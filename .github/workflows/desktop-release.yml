@@ -1,0 +1,194 @@
+name: desktop-release
+
+# Builds the Tauri desktop shell for Windows (x64 + arm64), macOS (arm64 +
+# Intel x64) and Linux, bundles the per-platform Node runtime + dsh closure
+# (scripts/bundle-runtime.mjs) and uploads the installers to a GitHub Release.
+# Each architecture row is its own job and artifact.
+#
+# Trigger: manual dispatch, or pushing a tag `v*` (the tauri-action creates
+# or updates the Release for that tag).
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_HTTP_CHECK_REVOKE: 'false'
+  # GitHub-hosted ubuntu-latest (24.04) has no FUSE; linuxdeploy and the
+  # appimage plugin must self-extract instead of mounting the AppImage.
+  APPIMAGE_EXTRACT_AND_RUN: '1'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x64 on the standard runner; Windows arm64 needs the
+          # native arm64 runner (an x64 host cannot run arm64 node, which is
+          # what drives native-dependency resolution in the closure).
+          - platform: windows-latest
+            runtime-platform: win
+            arch: x64
+            target: ''
+          - platform: windows-11-arm
+            runtime-platform: win
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+          # macOS arm64 is the default target on the arm64 runner; the Intel
+          # row bundles an x64 runtime (resolved under the bundled x64 node)
+          # and cross-compiles Rust.
+          - platform: macos-latest
+            runtime-platform: mac
+            arch: arm64
+            target: ''
+          - platform: macos-latest
+            runtime-platform: mac
+            arch: x64
+            target: x86_64-apple-darwin
+          - platform: ubuntu-latest
+            runtime-platform: linux
+            arch: x64
+            target: ''
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      # tauri-action creates the draft Release and uploads installers;
+      # actions:read lets the run's artifact downloads work from the UI.
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Tauri dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libfuse2 squashfs-tools
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Add cross-arch Rust target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build repository artifacts (lib + web dist)
+        run: pnpm run build
+
+      - name: Bundle Node runtime + dsh closure
+        working-directory: apps/desktop
+        run: node scripts/bundle-runtime.mjs --platform ${{ matrix.runtime-platform }} --arch ${{ matrix.arch }}
+
+      # Cross-arch bundles silently produce broken closures when any native
+      # module resolves for the wrong architecture (an x64 node loading an
+      # arm64 .node crashes at startup). `file` the bundled node and every
+      # native module and fail loudly on a mismatch.
+      - name: Verify closure architecture
+        if: matrix.platform == 'macos-latest' || matrix.platform == 'ubuntu-latest'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          EXPECTED="${{ matrix.arch }}"
+          # lipo lists every arch of a Mach-O (universal binaries carry both
+          # and are valid for either target); the file fallback serves Linux,
+          # where the binary reports x86_64 (mapped to the matrix's x64).
+          # The step runs with `set -e -o pipefail`, so a failing lipo must
+          # not abort mid-loop: fall back to file and neutralize the exit.
+          archs_of() {
+            local raw
+            if command -v lipo >/dev/null 2>&1; then
+              raw=$(lipo -archs "$1" 2>/dev/null) || raw=$(file -b "$1")
+            else
+              raw=$(file -b "$1")
+            fi
+            # Linux `file` prints x86-64 (hyphen), macOS lipo prints x86_64.
+            echo "$raw" | grep -oE 'x86[_-]64|arm64' | head -1 | sed 's/x86[_-]64/x64/'
+          }
+          node_arch=$(archs_of runtime/node/node || true)
+          echo "runtime node arch: $node_arch (expected $EXPECTED)"
+          echo "$node_arch" | grep -qw "$EXPECTED" || { echo "ERROR: node arch mismatch"; exit 1; }
+          bad=0
+          for f in $(find runtime/dsh/node_modules -name '*.node'); do
+            a=$(archs_of "$f" || true)
+            echo "  $(basename "$f") -> $a"
+            # An unidentifiable file cannot be loaded by node, so it cannot
+            # crash startup; only a KNOWN foreign arch is a failure.
+            if [ -n "$a" ]; then
+              echo "$a" | grep -qw "$EXPECTED" || { echo "  FOREIGN: $f"; bad=1; }
+            fi
+          done
+          test "$bad" -eq 0
+
+      # The tauri CLI runs a workspace-level `pnpm install --production` deps
+      # check that executes the repo root postinstall (lefthook) and fails
+      # without devDependencies. Hide the workspace declarations around the
+      # tauri build; the shell has no workspace memberships of its own.
+      - name: Hide workspace root from tauri deps check
+        shell: bash
+        run: |
+          mv pnpm-workspace.yaml pnpm-workspace.yaml.bak
+          node -e 'const fs=require("fs");const p="package.json";const j=JSON.parse(fs.readFileSync(p,"utf8"));delete j.workspaces;fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")'
+
+      - name: Build Tauri app
+        if: matrix.platform == 'macos-latest'
+        working-directory: apps/desktop
+        run: pnpm tauri build --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
+
+      - name: Build Tauri app and upload to Release
+        if: matrix.platform != 'macos-latest'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: v__VERSION__
+          releaseName: 'DeepSeek Harness Desktop v__VERSION__'
+          releaseBody: |
+            Tauri 桌面客户端，内置 Node 运行时与 dsh（四预设 standard / minimal / code / cordis 完整保留）。
+            首次启动向导默认安装插件中心与 Windows 终端检测，可选 IM 频道（企微/飞书/钉钉/微信/QQ）等插件。
+          releaseDraft: true
+          prerelease: false
+          args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+            apps/desktop/src-tauri/target/*/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/*/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/*/release/bundle/deb/*.deb
+            apps/desktop/src-tauri/target/*/release/bundle/dmg/*.dmg
+
+      - name: Restore workspace declarations
+        if: always()
+        shell: bash
+        run: |
+          [ -f pnpm-workspace.yaml.bak ] && mv -f pnpm-workspace.yaml.bak pnpm-workspace.yaml || true
+          git checkout -- package.json

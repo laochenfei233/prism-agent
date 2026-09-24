@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="100%">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5856D6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#F5F5F7"/>
+  
+  <!-- Section title -->
+  <text x="600" y="60" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="36" font-weight="700" fill="#1D1D1F" text-anchor="middle">核心功能</text>
+  
+  <!-- Feature cards -->
+  <g transform="translate(100, 100)">
+    <!-- Card 1: AI Agent -->
+    <rect x="0" y="0" width="300" height="200" rx="16" fill="white" stroke="#E5E5EA" stroke-width="1"/>
+    <text x="150" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#1D1D1F" text-anchor="middle">智能代理</text>
+    <text x="150" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">多种预定义角色</text>
+    <text x="150" y="100" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">产品经理 · 策略分析师</text>
+    <text x="150" y="130" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">内容运营 · 社群运营</text>
+    <text x="150" y="160" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">自定义角色支持</text>
+  </g>
+  
+  <g transform="translate(450, 100)">
+    <!-- Card 2: Tools -->
+    <rect x="0" y="0" width="300" height="200" rx="16" fill="white" stroke="#E5E5EA" stroke-width="1"/>
+    <text x="150" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#1D1D1F" text-anchor="middle">工具集成</text>
+    <text x="150" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">文件查找</text>
+    <text x="150" y="100" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">知识查找</text>
+    <text x="150" y="130" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI", Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">网络查找</text>
+    <text x="150" y="160" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">浏览器控制</text>
+  </g>
+  
+  <g transform="translate(800, 100)">
+    <!-- Card 3: MCP -->
+    <rect x="0" y="0" width="300" height="200" rx="16" fill="white" stroke="#E5E5EA" stroke-width="1"/>
+    <text x="150" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#1D1D1F" text-anchor="middle">MCP 支持</text>
+    <text x="150" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">Model Context Protocol</text>
+    <text x="150" y="100" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">浏览器 MCP 服务器</text>
+    <text x="150" y="130" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">工具扩展</text>
+    <text x="150" y="160" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#86868B" text-anchor="middle">标准化接口</text>
+  </g>
+  
+  <!-- Architecture diagram -->
+  <g transform="translate(100, 350)">
+    <rect x="0" y="0" width="1000" height="500" rx="16" fill="white" stroke="#E5E5EA" stroke-width="1"/>
+    <text x="500" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="600" fill="#1D1D1F" text-anchor="middle">系统架构</text>
+    
+    <!-- Architecture diagram content -->
+    <g transform="translate(100, 80)">
+      <!-- Renderer -->
+      <rect x="0" y="0" width="200" height="100" rx="12" fill="#007AFF" opacity="0.1" stroke="#007AFF" stroke-width="1"/>
+      <text x="100" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#007AFF" text-anchor="middle">渲染进程</text>
+      <text x="100" y="60" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">React UI</text>
+      <text x="100" y="80" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">AI 对话界面</text>
+    </g>
+    
+    <g transform="translate(400, 80)">
+      <!-- Main process -->
+      <rect x="0" y="0" width="200" height="100" rx="12" fill="#5856D6" opacity="0.1" stroke="#5856D6" stroke-width="1"/>
+      <text x="100" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#5856D6" text-anchor="middle">主进程</text>
+      <text x="100" y="60" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">AiStreamManager</text>
+      <text x="100" y="80" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">工具执行引擎</text>
+    </g>
+    
+    <g transform="translate(700, 80)">
+      <!-- External services -->
+      <rect x="0" y="0" width="200" height="100" rx="12" fill="#34C759" opacity="0.1" stroke="#34C759" stroke-width="1"/>
+      <text x="100" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#34C759" text-anchor="middle">AI 提供商</text>
+      <text x="100" y="60" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">OpenAI · Anthropic</text>
+      <text x="100" y="80" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">Google · MiMo</text>
+    </g>
+    
+    <!-- Arrows -->
+    <line x1="300" y1="130" x2="400" y2="130" stroke="#86868B" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="600" y1="130" x2="700" y2="130" stroke="#86868B" stroke-width="2" marker-end="url(#arrowhead)"/>
+    
+    <!-- Data flow -->
+    <text x="350" y="160" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">IPC</text>
+    <text x="650" y="160" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">API 调用</text>
+    
+    <!-- Tools layer -->
+    <g transform="translate(100, 220)">
+      <rect x="0" y="0" width="800" height="100" rx="12" fill="#FF9500" opacity="0.1" stroke="#FF9500" stroke-width="1"/>
+      <text x="400" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#FF9500" text-anchor="middle">工具层</text>
+      <text x="200" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">文件查找</text>
+      <text x="400" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">知识查找</text>
+      <text x="600" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">网络查找</text>
+    </g>
+    
+    <!-- MCP layer -->
+    <g transform="translate(100, 350)">
+      <rect x="0" y="0" width="800" height="100" rx="12" fill="#AF52DE" opacity="0.1" stroke="#AF52DE" stroke-width="1"/>
+      <text x="400" y="40" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#AF52DE" text-anchor="middle">MCP 服务器</text>
+      <text x="200" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">浏览器控制</text>
+      <text x="400" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">文件系统</text>
+      <text x="600" y="70" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#86868B" text-anchor="middle">数据库</text>
+    </g>
+    
+    <!-- Arrows to tools -->
+    <line x1="500" y1="180" x2="500" y2="220" stroke="#86868B" stroke-width="2" marker-end="url(#arrowhead)"/>
+    
+    <!-- Arrows to MCP -->
+    <line x1="500" y1="320" x2="500" y2="350" stroke="#86868B" stroke-width="2" marker-end="url(#arrowhead)"/>
+  </g>
+</svg>

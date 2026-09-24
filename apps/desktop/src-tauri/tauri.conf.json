@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DeepSeek Harness Desktop",
+  "version": "0.1.1-rc.2",
+  "identifier": "ai.deepseek.harness.desktop",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "beforeBuildCommand": "node --version"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DeepSeek Harness",
+        "url": "index.html",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "create": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; frame-src http://127.0.0.1:*; connect-src http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' http://127.0.0.1:* data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "dmg",
+      "appimage",
+      "deb"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../runtime": "runtime"
+    },
+    "category": "DeveloperTool",
+    "shortDescription": "DeepSeek Harness desktop client",
+    "longDescription": "A standalone desktop client for DeepSeek Harness (dsh). Embeds the dsh web UI in a native window with a bundled Node runtime."
+  },
+  "plugins": {}
+}

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="100%">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#5856D6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#AF52DE;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.15" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.05" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#007AFF;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#007AFF;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#000000"/>
+  
+  <!-- Gradient mesh background -->
+  <rect x="0" y="0" width="1200" height="630" fill="url(#gradient)" opacity="0.1"/>
+  
+  <!-- Glow effect -->
+  <circle cx="600" cy="315" r="300" fill="url(#glow)"/>
+  
+  <!-- Glass card -->
+  <rect x="100" y="100" width="1000" height="430" rx="24" fill="url(#glass)" stroke="#ffffff" stroke-width="0.5" opacity="0.9"/>
+  
+  <!-- AI Brain icon -->
+  <g transform="translate(600, 200)">
+    <circle cx="0" cy="0" r="40" fill="none" stroke="#007AFF" stroke-width="2" opacity="0.8"/>
+    <circle cx="0" cy="0" r="30" fill="none" stroke="#5856D6" stroke-width="1.5" opacity="0.6"/>
+    <circle cx="0" cy="0" r="20" fill="none" stroke="#AF52DE" stroke-width="1" opacity="0.4"/>
+    <circle cx="0" cy="0" r="8" fill="#007AFF" opacity="0.9"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="300" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="700" fill="#ffffff" text-anchor="middle">Prism Agent</text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="350" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="400" fill="#86868B" text-anchor="middle">Apple Design AI Assistant</text>
+  
+  <!-- Value proposition -->
+  <text x="600" y="400" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#ffffff" text-anchor="middle">智能代理 · 工具集成 · MCP 支持 · 多提供商</text>
+  
+  <!-- Features -->
+  <text x="600" y="440" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400" fill="#86868B" text-anchor="middle">文件查找 · 知识查找 · 网络查找 · 浏览器控制 · 会议纪要</text>
+  
+  <!-- Tech stack -->
+  <text x="600" y="480" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#86868B" text-anchor="middle">Electron · React · TypeScript · Vercel AI SDK · MCP Protocol</text>
+</svg>

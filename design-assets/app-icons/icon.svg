@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6900"/>
+      <stop offset="100%" style="stop-color:#E85D00"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Letter M - geometric sharp style -->
+  <path d="M 120 380 L 120 132 L 210 280 L 256 180 L 302 280 L 392 132 L 392 380 L 340 380 L 340 220 L 302 300 L 256 200 L 210 300 L 172 220 L 172 380 Z" 
+        fill="white" 
+        stroke="none"/>
+  <!-- Small accent dot -->
+  <circle cx="420" cy="132" r="24" fill="white" opacity="0.9"/>
+</svg>
