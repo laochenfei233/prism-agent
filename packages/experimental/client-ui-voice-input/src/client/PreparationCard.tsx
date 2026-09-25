@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Button, DisclosureRow, IconChevronDownOutlineRegular, StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SpeechPreparationState, SpeechProviderId, SpeechProviderView, SpeechSelectionPatch } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
+import type { SpeechPreparationState, SpeechProviderId, SpeechProviderView, SpeechSelectionPatch } from '@deepseek-ai/dsh-speech-to-text/types'
 import type { VoiceInputInjected } from './VoiceInput.tsx'
 import { NS } from './locales.ts'
 import css from './VoiceInput.module.css'

@@ -598,9 +598,9 @@ importers:
       '@deepseek-ai/dsh-experimental-auto-review':
         specifier: workspace:*
         version: link:../../packages/experimental/auto-review
-      '@deepseek-ai/dsh-experimental-speech-to-text':
+      '@deepseek-ai/dsh-speech-to-text':
         specifier: workspace:*
-        version: link:../../packages/experimental/speech-to-text
+        version: link:../../packages/speech/speech-to-text
       '@deepseek-ai/dsh-experimental-voice-input-bundle':
         specifier: workspace:*
         version: link:../../packages/experimental/voice-input-bundle
@@ -1759,6 +1759,12 @@ importers:
       '@deepseek-ai/dsh-deepseek-llm-api-extensions':
         specifier: workspace:*
         version: link:../../llm/deepseek-llm-api-extensions
+      '@deepseek-ai/dsh-speech-to-text':
+        specifier: workspace:*
+        version: link:../../speech/speech-to-text
+      '@deepseek-ai/dsh-speech-to-text-dashscope':
+        specifier: workspace:*
+        version: link:../../speech/speech-to-text-dashscope
       '@deepseek-ai/dsh-fs-local':
         specifier: workspace:*
         version: link:../../fs/fs-local
@@ -1795,6 +1801,9 @@ importers:
       '@deepseek-ai/dsh-mcp-resources':
         specifier: workspace:*
         version: link:../../mcp/mcp-resources
+      '@deepseek-ai/dsh-meeting-minutes':
+        specifier: workspace:*
+        version: link:../../meetings/meeting-minutes
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../../interaction/permission-presets
@@ -1918,6 +1927,9 @@ importers:
       '@deepseek-ai/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../jobs/tool-jobs
+      '@deepseek-ai/dsh-tool-meeting-minutes':
+        specifier: workspace:*
+        version: link:../../meetings/tool-meeting-minutes
       '@deepseek-ai/dsh-tool-present':
         specifier: workspace:*
         version: link:../../deliverables/tool-present
@@ -6778,9 +6790,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
-      '@deepseek-ai/dsh-experimental-speech-to-text':
+      '@deepseek-ai/dsh-speech-to-text':
         specifier: workspace:*
-        version: link:../speech-to-text
+        version: link:../../speech/speech-to-text
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:*
         version: link:../../typert/protocol
@@ -7197,9 +7209,9 @@ importers:
       '@deepseek-ai/dsh-experimental-api-speech-to-text':
         specifier: workspace:*
         version: link:../api-speech-to-text
-      '@deepseek-ai/dsh-experimental-speech-to-text':
+      '@deepseek-ai/dsh-speech-to-text':
         specifier: workspace:*
-        version: link:../speech-to-text
+        version: link:../../speech/speech-to-text
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session
@@ -7385,7 +7397,7 @@ importers:
         specifier: workspace:*
         version: link:../../util/values
 
-  packages/experimental/speech-to-text:
+  packages/speech/speech-to-text:
     dependencies:
       '@deepseek-ai/dsh-brand':
         specifier: workspace:*
@@ -7410,6 +7422,37 @@ importers:
         specifier: workspace:*
         version: link:../../settings/settings
 
+  packages/speech/speech-to-text-dashscope:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:*
+        version: link:../../credentials/credentials
+      '@deepseek-ai/dsh-credentials-local':
+        specifier: workspace:*
+        version: link:../../credentials/credentials-local
+      '@deepseek-ai/dsh-speech-to-text':
+        specifier: workspace:*
+        version: link:../speech-to-text
+      '@deepseek-ai/dsh-launch-environment':
+        specifier: workspace:*
+        version: link:../../util/launch-environment
+      '@deepseek-ai/dsh-timeout':
+        specifier: workspace:*
+        version: link:../../util/timeout
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.0
+
   packages/experimental/speech-to-text-sensevoice:
     dependencies:
       '@deepseek-ai/dsh-timeout':
@@ -7428,9 +7471,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
-      '@deepseek-ai/dsh-experimental-speech-to-text':
+      '@deepseek-ai/dsh-speech-to-text':
         specifier: workspace:*
-        version: link:../speech-to-text
+        version: link:../../speech/speech-to-text
       '@deepseek-ai/dsh-subprocess':
         specifier: workspace:*
         version: link:../../subprocess/subprocess
@@ -7510,9 +7553,9 @@ importers:
       '@deepseek-ai/dsh-experimental-client-ui-voice-input':
         specifier: workspace:*
         version: link:../client-ui-voice-input
-      '@deepseek-ai/dsh-experimental-speech-to-text':
+      '@deepseek-ai/dsh-speech-to-text':
         specifier: workspace:*
-        version: link:../speech-to-text
+        version: link:../../speech/speech-to-text
       '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice':
         specifier: workspace:*
         version: link:../speech-to-text-sensevoice
@@ -9402,6 +9445,49 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+
+  packages/meetings/meeting-minutes:
+    dependencies:
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-speech-to-text':
+        specifier: workspace:*
+        version: link:../../speech/speech-to-text
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: workspace:*
+        version: link:../../storage/storage-domain
+
+  packages/meetings/tool-meeting-minutes:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-meeting-minutes':
+        specifier: workspace:*
+        version: link:../meeting-minutes
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -13433,6 +13519,12 @@ importers:
       '@deepseek-ai/dsh-deepseek-llm-api-extensions':
         specifier: workspace:*
         version: link:../../packages/llm/deepseek-llm-api-extensions
+      '@deepseek-ai/dsh-speech-to-text':
+        specifier: workspace:*
+        version: link:../../packages/speech/speech-to-text
+      '@deepseek-ai/dsh-speech-to-text-dashscope':
+        specifier: workspace:*
+        version: link:../../packages/speech/speech-to-text-dashscope
       '@deepseek-ai/dsh-fs':
         specifier: workspace:*
         version: link:../../packages/fs/fs
@@ -13502,6 +13594,12 @@ importers:
       '@deepseek-ai/dsh-message-feedback':
         specifier: workspace:*
         version: link:../../packages/feedback/message-feedback
+      '@deepseek-ai/dsh-meeting-minutes':
+        specifier: workspace:*
+        version: link:../../packages/meetings/meeting-minutes
+      '@deepseek-ai/dsh-tool-meeting-minutes':
+        specifier: workspace:*
+        version: link:../../packages/meetings/tool-meeting-minutes
       '@deepseek-ai/dsh-output-retention':
         specifier: workspace:*
         version: link:../../packages/util/output-retention

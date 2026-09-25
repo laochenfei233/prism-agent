@@ -1,9 +1,9 @@
 ---
-description: "Named experimental transcription providers and cancellation ownership."
+description: "Named transcription providers and cancellation ownership."
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-experimental-speech-to-text
+# @deepseek-ai/dsh-speech-to-text
 
 English | [中文](README.zh.md)
 
@@ -25,7 +25,7 @@ This Service Definition selects named speech recognizers through `ctx.speechToTe
 <a id="use-this-package"></a>
 ## Use this package
 
-Load through the [voice input bundle](../voice-input-bundle/README.md), or compose the service with a provider and consumer. `defaultProvider` is required and selects an exact registered id; the bundle supplies `sensevoice-local`. `language` supplies the omitted language hint. A missing or duplicate provider fails explicitly.
+Load through the [voice input bundle](../../experimental/voice-input-bundle/README.md), or compose the service with a provider and consumer. `defaultProvider` is required and selects an exact registered id; the bundle supplies `sensevoice-local`. `language` supplies the omitted language hint. A missing or duplicate provider fails explicitly.
 
 Providers advertise preparation origins through `downloadSources`. `prepare(id, options)` forwards an optional `downloadSource` for one task; the provider validates the choice and refuses source changes during active preparation. Omission retains provider policy. Source choices are not persisted recognition preferences.
 

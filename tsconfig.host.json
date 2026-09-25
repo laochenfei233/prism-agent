@@ -181,9 +181,10 @@
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
-    { "path": "./packages/experimental/speech-to-text" },
+    { "path": "./packages/speech/speech-to-text" },
     { "path": "./packages/experimental/speech-to-text-sensevoice" },
     { "path": "./packages/experimental/api-speech-to-text" },
+    { "path": "./packages/speech/speech-to-text-dashscope" },
     { "path": "./packages/experimental/voice-input-bundle" },
     { "path": "./packages/client/locale/tsconfig.host.json" },
     { "path": "./packages/client/ui-theme/tsconfig.host.json" },
@@ -419,6 +420,8 @@
     { "path": "./packages/workflow/tool-ralph" },
     { "path": "./packages/webhook/webhook" },
     { "path": "./packages/webhook/webhook-github" },
+    { "path": "./packages/meetings/meeting-minutes" },
+    { "path": "./packages/meetings/tool-meeting-minutes" },
     { "path": "./packages/todo/tool-todo" },
     { "path": "./packages/plan/plan-mode" },
     { "path": "./packages/preset/agent-preset-registry" },

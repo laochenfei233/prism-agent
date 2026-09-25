@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-experimental-speech-to-text",
-  "description": "Experimental speech recognition with independently selectable providers",
+  "name": "@deepseek-ai/dsh-speech-to-text",
+  "description": "Speech recognition with independently selectable providers",
   "version": "0.1.7-rc.1",
   "publishConfig": {
     "access": "public"
@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/experimental/speech-to-text"
+    "directory": "packages/speech/speech-to-text"
   },
   "type": "module",
   "main": "lib/index.js",

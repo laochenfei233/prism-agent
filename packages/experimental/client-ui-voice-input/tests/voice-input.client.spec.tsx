@@ -6,7 +6,7 @@ import { bindSnapshotSelector, makeTranslate, RemoteError } from '@deepseek-ai/d
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SpeechProviderId, Transcript } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
+import type { SpeechProviderId, Transcript } from '@deepseek-ai/dsh-speech-to-text/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import { VoiceInput, type VoiceInputProps } from '../src/client/VoiceInput.tsx'
 import { RecordingError, Recording } from '../src/client/audio.ts'

@@ -45,7 +45,7 @@
       "path": "../api-speech-to-text"
     },
     {
-      "path": "../speech-to-text"
+      "path": "../../speech/speech-to-text"
     },
     {
       "path": "../../api/gateway/tsconfig.client.json"

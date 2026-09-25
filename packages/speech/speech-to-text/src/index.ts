@@ -11,7 +11,7 @@ export type * from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Experimental speech recognition provider registry. */
+    /** Speech recognition provider registry. */
     speechToText: SpeechToText
   }
 }

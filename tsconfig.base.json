@@ -37,13 +37,13 @@
       "@deepseek-ai/dsh-deepseek-account-platform/types": ["./packages/credentials/deepseek-account-platform/src/types.ts"],
       "@deepseek-ai/dsh-deepseek-account": ["./packages/credentials/deepseek-account/src/index.ts"],
       "@deepseek-ai/dsh-deepseek-account/types": ["./packages/credentials/deepseek-account/src/types.ts"],
-      "@deepseek-ai/dsh-experimental-speech-to-text": ["./packages/experimental/speech-to-text/src/index.ts"],
+      "@deepseek-ai/dsh-speech-to-text": ["./packages/speech/speech-to-text/src/index.ts"],
       "@deepseek-ai/dsh-experimental-speech-to-text-sensevoice": ["./packages/experimental/speech-to-text-sensevoice/src/index.ts"],
       "@deepseek-ai/dsh-experimental-api-speech-to-text": ["./packages/experimental/api-speech-to-text/src/index.ts"],
       "@deepseek-ai/dsh-experimental-client-ui-voice-input": ["./packages/experimental/client-ui-voice-input/src/index.ts"],
       "@deepseek-ai/dsh-experimental-voice-input-bundle": ["./packages/experimental/voice-input-bundle/src/index.ts"],
-      "@deepseek-ai/dsh-experimental-speech-to-text/wave": ["./packages/experimental/speech-to-text/src/wave.ts"],
-      "@deepseek-ai/dsh-experimental-speech-to-text/types": ["./packages/experimental/speech-to-text/src/types.ts"],
+      "@deepseek-ai/dsh-speech-to-text/wave": ["./packages/speech/speech-to-text/src/wave.ts"],
+      "@deepseek-ai/dsh-speech-to-text/types": ["./packages/speech/speech-to-text/src/types.ts"],
       "@deepseek-ai/dsh-experimental-api-speech-to-text/types": ["./packages/experimental/api-speech-to-text/src/types.ts"],
       "@deepseek-ai/dsh-experimental-client-ui-voice-input/client": ["./packages/experimental/client-ui-voice-input/src/client/index.ts"],
 
@@ -189,6 +189,7 @@
       // here. The aggregates' project references (tsconfig.host.json /
       // tsconfig.client.json) stay explicit — TS project references have no
       // wildcard form.
+      "@deepseek-ai/dsh-speech-to-text-dashscope": ["./packages/speech/speech-to-text-dashscope/src"],
       "@deepseek-ai/dsh-host-directory-picker": ["./packages/host/directory-picker/src"],
       "@deepseek-ai/dsh-host-directory-picker/*": ["./packages/host/directory-picker/src/*"],
       "@deepseek-ai/dsh-host-directory-picker-browse": ["./packages/host/directory-picker-browse/src"],
@@ -403,6 +404,7 @@
       "@deepseek-ai/dsh-lsp-stdio": ["./packages/lsp/lsp-stdio/src"],
       "@deepseek-ai/dsh-mcp-client": ["./packages/mcp/mcp-client/src"],
       "@deepseek-ai/dsh-mcp-resources": ["./packages/mcp/mcp-resources/src"],
+      "@deepseek-ai/dsh-meeting-minutes": ["./packages/meetings/meeting-minutes/src"],
       "@deepseek-ai/dsh-message-feedback": ["./packages/feedback/message-feedback/src"],
       "@deepseek-ai/dsh-native-command": ["./packages/util/native-command/src"],
       "@deepseek-ai/dsh-office-to-pdf": ["./packages/document/office-to-pdf/src"],
@@ -503,6 +505,7 @@
       "@deepseek-ai/dsh-tool-goal": ["./packages/goal/tool-goal/src"],
       "@deepseek-ai/dsh-tool-jobs": ["./packages/jobs/tool-jobs/src"],
       "@deepseek-ai/dsh-tool-lsp": ["./packages/lsp/tool-lsp/src"],
+      "@deepseek-ai/dsh-tool-meeting-minutes": ["./packages/meetings/tool-meeting-minutes/src"],
       "@deepseek-ai/dsh-tool-present": ["./packages/deliverables/tool-present/src"],
       "@deepseek-ai/dsh-tool-pwsh-persistent": ["./packages/shell/tool-pwsh-persistent/src"],
       "@deepseek-ai/dsh-tool-ralph": ["./packages/workflow/tool-ralph/src"],
