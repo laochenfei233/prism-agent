@@ -63,6 +63,30 @@ export class MeetingLlmAdapter extends LlmAdapter {
     })
   }
 
+  /**
+   * Queue successful text whose cancellation is scheduled after the service observes the final chunk.
+   * @param text - Visible model response.
+   * @param cancel - Caller-side cancellation to invoke after model completion.
+   */
+  queueTextCancelledAfterCompletion(text: string, cancel: () => void): void {
+    const chunks: StreamChunk[] = [
+      { type: 'text-delta', index: 0, text },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ]
+    this.responses.push(() => ({
+      [Symbol.asyncIterator]() {
+        return {
+          next(): Promise<IteratorResult<StreamChunk>> {
+            const chunk = chunks.shift()
+            if (chunk !== undefined) return Promise.resolve({ value: chunk, done: false })
+            queueMicrotask(cancel)
+            return Promise.resolve({ value: undefined, done: true })
+          },
+        }
+      },
+    }))
+  }
+
   /** Queue a terminal model failure carrying the supplied message. */
   queueFailure(message: string): void {
     this.responses.push(async function* queuedFailure() {

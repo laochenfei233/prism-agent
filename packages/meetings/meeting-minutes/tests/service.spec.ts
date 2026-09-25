@@ -68,6 +68,13 @@ describe('meeting input validation', () => {
     expect(suite.service.list()).toHaveLength(1)
   })
 
+  it('rejects a negative audio duration before storage', async () => {
+    const { suite } = await created()
+    await expect(suite.service.createFromTranscript({ title: 'Negative', transcript: 'text', audioSeconds: -1 }))
+      .rejects.toThrow('meeting audioSeconds must not be negative')
+    expect(suite.service.list().map(record => record.title)).toEqual(['Planning'])
+  })
+
   it('enforces the configured transcript bound after trimming', async () => {
     const suite = await harness({ maxTranscriptChars: 10 })
     await expect(suite.service.createFromTranscript({ title: 'too long', transcript: 'x'.repeat(11) }))
@@ -98,6 +105,18 @@ describe('summaries', () => {
     const { suite, meeting } = await created()
     suite.llm.queueFailure('model unavailable')
     await expect(suite.service.summarize(meeting.id)).rejects.toThrow('model unavailable')
+    const stored = suite.pool.media.get('meeting_minutes')!.tables.get('meetings')!.get(String(meeting.id))
+    expect(stored).toMatchObject({ summary: null, status: 'transcribed' })
+    expect(suite.llm.requests).toHaveLength(1)
+  })
+
+  it('does not persist a summary cancelled after model completion', async () => {
+    const { suite, meeting } = await created()
+    const caller = new AbortController()
+    suite.llm.queueTextCancelledAfterCompletion('Late summary.', () => {
+      caller.abort(new Error('summary cancelled late'))
+    })
+    await expect(suite.service.summarize(meeting.id, caller.signal)).rejects.toThrow('summary cancelled late')
     const stored = suite.pool.media.get('meeting_minutes')!.tables.get('meetings')!.get(String(meeting.id))
     expect(stored).toMatchObject({ summary: null, status: 'transcribed' })
     expect(suite.llm.requests).toHaveLength(1)
@@ -139,6 +158,18 @@ describe('answers', () => {
     await suite.service.ask(other.id, { question: 'What happened?' })
     expect(suite.service.listAnswers(meeting.id)).toHaveLength(0)
     expect(suite.service.listAnswers(other.id)).toHaveLength(1)
+  })
+
+  it('does not persist an answer cancelled after model completion', async () => {
+    const { suite, meeting } = await created()
+    const caller = new AbortController()
+    suite.llm.queueTextCancelledAfterCompletion('Late answer.', () => {
+      caller.abort(new Error('answer cancelled late'))
+    })
+    await expect(suite.service.ask(meeting.id, { question: 'What happened?' }, caller.signal))
+      .rejects.toThrow('answer cancelled late')
+    expect(suite.service.listAnswers(meeting.id)).toHaveLength(0)
+    expect(suite.llm.requests).toHaveLength(1)
   })
 
   it('rejects missing meetings and unknown answer reads', async () => {

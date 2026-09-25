@@ -160,7 +160,9 @@ export default class MeetingMinutesService extends Service {
     return this.enqueueOperation(async (serviceSignal) => {
       const operationSignal = AbortSignal.any([serviceSignal, signal])
       operationSignal.throwIfAborted()
+      if (request.audioSeconds !== undefined && request.audioSeconds < 0) throw new Error('meeting audioSeconds must not be negative')
       const transcript = this.normalizeTranscript(request.transcript)
+      operationSignal.throwIfAborted()
       const now = new Date().toISOString()
       const record: StoredMeetingMinutesRecord = {
         id: brandString<MeetingMinutesId>(randomUUID()),
@@ -192,6 +194,7 @@ export default class MeetingMinutesService extends Service {
     signal: AbortSignal = new AbortController().signal,
   ): Promise<MeetingMinutesRecord> {
     this.lifetime.signal.throwIfAborted()
+    signal.throwIfAborted()
     if (request.audio.byteLength === 0) throw new Error('meeting audio must not be empty')
     const speechRequest = {
       audio: request.audio,
@@ -248,6 +251,7 @@ export default class MeetingMinutesService extends Service {
         operationSignal,
         this.config.summarySystemPrompt.get(),
       ))
+      operationSignal.throwIfAborted()
       const next = await this.requireTables().meetings.update(id, record => ({
         ...record,
         summary,
@@ -281,6 +285,7 @@ export default class MeetingMinutesService extends Service {
         operationSignal,
         this.config.answerSystemPrompt.get(),
       ))
+      operationSignal.throwIfAborted()
       const record: StoredMeetingAnswerRecord = {
         id: brandString<MeetingAnswerId>(randomUUID()),
         meetingId: id,

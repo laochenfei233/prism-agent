@@ -129,7 +129,7 @@ function createMeetingTools(minutes: MeetingMinutesService) {
         items: { type: 'string' },
       },
       transcript: { type: 'string', required: true, description: 'Complete meeting transcript.' },
-      audioSeconds: { type: 'number', description: 'Recognized-audio duration in seconds; omit for a text import.' },
+      audioSeconds: { type: 'number', description: 'Nonnegative recognized-audio duration in seconds; omit for a text import.' },
     },
     output: {
       schema: meetingResultSchema,
