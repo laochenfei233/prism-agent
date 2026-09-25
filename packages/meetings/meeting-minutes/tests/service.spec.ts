@@ -7,6 +7,28 @@ import { disposeRoots, harness } from './harness.ts'
 
 afterEach(disposeRoots)
 
+/**
+ * Complete model work, then cancel before the awaiting operation resumes.
+ * @param text - Completed model response.
+ * @param cancel - Caller cancellation callback.
+ * @returns the model completion as a cancellation-aware awaitable.
+ */
+function completedThenCancel(text: string, cancel: () => void): PromiseLike<string> & { finally: () => PromiseLike<string> } {
+  const completion = {
+    then<TResult1 = string, TResult2 = never>(
+      onFulfilled?: (value: string) => TResult1 | PromiseLike<TResult1>,
+    ): PromiseLike<TResult1 | TResult2> {
+      const settled = onFulfilled?.(text) ?? text
+      cancel()
+      return Promise.resolve(settled) as PromiseLike<TResult1 | TResult2>
+    },
+    finally(): PromiseLike<string> {
+      return completion
+    },
+  }
+  return completion
+}
+
 async function created(harnessOptions?: Parameters<typeof harness>[0]) {
   const suite = await harness(harnessOptions)
   const meeting = await suite.service.createFromTranscript({
@@ -113,13 +135,15 @@ describe('summaries', () => {
   it('does not persist a summary cancelled after model completion', async () => {
     const { suite, meeting } = await created()
     const caller = new AbortController()
-    suite.llm.queueTextCancelledAfterCompletion('Late summary.', () => {
-      caller.abort(new Error('summary cancelled late'))
+    Object.assign(suite.service, {
+      completeText: () => completedThenCancel('Late summary.', () => {
+        caller.abort(new Error('summary cancelled late'))
+      }),
     })
     await expect(suite.service.summarize(meeting.id, caller.signal)).rejects.toThrow('summary cancelled late')
     const stored = suite.pool.media.get('meeting_minutes')!.tables.get('meetings')!.get(String(meeting.id))
     expect(stored).toMatchObject({ summary: null, status: 'transcribed' })
-    expect(suite.llm.requests).toHaveLength(1)
+    expect(suite.llm.requests).toHaveLength(0)
   })
 
   it('rejects a missing meeting or already-cancelled call without dispatching', async () => {
@@ -163,13 +187,15 @@ describe('answers', () => {
   it('does not persist an answer cancelled after model completion', async () => {
     const { suite, meeting } = await created()
     const caller = new AbortController()
-    suite.llm.queueTextCancelledAfterCompletion('Late answer.', () => {
-      caller.abort(new Error('answer cancelled late'))
+    Object.assign(suite.service, {
+      completeText: () => completedThenCancel('Late answer.', () => {
+        caller.abort(new Error('answer cancelled late'))
+      }),
     })
     await expect(suite.service.ask(meeting.id, { question: 'What happened?' }, caller.signal))
       .rejects.toThrow('answer cancelled late')
     expect(suite.service.listAnswers(meeting.id)).toHaveLength(0)
-    expect(suite.llm.requests).toHaveLength(1)
+    expect(suite.llm.requests).toHaveLength(0)
   })
 
   it('rejects missing meetings and unknown answer reads', async () => {
@@ -234,6 +260,10 @@ describe('audio ingestion', () => {
 
   it('rejects empty audio and pre-cancelled recognition without invoking speech', async () => {
     const { suite, recognize } = await created()
+    await expect(suite.service.createFromAudio(
+      { title: 'Cancelled empty', audio: new Uint8Array() },
+      AbortSignal.abort(new Error('audio cancelled')),
+    )).rejects.toThrow('audio cancelled')
     await expect(suite.service.createFromAudio({ title: 'Empty', audio: new Uint8Array() }))
       .rejects.toThrow('meeting audio must not be empty')
     await expect(suite.service.createFromAudio(

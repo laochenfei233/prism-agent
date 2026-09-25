@@ -259,7 +259,7 @@
           },
           "audioSeconds": {
             "type": "number",
-            "description": "Recognized-audio duration in seconds; omit for a text import."
+            "description": "Nonnegative recognized-audio duration in seconds; omit for a text import."
           }
         },
         "required": [
