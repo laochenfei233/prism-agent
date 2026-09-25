@@ -72,6 +72,12 @@ flowchart LR
   cfg --> plugin_dsh_base_storage_json
   plugin_dsh_base_storage_domain["storage-domain<br/>@deepseek-ai/dsh-storage-domain"]
   cfg --> plugin_dsh_base_storage_domain
+  plugin_dsh_base_speech_to_text["speech-to-text<br/>@deepseek-ai/dsh-speech-to-text"]
+  cfg --> plugin_dsh_base_speech_to_text
+  plugin_dsh_base_speech_to_text_dashscope["speech-to-text-dashscope<br/>@deepseek-ai/dsh-speech-to-text-dashscope"]
+  cfg --> plugin_dsh_base_speech_to_text_dashscope
+  plugin_dsh_base_meeting_minutes["meeting-minutes<br/>@deepseek-ai/dsh-meeting-minutes"]
+  cfg --> plugin_dsh_base_meeting_minutes
   plugin_dsh_base_session_projection_cache["session-projection-cache<br/>@deepseek-ai/dsh-session-projection-cache"]
   cfg --> plugin_dsh_base_session_projection_cache
   plugin_dsh_base_session_telemetry_otel["session-telemetry-otel<br/>@deepseek-ai/dsh-session-telemetry-otel"]
@@ -166,6 +172,8 @@ flowchart LR
   cfg --> plugin_dsh_base_image_offload
   plugin_dsh_base_tool_todo["tool-todo<br/>@deepseek-ai/dsh-tool-todo"]
   cfg --> plugin_dsh_base_tool_todo
+  plugin_dsh_base_tool_meeting_minutes["tool-meeting-minutes<br/>@deepseek-ai/dsh-tool-meeting-minutes"]
+  cfg --> plugin_dsh_base_tool_meeting_minutes
   plugin_dsh_base_tool_goal["tool-goal<br/>@deepseek-ai/dsh-tool-goal"]
   cfg --> plugin_dsh_base_tool_goal
   plugin_dsh_base_tool_ralph["tool-ralph<br/>@deepseek-ai/dsh-tool-ralph"]
@@ -228,6 +236,9 @@ flowchart LR
 | `storage` | `@deepseek-ai/dsh-storage` |
 | `storage-json` | `@deepseek-ai/dsh-storage-json` |
 | `storage-domain` | `@deepseek-ai/dsh-storage-domain` |
+| `speech-to-text` | `@deepseek-ai/dsh-speech-to-text` |
+| `speech-to-text-dashscope` | `@deepseek-ai/dsh-speech-to-text-dashscope` |
+| `meeting-minutes` | `@deepseek-ai/dsh-meeting-minutes` |
 | `session-projection-cache` | `@deepseek-ai/dsh-session-projection-cache` |
 | `session-telemetry-otel` | `@deepseek-ai/dsh-session-telemetry-otel` |
 | `subprocess` | `@deepseek-ai/dsh-subprocess-local` |
@@ -275,6 +286,7 @@ flowchart LR
 | `tool-result-pruner` | `@deepseek-ai/dsh-compaction-tool-result-pruner` |
 | `image-offload` | `@deepseek-ai/dsh-compaction-image-offload` |
 | `tool-todo` | `@deepseek-ai/dsh-tool-todo` |
+| `tool-meeting-minutes` | `@deepseek-ai/dsh-tool-meeting-minutes` |
 | `tool-goal` | `@deepseek-ai/dsh-tool-goal` |
 | `tool-ralph` | `@deepseek-ai/dsh-tool-ralph` |
 | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |

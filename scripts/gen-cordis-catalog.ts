@@ -54,6 +54,7 @@ export { REGION_BEGIN, REGION_END }
  * errors, so the partition can never silently drift from the service API.
  */
 export const SERVICE_PAGE: Record<string, string> = {
+  meetingMinutes: 'meetings.md',
   speechToText: 'voice-input.md',
   speechController: 'voice-input.md',
   productTelemetry: 'product-telemetry.md',
@@ -653,6 +654,14 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TeamTaskView: 'agent-team.md',
   TeamProjection: 'agent-team.md',
   TeamMemberProjection: 'agent-team.md',
+  MeetingAnswerId: 'meetings.md',
+  MeetingAnswerRecord: 'meetings.md',
+  MeetingMinutesId: 'meetings.md',
+  MeetingMinutesRecord: 'meetings.md',
+  MeetingMinutesStatus: 'meetings.md',
+  AskMeetingMinutesRequest: 'meetings.md',
+  CreateMeetingFromAudioRequest: 'meetings.md',
+  CreateMeetingFromTranscriptRequest: 'meetings.md',
   TeamWaitResult: 'agent-team.md',
   UpdateTeamTaskRequest: 'agent-team.md',
   TokenMeasurement: 'token-meter.md',

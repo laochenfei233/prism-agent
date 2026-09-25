@@ -42,6 +42,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/message/queued`, `team/message/delivered`, `team/task`, `tool/result` | - | All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
+| `@deepseek-ai/dsh-tool-meeting-minutes` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
@@ -2357,6 +2358,130 @@ Record and update a structured task list for the current work. Send the ENTIRE l
 Source: [`packages/todo/tool-todo/src/index.ts`](../packages/todo/tool-todo/src/index.ts)
 
 todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.
+
+<a id="deepseek-aidsh-tool-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-tool-meeting-minutes`
+
+### `meeting_minutes_ask`
+
+Ask one question about a meeting and persist the question/answer exchange.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    },
+    "question": {
+      "type": "string",
+      "description": "The question to answer from the meeting transcript."
+    }
+  },
+  "required": [
+    "id",
+    "question"
+  ]
+}
+```
+
+Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_create`
+
+Create a durable meeting record from a complete transcript. Use this after transcript text is available.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short meeting title."
+    },
+    "participants": {
+      "type": "array",
+      "description": "Participant display names in meeting order.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Complete meeting transcript."
+    },
+    "audioSeconds": {
+      "type": "number",
+      "description": "Recognized-audio duration in seconds; omit for a text import."
+    }
+  },
+  "required": [
+    "title",
+    "transcript"
+  ]
+}
+```
+
+Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_get`
+
+Read one durable meeting, including its transcript and current summary.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_list`
+
+List durable meetings without their transcripts. Read one meeting when its transcript is needed.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_summarize`
+
+Generate and persist a summary for one meeting using the deployment-configured meeting model.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies.
 
 <a id="deepseek-aidsh-tool-workflow"></a>
 

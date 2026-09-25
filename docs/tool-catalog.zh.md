@@ -46,6 +46,7 @@
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 9 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
+| `@deepseek-ai/dsh-tool-meeting-minutes` | `meeting_minutes_ask`、`meeting_minutes_create`、`meeting_minutes_get`、`meeting_minutes_list`、`meeting_minutes_summarize` | `ctx.tools`、`ctx.meetingMinutes` | `meeting-minutes storage`、`tool/result` | - | 五个显式持久会议操作。目录只桩化服务身份，因为 schema 收集从不执行；实时执行需要会议服务及其配置的存储、语音和 LLM 依赖。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
@@ -2364,6 +2365,130 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 来源：[`packages/todo/tool-todo/src/index.ts`](../packages/todo/tool-todo/src/index.ts)
 
 todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。
+
+<a id="deepseek-aidsh-tool-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-tool-meeting-minutes`
+
+### `meeting_minutes_ask`
+
+就一个会议提出一个问题，并持久化问答记录。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    },
+    "question": {
+      "type": "string",
+      "description": "The question to answer from the meeting transcript."
+    }
+  },
+  "required": [
+    "id",
+    "question"
+  ]
+}
+```
+
+来源：[`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_create`
+
+用完整转写创建持久会议记录。转写文本可用后使用此工具。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short meeting title."
+    },
+    "participants": {
+      "type": "array",
+      "description": "Participant display names in meeting order.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Complete meeting transcript."
+    },
+    "audioSeconds": {
+      "type": "number",
+      "description": "Recognized-audio duration in seconds; omit for a text import."
+    }
+  },
+  "required": [
+    "title",
+    "transcript"
+  ]
+}
+```
+
+来源：[`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_get`
+
+读取一个持久会议，包括其转写和当前摘要。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_list`
+
+列出持久会议，但不返回转写。需要转写时读取一个会议。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+### `meeting_minutes_summarize`
+
+使用部署配置的会议模型为一个会议生成并持久化摘要。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+
+五个显式持久会议操作。目录只桩化服务身份，因为 schema 收集从不执行；实时执行需要会议服务及其配置的存储、语音和 LLM 依赖。
 
 <a id="deepseek-aidsh-tool-workflow"></a>
 

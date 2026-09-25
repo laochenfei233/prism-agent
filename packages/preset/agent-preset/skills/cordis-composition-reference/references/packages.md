@@ -186,7 +186,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | no | Experimental computer-use provider embedding the Cua Driver native npm SDK |
 | `@deepseek-ai/dsh-experimental-inspector` | yes | Experimental cross-realm CDP hub for Host debugging and Client Runtime inspection |
 | `@deepseek-ai/dsh-experimental-ptc-runtime-python` | yes | CPython subprocess implementation of the DeepSeek Harness PTC execution seam |
-| `@deepseek-ai/dsh-experimental-speech-to-text` | yes | Experimental speech recognition with independently selectable providers |
 | `@deepseek-ai/dsh-experimental-speech-to-text-sensevoice` | yes | Local SenseVoice ONNX transcription with a managed sherpa-onnx process |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | yes | Scoped model-facing Agent Teams tools over ctx.agentTeams |
 
@@ -297,6 +296,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
 | `@deepseek-ai/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
 
+## meetings
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-meeting-minutes` | yes | Durable meeting records, transcription ingestion, summaries, and persisted meeting answers (ctx.meetingMinutes) |
+| `@deepseek-ai/dsh-tool-meeting-minutes` | no | Model-facing meeting list, retrieval, creation, summary, and question tools over ctx.meetingMinutes |
+
 ## plan
 
 | Package | Config | Description |
@@ -396,6 +402,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-skill-office` | yes | Bundled Word, PowerPoint, and Excel workflows and structural checks |
 | `@deepseek-ai/dsh-tool-skill` | yes | Model-facing skill loading tool for the DeepSeek Harness |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | yes | The load_workspace_dependencies tool: absolute paths into a bundled Python, Node.js, and pnpm payload |
+
+## speech
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-speech-to-text` | yes | Speech recognition with independently selectable providers |
+| `@deepseek-ai/dsh-speech-to-text-dashscope` | yes | DashScope realtime duplex transcription provider for the DeepSeek Harness speech capability seam (ctx.speechToText) |
 
 ## spill
 

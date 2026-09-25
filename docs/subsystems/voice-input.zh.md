@@ -2,7 +2,7 @@
 
 [English](voice-input.md) | 中文
 
-实验性语音识别包含三个角色：[服务定义](../../packages/experimental/speech-to-text/README.zh.md)路由具名 Provider，[SenseVoice Provider](../../packages/experimental/speech-to-text-sensevoice/README.zh.md)拥有本地推理，[Remote 消费者](../../packages/experimental/api-speech-to-text/README.zh.md)服务浏览器。[可选 Bundle](../../packages/experimental/voice-input-bundle/README.zh.md)将它们与麦克风 UI 组合。
+语音输入包含三个角色：[服务定义](../../packages/speech/speech-to-text/README.zh.md)路由具名 Provider，[SenseVoice Provider](../../packages/experimental/speech-to-text-sensevoice/README.zh.md)拥有本地推理，[Remote 消费者](../../packages/experimental/api-speech-to-text/README.zh.md)服务浏览器。[可选 Bundle](../../packages/experimental/voice-input-bundle/README.zh.md)将它们与麦克风 UI 组合。
 
 ## Provider 选择
 
@@ -160,5 +160,5 @@ resolve(request: SpeechRequest): SpeechSpec
 async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>
 ```
 
-Source: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)
+Source: [`packages/speech/speech-to-text/src/index.ts`](../../packages/speech/speech-to-text/src/index.ts)
 <!-- END GENERATED cordis-surface -->

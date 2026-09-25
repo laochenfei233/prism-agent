@@ -996,24 +996,6 @@ export interface Config {
 
 Source: [`packages/experimental/ptc-runtime-python/src/index.ts:42`](../packages/experimental/ptc-runtime-python/src/index.ts)
 
-<a id="deepseek-aidsh-experimental-speech-to-text"></a>
-
-## `@deepseek-ai/dsh-experimental-speech-to-text`
-
-```ts config-catalog
-/** Live selection read before a transcription starts; `configure()` writes it through the profile. */
-export interface Config {
-  /** Registered provider selected when the caller omits an id. */
-  defaultProvider: Volatile<string>
-  /** Provider language hint selected when the caller omits one. */
-  language: Volatile<string>
-}
-```
-
-Depends on: `Volatile` (`@deepseek-ai/cordis`)
-
-Source: [`packages/experimental/speech-to-text/src/index.ts:20`](../packages/experimental/speech-to-text/src/index.ts)
-
 <a id="deepseek-aidsh-experimental-speech-to-text-sensevoice"></a>
 
 ## `@deepseek-ai/dsh-experimental-speech-to-text-sensevoice`
@@ -2011,6 +1993,32 @@ export interface ReconnectConfig {
 
 Source: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
 
+<a id="deepseek-aidsh-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-meeting-minutes`
+
+Requires: `storageDomain` · `speechToText` · `llm`
+
+```ts config-catalog
+/** Deployment-owned model and bound choices; there are no service-level model defaults. */
+export interface Config {
+  /** Registered LLM provider used for summaries and meeting questions. */
+  summaryProvider: Volatile<string>
+  /** Registered model id used for summaries and meeting questions. */
+  summaryModel: Volatile<string>
+  /** System prompt that establishes summary behavior. */
+  summarySystemPrompt: Volatile<string>
+  /** System prompt that establishes meeting-question behavior. */
+  answerSystemPrompt: Volatile<string>
+  /** Maximum accepted transcript length in Unicode code units. */
+  maxTranscriptChars: Volatile<number>
+}
+```
+
+Depends on: `Volatile` (`@deepseek-ai/cordis`)
+
+Source: [`packages/meetings/meeting-minutes/src/index.ts:33`](../packages/meetings/meeting-minutes/src/index.ts)
+
 <a id="deepseek-aidsh-message-feedback"></a>
 
 ## `@deepseek-ai/dsh-message-feedback`
@@ -2774,6 +2782,58 @@ export interface Config {
 ```
 
 Source: [`packages/skill/skill-office/src/index.ts:16`](../packages/skill/skill-office/src/index.ts)
+
+<a id="deepseek-aidsh-speech-to-text"></a>
+
+## `@deepseek-ai/dsh-speech-to-text`
+
+```ts config-catalog
+/** Live selection read before a transcription starts; `configure()` writes it through the profile. */
+export interface Config {
+  /** Registered provider selected when the caller omits an id. */
+  defaultProvider: Volatile<string>
+  /** Provider language hint selected when the caller omits one. */
+  language: Volatile<string>
+}
+```
+
+Depends on: `Volatile` (`@deepseek-ai/cordis`)
+
+Source: [`packages/speech/speech-to-text/src/index.ts:20`](../packages/speech/speech-to-text/src/index.ts)
+
+<a id="deepseek-aidsh-speech-to-text-dashscope"></a>
+
+## `@deepseek-ai/dsh-speech-to-text-dashscope`
+
+Requires: `speechToText`
+
+```ts config-catalog
+/** Plugin configuration; every field is resolved before the provider is registered. */
+export interface Config {
+  /** Literal DashScope key; prefer {@link Config.apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference holding the key; defaults to `DASHSCOPE_API_KEY`. */
+  apiKeyEnv: string
+  /** Registration identity this recognizer occupies. */
+  providerId: string
+  /** Language hints this recognizer accepts. */
+  languages: string[]
+  /** Duplex recognition endpoint. */
+  url: string
+  /** Realtime recognition model name. */
+  model: string
+  /** Whether the model labels speakers in its results. */
+  speakerDiarization: boolean
+  /** Maximum accepted recording duration in seconds. */
+  maxDurationSeconds: number
+  /** Deadline, in milliseconds, covering connect, upload, and result accumulation. */
+  timeoutMs: number
+  /** Deadline, in milliseconds, for the results sent after `task-finish`. */
+  drainTimeoutMs: number
+}
+```
+
+Source: [`packages/speech/speech-to-text-dashscope/src/index.ts:42`](../packages/speech/speech-to-text-dashscope/src/index.ts)
 
 <a id="deepseek-aidsh-spill-local"></a>
 
@@ -4204,6 +4264,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@deepseek-ai/dsh-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
+- `@deepseek-ai/dsh-tool-meeting-minutes` — requires `tools` · `meetingMinutes` ([`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts))
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@deepseek-ai/dsh-webhook` — requires `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` ([`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts))

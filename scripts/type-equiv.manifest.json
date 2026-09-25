@@ -2251,6 +2251,46 @@
       "doc": "docs/subsystems/product-telemetry.md",
       "symbol": "ProductTelemetryRecord",
       "source": "packages/host/product-telemetry-otel/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingMinutesId",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingAnswerId",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingMinutesStatus",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingMinutesRecord",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingAnswerRecord",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "CreateMeetingFromTranscriptRequest",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "CreateMeetingFromAudioRequest",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "AskMeetingMinutesRequest",
+      "source": "packages/meetings/meeting-minutes/src/types.ts"
     }
   ]
 }

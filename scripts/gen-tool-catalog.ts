@@ -63,7 +63,9 @@ import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
 import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
+import type MeetingMinutesService from '@deepseek-ai/dsh-meeting-minutes'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import * as ToolMeetingMinutes from '@deepseek-ai/dsh-tool-meeting-minutes'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
@@ -629,6 +631,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-meeting-minutes',
+    dir: 'tool-meeting-minutes',
+    source: 'packages/meetings/tool-meeting-minutes/src/index.ts',
+    requires: ['ctx.tools', 'ctx.meetingMinutes'],
+    writes: ['meeting-minutes storage', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never executes a meeting operation or opens storage.
+      ctx.provide('meetingMinutes', {} as MeetingMinutesService)
+      await ctx.plugin(ToolMeetingMinutes)
+    },
+    note:
+      'Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-workflow',

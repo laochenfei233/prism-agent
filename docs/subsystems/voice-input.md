@@ -2,7 +2,7 @@
 
 English | [中文](voice-input.zh.md)
 
-Experimental speech recognition has three roles: the [Service Definition](../../packages/experimental/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes them with the microphone UI.
+Voice input has three roles: the [Service Definition](../../packages/speech/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes them with the microphone UI.
 
 ## Provider selection
 
@@ -160,5 +160,5 @@ resolve(request: SpeechRequest): SpeechSpec
 async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>
 ```
 
-Source: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)
+Source: [`packages/speech/speech-to-text/src/index.ts`](../../packages/speech/speech-to-text/src/index.ts)
 <!-- END GENERATED cordis-surface -->
