@@ -1468,6 +1468,61 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'meetingMinutes',
+    summary: 'Durable meeting service.',
+    description: 'Durable meeting service. Mutations serialize so dependent deletes and answers remain consistent.',
+    methods: [
+      {
+        signature: 'createFromTranscript( request: CreateMeetingFromTranscriptRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Create a meeting from text without invoking speech recognition.',
+        parameters: [{ name: 'request', description: 'Title, optional participants, transcript, and audio duration.' }, { name: 'signal', description: 'Caller cancellation before the durable write.' }],
+        returns: 'the durable record after storage settles.',
+      },
+      {
+        signature: 'async createFromAudio( request: CreateMeetingFromAudioRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Transcribe one complete recording with the explicitly resolved speech provider, then persist its text as a new meeting.',
+        parameters: [{ name: 'request', description: 'Title, optional participants, complete WAV audio, and optional speech selection.' }, { name: 'signal', description: 'Caller cancellation for recognition and the durable write.' }],
+        returns: 'the durable record after transcription and storage settle.',
+      },
+      {
+        signature: 'list(): MeetingMinutesRecord[]',
+        description: 'Read meetings in newest-first creation order.',
+        parameters: [],
+        returns: 'a fresh array of public records.',
+      },
+      {
+        signature: 'get(id: MeetingMinutesId): MeetingMinutesRecord',
+        description: 'Read one meeting.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }],
+        returns: 'the public record.',
+      },
+      {
+        signature: 'summarize(id: MeetingMinutesId, signal: AbortSignal = new AbortController().signal): Promise<MeetingMinutesRecord>',
+        description: 'Generate and persist the meeting summary. A model or cancellation failure leaves the existing record unchanged.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'signal', description: 'Caller cancellation for the model call and durable write.' }],
+        returns: 'the summarized record.',
+      },
+      {
+        signature: 'ask( id: MeetingMinutesId, request: AskMeetingMinutesRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingAnswerRecord>',
+        description: 'Ask one question about a meeting, return its answer, and persist the exchange.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'request', description: 'The nonempty question.' }, { name: 'signal', description: 'Caller cancellation for the model call and durable write.' }],
+        returns: 'the durable answer record.',
+      },
+      {
+        signature: 'listAnswers(id: MeetingMinutesId): MeetingAnswerRecord[]',
+        description: 'Read answers for one meeting in newest-first creation order.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }],
+        returns: 'a fresh array of answer records.',
+      },
+      {
+        signature: 'delete(id: MeetingMinutesId): Promise<boolean>',
+        description: 'Delete one meeting and all of its answers. Answer deletion precedes meeting deletion, so a failed answer write cannot orphan a missing meeting.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }],
+        returns: '`true` when the meeting existed, or `false` when it was already absent.',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Session-log service; cold operations never construct a Session or Agent.',
     description: 'Session-log service; cold operations never construct a Session or Agent.',
@@ -4354,6 +4409,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ArchiveSessionOptions {\n    readonly stopActivity?: boolean;\n}',
   },
   {
+    name: 'AskMeetingMinutesRequest',
+    declaration: 'export interface AskMeetingMinutesRequest {\n    readonly question: string;\n}',
+  },
+  {
     name: 'AskUserQuestionAnswer',
     declaration: 'export interface AskUserQuestionAnswer {\n    answers: AskUserQuestionAnswerItem[];\n}',
   },
@@ -4756,6 +4815,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CreateGoalResult',
     declaration: 'export interface CreateGoalResult {\n    readonly ref: GoalRef;\n}',
+  },
+  {
+    name: 'CreateMeetingFromAudioRequest',
+    declaration: 'export interface CreateMeetingFromAudioRequest {\n    readonly title: string;\n    readonly participants?: readonly string[];\n    readonly audio: Uint8Array;\n    readonly language?: string;\n    readonly providerId?: string;\n}',
+  },
+  {
+    name: 'CreateMeetingFromTranscriptRequest',
+    declaration: 'export interface CreateMeetingFromTranscriptRequest {\n    readonly title: string;\n    readonly participants?: readonly string[];\n    readonly transcript: string;\n    readonly audioSeconds?: number;\n}',
   },
   {
     name: 'CreateSessionOptions',
@@ -5440,6 +5507,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'McpResourceRequest',
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
+  },
+  {
+    name: 'MeetingAnswerId',
+    declaration: 'export type MeetingAnswerId = Branded<\'MeetingAnswerId\'>;',
+  },
+  {
+    name: 'MeetingAnswerRecord',
+    declaration: 'export interface MeetingAnswerRecord {\n    readonly id: MeetingAnswerId;\n    readonly meetingId: MeetingMinutesId;\n    readonly question: string;\n    readonly answer: string;\n    readonly createdAt: string;\n}',
+  },
+  {
+    name: 'MeetingMinutesId',
+    declaration: 'export type MeetingMinutesId = Branded<\'MeetingMinutesId\'>;',
+  },
+  {
+    name: 'MeetingMinutesRecord',
+    declaration: 'export interface MeetingMinutesRecord {\n    readonly id: MeetingMinutesId;\n    readonly title: string;\n    readonly participants: readonly string[];\n    readonly transcript: string;\n    readonly summary: string | null;\n    readonly status: MeetingMinutesStatus;\n    readonly audioSeconds: number;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+  },
+  {
+    name: 'MeetingMinutesStatus',
+    declaration: 'export type MeetingMinutesStatus = \'transcribed\' | \'summarized\';',
   },
   {
     name: 'Message',
