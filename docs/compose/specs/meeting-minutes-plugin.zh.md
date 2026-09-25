@@ -1,6 +1,6 @@
 ---
 feature: meeting-minutes-plugin
-status: in-progress
+status: delivered
 updated: 2026-09-25
 branch: codex/meeting-minutes-plugin
 commits: base..HEAD
@@ -12,7 +12,13 @@ commits: base..HEAD
 
 ## Report
 
-实现仍在进行中。
+**已构建内容** — `@deepseek-ai/dsh-meeting-minutes` 现在通过 `ctx.storageDomain` 持有持久的会议记录和回答。它可以从转写文本或完整音频创建会议，规范化并限制输入，提供列表、读取和删除，生成配置模型摘要和持久化问答，并确保失败或取消的模型工作不会改变持久状态。
+
+`@deepseek-ai/dsh-tool-meeting-minutes` 将创建、列表、读取、摘要和提问暴露为模型工具。语音转文本服务和 DashScope 提供方已提升到 `packages/speech`，基础 bundle 会注册这两个插件。
+
+**验证** — `pnpm run test -- packages/meetings packages/speech` 通过 6 个文件、52 个测试；会议服务聚焦规范通过 24 个测试。移除两处提交前取消检查会让两个晚到取消回归失败，恢复后聚焦套件重新 24/24 通过。`packages/meetings packages/speech` 的 `oxlint`、`pnpm run typecheck`、`pnpm run test:snapshot -- -t meeting-minutes-list`、`pnpm run verify-package-invariants`（38 个 companion）、`pnpm run duplication`（0 个克隆）以及 `pnpm run verify-doc-budgets`（8 个文档）通过。仓库引用门禁仍只报告 `archive-import-prism-agent-e.md`；仓库级 hygiene 仍保留已记录的既存 vendor rescope、工作区约束、desktop license 和 ACP Cordis 配置失败。
+
+**历程记录** — 语音转文本接缝和 DashScope 提供方从 experimental 包提升，使会议音频能够解析一个明确的 Host 提供方。最初的取消测试通过测试 LLM 队列完成，即使没有持久写入前检查仍会通过；最终回归通过一个自定义 awaitable 完成模型工作，并在服务恢复前中止，因此变异测试能够证明每处检查都不可省略。空音频取消在验证之前断言，使调用方取消保持为第一个可观察失败。
 
 ## [S1] 问题
 
@@ -36,17 +42,17 @@ commits: base..HEAD
 
 ## Tasks
 
-- [ ] T1：实现持久会议服务和音频/转写导入。
-- [ ] T2：实现摘要和持久化问答操作。
-- [ ] T3：实现面向模型的会议工具。
-- [ ] T4：集成 DashScope 语音提供方，并在基础 bundle 中注册会议插件。
-- [ ] T5：运行聚焦验证并修复失败。
+- [x] T1：实现持久会议服务和音频/转写导入。
+- [x] T2：实现摘要和持久化问答操作。
+- [x] T3：实现面向模型的会议工具。
+- [x] T4：集成 DashScope 语音提供方，并在基础 bundle 中注册会议插件。
+- [x] T5：运行聚焦验证并修复失败。
 
 ## [S4] 验收
 
-- [ ] 可以从转写或音频创建会议，并列表、读取和删除；删除会移除其回答。
-- [ ] 摘要调用配置的 LLM 路由并持久化成功的摘要；失败时记录保持已转写状态。
-- [ ] 提问调用配置的 LLM 路由，返回回答，并持久化问答对。
-- [ ] 模型工具可以通过 `ctx.meetingMinutes` 执行列表/读取/创建/摘要/提问，并安全注册/释放。
-- [ ] 语音转音频导入使用显式解析的语音提供方，并响应取消。
-- [ ] 与变更面相关的 TypeScript、聚焦测试、lint、duplication、hygiene 和文档门禁通过。
+- [x] 可以从转写或音频创建会议，并列表、读取和删除；删除会移除其回答。
+- [x] 摘要调用配置的 LLM 路由并持久化成功的摘要；失败时记录保持已转写状态。
+- [x] 提问调用配置的 LLM 路由，返回回答，并持久化问答对。
+- [x] 模型工具可以通过 `ctx.meetingMinutes` 执行列表/读取/创建/摘要/提问，并安全注册/释放。
+- [x] 语音转音频导入使用显式解析的语音提供方，并响应取消。
+- [x] 与变更面相关的 TypeScript、聚焦测试、lint、duplication、hygiene 和文档门禁通过。
