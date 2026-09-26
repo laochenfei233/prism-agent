@@ -1,7 +1,7 @@
 /**
  * Durable meeting-minutes service (`ctx.meetingMinutes`): transcript/audio
  * ingestion, configured-model summaries, and persisted question/answer pairs.
- * @module @deepseek-ai/dsh-meeting-minutes
+ * @module @prism-ai/prism-meeting
  */
 
 import { randomUUID } from 'node:crypto'

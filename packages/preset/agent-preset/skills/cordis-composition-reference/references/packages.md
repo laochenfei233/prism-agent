@@ -296,13 +296,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
 | `@deepseek-ai/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
 
-## meetings
-
-| Package | Config | Description |
-|---|---|---|
-| `@deepseek-ai/dsh-meeting-minutes` | yes | Durable meeting records, transcription ingestion, summaries, and persisted meeting answers (ctx.meetingMinutes) |
-| `@deepseek-ai/dsh-tool-meeting-minutes` | no | Model-facing meeting list, retrieval, creation, summary, and question tools over ctx.meetingMinutes |
-
 ## plan
 
 | Package | Config | Description |
@@ -316,6 +309,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-agent-preset` | yes | Declare an Agent capability composition in Cordis YAML |
 | `@deepseek-ai/dsh-agent-preset-registry` | yes | Declarative Agent preset registry and profile-backed editing |
 | `@deepseek-ai/dsh-persona` | yes | Composition-authored deployment persona section for the DeepSeek Harness |
+
+## prism
+
+| Package | Config | Description |
+|---|---|---|
+| `@prism-ai/prism-meeting` | yes | Prism meeting-minutes plugin: durable records, transcribed audio, configured summaries, persisted answers, and model-facing tools |
 
 ## ptc-runtime
 

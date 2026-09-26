@@ -4,7 +4,7 @@
 
 会议能力在 Session 日志之外拥有持久会议记录及其从属回答。[`ctx.meetingMinutes`](#ctxmeetingminutes--meetingminutesservice) 导入完整转写或录音，使用一个部署配置的 LLM 路由生成摘要和回答，并持久化成功输出。显式工具消费者只把选定操作暴露给模型。
 
-源码：[`packages/meetings/meeting-minutes/src/types.ts`](../../packages/meetings/meeting-minutes/src/types.ts)
+源码：[`packages/prism/prism-meeting/src/types.ts`](../../packages/prism/prism-meeting/src/types.ts)
 
 ## 会议与回答词汇
 
@@ -166,5 +166,5 @@ listAnswers(id: MeetingMinutesId): MeetingAnswerRecord[]
 delete(id: MeetingMinutesId): Promise<boolean>
 ```
 
-Source: [`packages/meetings/meeting-minutes/src/index.ts`](../../packages/meetings/meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/index.ts`](../../packages/prism/prism-meeting/src/index.ts)
 <!-- END GENERATED cordis-surface -->

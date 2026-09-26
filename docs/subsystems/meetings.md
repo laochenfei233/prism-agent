@@ -4,7 +4,7 @@ English | [中文](meetings.zh.md)
 
 The meetings capability owns durable meeting records and their dependent answers outside Session logs. [`ctx.meetingMinutes`](#ctxmeetingminutes--meetingminutesservice) imports complete transcripts or recordings, invokes one deployment-configured LLM route for summaries and questions, and stores successful output. Model access is limited by the explicit tool consumer to selected operations.
 
-Source: [`packages/meetings/meeting-minutes/src/types.ts`](../../packages/meetings/meeting-minutes/src/types.ts)
+Source: [`packages/prism/prism-meeting/src/types.ts`](../../packages/prism/prism-meeting/src/types.ts)
 
 ## Meeting and answer vocabulary
 
@@ -166,5 +166,5 @@ listAnswers(id: MeetingMinutesId): MeetingAnswerRecord[]
 delete(id: MeetingMinutesId): Promise<boolean>
 ```
 
-Source: [`packages/meetings/meeting-minutes/src/index.ts`](../../packages/meetings/meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/index.ts`](../../packages/prism/prism-meeting/src/index.ts)
 <!-- END GENERATED cordis-surface -->

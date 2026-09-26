@@ -1,7 +1,7 @@
 /**
  * Meeting-minutes domain declaration: durable record schemas and the storage
  * domain opened by the service. Zod validation belongs at this durable boundary.
- * @module @deepseek-ai/dsh-meeting-minutes/src/spec
+ * @module @prism-ai/prism-meeting/src/spec
  */
 
 import { z } from 'zod'

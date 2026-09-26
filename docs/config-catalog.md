@@ -1993,32 +1993,6 @@ export interface ReconnectConfig {
 
 Source: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
 
-<a id="deepseek-aidsh-meeting-minutes"></a>
-
-## `@deepseek-ai/dsh-meeting-minutes`
-
-Requires: `storageDomain` · `speechToText` · `llm`
-
-```ts config-catalog
-/** Deployment-owned model and bound choices; there are no service-level model defaults. */
-export interface Config {
-  /** Registered LLM provider used for summaries and meeting questions. */
-  summaryProvider: Volatile<string>
-  /** Registered model id used for summaries and meeting questions. */
-  summaryModel: Volatile<string>
-  /** System prompt that establishes summary behavior. */
-  summarySystemPrompt: Volatile<string>
-  /** System prompt that establishes meeting-question behavior. */
-  answerSystemPrompt: Volatile<string>
-  /** Maximum accepted transcript length in Unicode code units. */
-  maxTranscriptChars: Volatile<number>
-}
-```
-
-Depends on: `Volatile` (`@deepseek-ai/cordis`)
-
-Source: [`packages/meetings/meeting-minutes/src/index.ts:33`](../packages/meetings/meeting-minutes/src/index.ts)
-
 <a id="deepseek-aidsh-message-feedback"></a>
 
 ## `@deepseek-ai/dsh-message-feedback`
@@ -4168,6 +4142,32 @@ export interface Config {
 
 Source: [`packages/deliverables/workspace-changes/src/index.ts:33`](../packages/deliverables/workspace-changes/src/index.ts)
 
+<a id="prism-aiprism-meeting"></a>
+
+## `@prism-ai/prism-meeting`
+
+Requires: `storageDomain` · `speechToText` · `llm`
+
+```ts config-catalog
+/** Deployment-owned model and bound choices; there are no service-level model defaults. */
+export interface Config {
+  /** Registered LLM provider used for summaries and meeting questions. */
+  summaryProvider: Volatile<string>
+  /** Registered model id used for summaries and meeting questions. */
+  summaryModel: Volatile<string>
+  /** System prompt that establishes summary behavior. */
+  summarySystemPrompt: Volatile<string>
+  /** System prompt that establishes meeting-question behavior. */
+  answerSystemPrompt: Volatile<string>
+  /** Maximum accepted transcript length in Unicode code units. */
+  maxTranscriptChars: Volatile<number>
+}
+```
+
+Depends on: `Volatile` (`@deepseek-ai/cordis`)
+
+Source: [`packages/prism/prism-meeting/src/index.ts:33`](../packages/prism/prism-meeting/src/index.ts)
+
 ## Loadable plugins with no config
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.
@@ -4264,7 +4264,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@deepseek-ai/dsh-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
-- `@deepseek-ai/dsh-tool-meeting-minutes` — requires `tools` · `meetingMinutes` ([`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts))
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@deepseek-ai/dsh-webhook` — requires `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` ([`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts))

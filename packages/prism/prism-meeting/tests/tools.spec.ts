@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context, type Volatile } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@deepseek-ai/dsh-meeting-minutes'
-import MeetingMinutesService from '@deepseek-ai/dsh-meeting-minutes'
+import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@prism-ai/prism-meeting'
+import MeetingMinutesService from '@prism-ai/prism-meeting'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import ToolMeetingMinutes from '../src/index.ts'
+import ToolMeetingMinutes from '../src/tools.ts'
 
 const contexts: Context[] = []
 
@@ -116,7 +116,7 @@ function json<T>(
 }
 
 
-describe('tool-meeting-minutes', () => {
+describe('prism-meeting tools', () => {
   it('registers and disposes the five schemas', async () => {
     const ctx = await setup()
     expect(ctx.tools.schemas().map(schema => schema.name)).toEqual([

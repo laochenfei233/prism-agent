@@ -42,7 +42,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/message/queued`, `team/message/delivered`, `team/task`, `tool/result` | - | All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
-| `@deepseek-ai/dsh-tool-meeting-minutes` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
+| `@prism-ai/prism-meeting` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
@@ -2359,9 +2359,9 @@ Source: [`packages/todo/tool-todo/src/index.ts`](../packages/todo/tool-todo/src/
 
 todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.
 
-<a id="deepseek-aidsh-tool-meeting-minutes"></a>
+<a id="prism-aiprism-meeting"></a>
 
-## `@deepseek-ai/dsh-tool-meeting-minutes`
+## `@prism-ai/prism-meeting`
 
 ### `meeting_minutes_ask`
 
@@ -2387,7 +2387,7 @@ Ask one question about a meeting and persist the question/answer exchange.
 }
 ```
 
-Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
 
 ### `meeting_minutes_create`
 
@@ -2414,7 +2414,7 @@ Create a durable meeting record from a complete transcript. Use this after trans
     },
     "audioSeconds": {
       "type": "number",
-      "description": "Recognized-audio duration in seconds; omit for a text import."
+      "description": "Nonnegative recognized-audio duration in seconds; omit for a text import."
     }
   },
   "required": [
@@ -2424,7 +2424,7 @@ Create a durable meeting record from a complete transcript. Use this after trans
 }
 ```
 
-Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
 
 ### `meeting_minutes_get`
 
@@ -2445,7 +2445,7 @@ Read one durable meeting, including its transcript and current summary.
 }
 ```
 
-Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
 
 ### `meeting_minutes_list`
 
@@ -2458,7 +2458,7 @@ List durable meetings without their transcripts. Read one meeting when its trans
 }
 ```
 
-Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
 
 ### `meeting_minutes_summarize`
 
@@ -2479,7 +2479,7 @@ Generate and persist a summary for one meeting using the deployment-configured m
 }
 ```
 
-Source: [`packages/meetings/tool-meeting-minutes/src/index.ts`](../packages/meetings/tool-meeting-minutes/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
 
 Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies.
 

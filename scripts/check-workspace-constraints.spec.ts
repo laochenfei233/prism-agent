@@ -334,6 +334,21 @@ describe('package payload constraints', () => {
     ])
   })
 
+  it('accepts Prism-owned packages from the Prism repository', () => {
+    const dir = 'packages/prism/prism-meeting'
+    const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+    expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+    expect(checkWorkspaceManifest({
+      dir,
+      manifest: {
+        ...manifest,
+        repository: { ...manifest.repository, url: 'git+https://example.com/prism.git' },
+      },
+    })).toEqual([
+      expect.stringContaining(`@prism-ai/prism-meeting: release member repository must use git+https://github.com/laochenfei233/prism-agent-e.git with directory ${dir}`),
+    ])
+  })
+
   it.each([
     'packages/client/ui-sidebar-documentpreview',
     'packages/client/ui-sidebar-terminal',

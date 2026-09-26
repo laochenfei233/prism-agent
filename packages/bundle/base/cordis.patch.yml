@@ -188,8 +188,8 @@
 
     # Durable meeting records and their model-facing operations. Model routes
     # and prompts are deployment composition choices, not hidden service defaults.
-    - id: meeting-minutes
-      name: '@deepseek-ai/dsh-meeting-minutes'
+    - id: prism-meeting
+      name: '@prism-ai/prism-meeting'
       config:
         summaryProvider: deepseek-official
         summaryModel: deepseek-flash
@@ -455,8 +455,8 @@
 
     # Durable meeting records reach the model here; the meeting service is
     # mounted beside the storage domain above.
-    - id: tool-meeting-minutes
-      name: '@deepseek-ai/dsh-tool-meeting-minutes'
+    - id: tool-prism-meeting
+      name: '@prism-ai/prism-meeting/tools'
 
     # Persisted same-session goals reach the model and the slash menu here; the
     # domain, driver, and `/goal` command are above.

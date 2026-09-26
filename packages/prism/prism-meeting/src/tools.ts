@@ -1,6 +1,6 @@
 /**
  * Model-facing meeting tools over `ctx.meetingMinutes`.
- * @module @deepseek-ai/dsh-tool-meeting-minutes
+ * @module @prism-ai/prism-meeting/tools
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -8,10 +8,10 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type {
   MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord, MeetingMinutesService,
-} from '@deepseek-ai/dsh-meeting-minutes'
+} from './index.ts'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
-export const name = 'tool-meeting-minutes'
+export const name = 'prism-meeting-tools'
 export const inject = ['tools', 'meetingMinutes']
 
 /** Model-facing meeting fields; lists replace transcript text with its length. */
@@ -244,7 +244,7 @@ export function apply(ctx: Context): void {
     .map(definition => ctx.tools.register(definition))
   ctx.effect(() => () => {
     for (const remove of dispose) remove()
-  }, 'toolMeetingMinutes.register')
+  }, 'prismMeeting.tools.register')
 }
 
 /** Plugin descriptor consumed by the Cordis loader. */
