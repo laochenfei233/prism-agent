@@ -20,6 +20,7 @@ kind: "package-reference"
 ## 目录
 
 - [概述](#summary)
+- [安装](#installation)
 - [配置](#configuration)
 - [服务 API](#service-api)
 - [模型体验](#model-experience)
@@ -27,6 +28,18 @@ kind: "package-reference"
 - [开发备注](#dev-note)
 
 -----
+
+<a id="installation"></a>
+## 安装
+
+把 tarball 安装到基于 base 的 DSH profile，然后重启该 profile：
+
+```sh
+dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
+dsh --profile <profile>
+```
+
+本包声明了 `dsh.bundle.patch`。base bundle 已提供 `prism-meeting` 和 `tool-prism-meeting` 行时，patch 会按 id 覆盖它们；选择本 bundle 层时也会注册两个入口。profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`。
 
 <a id="service-api"></a>
 ## 服务 API

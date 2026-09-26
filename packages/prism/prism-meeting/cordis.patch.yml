@@ -1,0 +1,15 @@
+# Prism meeting bundle patch. The same row ids are present in dsh-base; this
+# layer replaces them by id when the bundle is installed in a base-backed
+# profile, so the service and tool never register twice.
+
+- id: prism-meeting
+  name: '@prism-ai/prism-meeting'
+  config:
+    summaryProvider: deepseek-official
+    summaryModel: deepseek-flash
+    summarySystemPrompt: You summarize meetings in the caller's language. Preserve decisions, owners, deadlines, and unresolved questions; do not invent facts.
+    answerSystemPrompt: You answer questions only from the supplied meeting transcript in the caller's language. Say what the transcript does not establish; do not invent facts.
+    maxTranscriptChars: 50000
+
+- id: tool-prism-meeting
+  name: '@prism-ai/prism-meeting/tools'

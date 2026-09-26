@@ -18,6 +18,7 @@ English | [中文](README.zh.md)
 ## Table of Contents
 
 - [Summary](#summary)
+- [Installation](#installation)
 - [Configuration](#configuration)
 - [Service API](#service-api)
 - [Model Experience](#model-experience)
@@ -25,6 +26,18 @@ English | [中文](README.zh.md)
 - [Dev Note](#dev-note)
 
 -----
+
+<a id="installation"></a>
+## Installation
+
+Install the tarball into a base-backed DSH profile, then restart that profile:
+
+```sh
+dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
+dsh --profile <profile>
+```
+
+The package declares `dsh.bundle.patch`. Its patch overrides the `prism-meeting` and `tool-prism-meeting` rows when the base bundle already provides them, and registers both entries when the installed bundle layer is selected. The profile needs the base LLM, storage-domain, speech-to-text, and tools services. Set `DASHSCOPE_API_KEY` for audio recognition.
 
 <a id="service-api"></a>
 ## Service API
