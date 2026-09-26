@@ -37,7 +37,7 @@ dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.
 dsh --profile <profile>
 ```
 
-The package declares `dsh.bundle.patch`. Its patch overrides the `prism-meeting` and `tool-prism-meeting` rows when the base bundle already provides them, and registers both entries when the installed bundle layer is selected. The profile needs the base LLM, storage-domain, speech-to-text, and tools services. Set `DASHSCOPE_API_KEY` for audio recognition.
+The package declares `dsh.bundle.patch`. Its insert rows reuse the `prism-meeting` and `tool-prism-meeting` ids when the base bundle already provides them, and add both entries in profiles that do not. The profile needs the base LLM, storage-domain, speech-to-text, and tools services. Set `DASHSCOPE_API_KEY` for audio recognition.
 
 <a id="service-api"></a>
 ## Service API

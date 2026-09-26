@@ -39,7 +39,7 @@ dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.
 dsh --profile <profile>
 ```
 
-本包声明了 `dsh.bundle.patch`。base bundle 已提供 `prism-meeting` 和 `tool-prism-meeting` 行时，patch 会按 id 覆盖它们；选择本 bundle 层时也会注册两个入口。profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`。
+本包声明了 `dsh.bundle.patch`。base bundle 已提供 `prism-meeting` 和 `tool-prism-meeting` 时，insert 会复用这些 id；缺少这些行的 profile 会新增两个入口。profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`。
 
 <a id="service-api"></a>
 ## 服务 API
