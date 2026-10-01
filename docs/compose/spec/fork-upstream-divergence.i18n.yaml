@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/fork-upstream-divergence.md
+fork-upstream-divergence.md: 47b10fc235e63a3ef33a3eca7608d6e35980ca78
+fork-upstream-divergence.zh.md: 6bdba118cbfb9c2a1e38e8d8f7d092cd5c77dd16
