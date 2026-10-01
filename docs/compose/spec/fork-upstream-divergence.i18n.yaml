@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/fork-upstream-divergence.md
-fork-upstream-divergence.md: 47b10fc235e63a3ef33a3eca7608d6e35980ca78
-fork-upstream-divergence.zh.md: 6bdba118cbfb9c2a1e38e8d8f7d092cd5c77dd16
+fork-upstream-divergence.md: d3ba9ac8ad3c9a111a9652ce3cf7d4bb582ef992
+fork-upstream-divergence.zh.md: bf072b9e6efe55b4c05bcab320ae8bc5722a92f7
