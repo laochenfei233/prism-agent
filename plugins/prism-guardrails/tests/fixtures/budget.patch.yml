@@ -1,0 +1,47 @@
+# End-to-end overlay for the turn-budget scenario: the same composition as
+# `capability.patch.yml` with a two-step budget, so the scripted model's sticky
+# tool call is cut off by the rail rather than by the script.
+- id: headless-startup
+  disabled: true
+
+- id: headless-runner
+  disabled: true
+
+- id: llm-deepseek
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: agent-loop
+  config:
+    agents:
+      - id: main
+        provider: capability-mock
+        model: capability-mock
+        cwd: !!js process.cwd()
+
+- id: shell-env
+  config:
+    dshHome: './.dsh-home'
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill-filesystem
+  config:
+    dshHome: './.dsh-home'
+    agentsHome: './.agents-home'
+
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+
+- insert:
+    - id: capability-mock-llm
+      name: './capability-mock-llm.ts'
+
+    - id: prism-guardrails
+      name: '../../lib/index.js'
+      config:
+        maxStepsPerTurn: 2

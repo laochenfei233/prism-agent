@@ -1,5 +1,6 @@
-/* Appearance row (figma 'Frame 2117131228': title + cube row, column gap 8,
- * pad 16/0, hairline separator; the section column strips it when last). */
+/* Appearance gallery (figma 'Frame 2117131228' section frame: title + row,
+ * column gap 8, pad 16/0, hairline separator; the section column strips it
+ * when last). */
 
 .group {
   display: flex;
@@ -16,42 +17,90 @@
   color: var(--dsw-alias-label-primary);
 }
 
-.cubeRow {
-  display: flex;
-  align-items: stretch;
+/* Gallery grid: cards flex down from the figma 276px cube so a 800px settings
+ * panel fits four per row and reflows without a breakpoint. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-/* Appearance cube (figma '.Selector Cube' 276x82 r16, pad 20/32, centered
- * icon-over-label column, gap 4); flexed down from the figma width so all
- * three sit on one row in the 800 panel, wrapping when narrower. */
-.themeCube {
+.themeCard {
   box-sizing: border-box;
-  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 20px 32px;
+  gap: 8px;
+  padding: 10px;
   border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 20px;
+  border-radius: 16px;
   background: transparent;
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--dsw-alias-label-primary);
+  text-align: left;
   cursor: pointer;
 }
 
-.themeCube:hover:not(.selected) {
+.themeCard:hover:not(.selected) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* Selected cube: #F5F6F7 fill + #ADB2B8 border (static token — the bluish-400
+/* Selected card: #F5F6F7 fill + #ADB2B8 border (static token — the bluish-400
  * step has no alias-layer name). */
 .selected {
   background: var(--dsw-alias-bg-module-platform);
   border-color: var(--dsw-static-neutral-bluish-400);
+}
+
+/* Miniature of one palette: canvas, a sidebar rail, two content cards, and the
+ * accent block. Every color arrives as an inline custom property, so a theme
+ * previews itself without this sheet knowing any theme's values. */
+.preview {
+  position: relative;
+  display: flex;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--preview-base);
+}
+
+.previewRail {
+  flex: none;
+  width: 26%;
+  background: var(--preview-surface);
+  border-right: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.previewBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 8px;
+  min-width: 0;
+}
+
+.previewCard {
+  flex: 1;
+  border-radius: 4px;
+  background: var(--preview-surface);
+}
+
+/* The accent block: the one colored pixel budget a theme gets. */
+.previewAccent {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--preview-accent);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

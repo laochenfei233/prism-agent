@@ -143,6 +143,8 @@ export const SERVICE_PAGE: Record<string, string> = {
   workspaceChanges: 'deliverables.md',
   terminalController: 'workspace.md',
   directoryPickerController: 'workspace.md',
+  cron: 'cron.md',
+  cronController: 'cron.md',
 }
 
 /**
@@ -196,6 +198,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   slots: 'client-side interface-typed browser service — packages/client/ui-renderer/README.md owns the API',
   theme: 'client-side interface-typed browser service — packages/client/ui-theme/README.md owns the API',
   workspaces: 'client-side interface-typed browser service — packages/api/workspace-controller/README.md owns the API',
+  cronJobs: 'client-side scheduled-task state and commands — packages/api/cron-controller/README.md owns the API',
   resources: 'client-side resource model (protocol providers, pins, live sources) — packages/client/resources/README.md owns the API',
   sidebarRight: 'client-side right-Sidebar navigation face — packages/client/ui-sidebar-right/README.md owns the API',
   sidebarRightTabs: 'client-side right-Sidebar tab-type registry — packages/client/ui-sidebar-right/README.md owns the API',
@@ -772,6 +775,17 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TypertPackageRecord: 'invariants.md',
   TypertSchemaFilter: 'invariants.md',
   TypertSchemaRecord: 'invariants.md',
+  CronJob: 'cron.md',
+  CronJobId: 'cron.md',
+  CronJobRequest: 'cron.md',
+  CronJobUpdate: 'cron.md',
+  CronRunRecord: 'cron.md',
+  CronViewCreateRequest: 'cron.md',
+  CronViewJobRequest: 'cron.md',
+  CronViewRunNowValue: 'cron.md',
+  CronViewUpdateRequest: 'cron.md',
+  CronViewValue: 'cron.md',
+  CronFollowFrame: 'cron.md',
 }
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */

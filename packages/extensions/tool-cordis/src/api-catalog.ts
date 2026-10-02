@@ -843,6 +843,86 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'cron',
+    summary: 'Calendar scheduling, as every consumer sees it.',
+    description: 'Calendar scheduling, as every consumer sees it.\n\nImplementations answer from durable state, so a caller never has to know whether this process is the scheduler: an operation that cannot be served here reports `cron_not_leader` through the provider\'s own failure surface rather than returning a stale answer.',
+    methods: [
+      {
+        signature: 'abstract list(): readonly CronJob[]',
+        description: 'Every stored job, in the store\'s own order.',
+        parameters: [],
+        returns: 'the jobs the provider holds.',
+      },
+      {
+        signature: 'abstract get(id: CronJobId): CronJob | undefined',
+        description: 'Read one job.',
+        parameters: [{ name: 'id', description: 'the job\'s identity.' }],
+        returns: 'the job, or `undefined` when none is stored under that id.',
+      },
+      {
+        signature: 'abstract create(request: CronJobRequest): Promise<CronJob>',
+        description: 'Create a job.',
+        parameters: [{ name: 'request', description: 'the caller\'s stated rule, target, and message.' }],
+        returns: 'the stored job, including its minted identity and next occurrence.',
+      },
+      {
+        signature: 'abstract update(id: CronJobId, update: CronJobUpdate): Promise<CronJob>',
+        description: 'Change a stored job.',
+        parameters: [{ name: 'id', description: 'the job\'s identity.' }, { name: 'update', description: 'the fields to replace.' }],
+        returns: 'the stored job after the change.',
+      },
+      {
+        signature: 'abstract remove(id: CronJobId): Promise<boolean>',
+        description: 'Remove a job.',
+        parameters: [{ name: 'id', description: 'the job\'s identity.' }],
+        returns: 'whether a job was stored under that id.',
+      },
+      {
+        signature: 'abstract runNow(id: CronJobId): Promise<CronRunRecord>',
+        description: 'Run a job once, now, without changing its schedule.',
+        parameters: [{ name: 'id', description: 'the job\'s identity.' }],
+        returns: 'the finished run\'s record.',
+      },
+    ],
+  },
+  {
+    key: 'cronController',
+    summary: 'Host service backing the generated `ctx.remote.cron` namespace.',
+    description: 'Host service backing the generated `ctx.remote.cron` namespace.',
+    methods: [
+      {
+        signature: '@Remote(\'create\') create(request: CronViewCreateRequest): Promise<CronViewValue>',
+        description: 'Store one new task.',
+        parameters: [{ name: 'request', description: 'the stated rule, destination, and message.' }],
+        returns: 'the stored task, including its minted identity and next occurrence.',
+      },
+      {
+        signature: '@Remote(\'update\') update(request: CronViewUpdateRequest): Promise<CronViewValue>',
+        description: 'Replace the stated fields of one stored task.',
+        parameters: [{ name: 'request', description: 'the target identity and the fields to replace.' }],
+        returns: 'the stored task after the change.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: CronViewJobRequest): Promise<CronViewValue>',
+        description: 'Remove one stored task.',
+        parameters: [{ name: 'request', description: 'the target identity.' }],
+        returns: 'the removed task\'s projection.',
+      },
+      {
+        signature: '@Remote(\'runNow\') runNow(request: CronViewJobRequest): Promise<CronViewRunNowValue>',
+        description: 'Run one stored task once, now, without changing its schedule.',
+        parameters: [{ name: 'request', description: 'the target identity.' }],
+        returns: 'the finished run\'s bounded record.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) follow(signal: AbortSignal): AsyncIterable<CronFollowFrame>',
+        description: 'Stream a complete task baseline followed by ordered stored-task increments.',
+        parameters: [{ name: 'signal', description: 'generation cancellation owned by the Remote stream carrier.' }],
+        returns: 'the baseline, then one frame per committed task write.',
+      },
+    ],
+  },
+  {
     key: 'deepseekAccount',
     summary: 'Account operations; only Host consumers can obtain a request credential.',
     description: 'Account operations; only Host consumers can obtain a request credential.',
@@ -4788,6 +4868,62 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CredentialRef',
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
+  },
+  {
+    name: 'CronFollowBaseline',
+    declaration: 'export type CronFollowBaseline = {\n    readonly items: readonly CronJobView[];\n    readonly listError?: undefined;\n} | {\n    readonly items?: undefined;\n    readonly listError: {\n        readonly code: \'cron/not-leader\';\n        readonly message: string;\n    };\n};',
+  },
+  {
+    name: 'CronFollowFrame',
+    declaration: 'export type CronFollowFrame = {\n    readonly type: \'baseline\';\n    readonly value: CronFollowBaseline;\n} | {\n    readonly type: \'upsert\';\n    readonly job: CronJobView;\n} | {\n    readonly type: \'remove\';\n    readonly jobId: CronJobId;\n};',
+  },
+  {
+    name: 'CronJob',
+    declaration: 'export interface CronJob {\n    readonly version: 1;\n    readonly id: CronJobId;\n    readonly expression: string;\n    readonly timeZone: string;\n    readonly enabled: boolean;\n    readonly target: CronTarget;\n    readonly prompt: string;\n    readonly overlapPolicy: CronOverlapPolicy;\n    readonly misfirePolicy: CronMisfirePolicy;\n    readonly maxRunMs: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly nextDueAt: number;\n    readonly recentRuns: readonly CronRunRecord[];\n}',
+  },
+  {
+    name: 'CronJobRequest',
+    declaration: 'export interface CronJobRequest {\n    readonly expression: string;\n    readonly timeZone: string;\n    readonly target: CronTarget;\n    readonly prompt: string;\n    readonly overlapPolicy?: CronOverlapPolicy;\n    readonly misfirePolicy?: CronMisfirePolicy;\n    readonly maxRunMs?: number;\n}',
+  },
+  {
+    name: 'CronJobUpdate',
+    declaration: 'export type CronJobUpdate = Partial<Omit<CronJobRequest, \'expression\' | \'timeZone\'>> & {\n    readonly expression?: string;\n    readonly timeZone?: string;\n    readonly enabled?: boolean;\n};',
+  },
+  {
+    name: 'CronJobView',
+    declaration: 'export interface CronJobView {\n    readonly jobId: CronJobId;\n    readonly expression: string;\n    readonly timeZone: string;\n    readonly enabled: boolean;\n    readonly target: CronTargetView;\n    readonly prompt: string;\n    readonly overlapPolicy: \'skip\' | \'queue-one\';\n    readonly misfirePolicy: \'skip\' | \'run-once-late\';\n    readonly maxRunMs: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly nextDueAt: number;\n    readonly recentRuns: readonly CronRunRecord[];\n}',
+  },
+  {
+    name: 'CronMisfirePolicy',
+    declaration: 'export type CronMisfirePolicy = \'skip\' | \'run-once-late\';',
+  },
+  {
+    name: 'CronOverlapPolicy',
+    declaration: 'export type CronOverlapPolicy = \'skip\' | \'queue-one\';',
+  },
+  {
+    name: 'CronTargetView',
+    declaration: 'export type CronTargetView = {\n    readonly kind: \'new-session\';\n    readonly workspacePath: string;\n    readonly agentPreset: string;\n    readonly permissionPreset: string;\n    readonly model: {\n        readonly provider: string;\n        readonly model: string;\n    } | null;\n} | {\n    readonly kind: \'session\';\n    readonly sessionId: string;\n};',
+  },
+  {
+    name: 'CronViewCreateRequest',
+    declaration: 'export type CronViewCreateRequest = {\n    readonly expression: string;\n    readonly timeZone: string;\n    readonly target: CronTarget;\n    readonly prompt: string;\n    readonly overlapPolicy?: \'skip\' | \'queue-one\';\n    readonly misfirePolicy?: \'skip\' | \'run-once-late\';\n    readonly maxRunMs?: number;\n};',
+  },
+  {
+    name: 'CronViewJobRequest',
+    declaration: 'export interface CronViewJobRequest {\n    readonly jobId: string;\n}',
+  },
+  {
+    name: 'CronViewRunNowValue',
+    declaration: 'export interface CronViewRunNowValue {\n    readonly run: CronRunRecord;\n}',
+  },
+  {
+    name: 'CronViewUpdateRequest',
+    declaration: 'export interface CronViewUpdateRequest {\n    readonly jobId: CronJobId;\n    readonly expression?: string;\n    readonly timeZone?: string;\n    readonly target?: CronTarget;\n    readonly prompt?: string;\n    readonly overlapPolicy?: \'skip\' | \'queue-one\';\n    readonly misfirePolicy?: \'skip\' | \'run-once-late\';\n    readonly maxRunMs?: number;\n    readonly enabled?: boolean;\n}',
+  },
+  {
+    name: 'CronViewValue',
+    declaration: 'export interface CronViewValue {\n    readonly job: CronJobView;\n}',
   },
   {
     name: 'DeepSeekLlmApiExtensionMap',

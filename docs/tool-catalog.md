@@ -45,6 +45,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@deepseek-ai/dsh-tool-cron` | `cron_create`, `cron_delete`, `cron_list`, `cron_run`, `cron_update` | `ctx.tools`, `ctx.cron`, `ctx.agents`, `ctx.sessionProjections`, `a calling live root Agent in an open turn` | `tool/call`, `cron storage-domain jobs and their bounded run history`, `tool/result` | - | The five scheduled-task tools are the model-facing consumer of ctx.cron. cron_create and cron_update require a direct human message in the live root-agent turn, because creating or re-pointing a task is what authorizes unattended spending; cron_list, cron_delete, and cron_run need the same live root turn but no human message. A new-session target must state its workspace, agent preset, and permission preset, and the deployment must compose a ctx.cron provider (e.g. `@deepseek-ai/dsh-cron`). |
 
 <a id="deepseek-aidsh-plugin-manager"></a>
 
@@ -2524,3 +2525,255 @@ Search the web for current information. Provide 1–4 queries in the required qu
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="deepseek-aidsh-tool-cron"></a>
+
+## `@deepseek-ai/dsh-tool-cron`
+
+### `cron_create`
+
+Create one scheduled task that runs unattended, without a conversation open. Supply the cron expression, the IANA time zone it is read in, the target, and the prompt the firing delivers. The task must name where it runs: a new-session target states the workspace, the agent preset, and the permission preset every run acts under, and a session target states the session every run continues. This requires a direct human request in the current turn and cannot be called from autonomous work. Every run is bounded by max_run_ms.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "expression": {
+      "type": "string",
+      "description": "Five-field cron expression, for example 0 9 * * 1-5, or an @hourly-family macro."
+    },
+    "time_zone": {
+      "type": "string",
+      "description": "IANA zone the expression is read in, for example Asia/Shanghai."
+    },
+    "target": {
+      "type": "object",
+      "description": "Where each run happens.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "new-session (each run creates its own session) | session (each run continues one existing session).",
+          "enum": [
+            "new-session",
+            "session"
+          ]
+        },
+        "workspace_path": {
+          "type": "string",
+          "description": "Absolute directory a new-session run works in; required with kind new-session."
+        },
+        "agent_preset": {
+          "type": "string",
+          "description": "Agent preset a new-session run is composed from; required with kind new-session."
+        },
+        "permission_preset": {
+          "type": "string",
+          "description": "Permission preset a new-session run acts under; required with kind new-session."
+        },
+        "model_provider": {
+          "type": "string",
+          "description": "Provider for a new-session run when it must differ from the deployment default."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model for a new-session run when it must differ from the deployment default."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session every run continues; required with kind session."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Message a firing delivers to the target session."
+    },
+    "max_run_ms": {
+      "type": "integer",
+      "description": "Ceiling on one run in milliseconds; defaults to 600000."
+    },
+    "overlap_policy": {
+      "type": "string",
+      "description": "What happens when a run is still going at the next occurrence; defaults to skip.",
+      "enum": [
+        "skip",
+        "queue-one"
+      ]
+    },
+    "misfire_policy": {
+      "type": "string",
+      "description": "What happens to occurrences missed while no scheduler ran; defaults to skip.",
+      "enum": [
+        "skip",
+        "run-once-late"
+      ]
+    }
+  },
+  "required": [
+    "expression",
+    "time_zone",
+    "target",
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_delete`
+
+Delete one scheduled task by the exact id returned by cron_create or cron_list. The task stops firing; its recorded runs are removed with it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_list`
+
+List every scheduled task with its exact id, expression, time zone, target, prompt, run ceiling, enabled state, next occurrence in UTC, and most recent runs.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_run`
+
+Run one scheduled task once, now, without changing its schedule. The task must exist and must have no run in flight. The result reports how that run ended; it does not move the next occurrence.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_update`
+
+Change one scheduled task by its exact id. Supply only the fields to replace: expression, time_zone, target, prompt, overlap_policy, misfire_policy, max_run_ms, or enabled. A target that creates a session must state its workspace, agent preset, and permission preset. This requires a direct human request in the current turn.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    },
+    "expression": {
+      "type": "string",
+      "description": "Replacement five-field cron expression."
+    },
+    "time_zone": {
+      "type": "string",
+      "description": "Replacement IANA zone the expression is read in."
+    },
+    "target": {
+      "type": "object",
+      "description": "Replacement target; a new-session target must state its workspace, agent preset, and permission preset.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "new-session (each run creates its own session) | session (each run continues one existing session).",
+          "enum": [
+            "new-session",
+            "session"
+          ]
+        },
+        "workspace_path": {
+          "type": "string",
+          "description": "Absolute directory a new-session run works in; required with kind new-session."
+        },
+        "agent_preset": {
+          "type": "string",
+          "description": "Agent preset a new-session run is composed from; required with kind new-session."
+        },
+        "permission_preset": {
+          "type": "string",
+          "description": "Permission preset a new-session run acts under; required with kind new-session."
+        },
+        "model_provider": {
+          "type": "string",
+          "description": "Provider for a new-session run when it must differ from the deployment default."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model for a new-session run when it must differ from the deployment default."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session every run continues; required with kind session."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Replacement message a firing delivers."
+    },
+    "max_run_ms": {
+      "type": "integer",
+      "description": "Replacement ceiling on one run, in milliseconds."
+    },
+    "overlap_policy": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "queue-one"
+      ]
+    },
+    "misfire_policy": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "run-once-late"
+      ]
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the scheduler may fire the task."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+The five scheduled-task tools are the model-facing consumer of ctx.cron. cron_create and cron_update require a direct human message in the live root-agent turn, because creating or re-pointing a task is what authorizes unattended spending; cron_list, cron_delete, and cron_run need the same live root turn but no human message. A new-session target must state its workspace, agent preset, and permission preset, and the deployment must compose a ctx.cron provider (e.g. `@deepseek-ai/dsh-cron`).

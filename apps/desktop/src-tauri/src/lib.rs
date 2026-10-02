@@ -1,17 +1,17 @@
-//! DeepSeek Harness desktop shell.
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+//! Prism Agent desktop shell.
 //!
 //! The shell embeds the dsh web UI (served by the bundled `dsh` process on the
 //! loopback `INTERNAL_PORT`) inside a native window. It owns the dsh child
-//! process lifecycle (spawn, health probe, crash restart), a tray icon that
-//! keeps the app resident when the window closes, and the first-run wizard
-//! that picks an agent preset and installs plugins.
+//! process lifecycle (spawn, health probe, crash restart) and a tray icon that
+//! keeps the app resident when the window closes.
 
 mod dsh_runner;
 mod setup;
 mod tray;
 
-use tauri::Manager;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
+use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
 
 use dsh_runner::DshHandle;
@@ -37,15 +37,83 @@ fn build_main_window(app: &tauri::AppHandle) -> Result<(), String> {
         .ok_or_else(|| "No \"main\" window in the Tauri config".to_string())?;
 
     let handle = app.clone();
-    tauri::WebviewWindowBuilder::from_config(app, &window_config)
+    let window = tauri::WebviewWindowBuilder::from_config(app, &window_config)
         .map_err(|e| e.to_string())?
         .on_new_window(move |url, _features: NewWindowFeatures| {
             open_new_window_externally(&handle, &url)
         })
         .build()
         .map_err(|e| e.to_string())?;
+    // Windows can keep the previous taskbar icon under the same executable
+    // identity. Set the window icon from the generated asset on every launch
+    // so the taskbar and Alt-Tab surfaces converge on the current artwork.
+    if let Ok(icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png")) {
+        let _ = window.set_icon(icon);
+    }
+    allow_embedded_permissions(&window);
     Ok(())
 }
+
+/// Answer WebView2's permission requests for the embedded dsh UI.
+///
+/// WebView2 denies every kind it is not told about, and it never prompts on its
+/// own, so the microphone failed with "Permission denied" before any user
+/// decision. Wry installs a handler of its own for clipboard reads. This one
+/// grants the kinds the desktop client can use — microphone, camera, screen
+/// capture, geolocation, notifications, media playback, and file read/write —
+/// and leaves the rest (MIDI, sensors, window management) unanswered.
+#[cfg(windows)]
+fn allow_embedded_permissions(window: &tauri::WebviewWindow) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_PERMISSION_KIND, COREWEBVIEW2_PERMISSION_KIND_AUTOPLAY,
+        COREWEBVIEW2_PERMISSION_KIND_CAMERA, COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ,
+        COREWEBVIEW2_PERMISSION_KIND_FILE_READ_WRITE, COREWEBVIEW2_PERMISSION_KIND_GEOLOCATION,
+        COREWEBVIEW2_PERMISSION_KIND_MICROPHONE, COREWEBVIEW2_PERMISSION_KIND_NOTIFICATIONS,
+        COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+    };
+    use webview2_com::PermissionRequestedEventHandler;
+
+    let attached = window.with_webview(|webview| unsafe {
+        let core = match webview.controller().CoreWebView2() {
+            Ok(core) => core,
+            Err(_) => return,
+        };
+        let mut token = 0;
+        let _ = core.add_PermissionRequested(
+            &PermissionRequestedEventHandler::create(Box::new(|_, args| {
+                let Some(args) = args else { return Ok(()) };
+                let mut kind = COREWEBVIEW2_PERMISSION_KIND::default();
+                args.PermissionKind(&mut kind)?;
+                let granted = [
+                    COREWEBVIEW2_PERMISSION_KIND_MICROPHONE,
+                    COREWEBVIEW2_PERMISSION_KIND_CAMERA,
+                    COREWEBVIEW2_PERMISSION_KIND_GEOLOCATION,
+                    COREWEBVIEW2_PERMISSION_KIND_NOTIFICATIONS,
+                    COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ,
+                    COREWEBVIEW2_PERMISSION_KIND_AUTOPLAY,
+                    COREWEBVIEW2_PERMISSION_KIND_FILE_READ_WRITE,
+                ];
+                if granted.contains(&kind) {
+                    args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+                }
+                Ok(())
+            })),
+            &mut token,
+        );
+        // Screen capture has no permission kind in this WebView2 SDK: the
+        // frame's `display-capture` delegation in `ui/dist/index.html` is the
+        // whole grant, and `getDisplayMedia` picks through WebView2's own UI.
+    });
+    if let Err(error) = attached {
+        // The window still runs without the handlers; recording and the other
+        // capabilities are what break, so the shell logs instead of refusing to
+        // start.
+        eprintln!("WebView2 permission handlers not attached: {error}");
+    }
+}
+
+#[cfg(not(windows))]
+fn allow_embedded_permissions(_window: &tauri::WebviewWindow) {}
 
 /// Schemes we hand to the OS opener. The URL comes from web content, so only
 /// the well-known link schemes pass; anything else is refused outright.
@@ -60,7 +128,10 @@ fn is_externally_openable(url: &tauri::Url) -> bool {
 /// Without a handler the platform webview drops these requests on the floor,
 /// which is what made `target="_blank"` links dead in the app: WebView2 marks
 /// the request handled with nothing to show, so the click does nothing at all.
-fn open_new_window_externally(app: &tauri::AppHandle, url: &tauri::Url) -> NewWindowResponse<tauri::Wry> {
+fn open_new_window_externally(
+    app: &tauri::AppHandle,
+    url: &tauri::Url,
+) -> NewWindowResponse<tauri::Wry> {
     let openable = is_externally_openable(url);
     if openable {
         let opened = app.opener().open_url(url.as_str(), None::<&str>).is_ok()
@@ -86,11 +157,17 @@ fn open_with_os(url: &str) -> std::io::Result<()> {
     }
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open").arg(url).status().map(|_| ())
+        std::process::Command::new("open")
+            .arg(url)
+            .status()
+            .map(|_| ())
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
-        std::process::Command::new("xdg-open").arg(url).status().map(|_| ())
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .status()
+            .map(|_| ())
     }
 }
 
@@ -106,7 +183,10 @@ fn log_new_window(app: &tauri::AppHandle, url: &tauri::Url, openable: bool, open
         {
             use std::io::Write;
             use std::time::{SystemTime, UNIX_EPOCH};
-            let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+            let ts = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
             let _ = writeln!(file, "{ts} {url} openable={openable} opened={opened}");
         }
     }
@@ -135,14 +215,27 @@ fn hide_child_consoles() {
 fn hide_child_consoles() {}
 
 pub fn run() {
+    dsh_runner::start_startup_clock();
     hide_child_consoles();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
-            build_main_window(app.handle())?;
-            let handle = DshHandle::spawn(app.handle())?;
+            // Spawn the dsh child before the window exists. WebView2 environment
+            // creation costs seconds on a cold start and the child's Node boot
+            // costs seconds more; running them in sequence spent both. The child
+            // publishes readiness through `dsh_status`, which the shell page
+            // polls, so no window has to exist while the child starts, and the
+            // managed state is registered before any page script can invoke it.
+            // A runtime that cannot be resolved is carried as state instead of
+            // aborting the launch, so the window still opens to report it.
+            let handle = DshHandle::spawn(app.handle());
             app.manage(handle);
+            build_main_window(app.handle())?;
+            dsh_runner::append_startup_log("window ready");
             tray::build(app.handle())?;
             Ok(())
         })
@@ -155,11 +248,6 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            setup::is_initialized,
-            setup::first_run_state,
-            setup::set_preset,
-            setup::install_plugin,
-            setup::apply_first_run,
             dsh_runner::dsh_status,
             dsh_runner::restart_dsh,
             dsh_runner::open_ui,

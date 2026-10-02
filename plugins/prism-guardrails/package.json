@@ -1,0 +1,34 @@
+{
+  "name": "prism-guardrails",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DeepSeek Harness bundle turning four advisory capabilities into enforced ones: plan-mode tool denial, repeated-call approval, a per-turn step budget, and an actionable user-only skill denial",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts tests/prism-guardrails.spec.ts",
+    "test:e2e": "npm run build && vitest run --config vitest.config.ts tests/capability.e2e.spec.ts",
+    "test:all": "npm run build && vitest run --config vitest.config.ts",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}

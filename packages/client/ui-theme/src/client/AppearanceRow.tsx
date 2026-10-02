@@ -1,25 +1,22 @@
 /**
- * Appearance preference row registered into the General section item slot
- * (figma 501:30012 'Frame 2117131228'): title + three preference cubes.
- * Registered by this package — the theme feature owns its own settings
- * surface. Selection follows the persisted preference, never the resolved
- * active theme.
+ * Appearance gallery registered into the General section item slot: one row
+ * per selectable preference, each showing a miniature of the palette it
+ * selects. The gallery is rebuilt from the theme registry, so a theme another
+ * package registers appears here without this row knowing about it. Selection
+ * follows the persisted preference, never the resolved active theme.
  */
 import clsx from 'clsx'
-import {
-  IconDarkOutlineMedium, IconFollowsystemOutlineMedium, IconLightOutlineMedium,
-} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ThemePreference } from '../theme-settings.ts'
-import type { ThemeKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ThemeGalleryEntry } from './gallery.ts'
 import type { createAppearanceRowStore } from './settings-store.ts'
+import { THEME_LABEL_KEYS, type ThemeKey } from './locales.ts'
 import css from './AppearanceRow.module.css'
 
 /** Injected business face: the preference write (t rides the standard locale seat). */
 export interface AppearanceRowInjected {
-  /** Switch the theme preference. */
-  setTheme: (id: ThemePreference) => void
+  /** Switch the theme preference; accepts any registered theme id or `system`. */
+  setTheme: (id: string) => void
 }
 
 /** Full component props: runtime share + store share + locale seat + injected face. */
@@ -27,34 +24,64 @@ export type AppearanceRowComponentProps =
   PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createAppearanceRowStore>>
   & PropsLocale<'settings.theme'> & AppearanceRowInjected
 
-/** Cube order and icons (figma 501:30015-30017: Light, Dark, System). */
-const CUBES: readonly { id: ThemePreference; labelKey: ThemeKey; Icon: typeof IconLightOutlineMedium }[] = [
-  { id: 'light', labelKey: 'appearance.light', Icon: IconLightOutlineMedium },
-  { id: 'dark', labelKey: 'appearance.dark', Icon: IconDarkOutlineMedium },
-  { id: 'system', labelKey: 'appearance.system', Icon: IconFollowsystemOutlineMedium },
-]
+/** The locale seat's translate function, taken from the composed props. */
+type GalleryTranslate = AppearanceRowComponentProps['t']
 
 /**
- * Render the Appearance row.
+ * Resolve one row's display copy.
+ * @param id - preference id.
+ * @param t - the row's locale seat.
+ * @returns the localized label, or the id for a theme this package does not name.
+ */
+function themeLabel(id: string, t: GalleryTranslate): string {
+  const key: ThemeKey | undefined = THEME_LABEL_KEYS[id]
+  return key === undefined ? id : t(key)
+}
+
+/**
+ * Preview custom properties for one row. Returned as a plain string map and
+ * spread at the style site: `CSSProperties` has no custom-property index, and
+ * a spread is the one position TypeScript does not excess-check.
+ * @param entry - the row's gallery entry.
+ * @returns the three preview variables.
+ */
+function previewVariables(entry: ThemeGalleryEntry): Record<string, string> {
+  return {
+    '--preview-base': entry.base,
+    '--preview-surface': entry.surface,
+    '--preview-accent': entry.accent,
+  }
+}
+
+/**
+ * Render the Appearance gallery.
  * @param props - composed slot props.
  * @returns the row element tree.
  */
 export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentProps) {
   const preference = useStore(s => s.preference)
+  const entries = useStore(s => s.entries)
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.title')}</div>
-      <div className={css.cubeRow}>
-        {CUBES.map(({ id, labelKey, Icon }) => (
+      <div className={css.gallery}>
+        {entries.map(entry => (
           <button
-            key={id}
+            key={entry.id}
             type="button"
-            className={clsx(css.themeCube, preference === id && css.selected)}
-            aria-pressed={preference === id}
-            onClick={() => { setTheme(id) }}
+            className={clsx(css.themeCard, preference === entry.id && css.selected)}
+            aria-pressed={preference === entry.id}
+            onClick={() => { setTheme(entry.id) }}
           >
-            <Icon />
-            {t(labelKey)}
+            <span className={css.preview} style={{ ...previewVariables(entry) }}>
+              <span className={css.previewRail} />
+              <span className={css.previewBody}>
+                <span className={css.previewCard} />
+                <span className={css.previewCard} />
+              </span>
+              <span className={css.previewAccent} />
+            </span>
+            <span className={css.label}>{themeLabel(entry.id, t)}</span>
           </button>
         ))}
       </div>

@@ -49,6 +49,7 @@
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
+| `@deepseek-ai/dsh-tool-cron` | `cron_create`、`cron_delete`、`cron_list`、`cron_run`、`cron_update` | `ctx.tools`、`ctx.cron`、`ctx.agents`、`ctx.sessionProjections`、`a calling live root Agent in an open turn` | `tool/call`、`cron storage-domain jobs and their bounded run history`、`tool/result` | - | 这五个定时任务工具是 ctx.cron 面向模型的消费方。cron_create 与 cron_update 要求实时根 Agent 轮次中的直接人类消息，因为创建任务或重设其目标是授权无人值守开销的行为；cron_list、cron_delete 与 cron_run 需要同样的实时根轮次，但不需要人类消息。new-session 落点必须声明其工作区、agent preset 与 permission preset，且部署必须组装 ctx.cron 提供方（例如 `@deepseek-ai/dsh-cron`）。 |
 
 <a id="deepseek-aidsh-plugin-manager"></a>
 
@@ -2532,3 +2533,255 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 来源：[`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。
+
+<a id="deepseek-aidsh-tool-cron"></a>
+
+## `@deepseek-ai/dsh-tool-cron`
+
+### `cron_create`
+
+创建一个在没有对话打开的情况下无人值守运行的定时任务。给出 cron 表达式、读取它的 IANA 时区、落点，以及触发时投递的提示词。任务必须说明它的运行位置：new-session 落点声明工作区、agent preset 以及每次运行所依据的 permission preset；session 落点声明每次运行所延续的会话。这要求当前轮次中有直接的人类请求，且不能从自主工作中调用。每次运行都受 max_run_ms 限制。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "expression": {
+      "type": "string",
+      "description": "Five-field cron expression, for example 0 9 * * 1-5, or an @hourly-family macro."
+    },
+    "time_zone": {
+      "type": "string",
+      "description": "IANA zone the expression is read in, for example Asia/Shanghai."
+    },
+    "target": {
+      "type": "object",
+      "description": "Where each run happens.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "new-session (each run creates its own session) | session (each run continues one existing session).",
+          "enum": [
+            "new-session",
+            "session"
+          ]
+        },
+        "workspace_path": {
+          "type": "string",
+          "description": "Absolute directory a new-session run works in; required with kind new-session."
+        },
+        "agent_preset": {
+          "type": "string",
+          "description": "Agent preset a new-session run is composed from; required with kind new-session."
+        },
+        "permission_preset": {
+          "type": "string",
+          "description": "Permission preset a new-session run acts under; required with kind new-session."
+        },
+        "model_provider": {
+          "type": "string",
+          "description": "Provider for a new-session run when it must differ from the deployment default."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model for a new-session run when it must differ from the deployment default."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session every run continues; required with kind session."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Message a firing delivers to the target session."
+    },
+    "max_run_ms": {
+      "type": "integer",
+      "description": "Ceiling on one run in milliseconds; defaults to 600000."
+    },
+    "overlap_policy": {
+      "type": "string",
+      "description": "What happens when a run is still going at the next occurrence; defaults to skip.",
+      "enum": [
+        "skip",
+        "queue-one"
+      ]
+    },
+    "misfire_policy": {
+      "type": "string",
+      "description": "What happens to occurrences missed while no scheduler ran; defaults to skip.",
+      "enum": [
+        "skip",
+        "run-once-late"
+      ]
+    }
+  },
+  "required": [
+    "expression",
+    "time_zone",
+    "target",
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_delete`
+
+按 cron_create 或 cron_list 返回的确切 id 删除一个定时任务。该任务停止触发；其已记录的运行随之移除。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_list`
+
+列出每个定时任务的确切 id、表达式、时区、落点、提示词、运行上限、启用状态、UTC 下次发生时刻，以及最近的运行。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_run`
+
+立即运行一个定时任务一次，且不改变其排期。该任务必须存在，且不能有正在进行的运行。结果报告该次运行如何结束；它不推进下次发生时刻。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+### `cron_update`
+
+按确切 id 修改一个定时任务。只给出要替换的字段：expression、time_zone、target、prompt、overlap_policy、misfire_policy、max_run_ms 或 enabled。会创建会话的落点必须声明其工作区、agent preset 与 permission preset。这要求当前轮次中有直接的人类请求。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Exact task id returned by cron_create or cron_list."
+    },
+    "expression": {
+      "type": "string",
+      "description": "Replacement five-field cron expression."
+    },
+    "time_zone": {
+      "type": "string",
+      "description": "Replacement IANA zone the expression is read in."
+    },
+    "target": {
+      "type": "object",
+      "description": "Replacement target; a new-session target must state its workspace, agent preset, and permission preset.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "new-session (each run creates its own session) | session (each run continues one existing session).",
+          "enum": [
+            "new-session",
+            "session"
+          ]
+        },
+        "workspace_path": {
+          "type": "string",
+          "description": "Absolute directory a new-session run works in; required with kind new-session."
+        },
+        "agent_preset": {
+          "type": "string",
+          "description": "Agent preset a new-session run is composed from; required with kind new-session."
+        },
+        "permission_preset": {
+          "type": "string",
+          "description": "Permission preset a new-session run acts under; required with kind new-session."
+        },
+        "model_provider": {
+          "type": "string",
+          "description": "Provider for a new-session run when it must differ from the deployment default."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model for a new-session run when it must differ from the deployment default."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session every run continues; required with kind session."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Replacement message a firing delivers."
+    },
+    "max_run_ms": {
+      "type": "integer",
+      "description": "Replacement ceiling on one run, in milliseconds."
+    },
+    "overlap_policy": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "queue-one"
+      ]
+    },
+    "misfire_policy": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "run-once-late"
+      ]
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the scheduler may fire the task."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/cron/tool-cron/src/index.ts`](../packages/cron/tool-cron/src/index.ts)
+
+这五个定时任务工具是 ctx.cron 面向模型的消费方。cron_create 与 cron_update 要求实时根 Agent 轮次中的直接人类消息，因为创建任务或重设其目标是授权无人值守开销的行为；cron_list、cron_delete 与 cron_run 需要同样的实时根轮次，但不需要人类消息。new-session 落点必须声明其工作区、agent preset 与 permission preset，且部署必须组装 ctx.cron 提供方（例如 `@deepseek-ai/dsh-cron`）。

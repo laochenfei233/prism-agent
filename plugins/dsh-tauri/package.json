@@ -1,0 +1,68 @@
+{
+  "name": "dsh-tauri",
+  "type": "module",
+  "version": "0.2.1",
+  "description": "Message bridge for DeepSeek Harness desktop: forwards host nav-bar commands (sidebar toggle / page prev / page next) into dsh and reports dsh state back. No UI, no runtime dependencies.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsh-tauri-desk/dsh-tauri.git"
+  },
+  "keywords": [
+    "dsh",
+    "plugin",
+    "tauri",
+    "deepseek-harness",
+    "bridge",
+    "nav"
+  ],
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "lib/index.js",
+  "files": [
+    "README.md",
+    "cordis.patch.yml",
+    "lib"
+  ],
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {},
+  "dependencies": {},
+  "devDependencies": {
+    "@antfu/eslint-config": "^9.3.0",
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-layout": "0.1.0-rc.7",
+    "bumpp": "^12.2.1",
+    "eslint": "^10.9.1",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "vitest": "^4.1.11"
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.node.json",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "clean": "node -e \"require('node:fs').rmSync('lib', { recursive: true, force: true })\"",
+    "release": "bumpp"
+  }
+}

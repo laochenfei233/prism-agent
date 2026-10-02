@@ -336,7 +336,7 @@ function profileDependencyNames(manifest: ProfileManifest): string[] {
 
 /** Resolve the installation packages that the runtime resolver supplies to every profile. */
 function collectInstallationScopePackages(
-  installAnchor: string, skippedBundles: ReadonlySet<string>,
+  installAnchor: string, skippedBundles: ReadonlySet<string>, listings: DirectoryListings,
 ): {
   packageNames: ReadonlySet<string>
   packageDirs: ReadonlyMap<string, string>
@@ -367,7 +367,7 @@ function collectInstallationScopePackages(
     /* v8 ignore next -- a real app manifest always declares dependencies */
     for (const dep of profileDependencyNames(next.manifest)) {
       if (links.has(dep)) continue
-      const dir = packageDirFromAnchor(next.anchor, dep)
+      const dir = packageDirFromAnchor(next.anchor, dep, listings)
       // A declared-but-uninstalled dependency cannot be a loader-visible
       // plugin; skip it rather than fail the whole boot.
       if (dir === undefined) continue
@@ -409,15 +409,16 @@ export async function createRuntimeResolution(
   const { installAnchor, profile, home = resolveDshHome() } = options
   const profilesDir = join(home, PROFILES_DIR)
   const manifest = readOptionalProfileManifest(profile)
+  const listings: DirectoryListings = new Map()
   const { packageNames, packageDirs, declarers, versions } = collectInstallationScopePackages(
-    installAnchor, skippedProfileBundles(profile, manifest),
+    installAnchor, skippedProfileBundles(profile, manifest), listings,
   )
   const profileDeclarers = new Map<string, string>()
   const profileVersions = new Map<string, string | undefined>()
   const localPackageNames = profile === undefined ? [] : installedProfilePackageNames(profile, manifest)
   const profilePackages: ReadonlyMap<string, string> = profile === undefined
     ? new Map<string, string>()
-    : collectProfileScopePackages(profile, packageNames, profileDeclarers, profileVersions)
+    : collectProfileScopePackages(profile, packageNames, listings, profileDeclarers, profileVersions)
   const linkedRoots = profile === undefined ? [] : linkedProfileRoots(profile, profilesDir)
   // The Promise return type is the pre-stable API; construction has no asynchronous step.
   return await Promise.resolve(Object.freeze({
@@ -470,7 +471,7 @@ function installedProfilePackageNames(profile: Profile, manifest: ProfileManifes
 
 /** Collect the first resolvable package directory for each dependency name. */
 function dependencyClosure(
-  anchors: readonly string[], reserved: ReadonlySet<string>,
+  anchors: readonly string[], reserved: ReadonlySet<string>, listings: DirectoryListings,
   declarers?: Map<string, string>,
   versions?: Map<string, string | undefined>,
 ): Map<string, string> {
@@ -493,7 +494,7 @@ function dependencyClosure(
       /* v8 ignore next -- an installable package manifest always declares dependencies or peers */
       for (const dep of profileDependencyNames(next.manifest)) {
         if (visited.has(dep)) continue
-        const dir = packageDirFromAnchor(next.anchor, dep)
+        const dir = packageDirFromAnchor(next.anchor, dep, listings)
         // A declared-but-uninstalled dependency cannot be loader-visible.
         if (dir === undefined) continue
         visited.add(dep)
@@ -511,14 +512,14 @@ function dependencyClosure(
 
 /** Collect packages carried by the profile's selected bundles that the installation does not supply. */
 function collectProfileScopePackages(
-  profile: Profile, installationPackageNames: ReadonlySet<string>,
+  profile: Profile, installationPackageNames: ReadonlySet<string>, listings: DirectoryListings,
   declarers?: Map<string, string>,
   versions?: Map<string, string | undefined>,
 ): Map<string, string> {
   const bundleAnchors = profile.layers
     .filter(layer => !installationPackageNames.has(layer.packageName))
     .map(layer => join(layer.packageDir, 'package.json'))
-  const bundleLinks = dependencyClosure(bundleAnchors, installationPackageNames, declarers, versions)
+  const bundleLinks = dependencyClosure(bundleAnchors, installationPackageNames, listings, declarers, versions)
   for (const layer of profile.layers) bundleLinks.delete(layer.packageName)
   return bundleLinks
 }
@@ -584,6 +585,76 @@ function normalizeShippedProfile(name: string, dir: string, manifest: ProfileMan
   return normalized
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
+/**
+ * Directory listings observed while one resolution is built. One resolution probes the require paths of
+ * every installed package, and those probes land on the same few `node_modules` directories; the map is
+ * created per build so a later build re-reads the filesystem. An entry of `undefined` records a directory
+ * whose entries could not be read, which leaves its candidates to the probe.
+ */
+type DirectoryListings = Map<string, DirectoryListing | undefined>
+
+/** One listed directory: its entry names as read, and those names case-folded for a case-insensitive filesystem. */
+interface DirectoryListing {
+  /** Entry names as the directory reports them. */
+  readonly names: ReadonlySet<string>
+  /** Lowercased entry names, so a name the filesystem resolves case-insensitively still hits its entry. */
+  readonly folded: ReadonlySet<string>
+}
+
+/** The listing of a search path that is not there, which therefore holds no package. */
+const ABSENT_DIRECTORY: DirectoryListing = { names: new Set(), folded: new Set() }
+
+/**
+ * Whether a failed directory read proves the directory itself is not there. Every other failure — a mode
+ * or ACL that hides the entries, an I/O fault — leaves the answer to the probe rather than to the listing.
+ * @param error - the error `readdirSync` threw.
+ * @returns whether the directory is absent.
+ */
+function isMissingDirectory(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException).code === 'ENOENT'
+}
+
+/**
+ * List one directory at most once per build.
+ * @param dir - directory to list.
+ * @param listings - the build's listing cache.
+ * @returns the entries; the empty listing when the directory is not there; undefined when it cannot be
+ * read for another reason, which leaves every candidate to the caller's probe.
+ */
+function listingOf(dir: string, listings: DirectoryListings): DirectoryListing | undefined {
+  if (!listings.has(dir)) {
+    try {
+      listings.set(dir, listedDirectory(dir))
+    } catch (error) {
+      // A search path that is not there holds no package; a permission or I/O failure leaves the probe to answer.
+      listings.set(dir, isMissingDirectory(error) ? ABSENT_DIRECTORY : undefined)
+    }
+  }
+  return listings.get(dir)
+}
+
+/**
+ * Read one directory into its entries and their case-folded names.
+ * @param dir - directory to list.
+ * @returns the entries the directory reports.
+ */
+function listedDirectory(dir: string): DirectoryListing {
+  const names: ReadonlySet<string> = new Set(readdirSync(dir))
+  return { names, folded: new Set([...names].map(name => name.toLowerCase())) }
+}
+
+/**
+ * Whether a readable listing holds the named entry, matching as the filesystem does: exactly, or through
+ * the folded names of a directory that resolves entries case-insensitively.
+ * @param listing - entries of the directory the candidate sits in.
+ * @param name - entry name the candidate expects there.
+ * @returns whether the listing holds that entry.
+ */
+function listingHolds(listing: DirectoryListing, name: string): boolean {
+  return listing.names.has(name) || listing.folded.has(name.toLowerCase())
+}
+
 /**
  * Resolve a package's root directory from one anchor without depending on the
  * package exporting `./package.json` (`require.resolve` would need that):
@@ -591,17 +662,30 @@ function normalizeShippedProfile(name: string, dir: string, manifest: ProfileMan
  * manifest. This is Node's own node_modules lookup order, so the result
  * matches what the Loader would import from the same anchor, and
  * `existsSync` follows the symlinks pnpm's isolated layout uses.
+ * A listing only skips the probe for a candidate it proves is not there: a
+ * directory that does not exist holds nothing, while a directory that could
+ * not be listed, or a name the listing holds, is still left to the probe.
+ * @param anchor - absolute path of a file whose lookup order applies.
+ * @param packageName - bare package or scoped package name.
+ * @param listings - the build's directory listing cache.
+ * @returns the package directory, or undefined when no search path holds its manifest.
  */
-function packageDirFromAnchor(anchor: string, packageName: string): string | undefined {
+function packageDirFromAnchor(
+  anchor: string, packageName: string, listings: DirectoryListings,
+): string | undefined {
   // resolve.paths returns null only for builtins, which no bundle name is.
   /* v8 ignore next */
   for (const searchPath of createRequire(anchor).resolve.paths(packageName) ?? []) {
     const candidate = join(searchPath, packageName)
+    const listing = listingOf(dirname(candidate), listings)
+    // PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
+    if (listing !== undefined && !listingHolds(listing, basename(candidate))) continue
     if (existsSync(join(candidate, 'package.json'))) return candidate
   }
   return undefined
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
 /**
  * Resolve one bundle package's directory: installation anchor first, then the
  * profile directory. The installation-first order is the contract that
@@ -617,8 +701,9 @@ function packageDirFromAnchor(anchor: string, packageName: string): string | und
 export function resolveBundleDir(
   binName: string, packageName: string, installAnchor: string, profileDir: string,
 ): string {
+  const listings: DirectoryListings = new Map()
   for (const anchor of [installAnchor, join(profileDir, 'package.json')]) {
-    const dir = packageDirFromAnchor(anchor, packageName)
+    const dir = packageDirFromAnchor(anchor, packageName, listings)
     if (dir !== undefined) return dir
   }
   throw new Error(

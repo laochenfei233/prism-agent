@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop-ui",
-  "description": "Static shell UI for dsh-desktop (nav bar + first-run wizard). Prebuilt, no build step.",
+  "description": "Static shell UI for dsh-desktop (full-window iframe shell). Prebuilt, no build step.",
   "version": "0.1.0",
   "private": true
 }

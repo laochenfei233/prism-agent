@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 // Builds the bundled runtime consumed by the Tauri shell:
 //
 //   apps/desktop/runtime/
@@ -17,7 +18,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createWriteStream } from 'node:fs';
-import { delimiter, dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, statSync, realpathSync } from 'node:fs';
 
@@ -257,31 +258,103 @@ async function deployDsh() {
   flattenClosure();
   patchBrokenLinks(repo);
   patchMissingPeers(repo);
+  patchDesktopBrowserAuth();
+  copyLocalPlugins(repo);
   if (PLATFORM === 'linux') pruneForeignLinuxPlatformPackages();
   if (PLATFORM === 'mac' || PLATFORM === 'linux') pruneForeignNativeModules();
   // Last: flattenClosure and the patch passes rebuild node_modules from the
   // store, which would overwrite an earlier dist patch.
-  injectNotificationBridge(distDest);
+  injectDesktopHostBridge(distDest);
 }
 
-// WebView2 denies the Web Notification permission in cross-origin iframes
-// (wry answers only the clipboard PermissionRequested) and does not raise
-// NewWindowRequested for target=_blank clicks from one (only the context-menu
-// path does), so web notification plugins never fire and left-clicks on
-// external links die in the desktop. Patch the served entry document with a
-// host bridge that, inside the dsh iframe, routes both to the shell — native
-// toasts through tauri-plugin-notification, and external links through the
-// opener plugin. Plain-browser `dsh web` users stay untouched: the bridge
-// activates only when a parent frame exists.
-function injectNotificationBridge(distDest) {
+// Keep every local bundle under the repository's `plugins/` directory in the
+// desktop runtime. The shell copies these into the profile on first launch and
+// selects their package names as profile bundle layers.
+function copyLocalPlugins(repo) {
+  const sourceRoot = join(repo, 'plugins');
+  if (!existsSync(sourceRoot)) return;
+  for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const source = join(sourceRoot, entry.name);
+    if (!existsSync(join(source, 'package.json'))) continue;
+    const destination = join(PLUGINS_DIR, entry.name);
+    rmSync(destination, { recursive: true, force: true });
+    cpSync(source, destination, {
+      recursive: true,
+      filter: (path) => {
+        const rel = relative(source, path);
+        if (rel === '') return true;
+        const parts = rel.split(/[\\/]/u);
+        if (parts.includes('node_modules') || parts.includes('src') || parts.includes('tests') || parts.includes('scripts')) return false;
+        if (rel.endsWith('.map') || rel.endsWith('.ts') || rel.endsWith('.tsbuildinfo')) return false;
+        return true;
+      },
+    });
+    step(`local plugin ${entry.name} copied`);
+  }
+}
+
+// The desktop shell embeds the web UI in a cross-site iframe. Chromium sends
+// SameSite=Strict cookies only when the top-level site matches the request
+// site, so the browser-session cookie minted by the printed launch URL never
+// reaches the dsh server after its redirect. Keep the cookie HttpOnly and
+// authority-bound, but allow it in the desktop iframe by using the modern
+// cross-site form; the server's loopback trust fence still checks Host and
+// Origin. At the time of writing Chromium accepts Secure cookies on loopback
+// HTTP, which is required for SameSite=None.
+function patchDesktopBrowserAuth() {
+  const entry = join(
+    DSH_DIR,
+    'node_modules',
+    '@deepseek-ai',
+    'dsh-client-connection',
+    'lib',
+    'index.js',
+  );
+  if (!existsSync(entry)) {
+    throw new Error(`desktop browser auth entry missing at ${entry}`);
+  }
+  const source = readFileSync(entry, 'utf8');
+  const before = 'SameSite=Strict`;';
+  const after = 'SameSite=None; Secure`;';
+  if (source.includes(after)) {
+    step('desktop browser auth already patched');
+    return;
+  }
+  if (!source.includes(before)) {
+    throw new Error('desktop browser auth patch: SameSite=Strict marker not found');
+  }
+  writeFileSync(entry, source.replace(before, after));
+  step('desktop browser auth patched for cross-site iframe cookies');
+}
+
+// The served entry document carries the bridge a shell-embedded dsh UI talks
+// to its host through. Two of its jobs answer WebView2 limits that break the
+// plain web UI inside the iframe: wry answers only the clipboard
+// PermissionRequested, so web notification plugins never fire, and
+// NewWindowRequested is not raised for target=_blank clicks, so external
+// links die. The bridge routes both to the shell — native toasts through
+// tauri-plugin-notification, and external links through the opener plugin. Its
+// third job reports that the interface finished mounting, which is what the
+// shell's splash waits for; the frame's own load event fires while client
+// plugins are still activating. Plain-browser `dsh web` users stay untouched:
+// the bridge activates only when a parent frame exists.
+function injectDesktopHostBridge(distDest) {
   const entry = join(distDest, 'index.html');
   if (!existsSync(entry)) return;
   let html = readFileSync(entry, 'utf8');
   if (html.includes('dsh-desktop-host')) return;
+  if (!html.includes('</head>')) {
+    throw new Error('desktop host bridge: </head> missing from the served entry document');
+  }
   const bridge = `<script>
 (() => {
   if (window === window.parent) return
   const post = (payload) => window.parent.postMessage({ source: "dsh-desktop-host", ...payload }, "*")
+  // Ask the shell to hold its splash past the frame's load event: this page
+  // reports readiness itself, and a page without this bridge (a runtime seeded
+  // from an unpatched dist) keeps the shell's load-time reveal.
+  post({ kind: "hold" })
 
   class DshNotification {
     constructor(title, options = {}) {
@@ -318,6 +391,29 @@ function injectNotificationBridge(distDest) {
     } catch {}
     return nativeOpen(url, ...rest)
   }
+
+  // The shell covers the frame with its own splash until the interface is
+  // mounted, because this document's load event fires while the client plugins
+  // are still activating. The boot page owns the mount point until the
+  // assembled application replaces it, and it renders [data-dsh-boot-spinner]
+  // only while the boot is still running, so either condition means the frame
+  // has nothing left to wait for.
+  const settled = () => {
+    const boot = document.querySelector("[data-dsh-boot]")
+    return boot === null || boot.querySelector("[data-dsh-boot-spinner]") === null
+  }
+  let observer
+  function reportSettled() {
+    if (!settled()) return
+    observer.disconnect()
+    post({ kind: "ready" })
+  }
+  observer = new MutationObserver(reportSettled)
+  observer.observe(document.documentElement, { childList: true, subtree: true })
+  // The boot page is appended while the entry module evaluates, so the first
+  // check has to wait for every deferred script.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", reportSettled, { once: true })
+  else reportSettled()
 })()
 </script>`;
   writeFileSync(entry, html.replace('</head>', `${bridge}\n  </head>`));

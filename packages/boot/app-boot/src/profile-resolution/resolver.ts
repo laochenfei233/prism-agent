@@ -1,6 +1,6 @@
 /** In-memory profile package routing for Node's default ESM and CommonJS loaders. */
 
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { createRequire, isBuiltin } from 'node:module'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -8,6 +8,7 @@ import { getEnvironmentData, setEnvironmentData } from 'node:worker_threads'
 import type { ModuleLoaderV1, ModuleLoaderV2, ResolveResult } from '@deepseek-ai/cordis-plugin-loader'
 import { imports as resolvePackageImports, type Package as ResolvePackageManifest } from 'resolve.exports'
 import type { RuntimeResolutionEntry, RuntimeResolution } from '../profile.ts'
+import { realModuleDirectory } from './legacy-links.ts'
 
 const WORKER_RESOLUTION_KEY = '@deepseek-ai/dsh-app-boot/profile-resolution'
 const EMPTY_ATTRIBUTES: ImportAttributes = Object.freeze({})
@@ -150,9 +151,21 @@ export function barePackageName(request: string): string | undefined {
   return second < 0 ? request : request.slice(0, second)
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
+/**
+ * Canonicalize one path for the prefix tables through the carrier's filesystem. The JavaScript realpath
+ * walks every path component with `lstat`; one resolution canonicalizes a directory for every installed
+ * package, so the carrier's own canonicalization is the difference between one filesystem call per path
+ * and one per component.
+ * The carrier reports the on-disk text, where the JavaScript realpath returned the input's own casing and
+ * 8.3 short form; `prefixes` keeps the configured path as its other variant, so a difference in case only
+ * matters for a path that also traverses a link.
+ * @param path - path to canonicalize.
+ * @returns the canonical path, or the resolved path when it is not materialized yet.
+ */
 function canonicalPath(path: string): string {
   try {
-    return realpathSync(path)
+    return realModuleDirectory(path)
   } catch {
     // A runtime resolution may name a profile scope before that directory is materialized.
     return resolve(path)

@@ -84,8 +84,12 @@ public static class DshFileAssociations {
       finally {
         if (Marshal.ReadInt32(count) > owned) {
           // USER_TIMER_MINIMUM wakes the STA to inspect the reference count while dispatching COM work.
+          // The failure names its Win32 error in the message rather than
+          // System.ComponentModel.Win32Exception, which the compile references
+          // below cannot resolve: one unresolvable type fails the whole
+          // Add-Type compile and with it every association query.
           UIntPtr timer = SetTimer(IntPtr.Zero, UIntPtr.Zero, 10, IntPtr.Zero);
-          if (timer == UIntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+          if (timer == UIntPtr.Zero) throw new InvalidOperationException("Shell handoff timer failed: Win32 error " + Marshal.GetLastWin32Error().ToString());
           try {
             while (Marshal.ReadInt32(count) > owned) {
               Message message;
@@ -205,7 +209,27 @@ public static class DshFileAssociations {
 }`
 
 /**
+ * Reference selection for the adapter compile.
+ *
+ * Windows PowerShell resolves the adapter's drawing types from the framework
+ * assembly `System.Drawing`. PowerShell 7 resolves them through
+ * `System.Drawing.Common` instead, and a host that installs PowerShell 7 as
+ * `powershell.exe` therefore reaches this branch: the reference pack beside that
+ * runtime carries the base class library but omits `System.Drawing.Common`, so
+ * the pack and the drawing implementation assemblies are named together.
+ */
+const WINDOWS_REFERENCES = String.raw`$references = @('System', 'System.Core', 'System.Drawing')
+if ($PSVersionTable.PSEdition -eq 'Core') {
+  $references = @(Get-ChildItem -LiteralPath (Join-Path $PSHOME 'ref') -Filter *.dll | ForEach-Object { $_.FullName })
+  $references += @(Get-ChildItem -LiteralPath $PSHOME -Filter 'System.Private.Windows.*.dll' | ForEach-Object { $_.FullName })
+  $references += (Join-Path $PSHOME 'System.Drawing.Common.dll')
+}`
+
+/**
  * Execute the Windows Shell adapter in a Unicode STA PowerShell process.
+ *
+ * The type definition compiles against the reference set both Windows
+ * PowerShell and PowerShell 7 accept, so it names no type outside it.
  * @param path - Windows file path, translated by the caller for WSL.
  * @param application - registered handler to invoke; null requests the application list.
  * @param signal - caller cancellation.
@@ -219,7 +243,8 @@ export async function windowsFileApplications(
   const encodedApplication = Buffer.from(application ?? '').toString('base64')
   const script = `$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-Add-Type -ReferencedAssemblies System,System.Core,System.Drawing -TypeDefinition @'
+${WINDOWS_REFERENCES}
+Add-Type -ReferencedAssemblies $references -TypeDefinition @'
 ${WINDOWS_ASSOCIATIONS}
 '@
 $path = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedPath}'))

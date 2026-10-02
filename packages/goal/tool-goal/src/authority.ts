@@ -94,12 +94,21 @@ function isMatchingGoalRound(execution: GoalToolExecution, goal: GoalView): bool
 
 /**
  * Require authority originating in a human message accepted by a runtime root.
+ *
+ * The `purpose` default keeps this package's own callers, which all refuse a
+ * goal operation, from stating the same phrase at every call site.
  * @param ctx - Context carrying the live agent graph.
  * @param execution - Authenticated current tool execution.
+ * @param purpose - The operation the refusal names, so a second consumer of this
+ * check reports its own act rather than the goal tools'.
  */
-export function requireDirectHuman(ctx: Context, execution: GoalToolExecution): void {
+export function requireDirectHuman(
+  ctx: Context,
+  execution: GoalToolExecution,
+  purpose = 'this goal operation',
+): void {
   if (hasDirectHumanInput(ctx, execution)) return
-  reject('this goal operation requires a direct human turn on a top-level agent')
+  reject(`${purpose} requires a direct human turn on a top-level agent`)
 }
 
 /**

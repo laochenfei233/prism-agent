@@ -1,0 +1,56 @@
+/** Product copy for the Agent Progress panel. */
+
+/** Dictionary namespace owned by this plugin. */
+export const NS = 'agentProgress'
+
+/** Chinese dictionary. */
+export const zh: Record<string, string> = {
+  panel: '进展',
+  title: 'Agent 工作进展',
+  close: '关闭',
+  refresh: '刷新',
+  empty: '还没有会话',
+  emptyHint: '开始一个会话后，这里会显示每个 Agent 的工作进展。',
+  summary: '{running} 个运行中 · {unfinished} 项待办未完成',
+  summaryQuiet: '当前没有运行中的会话',
+  running: '运行中',
+  idle: '空闲',
+  subagent: '子代理',
+  waiting: '等待回答',
+  unread: '有新结果',
+  goal: '目标',
+  planning: '计划模式',
+  todos: '待办',
+  noTodos: '没有待办清单',
+  openSession: '打开会话',
+  now: '刚刚',
+  minutes: '{n} 分钟前',
+  hours: '{n} 小时前',
+  days: '{n} 天前',
+}
+
+/** English dictionary. */
+export const en: Record<string, string> = {
+  panel: 'Progress',
+  title: 'Agent progress',
+  close: 'Close',
+  refresh: 'Refresh',
+  empty: 'No sessions yet',
+  emptyHint: "Start a session and every agent's progress shows up here.",
+  summary: '{running} running · {unfinished} open todos',
+  summaryQuiet: 'Nothing is running right now',
+  running: 'Running',
+  idle: 'Idle',
+  subagent: 'Subagent',
+  waiting: 'Waiting for you',
+  unread: 'New result',
+  goal: 'Goal',
+  planning: 'Plan mode',
+  todos: 'Todos',
+  noTodos: 'No todo list',
+  openSession: 'Open session',
+  now: 'just now',
+  minutes: '{n} min ago',
+  hours: '{n} h ago',
+  days: '{n} d ago',
+}

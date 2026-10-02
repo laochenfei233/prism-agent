@@ -95,10 +95,10 @@ describe('ui-theme apply', () => {
     const before = await bench()
     declareItems(before.slots)
     await before.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('外观')
+    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('主题')
     expect(before.locale.bind(SETTINGS_NS)('fontSize.title')).toBe('字号大小')
     before.locale.setLocale('en')
-    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('Appearance')
+    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('Theme')
     const entry = before.slots.entries(SLOT).find(e => e.component === AppearanceRow)!
     expect(entry.options).toMatchObject({ id: 'appearance', order: 10 })
     const fontEntry = before.slots.entries(SLOT).find(e => e.component === FontSizeRow)!
@@ -126,13 +126,19 @@ describe('ui-theme apply', () => {
     const { instance, face } = faceOf(b.slots)
     // The inject-time re-sync sealed the init window: the mirror is current.
     expect(instance.getSnapshot().preference).toBe('dark')
+    // Every registered theme reaches the gallery, `system` first.
+    expect(instance.getSnapshot().entries.map(entry => entry.id))
+      .toEqual(['system', 'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
     // Copy rides the standard locale seat: the entry declares the namespace.
     expect(b.slots.entries(SLOT).find(e => e.component === AppearanceRow)!.locale).toBe(SETTINGS_NS)
 
+    face.setTheme('graph-glass')
+    expect(theme.getTheme().preference).toBe('graph-glass')
+    expect(instance.getSnapshot().preference).toBe('graph-glass')
     face.setTheme('system')
     expect(theme.getTheme().preference).toBe('system')
     expect(instance.getSnapshot().preference).toBe('system')
-    await vi.waitFor(() => { expect(b.mutate).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(b.mutate).toHaveBeenCalledTimes(3) })
   })
 
   it('projects font-size snapshots into its row store and routes face writes back', async () => {

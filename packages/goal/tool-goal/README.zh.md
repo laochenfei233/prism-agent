@@ -77,8 +77,8 @@ kind: "package-reference"
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：工具注册、配置、系统提示词章节、结果渲染 |
-| [`src/authority.ts`](src/authority.ts) | 执行时权限检查与 Goal Round 接受 |
+| [`src/index.ts`](src/index.ts) | 插件入口：工具注册、配置、系统提示词章节、结果渲染；同时为第二个面向模型的消费者再导出下方的权限助手 |
+| [`src/authority.ts`](src/authority.ts) | 执行时权限检查与 Goal Round 接受。`goalToolExecution` 认证确切的活动调用 agent 及其开启的轮次，`requireDirectHuman(ctx, execution, purpose?)` 要求运行根轮次中存在宿主证实的人类消息；可选的 `purpose` 命名被拒的操作，默认为 `this goal operation` |
 | [`src/wrapup.ts`](src/wrapup.ts) | 终局自主更新的结束消息指令 |
 | — | 不发布运行时不变式伴生入口；此面向模型的适配器不拥有独立状态或事件协议；已接受的变更由 goal 领域检查，权限行为则由本包测试验证。 |
 

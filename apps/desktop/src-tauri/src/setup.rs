@@ -1,85 +1,28 @@
-//! First-run wizard support: detect initialization, choose the default agent
-//! preset (written into the web profile's `cordis.patch.yml` through the
-//! official patch layer), and install plugins through the `dsh plugin` CLI
-//! (with a local-copy path for plugins that ship inside the runtime bundle).
+//! Desktop profile seeding: preinstall the bundled default plugins into the
+//! web profile through the official patch and bundle layers before the dsh
+//! process spawns.
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use serde::Serialize;
 use serde_yaml::Value as Yaml;
 use tauri::{AppHandle, Manager};
 
-use crate::dsh_runner::resolve_runtime;
-
-const PRESET_ROW_ID: &str = "agent-presets";
-const STATE_FILE: &str = "desktop.json";
-
+/// Prism's harness home: `$PRISM_HOME` when set, otherwise Prism's own
+/// `~/.prism`, never the standalone dsh CLI's `~/.dsh`.
 pub fn dsh_home() -> PathBuf {
-    std::env::var("DSH_HOME")
+    std::env::var("PRISM_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
             let base = std::env::var("USERPROFILE")
                 .or_else(|_| std::env::var("HOME"))
                 .unwrap_or_default();
-            PathBuf::from(base).join(".dsh")
+            PathBuf::from(base).join(".prism")
         })
 }
 
 fn profile_web_dir(home: &Path) -> PathBuf {
     home.join("profiles").join("web")
-}
-
-fn state_path(home: &Path) -> PathBuf {
-    home.join(STATE_FILE)
-}
-
-#[derive(Serialize)]
-pub struct FirstRunState {
-    pub initialized: bool,
-    pub preset: String,
-}
-
-fn read_state(home: &Path) -> (bool, String) {
-    // The shell's own marker (written when the first-run wizard completes)
-    // decides initialization. The profile patch and package.json are seeded
-    // by ensure_default_plugins and the dsh process before the wizard runs,
-    // so their existence must not suppress the wizard.
-    let initialized = state_path(home).exists();
-    let preset = fs::read_to_string(state_path(home))
-        .ok()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
-        .and_then(|v| v.get("preset").and_then(|p| p.as_str()).map(String::from))
-        .unwrap_or_else(|| "standard".to_string());
-    (initialized, preset)
-}
-
-#[tauri::command]
-pub fn is_initialized() -> bool {
-    read_state(&dsh_home()).0
-}
-
-#[tauri::command]
-pub fn first_run_state() -> FirstRunState {
-    let (initialized, preset) = read_state(&dsh_home());
-    FirstRunState { initialized, preset }
-}
-
-/// Writes the chosen preset into the profile patch (replacing the
-/// `agent-presets` row's `config.default`) and records it in the shell state.
-#[tauri::command]
-pub fn set_preset(preset: String) -> Result<(), String> {
-    let home = dsh_home();
-    write_state(&home, &preset)?;
-    write_preset_patch(&home, &preset)?;
-    Ok(())
-}
-
-fn write_state(home: &Path, preset: &str) -> Result<(), String> {
-    fs::create_dir_all(home).map_err(|e| e.to_string())?;
-    let state = serde_json::json!({ "preset": preset });
-    fs::write(state_path(home), serde_json::to_string_pretty(&state).unwrap()).map_err(|e| e.to_string())
 }
 
 /// Drop non-mapping rows from a profile patch. Early shell builds wrote
@@ -89,124 +32,9 @@ fn sanitize_rows(rows: Vec<Yaml>) -> Vec<Yaml> {
     rows.into_iter().filter(|row| row.is_mapping()).collect()
 }
 
-fn write_preset_patch(home: &Path, preset: &str) -> Result<(), String> {
-    let patch_path = profile_web_dir(home).join("cordis.patch.yml");
-    fs::create_dir_all(patch_path.parent().unwrap()).map_err(|e| e.to_string())?;
-
-    let mut rows: Vec<Yaml> = if patch_path.exists() {
-        fs::read_to_string(&patch_path)
-            .ok()
-            .and_then(|raw| serde_yaml::from_str(&raw).ok())
-            .map(sanitize_rows)
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-
-    let mut found = false;
-    for row in rows.iter_mut() {
-        if row.get("id").and_then(Yaml::as_str) == Some(PRESET_ROW_ID) {
-            if row.get_mut("config").is_none() {
-                row["config"] = Yaml::Mapping(Default::default());
-            }
-            row["config"]["default"] = Yaml::String(preset.to_string());
-            found = true;
-            break;
-        }
-    }
-    if !found {
-        rows.push(serde_yaml::from_str(&format!(
-            "id: {PRESET_ROW_ID}\nconfig:\n  default: {preset}\n"
-        )).map_err(|e| format!("build patch row: {e}"))?);
-    }
-
-    fs::write(&patch_path, serde_yaml::to_string(&rows).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())
-}
-
-/// Installs one plugin. `spec` is either a package/Git spec passed to
-/// `dsh plugin --profile web add <spec>`, or `local:<name>` for a plugin that
-/// ships inside the bundled runtime (`runtime/plugins/<name>`) and is copied
-/// into the profile with a patch `insert` row — the dsh-win-terminal-inspector
-/// path, which has no npm distribution.
-#[tauri::command]
-pub async fn install_plugin(app: AppHandle, spec: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || install_plugin_sync(&app, &spec))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
-fn install_plugin_sync(app: &AppHandle, spec: &str) -> Result<String, String> {
-    if let Some(name) = spec.strip_prefix("local:") {
-        return install_local_plugin(app, name);
-    }
-    let home = dsh_home();
-    let (node, dsh_bin) = resolve_runtime(app)?;
-    let profile_dir = profile_web_dir(&home);
-    fs::create_dir_all(&profile_dir).map_err(|e| e.to_string())?;
-
-    let mut cmd = Command::new(&node);
-    no_window(&mut cmd);
-    let output = cmd
-        .arg(&dsh_bin)
-        .arg("plugin")
-        .arg("--profile")
-        .arg("web")
-        .arg("add")
-        .arg(spec)
-        .current_dir(profile_dir)
-        .output()
-        .map_err(|e| format!("failed to run dsh plugin add: {e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    if !output.status.success() {
-        return Err(format!("dsh plugin add failed ({})\n{stdout}\n{stderr}", output.status));
-    }
-    Ok(stdout)
-}
-
-fn install_local_plugin(app: &AppHandle, name: &str) -> Result<String, String> {
-    let runtime_plugins = runtime_plugins_dir(app)?;
-    // The runtime plugin directory keeps the repo-style `dsh-` name prefix;
-    // accept both the wizard's short id and the actual directory name.
-    let src = ["dsh-", ""]
-        .iter()
-        .map(|prefix| runtime_plugins.join(format!("{prefix}{name}")))
-        .find(|p| p.exists())
-        .ok_or_else(|| format!("bundled plugin {name} not found in runtime"))?;
-    let home = dsh_home();
-    let dest = profile_web_dir(&home).join("plugins").join(name);
-    fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
-    copy_dir(&src, &dest)?;
-
-    // Append a patch `insert` row unless one with the same id already exists.
-    let patch_path = profile_web_dir(&home).join("cordis.patch.yml");
-    let mut rows: Vec<Yaml> = fs::read_to_string(&patch_path)
-        .ok()
-        .and_then(|raw| serde_yaml::from_str(&raw).ok())
-        .unwrap_or_default();
-    let exists = rows.iter().any(|row| {
-        row.get("insert")
-            .and_then(|ins| ins.as_sequence())
-            .is_some_and(|seq| {
-                seq.iter().any(|entry| {
-                    entry.get("id").and_then(Yaml::as_str) == Some("win-terminal-inspector")
-                })
-            })
-    });
-    if !exists {
-        rows.push(serde_yaml::from_str(
-            "insert:\n  - id: win-terminal-inspector\n    name: ./plugins/dsh-win-terminal-inspector/index.js\n",
-        ).map_err(|e| format!("build patch row: {e}"))?);
-        fs::write(&patch_path, serde_yaml::to_string(&rows).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(format!("installed {name}"))
-}
-
 /// Preinstalled default plugins (plugin market + Windows terminal
 /// inspector). The shell copies them from the bundled runtime into the web
-/// profile on first launch — the wizard no longer installs them. The
+/// profile on every launch before the dsh process spawns. The
 /// win-terminal-inspector copy AND its patch row are gated on the plugin
 /// being present in the runtime: mac/linux bundles do not ship it, and an
 /// entry the loader cannot resolve crashes the hub on every startup.
@@ -230,6 +58,14 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
     // entry name to serve the plugin-center tab. A path-based row loads the
     // server half but leaves the entry unresolvable by the registry.
     ensure_market_bundle(&home, &runtime_plugins)?;
+    let mut bundle_layers = ensure_local_bundles(&home, &runtime_plugins)?;
+    for bundle in ["@deepseek-ai/dsh-experimental-voice-input-bundle"] {
+        if runtime_bundle_present(&runtime_plugins, bundle) {
+            bundle_layers.push(bundle.to_string());
+        }
+    }
+    bundle_layers.sort();
+    bundle_layers.dedup();
 
     // dsh-win-terminal-inspector has no npm distribution; it ships as a local
     // copy inside the profile's plugins directory.
@@ -256,11 +92,20 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
     // every launch. Only the patch layer owns dsh-plugin when the bundle
     // layer does not list it; a stale patch row an older shell wrote
     // unconditionally is dropped instead.
-    if profile_bundles(&profile).iter().any(|bundle| bundle == "dsh-plugin") {
+    if profile_bundles(&profile)
+        .iter()
+        .any(|bundle| bundle == "dsh-plugin")
+    {
         remove_patch_row(&mut rows, "dsh-plugin");
     } else {
-        upsert_patch_row(&mut rows, "dsh-plugin",
-            "insert:\n  - id: dsh-plugin\n    name: dsh-plugin\n")?;
+        upsert_patch_row(
+            &mut rows,
+            "dsh-plugin",
+            "insert:\n  - id: dsh-plugin\n    name: dsh-plugin\n",
+        )?;
+    }
+    if !bundle_layers.is_empty() {
+        ensure_profile_bundles(&profile, &bundle_layers)?;
     }
     if win_present {
         if !has_patch_row(&rows, "win-terminal-inspector") {
@@ -305,16 +150,104 @@ const MCP_TEMPLATE: &str = r#"
 /// (`$DSH_HOME/profiles/node_modules`) so bare `dsh-plugin` resolves from the
 /// profile through the ordinary parent-walk, exactly like an in-box bundle.
 fn ensure_market_bundle(home: &Path, runtime_plugins: &Path) -> Result<(), String> {
-    let src = runtime_plugins.join("dsh-plugin").join("node_modules").join("dsh-plugin");
+    let src = runtime_plugins
+        .join("dsh-plugin")
+        .join("node_modules")
+        .join("dsh-plugin");
     if !src.exists() {
         return Ok(());
     }
-    let dest = home.join("profiles").join("node_modules").join("dsh-plugin");
+    let dest = home
+        .join("profiles")
+        .join("node_modules")
+        .join("dsh-plugin");
     if dest.exists() {
         return Ok(());
     }
     fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
     copy_dir(&src, &dest)
+}
+
+/// Copy every local bundle shipped under the runtime's `plugins/` directory
+/// into the profile-level module fallback and return the package names that
+/// must be selected as bundle layers.
+fn ensure_local_bundles(home: &Path, runtime_plugins: &Path) -> Result<Vec<String>, String> {
+    let mut names = Vec::new();
+    for entry in fs::read_dir(runtime_plugins).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            continue;
+        }
+        let directory_name = entry.file_name().to_string_lossy().into_owned();
+        if directory_name == "dsh-plugin" || directory_name == "dsh-win-terminal-inspector" {
+            continue;
+        }
+        let package_path = entry.path().join("package.json");
+        let raw = match fs::read_to_string(&package_path) {
+            Ok(raw) => raw,
+            Err(_) => continue,
+        };
+        let package: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|e| format!("parse {}: {e}", package_path.display()))?;
+        let Some(package_name) = package.get("name").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        let has_bundle = package
+            .get("dsh")
+            .and_then(|dsh| dsh.get("bundle"))
+            .is_some();
+        if !has_bundle {
+            continue;
+        }
+        let destination = home
+            .join("profiles")
+            .join("node_modules")
+            .join(package_name);
+        if !destination.exists() {
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            copy_dir(&entry.path(), &destination)?;
+        }
+        names.push(package_name.to_string());
+    }
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+/// Select bundled local packages as profile bundle layers without disturbing
+/// the profile's existing bundle order.
+fn ensure_profile_bundles(profile: &Path, names: &[String]) -> Result<(), String> {
+    let path = profile.join("package.json");
+    let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))?;
+    let root = manifest
+        .as_object_mut()
+        .ok_or_else(|| format!("{} is not a JSON object", path.display()))?;
+    let dsh = root
+        .entry("dsh")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| format!("{} dsh field is not an object", path.display()))?;
+    let profile_value = dsh
+        .entry("profile")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| format!("{} dsh.profile field is not an object", path.display()))?;
+    let bundles = profile_value
+        .entry("bundles")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()
+        .ok_or_else(|| format!("{} dsh.profile.bundles is not an array", path.display()))?;
+    for name in names {
+        if !bundles.iter().any(|entry| entry.as_str() == Some(name)) {
+            bundles.push(serde_json::Value::String(name.clone()));
+        }
+    }
+    let rendered = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
+    fs::write(&path, format!("{rendered}\n")).map_err(|e| e.to_string())
 }
 
 /// Insert a patch row unless a row with the same id exists, replacing it when
@@ -325,7 +258,10 @@ fn upsert_patch_row(rows: &mut Vec<Yaml>, id: &str, row_yaml: &str) -> Result<()
     let position = rows.iter().position(|row| {
         row.get("insert")
             .and_then(|ins| ins.as_sequence())
-            .is_some_and(|seq| seq.iter().any(|e| e.get("id").and_then(Yaml::as_str) == Some(id)))
+            .is_some_and(|seq| {
+                seq.iter()
+                    .any(|e| e.get("id").and_then(Yaml::as_str) == Some(id))
+            })
     });
     match position {
         Some(index) => rows[index] = row,
@@ -339,7 +275,10 @@ fn remove_patch_row(rows: &mut Vec<Yaml>, id: &str) {
     rows.retain(|row| {
         !row.get("insert")
             .and_then(|ins| ins.as_sequence())
-            .is_some_and(|seq| seq.iter().any(|e| e.get("id").and_then(Yaml::as_str) == Some(id)))
+            .is_some_and(|seq| {
+                seq.iter()
+                    .any(|e| e.get("id").and_then(Yaml::as_str) == Some(id))
+            })
     });
 }
 
@@ -364,21 +303,15 @@ fn has_patch_row(rows: &[Yaml], id: &str) -> bool {
     rows.iter().any(|row| {
         row.get("insert")
             .and_then(|ins| ins.as_sequence())
-            .is_some_and(|seq| seq.iter().any(|e| e.get("id").and_then(Yaml::as_str) == Some(id)))
+            .is_some_and(|seq| {
+                seq.iter()
+                    .any(|e| e.get("id").and_then(Yaml::as_str) == Some(id))
+            })
     })
 }
 
-/// The app is a GUI process; spawned children would flash a console window.
-fn no_window(cmd: &mut std::process::Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-}
-
-fn runtime_plugins_dir(app: &AppHandle) -> Result<PathBuf, String> {    let resource_dir = app
+fn runtime_plugins_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app
         .path()
         .resource_dir()
         .map_err(|e| format!("resource dir unavailable: {e}"))?;
@@ -391,6 +324,15 @@ fn runtime_plugins_dir(app: &AppHandle) -> Result<PathBuf, String> {    let reso
         .map_err(|_| "no bundled plugins dir; set DSH_DESKTOP_PLUGINS_DIR in dev".to_string())
 }
 
+/// Whether a bundle package is present in the deployed dsh closure beside the
+/// bundled plugins directory.
+fn runtime_bundle_present(runtime_plugins: &Path, package_name: &str) -> bool {
+    runtime_plugins
+        .parent()
+        .map(|runtime| runtime.join("dsh").join("node_modules").join(package_name))
+        .is_some_and(|path| path.exists())
+}
+
 fn copy_dir(src: &Path, dest: &Path) -> Result<(), String> {
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
     for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
@@ -401,18 +343,6 @@ fn copy_dir(src: &Path, dest: &Path) -> Result<(), String> {
         } else {
             fs::copy(entry.path(), &target).map_err(|e| e.to_string())?;
         }
-    }
-    Ok(())
-}
-
-/// Runs the full first-run flow: set the preset, then install every selected
-/// plugin in order. The frontend calls this after the user confirms the
-/// wizard; each step's output streams back via the individual commands.
-#[tauri::command]
-pub async fn apply_first_run(app: AppHandle, preset: String, plugins: Vec<String>) -> Result<(), String> {
-    set_preset(preset)?;
-    for spec in plugins {
-        install_plugin(app.clone(), spec).await?;
     }
     Ok(())
 }

@@ -353,6 +353,13 @@
       name: '@deepseek-ai/dsh-client-ui-schedule'
       disabled: true
 
+    # Scheduled-task panel. The shipped Web graph resolves the client package
+    # but leaves it disabled; the explicit Cron overlay enables this same row
+    # together with the host Cron capability, its tools, and the controller.
+    - id: ui-cron
+      name: '@deepseek-ai/dsh-client-ui-cron'
+      disabled: true
+
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'

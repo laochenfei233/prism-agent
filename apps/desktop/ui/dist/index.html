@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DeepSeek Harness</title>
+  <title>Prism Agent</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="shell">
@@ -12,7 +12,53 @@
     <button id="btn-retry" class="btn">重启服务</button>
   </div>
   <main class="frame-host">
-    <iframe id="dsh-frame" title="DeepSeek Harness" src="about:blank"></iframe>
+    <!-- The dsh UI is served from the loopback origin inside this frame, so
+         every permission it needs must be delegated here: the frame is refused
+         before WebView2 is asked at all. Recording, camera, screen capture,
+         geolocation, notifications, media playback, and the clipboard are
+         delegated; the shell's WebView2 handler answers the same set. -->
+    <iframe id="dsh-frame" title="Prism Agent" src="about:blank"
+            allow="microphone; camera; display-capture; geolocation; notifications; autoplay; fullscreen; clipboard-read; clipboard-write"></iframe>
+    <!-- First paint. The bundled server needs seconds to boot and the client
+         plugins need more, so the window shows this instead of a white
+         rectangle for the whole wait. Shell-owned markup with no network
+         dependency; app.js removes it once the frame reports that the
+         interface mounted. -->
+    <div id="splash" class="splash">
+      <!-- The desktop application icon, inlined so the first paint needs no
+           asset fetch. The vector source is
+           design-assets/app-icons/prism-icon-badge.svg, which is also what
+           generates icons/icon.ico and the installer artwork, so the mark here
+           is the logo the user already sees on the shortcut and the taskbar. -->
+      <svg class="splash-mark" viewBox="0 0 1024 1024" aria-hidden="true">
+        <defs>
+          <linearGradient id="splash-mark-ink" x1="20%" y1="10%" x2="80%" y2="90%">
+            <stop offset="0%" stop-color="#1A1A1A" />
+            <stop offset="100%" stop-color="#050505" />
+          </linearGradient>
+          <filter id="splash-mark-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.14" />
+          </filter>
+        </defs>
+        <rect x="112" y="112" width="800" height="800" rx="176" fill="#FFFFFF" filter="url(#splash-mark-shadow)" />
+        <g transform="translate(512 512) scale(24) translate(-12 -12)" fill="none" stroke="url(#splash-mark-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 L20.66 7 L20.66 17 L12 22 L3.34 17 L3.34 7 Z" />
+          <path d="M12 12 L12 2 M12 12 L20.66 7 M12 12 L20.66 17 M12 12 L12 22 M12 12 L3.34 17 M12 12 L3.34 7" />
+        </g>
+        <g transform="translate(512 512) scale(24) translate(-12 -12)" fill="url(#splash-mark-ink)">
+          <circle cx="12" cy="12" r="3.2" />
+          <circle cx="12" cy="2" r="2.6" />
+          <circle cx="20.66" cy="7" r="2.6" />
+          <circle cx="20.66" cy="17" r="2.6" />
+          <circle cx="12" cy="22" r="2.6" />
+          <circle cx="3.34" cy="17" r="2.6" />
+          <circle cx="3.34" cy="7" r="2.6" />
+        </g>
+      </svg>
+      <div class="splash-title">Prism Agent</div>
+      <div id="splash-status" class="splash-status" role="status">正在启动本地服务…</div>
+      <div class="splash-bar" aria-hidden="true"><span></span></div>
+    </div>
   </main>
   <script src="app.js"></script>
 </body>

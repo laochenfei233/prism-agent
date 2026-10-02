@@ -69,6 +69,20 @@ describe('theme bootstrap row', () => {
     )
   })
 
+  it('paints a designed theme canvas and resolves its own palette, not the OS one', () => {
+    mockSystemDark(true)
+    const [head] = bootThemeInjections('graph-glass')
+    if (head?.kind !== 'style') throw new Error('theme head bootstrap row is not a style')
+    expect(head.text).toBe(':root{color-scheme:light}body{background-color:#f2f3f5;--dsh-boot-bg:#f2f3f5}')
+    executeBootstrap('graph-glass')
+    expect(document.documentElement.dataset.dsThemeSource).toBe('graph-glass')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
+
+    mockSystemDark(false)
+    executeBootstrap('strata-dark')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+  })
+
   it('defaults to system and falls back to light when matchMedia is unavailable', () => {
     vi.stubGlobal('matchMedia', undefined)
     executeBootstrap()

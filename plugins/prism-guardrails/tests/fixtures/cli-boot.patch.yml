@@ -1,0 +1,53 @@
+# Real-CLI boot overlay: the shipped `headless` profile driven by the actual
+# `dsh` entry point, with a keyless scripted model and the bundle loaded from
+# its built artifact by relative path (anchored beside this file).
+#
+# Unlike `capability.patch.yml`, this overlay leaves `headless-startup` and
+# `headless-runner` ENABLED, so the product's own one-shot path runs the task:
+#
+#   node --import tsx/esm apps/cli/src/bin.ts --profile headless \
+#     --patch plugins/prism-guardrails/tests/fixtures/cli-boot.patch.yml --json "probe"
+#
+# It turns on the plan-mode rail and scripts the model to call a denied tool, so
+# the run proves the refusal happens in the product entry point rather than in a
+# test harness. `PRISM_GUARDRAILS_SCRIPT` supplies the model's steps and
+# `PRISM_GUARDRAILS_PLAN=1` enters plan mode through the real plan-mode service.
+- id: llm-deepseek
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: agent-default-model
+  config:
+    provider: capability-mock
+    model: capability-mock
+
+- id: shell-env
+  config:
+    dshHome: './.dsh-home'
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill-filesystem
+  config:
+    dshHome: './.dsh-home'
+    agentsHome: './.agents-home'
+
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+
+- insert:
+    - id: capability-mock-llm
+      name: './capability-mock-llm.ts'
+
+    - id: capability-scenario
+      name: './capability-scenario.ts'
+
+    - id: prism-guardrails
+      name: '../../lib/index.js'
+      config:
+        planDeniedTools: [write]
+        maxStepsPerTurn: 8

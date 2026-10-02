@@ -28,6 +28,11 @@ import { renderWrapupContext } from './wrapup.ts'
 export const name = 'tool-goal'
 export const inject = ['agents', 'goals', 'tools', 'systemPrompt', 'sessionProjections']
 
+// The turn-boundary authority reading is shared with the other model-facing
+// consumer that must prove a direct human turn before spending unattended.
+export { goalToolExecution, requireDirectHuman } from './authority.ts'
+export type { GoalToolAuthority, GoalToolExecution } from './authority.ts'
+
 /** Model policy and hard lower bounds for goal-state updates. */
 export interface Config {
   /** Minimum admitted goal rounds before the model may self-report `blocked`. */

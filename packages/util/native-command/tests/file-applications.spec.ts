@@ -130,6 +130,21 @@ it('encodes Windows query and invocation data separately from native adapter sou
   expect(run.mock.calls[1]![0]).toBe('powershell.exe')
 })
 
+it('compiles the Windows adapter against the reference set of the host PowerShell edition', async () => {
+  const run = vi.fn<runner.NativeCommandRunner>(async () => ({ stdout: JSON.stringify([application]), stderr: '' }))
+  await nativeFileApplications('C:\\file.mp3', signal, { platform: 'win32', run })
+  const query = Buffer.from(run.mock.calls[0]![1].at(-1)!, 'base64').toString('utf16le')
+  // PowerShell 7 resolves System.Drawing through System.Drawing.Common, a
+  // reference the pack beside its runtime omits; Windows PowerShell uses the
+  // framework assembly, so the compile names whichever set the edition needs.
+  expect(query).toContain("if ($PSVersionTable.PSEdition -eq 'Core')")
+  expect(query).toContain("'System.Drawing.Common.dll'")
+  expect(query).toContain("$references = @('System', 'System.Core', 'System.Drawing')")
+  // A type the reference set cannot resolve fails the whole compile, and with it
+  // every association query the file actions depend on.
+  expect(query).not.toContain('throw new System.ComponentModel.Win32Exception')
+})
+
 it('uses the Windows desktop for WSL paths and rejects an empty translation', async () => {
   const run = vi.fn<runner.NativeCommandRunner>(async command => ({
     stdout: command === 'wslpath' ? 'C:\\音频.mp3\n' : JSON.stringify([application]), stderr: '',

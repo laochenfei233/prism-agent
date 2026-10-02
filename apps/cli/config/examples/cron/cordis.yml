@@ -1,0 +1,22 @@
+# Opt-in Cron overlay over the shipped Web composition. It enables the whole
+# scheduled-task set: the Host capability and its leader lease, the model-facing
+# tools, the Remote controller, and the panel row the Web bundle ships disabled.
+#
+# `leaderLockPath` is required and deliberately has no default: the lock must
+# name a path this deployment owns, so two deployments cannot share one domain
+# while each believes it leads.
+
+- insert:
+    - id: cron
+      name: '@deepseek-ai/dsh-cron'
+      config:
+        leaderLockPath: !!js dshHomePath('cron-leader.lock')
+
+    - id: tool-cron
+      name: '@deepseek-ai/dsh-tool-cron'
+
+    - id: cron-controller
+      name: '@deepseek-ai/dsh-api-cron-controller'
+
+- id: ui-cron
+  disabled: false

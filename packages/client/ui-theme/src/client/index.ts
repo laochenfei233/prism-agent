@@ -20,20 +20,27 @@ import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
 import type { FontSizeRowInjected } from './FontSizeRow.tsx'
 import { FontSizeRow } from './FontSizeRow.tsx'
+import { projectThemeGallery } from './gallery.ts'
 import { createAppearanceRowStore, createFontSizeRowStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
+import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
   DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
   isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  type ThemeDefinition, type ThemePreference, type ThemeSettings, type ThemeTokenModes,
+  type ThemeTokenOverrides, type ThemeTokens,
 } from '../theme-settings.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
 export type { FontSizeRowComponentProps, FontSizeRowInjected } from './FontSizeRow.tsx'
 export type { AppearanceRowState, FontSizeRowState } from './settings-store.ts'
+export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
-export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
+export type {
+  BuiltinThemeId, ThemeColorScheme, ThemeDefinition, ThemePreference, ThemeSettings, ThemeTokenModes,
+  ThemeTokenOverrides, ThemeTokens,
+} from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
@@ -43,37 +50,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** The Appearance settings row's copy. */
     'settings.theme': ThemeKey
   }
-}
-
-/** Theme token dictionary: --dsw-alias-* overrides keyed by variable name. */
-export type ThemeTokens = Record<string, string>
-
-/**
- * One override-layer token value: both palette modes are mandatory (repeat
- * the same value when the token is scheme-invariant) so an override never
- * goes illegible when the user switches to the other scheme.
- */
-export interface ThemeTokenModes {
-  /** Value applied while the light base palette is active. */
-  light: string
-  /** Value applied while the dark base palette is active. */
-  dark: string
-}
-
-/** Override-layer dictionary: token names to per-mode value pairs. */
-export type ThemeTokenOverrides = Record<string, ThemeTokenModes>
-
-/** One selectable theme: id, dark/light semantics, and alias-token overrides. */
-export interface ThemeDefinition {
-  /** Theme id (the setTheme argument for concrete themes). */
-  id: string
-  /**
-   * Which base palette this theme builds on. The presenter switches
-   * `body[data-ds-dark-theme]` from this field — never from the id.
-   */
-  colorScheme: 'light' | 'dark'
-  /** Alias-layer overrides applied as inline CSS variables over the base palette. */
-  tokens: ThemeTokens
 }
 
 /** Immutable theme state published on every change. */
@@ -123,12 +99,14 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-const BUILTIN_THEMES: readonly ThemeDefinition[] = Object.freeze([
-  Object.freeze({ id: 'light', colorScheme: 'light' as const, tokens: Object.freeze({}) }),
-  Object.freeze({ id: 'dark', colorScheme: 'dark' as const, tokens: Object.freeze({}) }),
-])
+/** Built-in registry seed: the designed palettes without their boot-canvas field. */
+const BASE_THEMES: readonly ThemeDefinition[] = Object.freeze(BUILTIN_THEMES.map(theme => Object.freeze({
+  id: theme.id, colorScheme: theme.colorScheme, tokens: theme.tokens,
+})))
 
 const BUILTIN_INSPECT_TOKENS: readonly ThemeTokenInspection[] = Object.freeze([
+  { name: '--dsh-theme-canvas-image', description: 'Tiled texture painted on the application frame behind every panel.', valueType: 'CSS background image', requiresLightAndDark: true, cssVariable: '--dsh-theme-canvas-image' },
+  { name: '--dsh-theme-center-image', description: 'Tiled texture painted on the main content column beneath its cards.', valueType: 'CSS background image', requiresLightAndDark: true, cssVariable: '--dsh-theme-center-image' },
   { name: '--dsw-alias-bg-base', description: 'Application base background.', valueType: 'CSS color', requiresLightAndDark: true, cssVariable: '--dsw-alias-bg-base' },
   { name: '--dsw-alias-bg-layer-1', description: 'Primary raised surface background.', valueType: 'CSS color', requiresLightAndDark: true, cssVariable: '--dsw-alias-bg-layer-1' },
   { name: '--dsw-alias-bg-layer-2', description: 'Secondary nested surface background.', valueType: 'CSS color', requiresLightAndDark: true, cssVariable: '--dsw-alias-bg-layer-2' },
@@ -159,7 +137,7 @@ const BUILTIN_INSPECT_TOKENS: readonly ThemeTokenInspection[] = Object.freeze([
 export class ThemeRuntime {
   private readonly ctx: ClientContext
   private readonly host: ConfigForm<ThemeSettings>
-  private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
+  private themes: ThemeDefinition[] = [...BASE_THEMES]
   private preference: ThemePreference
   private fontSize: number = bootstrapFontSize()
   private revision = 0
@@ -422,8 +400,8 @@ export const inject = ['slots', 'locale', 'remote', 'configForms']
 
 /**
  * Client plugin body: provide the theme service and register the
- * feature-owned Appearance preference row into the General section's item
- * slot (a feature owns its settings surface).
+ * feature-owned Appearance gallery into the General section's item slot (a
+ * feature owns its settings surface).
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
@@ -439,7 +417,7 @@ export function apply(ctx: ClientContext): void {
   const fontSizeStore = createFontSizeRowStore()
   let fontSizeBound: BoundActions<typeof fontSizeStore> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, snapshot.revision)
+    bound?.sync(snapshot.preference, projectThemeGallery(snapshot.themes), snapshot.revision)
     fontSizeBound?.sync(snapshot.fontSize, snapshot.revision)
   }
   ctx.on('theme/change', sync)

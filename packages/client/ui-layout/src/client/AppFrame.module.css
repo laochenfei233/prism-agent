@@ -4,7 +4,10 @@
   grid-template-rows: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--dsw-alias-bg-base);
+  /* The theme's canvas texture tiles from the frame's own top-left corner, so
+     a designed background reaches every window edge with no outer frame. */
+  background-color: var(--dsw-alias-bg-base);
+  background-image: var(--dsh-theme-canvas-image, none);
 }
 
 /* Only a discrete collapse/expand toggle eases the tracks (the TSX holds
@@ -32,7 +35,7 @@
 }
 
 :global([data-windows-titlebar]) .centerCol {
-  background: var(--dsw-alias-bg-base);
+  background-color: var(--dsw-alias-bg-base);
   border-radius: var(--dsh-windows-content-radius) 0 0 0;
   corner-shape: round;
 }
@@ -72,6 +75,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Sits under this column's cards: a theme's empty-region texture shows
+     wherever the surfaces above it do not cover. */
+  background-image: var(--dsh-theme-center-image, none);
 }
 
 /* macOS desktop: the frame goes transparent so window vibrancy reaches the
@@ -80,7 +86,8 @@
    to the opaque centre: on the translucent sidebar the alpha border mixes
    with the wallpaper and reads as a dark seam. */
 :global([data-platform='darwin']) .frame {
-  background: transparent;
+  /* background-color only: a theme's canvas texture still paints here. */
+  background-color: transparent;
 }
 
 /* The constant step below the window's top strip (traffic lights, sidebar
@@ -137,7 +144,7 @@
 }
 
 :global([data-platform='darwin']) .centerCol {
-  background: var(--dsw-alias-bg-base);
+  background-color: var(--dsw-alias-bg-base);
   border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
 

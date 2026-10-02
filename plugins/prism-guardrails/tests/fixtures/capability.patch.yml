@@ -1,0 +1,62 @@
+# End-to-end overlay over the shipped `headless` profile for the prism-guardrails
+# capability run.
+#
+# It is the shape a deployment uses: a keyless scripted model, the scenario
+# setup plugin, and the bundle loaded from its BUILT artifact by relative path —
+# the form `loadOverlayPatches` anchors beside this file, and the form a
+# checkout that has not installed the package needs.
+#
+# `headless-startup` and `headless-runner` are disabled because the fixture
+# drives the turn itself; `llm-deepseek` is disabled so no key is needed. The
+# session-title provider is disabled because it issues its own model call
+# through the same route, which would consume a scripted step out of order.
+- id: headless-startup
+  disabled: true
+
+- id: headless-runner
+  disabled: true
+
+- id: llm-deepseek
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: agent-loop
+  config:
+    agents:
+      - id: main
+        provider: capability-mock
+        model: capability-mock
+        cwd: !!js process.cwd()
+
+- id: shell-env
+  config:
+    dshHome: './.dsh-home'
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill-filesystem
+  config:
+    dshHome: './.dsh-home'
+    agentsHome: './.agents-home'
+
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+
+- insert:
+    - id: capability-mock-llm
+      name: './capability-mock-llm.ts'
+
+    - id: capability-scenario
+      name: './capability-scenario.ts'
+
+    - id: prism-guardrails
+      name: '../../lib/index.js'
+      config:
+        planDeniedTools: [write]
+        repeatAskAfter: 2
+        maxStepsPerTurn: 8
+        skillInvocationGuidance: true

@@ -77,8 +77,8 @@ This section explains how the tools enforce authority and render output; the obs
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, config, system-prompt section, result rendering |
-| [`src/authority.ts`](src/authority.ts) | Execution-time authority checks and goal-round acceptance |
+| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, config, system-prompt section, result rendering; also re-exports the authority helpers below for a second model-facing consumer |
+| [`src/authority.ts`](src/authority.ts) | Execution-time authority checks and goal-round acceptance. `goalToolExecution` authenticates the exact live calling agent and its open turn, and `requireDirectHuman(ctx, execution, purpose?)` requires a host-attested human message in a runtime-root turn; the optional `purpose` names the refused operation and defaults to `this goal operation` |
 | [`src/wrapup.ts`](src/wrapup.ts) | Closing-message instruction for terminal autonomous updates |
 | — | No runtime invariant companion is published; this model-facing adapter owns no independent state or event protocol; accepted mutations are checked by the goal domain and authority behavior is package-tested. |
 

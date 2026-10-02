@@ -6,28 +6,49 @@
  */
 
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
+import { BUILTIN_THEMES, bootBackgroundOf } from './builtin-themes.ts'
 import { DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, type ThemePreference } from './theme-settings.ts'
 
-const LIGHT_BACKGROUND = '#fff'
-const DARK_BACKGROUND = '#151517'
+/** Palette mode a preference resolves to before any media query is consulted. */
+function schemeOf(preference: ThemePreference): 'light' | 'dark' {
+  return BUILTIN_THEMES.find(theme => theme.id === preference)?.colorScheme ?? 'light'
+}
 
-/** CSS that colors the document canvas before any script executes. */
+/**
+ * CSS that colors the document canvas before any script executes. A fixed
+ * preference paints its own theme's canvas color; `system` paints the light
+ * canvas and lets the media query swap in the dark one.
+ * @param preference - persisted preference.
+ * @returns the head style text.
+ */
 function bootThemeStyle(preference: ThemePreference): string {
-  const light = `:root{color-scheme:light}body{background-color:${LIGHT_BACKGROUND};--dsh-boot-bg:${LIGHT_BACKGROUND}}`
-  const dark = `:root{color-scheme:dark}body{background-color:${DARK_BACKGROUND};--dsh-boot-bg:${DARK_BACKGROUND}}`
-  if (preference === 'light') return light
-  if (preference === 'dark') return dark
+  if (preference !== 'system') {
+    const background = bootBackgroundOf(preference, false)
+    const dark = schemeOf(preference) === 'dark'
+    return `:root{color-scheme:${dark ? 'dark' : 'light'}}body{background-color:${background};--dsh-boot-bg:${background}}`
+  }
+  const light = `:root{color-scheme:light}body{background-color:${bootBackgroundOf('light', false)};--dsh-boot-bg:${bootBackgroundOf('light', false)}}`
+  const dark = `:root{color-scheme:dark}body{background-color:${bootBackgroundOf('dark', true)};--dsh-boot-bg:${bootBackgroundOf('dark', true)}}`
   return `${light}@media(prefers-color-scheme:dark){${dark}}`
 }
 
-/** Build the body script that installs the palette selector and content size. */
+/** Preference ids whose base palette is dark, projected into the boot script. */
+const DARK_THEME_IDS = JSON.stringify(BUILTIN_THEMES.filter(theme => theme.colorScheme === 'dark').map(theme => theme.id))
+
+/**
+ * Build the body script that installs the palette selector and content size.
+ * @param preference - persisted preference.
+ * @param fontSize - content font size in px.
+ * @returns the body script text.
+ */
 function bootThemeBodyScript(preference: ThemePreference, fontSize: number): string {
   return `(() => {
   const preference = ${JSON.stringify(preference)}
+  const darkIds = ${DARK_THEME_IDS}
   const systemDark = preference === 'system'
     && typeof matchMedia !== 'undefined'
     && matchMedia('(prefers-color-scheme: dark)').matches
-  const dark = preference === 'dark' || systemDark
+  const dark = preference === 'system' ? systemDark : darkIds.includes(preference)
   document.documentElement.dataset.dsThemeSource = preference
   document.body.toggleAttribute('data-ds-dark-theme', dark)
   document.body.style.setProperty('--dsh-content-font-size', ${JSON.stringify(`${fontSize}px`)})

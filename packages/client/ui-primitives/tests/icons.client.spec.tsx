@@ -122,28 +122,40 @@ describe('product icon set', () => {
   })
 })
 
-describe('FishLogo', () => {
-  it('renders the fish path in currentColor at the native ratio', () => {
-    const { container } = render(<primitives.FishLogo />)
+describe('PrismLogo', () => {
+  it('renders the hexagonal lattice in currentColor over a square viewBox', () => {
+    const { container } = render(<primitives.PrismLogo />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('24')
-    expect(Number(svg.getAttribute('height'))).toBeCloseTo(17.7, 1)
-    expect(svg.getAttribute('viewBox')).toBe('-1.6 -1.2 26.36 19.44')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
+    expect(svg.getAttribute('height')).toBe('24')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 24 24')
+    // Ring plus spokes in the stroke group, the seven nodes in the fill group.
+    expect(container.querySelectorAll('path')).toHaveLength(2)
+    expect(container.querySelectorAll('circle')).toHaveLength(7)
     expect(container.innerHTML).toContain('currentColor')
-    expect(container.innerHTML).not.toContain('M0 0L23.16')
   })
 })
 
 describe('BrandWordmark', () => {
   it('can render the name artwork with or without its leading mark', () => {
-    const view = render(<primitives.BrandWordmark />)
+    const view = render(<primitives.BrandWordmark name="PRISM AGENT" />)
     const svg = view.container.querySelector('svg')!
-    expect(svg.getAttribute('width')).toBe('182')
-    expect(svg.getAttribute('viewBox')).toBe('0 0 182 24')
+    // 11 characters at 11.2 units plus the 34-unit mark column.
+    expect(svg.getAttribute('viewBox')).toBe('0 0 157.2 24')
+    expect(svg.getAttribute('width')).toBe('157.2')
+    expect(svg.querySelector('text')?.textContent).toBe('PRISM AGENT')
 
-    view.rerender(<primitives.BrandWordmark includeMark={false} />)
-    expect(svg.getAttribute('width')).toBe('156')
-    expect(svg.getAttribute('viewBox')).toBe('26 0 156 24')
+    view.rerender(<primitives.BrandWordmark name="PRISM AGENT" includeMark={false} />)
+    // Without the mark the artwork both crops and narrows to the name column.
+    expect(svg.getAttribute('viewBox')).toBe('34 0 123.2 24')
+    expect(svg.getAttribute('width')).toBe('123.2')
+  })
+
+  it('keeps the artwork height at the requested size whatever the name length', () => {
+    const view = render(<primitives.BrandWordmark name="PRISM" size={48} />)
+    const svg = view.container.querySelector('svg')!
+    expect(svg.getAttribute('height')).toBe('48')
+    expect(Number(svg.getAttribute('width'))).toBeCloseTo((48 * (34 + 5 * 11.2)) / 24, 5)
+    expect(svg.querySelector('text')?.getAttribute('textLength')).toBe('56')
   })
 })

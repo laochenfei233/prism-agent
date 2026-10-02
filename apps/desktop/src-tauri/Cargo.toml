@@ -1,7 +1,8 @@
+# PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 [package]
 name = "dsh-desktop"
 version = "0.1.1-rc.2"
-description = "DeepSeek Harness desktop shell (Tauri 2)"
+description = "Prism Agent desktop shell (Tauri 2)"
 authors = ["dsh-desktop contributors"]
 license = "MIT"
 edition = "2021"
@@ -18,10 +19,19 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-clipboard-manager = "2"
 tokio = { version = "1", features = ["process", "time", "sync", "rt-multi-thread", "macros", "io-util", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
+
+# The embedded dsh UI records audio, and WebView2 denies a microphone request
+# unless the host answers `PermissionRequested`; the callback types come from
+# the same crate version tauri links against.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
 
 [features]
 # This feature is used for production builds or when a dev server is not

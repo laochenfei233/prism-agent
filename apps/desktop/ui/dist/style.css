@@ -3,8 +3,8 @@
   --fg: #1f2328;
   --muted: #6b7280;
   --line: #e5e7eb;
-  --accent: #0f766e;
-  --accent-soft: #ecfdf5;
+  --accent: #e85d00;
+  --accent-soft: #fff1e6;
   --danger: #b91c1c;
 }
 
@@ -47,73 +47,61 @@ body.shell { display: flex; flex-direction: column; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
-.frame-host { flex: 1; min-height: 0; }
+.frame-host { flex: 1; min-height: 0; position: relative; }
 #dsh-frame { width: 100%; height: 100%; border: none; background: #fff; }
 
-/* ── wizard ──────────────────────────────────────────────── */
+/* ── splash: the first paint while the server and UI bundle boot ────────
+   Shown until the injected host bridge reports a mounted interface, later
+   than the frame's load event. Purely decorative, so it carries no text the
+   user must read to operate the app. */
 
-body.wizard {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f3f4f6;
-}
-
-.wizard-card {
-  width: min(760px, 92vw);
-  max-height: 94vh;
-  overflow-y: auto;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 28px 32px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-}
-
-.wizard-card h1 { margin: 0 0 6px; font-size: 22px; }
-.wizard-sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.6; }
-.wizard-card h2 { font-size: 15px; margin: 20px 0 10px; }
-.hint { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin: 6px 0; }
-.hint code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
-
-.preset-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-.preset-card {
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  padding: 12px 14px;
-  cursor: pointer;
+.splash {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.preset-card strong { font-size: 14px; }
-.preset-card span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-.preset-card.selected { border-color: var(--accent); background: var(--accent-soft); }
-.preset-card.selected strong { color: var(--accent); }
-
-.plugin-list { display: flex; flex-direction: column; gap: 8px; }
-
-.plugin-row {
-  display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-  cursor: pointer;
+  background: var(--bg);
+  color: var(--muted);
+  transition: opacity 180ms ease-out;
 }
-.plugin-row input { margin-top: 2px; accent-color: var(--accent); }
-.plugin-body { display: flex; flex-direction: column; gap: 2px; }
-.plugin-body strong { font-size: 13.5px; }
-.plugin-body span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 
-.progress { margin-top: 18px; }
-.progress-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
-.progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.splash.hidden { opacity: 0; pointer-events: none; }
+.splash.gone { display: none; }
 
-.wizard-actions { margin-top: 22px; display: flex; justify-content: flex-end; }
-.wizard-actions .btn { padding: 8px 22px; font-size: 14px; }
+.splash-mark {
+  display: block;
+  width: 72px;
+  height: 72px;
+}
+
+.splash-title { font-size: 15px; font-weight: 600; color: var(--fg); }
+.splash-status { font-size: 13px; }
+
+.splash-bar {
+  width: 160px;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--accent-soft);
+}
+
+.splash-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: splash-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes splash-slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-bar span { animation: none; width: 100%; }
+}

@@ -54,6 +54,8 @@ import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
 import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
+import type { CronService } from '@deepseek-ai/dsh-cron'
+import * as ToolCron from '@deepseek-ai/dsh-tool-cron'
 import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
@@ -670,6 +672,28 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-cron',
+    dir: 'tool-cron',
+    source: 'packages/cron/tool-cron/src/index.ts',
+    requires: ['ctx.tools', 'ctx.cron', 'ctx.agents', 'ctx.sessionProjections', 'a calling live root Agent in an open turn'],
+    writes: ['tool/call', 'cron storage-domain jobs and their bounded run history', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never executes a management verb or takes the leader
+      // lease, so the capability is declared rather than booted: mounting the
+      // shipped provider would open the durable domain and start its timer.
+      ctx.provide('cron', {} as CronService)
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(ToolCron)
+    },
+    note:
+      'The five scheduled-task tools are the model-facing consumer of ctx.cron. '
+      + 'cron_create and cron_update require a direct human message in the live root-agent turn, '
+      + 'because creating or re-pointing a task is what authorizes unattended spending; '
+      + 'cron_list, cron_delete, and cron_run need the same live root turn but no human message. '
+      + 'A new-session target must state its workspace, agent preset, and permission preset, '
+      + 'and the deployment must compose a ctx.cron provider (e.g. `@deepseek-ai/dsh-cron`).',
   },
 ]
 

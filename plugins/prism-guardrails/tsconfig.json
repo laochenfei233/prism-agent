@@ -1,0 +1,29 @@
+{
+  // The bundle is out of tree, so it borrows the checkout's packages instead of
+  // declaring workspace dependencies: every `@deepseek-ai/*` import in src/ is
+  // `import type`, so a deployment installs nothing and the emitted module has
+  // no imports at all.
+  //
+  // These five `paths` entries replace the base map (an extending config does
+  // not merge `paths`) and point at the checkout's BUILT declarations, which is
+  // how the repository's own packages consume each other through project
+  // references. Everything those declarations import resolves through the
+  // checkout's node_modules. Run `pnpm run build` in the checkout first.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "paths": {
+      "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-agent": ["../../packages/core/agent/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-plan-mode": ["../../packages/plan/plan-mode/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-skill": ["../../packages/skill/skill/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

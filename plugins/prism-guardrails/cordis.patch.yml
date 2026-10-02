@@ -1,0 +1,18 @@
+# The prism-guardrails bundle patch: one row over the profile root.
+#
+# `name` is the bundle's package name — the form a profile resolves once the
+# bundle is installed or published. A checkout that has not installed it points
+# the row at the built entry instead:
+#   name: 'file:///absolute/path/to/plugins/prism-guardrails/lib/index.js'
+#
+# Every rail is off until its key names a value, so this row is the deployment
+# policy the bundle was written for, not a set of built-in fallbacks. A key that
+# is present but unusable fails plugin load rather than silently disabling a rail.
+- insert:
+    - id: prism-guardrails
+      name: 'prism-guardrails'
+      config:
+        planDeniedTools: [write, edit, str_replace_editor]
+        repeatAskAfter: 5
+        maxStepsPerTurn: 20
+        skillInvocationGuidance: true

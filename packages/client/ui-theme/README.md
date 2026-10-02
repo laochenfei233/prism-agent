@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-client-ui-theme` lets Web GUI users choose `light`, `dark`, or `system` and set conversation content text from 12 to 17 px in Settings. A loopback client stores both values in the `ui-theme` settings namespace, which the local provider persists in `$DSH_HOME/cordis.patch.yml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot to the document. The package also ships the `--dsw-*` token stylesheets and injects a synchronous bootstrap so the selected palette and font size apply before the shell loads. Third-party themes can register alias-token overrides through `ctx.theme`.
+`dsh-client-ui-theme` lets Web GUI users choose a theme and set conversation content text from 12 to 17 px in Settings. Five themes ship built in: the `light` and `dark` base palettes, `system`, and three palettes — `graph-glass`, `mono-accent`, and `strata-dark`. A loopback client stores both choices in the `ui-theme` settings namespace, persisted to `$DSH_HOME/cordis.patch.yml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot. It also ships the `--dsw-*` token stylesheets and a bootstrap that applies the palette and font size before the shell loads. Third-party themes register alias-token overrides through `ctx.theme`.
 
 ## Table of Contents
 
@@ -27,17 +27,23 @@ English | [中文](README.zh.md)
 
 Users switch the color scheme and content font size from two rows in Settings (General section); both choices persist across restarts on a loopback browser. Feature plugins consume the current snapshot through `ctx.theme` and read the `--dsw-*` tokens in CSS; they do not manage theme state themselves.
 
-### Appearance and font size
+### Theme gallery and font size
 
-The plugin registers Appearance preference cubes and a font-size stepper in the General section. The stepper accepts integer values from 12 through 17 px and defaults to 14 px. It changes conversation headings and base text by the same increment, including the user bubble and composer draft; flow-row titles, summaries, and tables follow one step under the body size, while small text and code keep fixed sizes. Each accepted change writes through the Host settings API. Rapid changes serialize in gesture order with namespace revisions, and a rejected latest write reloads the durable values. Non-loopback pages keep both choices process-local.
+The plugin registers a theme gallery and a font-size stepper in the General section. The gallery lists one card per selectable preference — `system` first, then every registered theme — and each card paints a miniature of that theme's own canvas, raised surface, and accent colors, so a theme previews itself rather than being described. Selection follows the persisted preference, never the resolved active theme. The stepper accepts integer values from 12 through 17 px and defaults to 14 px. It changes conversation headings and base text by the same increment, including the user bubble and composer draft; flow-row titles, summaries, and tables follow one step under the body size, while small text and code keep fixed sizes. Each accepted change writes through the Host settings API. Rapid changes serialize in gesture order with namespace revisions, and a rejected latest write reloads the durable values. Non-loopback pages keep both choices process-local.
+
+### Designed themes
+
+Three designed palettes layer a complete alias-token set over one base palette. `graph-glass` builds on light: a 44px graph-paper canvas runs to every window edge with no outer frame, and panels, sidebar, and popovers are translucent white so the grid stays faintly visible through them. `mono-accent` builds on dark: one near-black surface ramp carries the page and exactly one hue — the Prism orange — is spent on primary buttons, links, the selected navigation row, and the business state, while the success and warning ramps fold onto the neutral ramp. `strata-dark` also builds on dark and takes depth from lightness alone, hatching empty main regions with a diagonal fill that shows only where opaque cards do not cover it.
+
+Two app-owned tokens carry decoration the alias layer cannot express as a color: `--dsh-theme-canvas-image` tiles the whole frame, and `--dsh-theme-center-image` tiles the main content column beneath its cards. ui-layout's frame consumes both and falls back to `none`, so themes that set neither keep the plain palette.
 
 ### Registering a theme
 
-A composition can register a third-party theme id with alias-token overrides through `ctx.theme`; the override layer folds into the active snapshot's tokens in registration order. Removing one never overwrites the last durable built-in preference. Third-party theme ids remain an in-process extension and do not cross the built-in settings schema.
+A composition can register a third-party theme id with alias-token overrides through `ctx.theme`; the override layer folds into the active snapshot's tokens in registration order, and the gallery adds a card for it using the tokens it overrides. Removing one never overwrites the last durable built-in preference. Third-party theme ids remain an in-process extension and do not cross the built-in settings schema.
 
 ### Pre-plugin palette
 
-When the host composition includes an HTTP server, the host half embeds the registered `ui-theme` settings, or schema defaults, into each index response. Head CSS selects the document canvas color scheme before any script runs, including a `prefers-color-scheme` query for the `system` preference. A body script then sets `body[data-ds-dark-theme]` and `--dsh-content-font-size` before the loading page and application scripts, so the first paint uses the selected palette and text size.
+When the host composition includes an HTTP server, the host half embeds the registered `ui-theme` settings, or schema defaults, into each index response. Head CSS selects the document canvas color scheme before any script runs, including a `prefers-color-scheme` query for the `system` preference and a designed theme's own canvas color otherwise. A body script then sets `body[data-ds-dark-theme]` and `--dsh-content-font-size` before the loading page and application scripts, so the first paint uses the selected palette and text size.
 
 -----
 

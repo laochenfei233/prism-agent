@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/prism/prism-meeting/README.md
+README.md: 27d2cb205dd1bc2124949fb777e65f006150e0dd
+README.zh.md: a2d12ca55f537661f8c4c09ff7385dbbc8cbee11

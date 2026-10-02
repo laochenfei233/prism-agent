@@ -4,8 +4,10 @@
  * empty-root composition, and runtime package resolution.
  */
 
+import { spawnSync } from 'node:child_process'
 import {
-  existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync,
+  chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync,
+  writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
@@ -266,6 +268,77 @@ describe('resolveBundleDir', () => {
     writeFileSync(join(dir, 'cordis.patch.yml'), '[]\n')
     expect(resolveBundleDir('t', 'sealed-bundle', anchor, profileDir)).toBe(dir)
   })
+
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
+  it('answers a requested name that differs in case from the installed directory as the filesystem does', () => {
+    const anchor = stageInstallation({})
+    const profileDir = tmp()
+    writeFileSync(join(profileDir, 'package.json'), '{}')
+    mkdirSync(join(profileDir, 'node_modules', 'mixed-case-bundle'), { recursive: true })
+    writeFileSync(
+      join(profileDir, 'node_modules', 'mixed-case-bundle', 'package.json'),
+      JSON.stringify({ name: 'mixed-case-bundle', version: '0.0.0' }),
+    )
+    const requested = join(profileDir, 'node_modules', 'MIXED-CASE-BUNDLE')
+    // A case-insensitive filesystem resolves the requested name to the directory on disk; a case-sensitive
+    // one holds no such package. Listing the directory before the probe may not turn either answer into the other.
+    if (existsSync(join(requested, 'package.json'))) {
+      expect(resolveBundleDir('t', 'MIXED-CASE-BUNDLE', anchor, profileDir)).toBe(requested)
+    } else {
+      expect(() => resolveBundleDir('t', 'MIXED-CASE-BUNDLE', anchor, profileDir))
+        .toThrow('cannot resolve profile bundle')
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('probes a search path whose entries cannot be read rather than reporting the package as missing', (context) => {
+    const anchor = stageInstallation({})
+    const profileDir = tmp()
+    writeFileSync(join(profileDir, 'package.json'), '{}')
+    const modules = join(profileDir, 'node_modules')
+    mkdirSync(join(modules, 'sealed'), { recursive: true })
+    writeFileSync(join(modules, 'sealed', 'package.json'), JSON.stringify({ name: 'sealed', version: '0.0.0' }))
+    // A node_modules the process may search but not list still resolves its packages through the probe:
+    // only a directory that is not there may be rejected from its listing. Windows has no such mode.
+    chmodSync(modules, 0o111)
+    onTestFinished(() => {
+      chmodSync(modules, 0o700)
+    })
+    let listable = true
+    try {
+      readdirSync(modules)
+    } catch {
+      // The mode denied the listing, which is the condition this test needs; root would keep reading it.
+      listable = false
+    }
+    if (listable) context.skip()
+    expect(resolveBundleDir('t', 'sealed', anchor, profileDir)).toBe(join(modules, 'sealed'))
+  })
+
+  it.skipIf(process.platform !== 'win32')('probes a search path whose entries an ACL hides rather than reporting the package as missing', (context) => {
+    const anchor = stageInstallation({})
+    const profileDir = tmp()
+    writeFileSync(join(profileDir, 'package.json'), '{}')
+    const modules = join(profileDir, 'node_modules')
+    mkdirSync(join(modules, 'sealed'), { recursive: true })
+    writeFileSync(join(modules, 'sealed', 'package.json'), JSON.stringify({ name: 'sealed', version: '0.0.0' }))
+    // Denying ReadData/ListDirectory to everyone hides the entries while a child stays reachable by
+    // name: the Windows counterpart of the POSIX mode above, and the same proof that only an absent
+    // directory is a miss. An account name is not reliably denied by `icacls`, so the deny and its
+    // cleanup both name the well-known Everyone SID.
+    const denied = spawnSync('icacls', [modules, '/deny', '*S-1-1-0:(RD)']).status === 0
+    onTestFinished(() => {
+      spawnSync('icacls', [modules, '/remove:d', '*S-1-1-0'])
+    })
+    let hidden = false
+    try {
+      readdirSync(modules)
+    } catch {
+      // The deny took effect; a host that does not apply the SID leaves the entries readable.
+      hidden = true
+    }
+    if (!denied || !hidden) context.skip()
+    expect(resolveBundleDir('t', 'sealed', anchor, profileDir)).toBe(join(modules, 'sealed'))
+  })
 })
 
 describe('loadProfile', () => {
@@ -497,6 +570,14 @@ describe('createRuntimeResolution', () => {
     expect(resolution.entries.find(entry => entry.name === 'dep-of-a')?.packageDir).toBe(join(modules, 'dep-of-a'))
     expect(existsSync(join(home, 'profiles', 'node_modules'))).toBe(false)
     await expect(createRuntimeResolution({ installAnchor: anchor, home })).resolves.toEqual(resolution)
+  })
+
+  it('skips a declared dependency whose node_modules entry holds no manifest', async () => {
+    const anchor = stageInstallation({ 'bundle-a': { patch: '[]\n', deps: { 'manifest-less': '0.0.0' } } })
+    // A directory carrying the dependency name but no package.json is not a package Node would resolve.
+    mkdirSync(join(anchor, '..', 'node_modules', 'manifest-less'), { recursive: true })
+    const resolution = await createRuntimeResolution({ installAnchor: anchor, home: tmp() })
+    expect(resolution.entries.map(entry => entry.name)).toEqual(['dsh-app', 'bundle-a'])
   })
 
   it('keeps selected bundle closures profile-local without overriding installation packages', async () => {

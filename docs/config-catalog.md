@@ -574,7 +574,7 @@ export interface Config {
   fontSize: Volatile<number>
 }
 
-/** Theme preference persisted by the product Appearance row. */
+/** Theme preference persisted by the product Appearance gallery. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
 ```
 
@@ -685,6 +685,40 @@ export interface Config {
 ```
 
 Source: [`packages/credentials/credentials-local/src/index.ts:64`](../packages/credentials/credentials-local/src/index.ts)
+
+<a id="deepseek-aidsh-cron"></a>
+
+## `@deepseek-ai/dsh-cron`
+
+Requires: `storageDomain` · `timer` · `agents`
+
+```ts config-catalog
+/**
+ * Plugin config as a deployment states it in `cordis.yml`.
+ *
+ * Every field is a deployment choice, so none of them is decided inside the
+ * plugin; the two optional ones carry a schema default and are still resolved
+ * explicitly by {@link resolveCronConfig}.
+ */
+export interface Config {
+  /**
+   * Path of the leadership lock file.
+   *
+   * Required, and deliberately not defaulted: a default could point somewhere
+   * other than the deployment's configured storage root, and two deployments
+   * would then each believe they lead while sharing one domain.
+   */
+  leaderLockPath: string
+  /** Delay before a follower retries leadership, in milliseconds. */
+  leaderRetryMs?: number
+  /** Finished runs each job keeps; older runs are dropped as new ones land. */
+  maxRunsPerJob?: number
+  /** Ceiling on one run, in milliseconds, when the creating caller states none. */
+  defaultMaxRunMs?: number
+}
+```
+
+Source: [`packages/cron/cron/src/config.ts:30`](../packages/cron/cron/src/config.ts)
 
 <a id="deepseek-aidsh-deepseek-account-platform"></a>
 
@@ -1013,6 +1047,40 @@ export interface Config {
 Depends on: `Volatile` (`@deepseek-ai/cordis`)
 
 Source: [`packages/experimental/speech-to-text/src/index.ts:20`](../packages/experimental/speech-to-text/src/index.ts)
+
+<a id="deepseek-aidsh-experimental-speech-to-text-dashscope"></a>
+
+## `@deepseek-ai/dsh-experimental-speech-to-text-dashscope`
+
+Requires: `speechToText`
+
+```ts config-catalog
+/** Plugin configuration; every field is resolved before the provider is registered. */
+export interface Config {
+  /** Literal DashScope key; prefer {@link Config.apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference holding the key; defaults to `DASHSCOPE_API_KEY`. */
+  apiKeyEnv: string
+  /** Registration identity this recognizer occupies. */
+  providerId: string
+  /** Language hints this recognizer accepts. */
+  languages: string[]
+  /** Duplex recognition endpoint. */
+  url: string
+  /** Realtime recognition model name. */
+  model: string
+  /** Whether the model labels speakers in its results. */
+  speakerDiarization: boolean
+  /** Maximum accepted recording duration in seconds. */
+  maxDurationSeconds: number
+  /** Deadline, in milliseconds, covering connect, upload, and result accumulation. */
+  timeoutMs: number
+  /** Deadline, in milliseconds, for the results sent after `task-finish`. */
+  drainTimeoutMs: number
+}
+```
+
+Source: [`packages/experimental/speech-to-text-dashscope/src/index.ts:42`](../packages/experimental/speech-to-text-dashscope/src/index.ts)
 
 <a id="deepseek-aidsh-experimental-speech-to-text-sensevoice"></a>
 
@@ -3345,6 +3413,22 @@ export interface Config {
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:443`](../packages/shell/tool-bash-persistent/src/index.ts)
 
+<a id="deepseek-aidsh-tool-cron"></a>
+
+## `@deepseek-ai/dsh-tool-cron`
+
+Requires: `agents` · `cron` · `sessionProjections` · `tools`
+
+```ts config-catalog
+/** Deployment policy for the scheduled-task tools. */
+export interface Config {
+  /** Run ceiling, in milliseconds, for a task whose creation states none. */
+  defaultMaxRunMs?: number
+}
+```
+
+Source: [`packages/cron/tool-cron/src/index.ts:44`](../packages/cron/tool-cron/src/index.ts)
+
 <a id="deepseek-aidsh-tool-fs"></a>
 
 ## `@deepseek-ai/dsh-tool-fs`
@@ -3416,7 +3500,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/goal/tool-goal/src/index.ts:32`](../packages/goal/tool-goal/src/index.ts)
+Source: [`packages/goal/tool-goal/src/index.ts:37`](../packages/goal/tool-goal/src/index.ts)
 
 <a id="deepseek-aidsh-tool-jobs"></a>
 
@@ -4115,6 +4199,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-acp-app` — requires `cmdlineArgs` ([`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts))
 - `@deepseek-ai/dsh-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
 - `@deepseek-ai/dsh-api-account-controller` — requires `deepseekAccount` ([`packages/api/account-controller/src/index.ts`](../packages/api/account-controller/src/index.ts))
+- `@deepseek-ai/dsh-api-cron-controller` — requires `cron` · `typert` ([`packages/api/cron-controller/src/index.ts`](../packages/api/cron-controller/src/index.ts))
 - `@deepseek-ai/dsh-api-remotes` — requires `typertGateway` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
 - `@deepseek-ai/dsh-authorization` — requires `credentials` ([`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts))
 - `@deepseek-ai/dsh-browser-use` ([`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts))
@@ -4130,6 +4215,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-cron` ([`packages/client/ui-cron/src/index.ts`](../packages/client/ui-cron/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-deliverables` — requires `systemPrompt` · `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` ([`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-directory-picker-native` ([`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts))
@@ -4285,6 +4371,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
 - `@deepseek-ai/dsh-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))
 - `@deepseek-ai/dsh-util-crypto` ([`packages/util/crypto/src/index.ts`](../packages/util/crypto/src/index.ts))
+- `@deepseek-ai/dsh-util-path-lock` ([`packages/util/path-lock/src/index.ts`](../packages/util/path-lock/src/index.ts))
 - `@deepseek-ai/dsh-util-time` ([`packages/util/time/src/index.ts`](../packages/util/time/src/index.ts))
 - `@deepseek-ai/dsh-util-values` ([`packages/util/values/src/index.ts`](../packages/util/values/src/index.ts))
 - `@deepseek-ai/dsh-util-workspace-path` ([`packages/util/workspace-path/src/index.ts`](../packages/util/workspace-path/src/index.ts))
