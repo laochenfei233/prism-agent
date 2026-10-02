@@ -1,6 +1,8 @@
 # design-assets
 
-从 Prism-Agent 旧代码库提取的图标与设计内容，随 prism-agent-e（deepseek-harness 基线）保留。
+English | [中文](README.zh.md)
+
+Prism 品牌标识矢量源与从 Prism-Agent 旧代码库提取的设计内容。
 
 提取日期：2026-09-24。源仓库完整归档见 `Documents/GitHub/archives/prism-agent-final-*.zip`。
 
@@ -8,16 +10,13 @@
 
 ### app-icons/
 
-| 文件 | 来源 |
+| 文件 | 说明 |
 | --- | --- |
-| icon.png / icon.svg / icon_base.png | `build/` 应用主图标 |
-| logo.png / logo-standalone.png / avatar.png | `build/` 品牌 logo 与头像 |
-| tray_icon.png / tray_icon_dark.png / tray_icon_light.png | `build/` 托盘图标 |
-| renderer-logo.png / renderer-avatar.png | `src/renderer/assets/images/` |
+| prism-icon-badge.svg / prism-mark.svg | 现行品牌标识矢量源，见 [app-icons/README.md](app-icons/README.md) |
 
 ### agent-logos/
 
-8 个渐变几何 SVG（logo:agent:1–8），从 `src/renderer/components/icons/AgentLogo.tsx` 的形状与渐变色值导出为独立静态 SVG。
+5 个渐变几何 SVG（logo:agent:2、3、4、6、7），从 `src/renderer/components/icons/AgentLogo.tsx` 的形状与渐变色值导出为独立静态 SVG；橙色系的 1、5、8 已连同其他橙色图标删除。
 
 ### readme-design/
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Prism Agent Windows icon">
+  <defs>
+    <linearGradient id="windows-mark" x1="20%" y1="10%" x2="80%" y2="90%">
+      <stop offset="0%" stop-color="#1A1A1A"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </linearGradient>
+    <filter id="windows-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect x="112" y="112" width="800" height="800" rx="176" fill="#FFFFFF" filter="url(#windows-shadow)"/>
+  <g transform="translate(512 512) scale(24) translate(-12 -12)" fill="none" stroke="url(#windows-mark)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2 L20.66 7 L20.66 17 L12 22 L3.34 17 L3.34 7 Z"/>
+    <path d="M12 12 L12 2 M12 12 L20.66 7 M12 12 L20.66 17 M12 12 L12 22 M12 12 L3.34 17 M12 12 L3.34 7"/>
+  </g>
+  <g transform="translate(512 512) scale(24) translate(-12 -12)" fill="url(#windows-mark)">
+    <circle cx="12" cy="12" r="3.2"/>
+    <circle cx="12" cy="2" r="2.6"/>
+    <circle cx="20.66" cy="7" r="2.6"/>
+    <circle cx="20.66" cy="17" r="2.6"/>
+    <circle cx="12" cy="22" r="2.6"/>
+    <circle cx="3.34" cy="17" r="2.6"/>
+    <circle cx="3.34" cy="7" r="2.6"/>
+  </g>
+</svg>

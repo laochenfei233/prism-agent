@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" role="img" aria-label="Prism Agent">
+  <!-- Compact mark: ink follows currentColor so it adopts the surface it sits on. -->
+  <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2 L20.66 7 L20.66 17 L12 22 L3.34 17 L3.34 7 Z"/>
+    <path d="M12 12 L12 2 M12 12 L20.66 7 M12 12 L20.66 17 M12 12 L12 22 M12 12 L3.34 17 M12 12 L3.34 7"/>
+  </g>
+  <g fill="currentColor">
+    <circle cx="12" cy="12" r="3.2"/>
+    <circle cx="12" cy="2" r="2.6"/>
+    <circle cx="20.66" cy="7" r="2.6"/>
+    <circle cx="20.66" cy="17" r="2.6"/>
+    <circle cx="12" cy="22" r="2.6"/>
+    <circle cx="3.34" cy="17" r="2.6"/>
+    <circle cx="3.34" cy="7" r="2.6"/>
+  </g>
+</svg>
