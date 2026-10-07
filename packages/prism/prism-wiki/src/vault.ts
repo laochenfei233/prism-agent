@@ -277,6 +277,7 @@ export function revisionOf(text: string): string {
  * here, so a page reachable only from `index.md` still counts as orphaned.
  * @param pages - every parsed page in the vault.
  * @param sources - every raw source path in the vault, relative to `raw/`.
+ * @param unreadable - page files whose frontmatter could not be parsed, reported as `frontmatter` findings.
  * @returns the counts examined and every finding, in report order.
  */
 export function lintVault(
