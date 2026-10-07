@@ -278,7 +278,11 @@ export function revisionOf(text: string): string {
  * @param sources - every raw source path in the vault, relative to `raw/`.
  * @returns the counts examined and every finding, in report order.
  */
-export function lintVault(pages: readonly WikiPage[], sources: readonly WikiSourcePath[]): WikiLintReport {
+export function lintVault(
+  pages: readonly WikiPage[],
+  sources: readonly WikiSourcePath[],
+  unreadable: readonly WikiUnreadablePage[] = [],
+): WikiLintReport {
   const findings: WikiLintFinding[] = []
   const index = buildLinkIndex(pages)
   const backlinks = new Map<string, Set<string>>()
@@ -373,8 +377,20 @@ export function lintVault(pages: readonly WikiPage[], sources: readonly WikiSour
     }
   }
 
+  for (const page of unreadable) {
+    findings.push({ kind: 'frontmatter', page: page.path, detail: page.message })
+  }
+
   findings.sort(compareFindings)
   return { pages: pages.length, sources: sources.length, findings }
+}
+
+/** A page file the vault could not parse, named for the human who must repair it. */
+export interface WikiUnreadablePage {
+  /** Page identity relative to `wiki/`, including the `.md` suffix. */
+  readonly path: WikiPagePath
+  /** The parser's own message, which names the offending field. */
+  readonly message: string
 }
 
 /** The filesystem half of the vault. */
@@ -426,10 +442,12 @@ export class VaultFiles {
   }
 
   /**
-   * Every page, parsed, with its mtime. Throws if any page's frontmatter is invalid.
+   * Every readable page, parsed, with its mtime. A page whose frontmatter cannot
+   * be parsed is skipped rather than aborting the walk, so one hand-edited file
+   * cannot take down search, lint, or the catalog. `listUnreadablePages` names
+   * those files, and `readPage` still refuses to return one.
    * @returns the parsed pages, ordered by path.
    * @throws WikiVaultError with code `WIKI_ROOT_NOT_VAULT` when `wiki/` is absent.
-   * @throws WikiVaultError with code `WIKI_FRONTMATTER_INVALID` for the first unparsable page.
    */
   async listPageEntries(): Promise<readonly VaultPageEntry[]> {
     const files = await this.pageFiles()
@@ -437,11 +455,37 @@ export class VaultFiles {
     for (const file of files.sort(compareStrings)) {
       const text = await readFile(file, 'utf8')
       const path = pagePathOf(this.root, file)
-      const { frontmatter, body } = parsePageText(text, path)
-      const metadata = await stat(file)
-      entries.push({ page: { path, frontmatter, body, revision: revisionOf(text) }, mtimeMs: metadata.mtimeMs })
+      try {
+        const { frontmatter, body } = parsePageText(text, path)
+        const metadata = await stat(file)
+        entries.push({ page: { path, frontmatter, body, revision: revisionOf(text) }, mtimeMs: metadata.mtimeMs })
+      } catch (error) {
+        // An unparsable page is reported by listUnreadablePages and by lint; it
+        // must not abort an enumeration every other reader depends on.
+        if (!(error instanceof WikiVaultError)) throw error
+      }
     }
     return entries
+  }
+
+  /**
+   * Every page file whose frontmatter cannot be parsed, with the parser's message.
+   * @returns the unreadable pages, ordered by path.
+   * @throws WikiVaultError with code `WIKI_ROOT_NOT_VAULT` when `wiki/` is absent.
+   */
+  async listUnreadablePages(): Promise<readonly WikiUnreadablePage[]> {
+    const files = await this.pageFiles()
+    const unreadable: WikiUnreadablePage[] = []
+    for (const file of files.sort(compareStrings)) {
+      const path = pagePathOf(this.root, file)
+      try {
+        parsePageText(await readFile(file, 'utf8'), path)
+      } catch (error) {
+        if (!(error instanceof WikiVaultError)) throw error
+        unreadable.push({ path, message: error.message })
+      }
+    }
+    return unreadable
   }
 
   /**

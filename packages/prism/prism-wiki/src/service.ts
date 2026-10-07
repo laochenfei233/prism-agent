@@ -320,7 +320,11 @@ export class WikiVaultService extends Service {
   async lint(): Promise<WikiLintReport> {
     const files = await this.ready()
     const entries = await files.listPageEntries()
-    return lintVault(entries.map(entry => entry.page), await files.listSources())
+    return lintVault(
+      entries.map(entry => entry.page),
+      await files.listSources(),
+      await files.listUnreadablePages(),
+    )
   }
 
   /**

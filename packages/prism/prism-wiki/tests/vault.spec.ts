@@ -440,3 +440,47 @@ describe('concurrent writers', () => {
     expect(names.filter(name => name.endsWith('.tmp'))).toEqual([])
   })
 })
+
+describe('a malformed page', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+    await files.writePage({
+      path: page('concepts/healthy.md'),
+      frontmatter: frontmatter({ title: 'Healthy' }),
+      body: 'Healthy body.\n',
+    }, 'write')
+    await writeFile(
+      join(root, 'wiki', 'concepts', 'broken.md'),
+      '---\ntitle: Broken\ntype: concept\ntags: [x]\n---\n\nBody.\n',
+      'utf8',
+    )
+  })
+
+  it('does not abort the vault-wide enumeration', async () => {
+    const paths = (await files.listPageEntries()).map(entry => entry.page.path)
+
+    expect(paths).toContain('concepts/healthy.md')
+    expect(paths).not.toContain('concepts/broken.md')
+  })
+
+  it('is named by listUnreadablePages', async () => {
+    const unreadable = await files.listUnreadablePages()
+
+    expect(unreadable.map(entry => entry.path)).toEqual(['concepts/broken.md'])
+    expect(unreadable[0]?.message).toContain('updated')
+  })
+
+  it('is reported by the lint report', async () => {
+    const report = lintVault(
+      (await files.listPageEntries()).map(entry => entry.page),
+      await files.listSources(),
+      await files.listUnreadablePages(),
+    )
+
+    expect(report.findings.some(finding => finding.kind === 'frontmatter' && finding.page === 'concepts/broken.md')).toBe(true)
+  })
+
+  it('is still refused by readPage', async () => {
+    await expect(files.readPage(page('concepts/broken.md'))).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+  })
+})
