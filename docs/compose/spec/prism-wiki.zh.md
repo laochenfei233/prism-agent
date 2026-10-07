@@ -108,6 +108,8 @@ vault 自己的 `AGENTS.md` 则在每个会话中恰好追加一次：于该会�
 
 `index.md` 与 `log.md` 由插件拥有：索引声明 `generated: true` 并在每次变更时被重新生成而非合并，手工编辑它会在下一次变更时被覆盖。
 
+`expectedRevision` 过期时会被拒绝，并返回一个把已存储页面带给模型的冲突。Web 保存路由只报告冲突码，页面会把读者的草稿与保留内容并排保留；把已存储页面放进该信封尚未实现。
+
 ### Web 页面
 
 客户端新增一个 Knowledge 页面：作为带 key 的 `main` 条目，与一行 `sidebar.panellist` 配对，通过 `ctx.slots.inject` 注册——在向其他包的 slot 注册时这是必需的。vault 树、渲染器、搜索框、反向链接面板、编辑器与健康标签页都通过同一个 inject face 读取数据。

@@ -108,6 +108,8 @@ Four writers touch the vault: the model's tools, the Web page, an external edito
 
 `index.md` and `log.md` are plugin-owned: the index declares `generated: true` and is regenerated rather than merged, and a hand edit to it is overwritten on the next mutation.
 
+A stale `expectedRevision` is refused with a conflict that carries the stored page to the model. The Web save route reports the conflict code and the page keeps the reader's draft beside the retained content; carrying the stored page into that envelope is deferred.
+
 ### The Web page
 
 A Knowledge page joins the client as a keyed `main` entry paired with a `sidebar.panellist` row, registered through `ctx.slots.inject`, which is required when registering into another package's slot. The vault tree, renderer, search box, backlinks panel, editor, and health tab read through one inject face.
