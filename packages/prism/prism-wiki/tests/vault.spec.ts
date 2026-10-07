@@ -433,11 +433,26 @@ describe('concurrent writers', () => {
     expect(log.split('\n').filter(line => line.startsWith('## ['))).toHaveLength(12)
   })
 
-  it('leaves no temporary file behind', async () => {
-    await files.writePage({ path: page('concepts/clean.md'), frontmatter: frontmatter(), body: 'Body.\n' }, 'write')
+  it('leaves no temporary file behind after concurrent writes', async () => {
+    await Promise.all(Array.from({ length: 4 }, (_, index) => files.writePage({
+      path: page(`concepts/temp-${index}.md`),
+      frontmatter: frontmatter(),
+      body: `Body ${index}.\n`,
+    }, 'write')))
 
     const names = await readdir(join(root, 'wiki', 'concepts'))
     expect(names.filter(name => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('still reports a stale revision when the stored page cannot be parsed', async () => {
+    await writeFile(join(root, 'wiki', 'concepts', 'unparsable.md'), 'not a page at all\n', 'utf8')
+
+    await expect(files.writePage({
+      path: page('concepts/unparsable.md'),
+      frontmatter: frontmatter(),
+      body: 'Replacement.\n',
+      expectedRevision: 'anything',
+    }, 'write')).rejects.toMatchObject({ code: 'WIKI_REVISION_CONFLICT' })
   })
 })
 

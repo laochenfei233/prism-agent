@@ -8,6 +8,7 @@
 export { WikiVaultService as default, WikiVaultService, WikiError, DEFAULT_PROTOCOL } from './service.ts'
 export type { Config } from './service.ts'
 export { VaultFiles, WikiVaultError, VAULT_SCHEMA_TEMPLATE, lintVault, parsePageText, serializePageText } from './vault.ts'
+export type { WikiUnreadablePage } from './vault.ts'
 export { WikiSearchIndex } from './search.ts'
 export type { WikiSearchEntry } from './search.ts'
 export type * from './types.ts'

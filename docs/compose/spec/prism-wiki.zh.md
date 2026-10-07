@@ -14,7 +14,7 @@ commits: 本分支上的两次提交
 
 **已构建内容** — `@prism-ai/prism-wiki` 在 `<DSH home>/knowledge` 维护一个 Markdown 知识库：不可变的 `raw/` 来源、模型拥有的 `wiki/` 页面、共同演化的 `AGENTS.md` schema、生成的 `index.md`、只追加的 `log.md`，以及插件私有的 `.wiki/`（内含可重建的 SQLite FTS5 缓存）。五个模型工具经 `ctx.tools.register` 注册，`/wiki` 是操作员界面，五条宿主 Fetch 路由承载 Web 知识库页面，包以预构建镜像发布在 `plugins/prism-wiki`。
 
-**验证** — 该包在两个根 aggregate 中都没有 `tsc` 诊断；八个测试文件 119 个测试全部通过；`oxlint` 无发现；两个 `tsdown` 面都能构建，`scripts/smoke.mjs` 通过。配对、换行、预算、Agent Note、客户端文案与导出 JSDoc 检查均通过。`verify-package-dependencies` 仍报告三处未分类的宿主值导入。
+**验证** — 该包在两个根 aggregate 中都没有 `tsc` 诊断；八个测试文件 127 个测试全部通过；`oxlint` 无发现；两个 `tsdown` 面都能构建，`scripts/smoke.mjs` 通过。配对、换行、预算、Agent Note、客户端文案与导出 JSDoc 检查均通过。`verify-package-dependencies` 仍报告三处未分类的宿主值导入。
 
 **历程记录** — 1) Web 那一半无法在 `plugins/` 下开发，因为 `clientBundle()` 通过 glob `packages/*/*/package.json` 解析客户端包。2) 全仓库构建在全新 worktree 中无法完成，因此改为按构建面驱动 `tsdown`。3) 沙箱阻止子进程，`pnpm`、`tsx`、vitest 与 lefthook 都需要提权，提交在逐条直接运行对应钩子等价检查后使用 `--no-verify`。4) 独立评审发现五个严重缺陷。已修复：引号列表损坏、`wiki_read` 能读取 schema 这一虚假承诺及其逐步重复投递、并发写入（现以唯一临时路径串行化）、单页损坏的爆炸半径（全库遍历现会跳过并交由巡检报告）、冲突负载（现携带已存储的页面），以及两处门禁失败；每一项都带有修复前会失败的回归测试。只剩三处未分类的宿主值导入，它们有待人工评审，因为依赖策略禁止自动化 agent 添加该例外，因此本文档不是 delivered。
 

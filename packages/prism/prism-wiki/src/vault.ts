@@ -455,16 +455,17 @@ export class VaultFiles {
     const files = await this.pageFiles()
     const entries: VaultPageEntry[] = []
     for (const file of files.sort(compareStrings)) {
-      const text = await readFile(file, 'utf8')
       const path = pagePathOf(this.root, file)
       try {
+        const text = await readFile(file, 'utf8')
         const { frontmatter, body } = parsePageText(text, path)
         const metadata = await stat(file)
         entries.push({ page: { path, frontmatter, body, revision: revisionOf(text) }, mtimeMs: metadata.mtimeMs })
       } catch (error) {
-        // An unparsable page is reported by listUnreadablePages and by lint; it
-        // must not abort an enumeration every other reader depends on.
-        if (!(error instanceof WikiVaultError)) throw error
+        // A page that vanished mid-walk or cannot be parsed is reported by
+        // listUnreadablePages and by lint; it must not abort an enumeration
+        // every other reader depends on.
+        if (!(error instanceof WikiVaultError) && !isMissing(error)) throw error
       }
     }
     return entries
@@ -636,11 +637,19 @@ export class VaultFiles {
       }
       const current = revisionOf(existing)
       if (current !== draft.expectedRevision) {
-        const stored = parsePageText(existing, draft.path)
+        let stored: WikiPage | undefined
+        try {
+          const parsedStored = parsePageText(existing, draft.path)
+          stored = { path: draft.path, frontmatter: parsedStored.frontmatter, body: parsedStored.body, revision: current }
+        } catch (error) {
+          // The stored page is itself unparsable. The stale revision is still the
+          // actionable failure, so it is reported without a page to compare.
+          if (!(error instanceof WikiVaultError)) throw error
+        }
         throw new WikiVaultError(
           `page "${draft.path}" changed: expected revision "${draft.expectedRevision}" but found "${current}"`,
           'WIKI_REVISION_CONFLICT',
-          { path: draft.path, frontmatter: stored.frontmatter, body: stored.body, revision: current },
+          stored,
         )
       }
     }

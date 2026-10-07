@@ -530,7 +530,14 @@ function createWikiTools(vault: WikiVaultService): ToolDefinition[] {
         ],
       } as const,
       render: (_args, value) => {
-        if (!value.ok) return [{ type: 'text', text: value.message }]
+        if (!value.ok) {
+          const current = value.current
+          if (current === undefined) return [{ type: 'text', text: value.message }]
+          return [{
+            type: 'text',
+            text: `${value.message}\nThe stored page is:\n\n${current.body}`,
+          }]
+        }
         return [{ type: 'text', text: `${value.created ? 'Created' : 'Replaced'} ${value.path} (revision ${value.revision}).` }]
       },
     },
