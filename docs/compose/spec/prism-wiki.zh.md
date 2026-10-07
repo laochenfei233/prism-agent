@@ -16,7 +16,7 @@ commits: 本分支上的两次提交
 
 **验证** — 该包在两个根 aggregate 中都没有 `tsc` 诊断；八个测试文件 119 个测试全部通过；`oxlint` 无发现；两个 `tsdown` 面都能构建，`scripts/smoke.mjs` 通过。配对、换行、预算、Agent Note、客户端文案与导出 JSDoc 检查均通过。`verify-package-dependencies` 仍报告三处未分类的宿主值导入。
 
-**历程记录** — 1) Web 那一半无法在 `plugins/` 下开发，因为 `clientBundle()` 通过 glob `packages/*/*/package.json` 解析客户端包。2) 全仓库构建在全新 worktree 中无法完成，因此改为按构建面驱动 `tsdown`。3) 沙箱阻止子进程，`pnpm`、`tsx`、vitest 与 lefthook 都需要提权，提交在逐条直接运行对应钩子等价检查后使用 `--no-verify`。4) 独立评审发现五个严重缺陷：引号列表损坏、`wiki_read` 能读取 schema 这一虚假承诺及其逐步重复投递，以及两处门禁失败已修复；并发写入、单页损坏的爆炸半径与冲突负载仍未解决，因此本文档不是 delivered。
+**历程记录** — 1) Web 那一半无法在 `plugins/` 下开发，因为 `clientBundle()` 通过 glob `packages/*/*/package.json` 解析客户端包。2) 全仓库构建在全新 worktree 中无法完成，因此改为按构建面驱动 `tsdown`。3) 沙箱阻止子进程，`pnpm`、`tsx`、vitest 与 lefthook 都需要提权，提交在逐条直接运行对应钩子等价检查后使用 `--no-verify`。4) 独立评审发现五个严重缺陷。已修复：引号列表损坏、`wiki_read` 能读取 schema 这一虚假承诺及其逐步重复投递、并发写入（现以唯一临时路径串行化，并由修复前会失败的测试覆盖），以及两处门禁失败。单页损坏的爆炸半径与冲突负载仍未解决，三处未分类的宿主值导入有待人工评审，因此本文档不是 delivered。
 
 ## [S1] Problem
 
