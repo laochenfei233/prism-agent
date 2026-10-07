@@ -50,7 +50,7 @@ const STATE_DIRECTORY = '.wiki'
 export const DEFAULT_PROTOCOL = [
   'A wiki vault is a persistent, interlinked body of markdown pages that is compiled once and kept current, instead of being re-derived per question.',
   'Three layers: `raw/` holds immutable sources; `wiki/` holds the pages you own; `AGENTS.md` holds this vault\'s conventions.',
-  'Read the vault schema with `wiki_read` before authoring anything, because it carries the conventions this deployment expects.',
+  'This vault\'s conventions are handed to you the first time you touch the vault in a session; follow them for every page you write.',
   'Ingest: read a source with `wiki_source`, then write or revise every page it changes with `wiki_write`. One source commonly touches several pages.',
   'Query: find pages with `wiki_search`, read them with `wiki_read`, and answer from them. A good answer is worth filing back as a page.',
   'Lint: run `wiki_lint` periodically and act on what it reports.',
@@ -107,6 +107,8 @@ export class WikiVaultService extends Service {
   private opening: Promise<VaultFiles> | undefined
   /** Sessions whose next step still owes them the vault schema. */
   private readonly schemaPending = new WeakSet<Agent>()
+  /** Sessions that already received the vault schema frame. */
+  private readonly schemaDelivered = new WeakSet<Agent>()
 
   /**
    * @param ctx - Owning Cordis context.
@@ -149,12 +151,14 @@ export class WikiVaultService extends Service {
   }
 
   /**
-   * Mark a session as owing the vault schema, so its next step carries it.
+   * Mark a session as owing the vault schema, so its next step carries it. A
+   * session that already received the frame is never marked again.
    * @param agent - The calling session's agent, when the call has one.
    */
   noteSchemaDue(agent: Agent | undefined): void {
     if (agent === undefined) return
     if (!this.config.schemaDeliveryEnabled.get()) return
+    if (this.schemaDelivered.has(agent)) return
     this.schemaPending.add(agent)
   }
 
@@ -166,6 +170,7 @@ export class WikiVaultService extends Service {
   private async takeSchemaFrame(agent: Agent): Promise<string> {
     if (!this.schemaPending.has(agent)) return ''
     this.schemaPending.delete(agent)
+    this.schemaDelivered.add(agent)
     const schema = await (await this.ready()).readSchema()
     return `<prism-wiki-schema>\n${schema.trim()}\n</prism-wiki-schema>\nThese are this vault's conventions. Follow them for every page you write.`
   }
@@ -424,8 +429,16 @@ export type {
   WikiSearchHit, WikiSourcePath, WikiSourceView, WikiVaultStatus,
 }
 
-/** Re-exported so `wiki_source` can brand a model-supplied path. */
+/**
+ * Brand a model-supplied page path, which reaches the tools as a bare string.
+ * @param value - Vault-relative page path as the caller wrote it.
+ * @returns The same path carrying its page identity.
+ */
 export const brandPagePath = (value: string): WikiPagePath => brandString<WikiPagePath>(value)
 
-/** Re-exported so `wiki_source` can brand a model-supplied path. */
+/**
+ * Brand a model-supplied raw-source path, which reaches the tools as a bare string.
+ * @param value - Source path relative to `raw/` as the caller wrote it.
+ * @returns The same path carrying its source identity.
+ */
 export const brandSourcePath = (value: string): WikiSourcePath => brandString<WikiSourcePath>(value)

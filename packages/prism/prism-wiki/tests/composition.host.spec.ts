@@ -164,7 +164,7 @@ describe('prism-wiki real Loader composition', () => {
 
     const protocol = assembly.sections.find(section => section.name === 'prism-wiki')?.text ?? ''
     expect(protocol).not.toBe('')
-    expect(protocol).toContain('Read the vault schema with `wiki_read` before authoring anything')
+    expect(protocol).toContain('immutable sources')
     expect(protocol).toBe(PrismWiki.DEFAULT_PROTOCOL)
     expect(assembly.tools.map(tool => tool.name).filter(name => name.startsWith('wiki_')).sort())
       .toEqual([...WIKI_TOOL_NAMES])

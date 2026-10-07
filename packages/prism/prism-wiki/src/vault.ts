@@ -1129,13 +1129,13 @@ function splitInlineList(inner: string): readonly string[] {
       continue
     }
     if (character === ',') {
-      pushListValue(values, unquote(current))
+      pushListValue(values, unquote(current.trim()))
       current = ''
       continue
     }
     current += character
   }
-  pushListValue(values, unquote(current))
+  pushListValue(values, unquote(current.trim()))
   return values
 }
 
