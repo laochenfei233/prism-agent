@@ -16,7 +16,7 @@ commits: 本分支上的两次提交
 
 **验证** — 该包在两个根 aggregate 中都没有 `tsc` 诊断；八个测试文件 119 个测试全部通过；`oxlint` 无发现；两个 `tsdown` 面都能构建，`scripts/smoke.mjs` 通过。配对、换行、预算、Agent Note、客户端文案与导出 JSDoc 检查均通过。`verify-package-dependencies` 仍报告三处未分类的宿主值导入。
 
-**历程记录** — 1) Web 那一半无法在 `plugins/` 下开发，因为 `clientBundle()` 通过 glob `packages/*/*/package.json` 解析客户端包。2) 全仓库构建在全新 worktree 中无法完成，因此改为按构建面驱动 `tsdown`。3) 沙箱阻止子进程，`pnpm`、`tsx`、vitest 与 lefthook 都需要提权，提交在逐条直接运行对应钩子等价检查后使用 `--no-verify`。4) 独立评审发现五个严重缺陷。已修复：引号列表损坏、`wiki_read` 能读取 schema 这一虚假承诺及其逐步重复投递、并发写入（现以唯一临时路径串行化，并由修复前会失败的测试覆盖），以及两处门禁失败。单页损坏的爆炸半径与冲突负载仍未解决，三处未分类的宿主值导入有待人工评审，因此本文档不是 delivered。
+**历程记录** — 1) Web 那一半无法在 `plugins/` 下开发，因为 `clientBundle()` 通过 glob `packages/*/*/package.json` 解析客户端包。2) 全仓库构建在全新 worktree 中无法完成，因此改为按构建面驱动 `tsdown`。3) 沙箱阻止子进程，`pnpm`、`tsx`、vitest 与 lefthook 都需要提权，提交在逐条直接运行对应钩子等价检查后使用 `--no-verify`。4) 独立评审发现五个严重缺陷。已修复：引号列表损坏、`wiki_read` 能读取 schema 这一虚假承诺及其逐步重复投递、并发写入（现以唯一临时路径串行化）、单页损坏的爆炸半径（全库遍历现会跳过并交由巡检报告）、冲突负载（现携带已存储的页面），以及两处门禁失败；每一项都带有修复前会失败的回归测试。只剩三处未分类的宿主值导入，它们有待人工评审，因为依赖策略禁止自动化 agent 添加该例外，因此本文档不是 delivered。
 
 ## [S1] Problem
 
@@ -153,7 +153,7 @@ vault 自己的 `AGENTS.md` 则在每个会话中恰好追加一次：于该会�
 - [x] `wiki_write` 能创建与更新页面、拒绝违反 schema 的 frontmatter，并在不需要第二次调用的情况下让 `index.md` 与 `log.md` 保持一致。
 - [x] 中文查询能检索到包含它的页面；对磁盘页面做外部编辑后再检索，能返回编辑后的文本。
 - [x] `wiki_lint` 能报告预置的孤儿页面、失效 wikilink、未集成来源与未解决的 `contradicts` 配对。
-- [ ] `wiki_write` 在 `expectedRevision` 过期时返回携带当前页面的冲突，并且不写入任何内容。
+- [x] `wiki_write` 在 `expectedRevision` 过期时返回携带当前页面的冲突，并且不写入任何内容。
 - [x] 五个工具能干净地注册与释放，且系统提示词段的字节在请求之间不变。
 - [x] vault schema 在每个会话中恰好追加一次，且位于请求尾部。
 - [x] Web 页面能列出 vault、渲染页面、跟随 wikilink、显示反向链接、执行检索，并保存一处随后在磁盘上可见的编辑。

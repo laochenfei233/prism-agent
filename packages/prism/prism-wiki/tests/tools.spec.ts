@@ -186,6 +186,9 @@ describe('writing and reading pages', () => {
     expect(stale.isError).toBe(false)
     expect(toolText(stale)).toContain('WIKI_REVISION_CONFLICT')
     expect(valueJson(stale)).toContain('"code":"WIKI_REVISION_CONFLICT"')
+    // The refusal carries the page that is actually stored, so the caller can compare.
+    expect(valueJson(stale)).toContain('"current"')
+    expect(valueJson(stale)).toContain('Original body.')
     expect(await readFile(join(root, 'wiki', 'concepts', 'kept.md'), 'utf8')).toContain('Original body.')
 
     // The conflict is about the revision, not a blanket refusal: the revision

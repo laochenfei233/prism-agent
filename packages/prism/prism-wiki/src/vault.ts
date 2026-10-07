@@ -93,8 +93,9 @@ export class WikiVaultError extends Error {
   /**
    * @param message - what failed, naming the page, source, or frontmatter field at fault.
    * @param code - the class of failure.
+   * @param current - the stored page, present when a revision conflict refused a write so the caller can compare.
    */
-  constructor(message: string, readonly code: WikiVaultErrorCode) {
+  constructor(message: string, readonly code: WikiVaultErrorCode, readonly current?: WikiPage) {
     super(message)
     this.name = 'WikiVaultError'
   }
@@ -634,9 +635,11 @@ export class VaultFiles {
       }
       const current = revisionOf(existing)
       if (current !== draft.expectedRevision) {
+        const stored = parsePageText(existing, draft.path)
         throw new WikiVaultError(
           `page "${draft.path}" changed: expected revision "${draft.expectedRevision}" but found "${current}"`,
           'WIKI_REVISION_CONFLICT',
+          { path: draft.path, frontmatter: stored.frontmatter, body: stored.body, revision: current },
         )
       }
     }

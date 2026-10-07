@@ -80,6 +80,8 @@ interface WikiToolFailure {
   readonly code: string
   /** What failed, prefixed with the code. */
   readonly message: string
+  /** The stored page, present when a revision conflict refused the write so the caller can compare. */
+  readonly current?: { readonly path: string; readonly title: string; readonly body: string; readonly revision: string }
 }
 
 /** One ranked hit as `wiki_search` reports it. */
@@ -248,6 +250,16 @@ function failureBranch() {
       ok: { type: 'boolean', const: false, required: true },
       code: { type: 'string', required: true },
       message: { type: 'string', required: true },
+      current: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          path: { type: 'string', required: true },
+          title: { type: 'string', required: true },
+          body: { type: 'string', required: true },
+          revision: { type: 'string', required: true },
+        },
+      },
     },
   } as const
 }
@@ -258,7 +270,19 @@ function failureBranch() {
  * @returns the model-facing failure, or undefined for an error this tool must keep propagating.
  */
 function failureOf(error: unknown): WikiToolFailure | undefined {
-  if (error instanceof WikiError || error instanceof WikiVaultError) {
+  if (error instanceof WikiVaultError) {
+    const current = error.current
+    if (current === undefined) {
+      return { ok: false, code: error.code, message: `${error.code}: ${error.message}` }
+    }
+    return {
+      ok: false,
+      code: error.code,
+      message: `${error.code}: ${error.message}`,
+      current: { path: current.path, title: current.frontmatter.title, body: current.body, revision: current.revision },
+    }
+  }
+  if (error instanceof WikiError) {
     return { ok: false, code: error.code, message: `${error.code}: ${error.message}` }
   }
   return undefined
