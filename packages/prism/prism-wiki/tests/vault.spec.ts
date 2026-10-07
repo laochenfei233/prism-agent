@@ -5,7 +5,7 @@
  * report.
  */
 
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -405,5 +405,38 @@ describe('the lint report', () => {
     const report = lintVault(pages, [source('one.md')])
 
     expect(report.findings).toEqual([])
+  })
+})
+
+describe('concurrent writers', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+  })
+
+  it('keeps every log entry when pages are written at once', async () => {
+    const writes = Array.from({ length: 8 }, (_, index) => files.writePage({
+      path: page(`concepts/concurrent-${index}.md`),
+      frontmatter: frontmatter({ title: `Concurrent ${index}` }),
+      body: `Body ${index}.\n`,
+    }, 'write'))
+
+    await expect(Promise.all(writes)).resolves.toHaveLength(8)
+
+    const log = await readFile(join(root, 'log.md'), 'utf8')
+    expect(log.split('\n').filter(line => line.startsWith('## ['))).toHaveLength(8)
+  })
+
+  it('keeps every entry when the log is appended at once', async () => {
+    await Promise.all(Array.from({ length: 12 }, (_, index) => files.appendLog('note', `entry ${index}`)))
+
+    const log = await readFile(join(root, 'log.md'), 'utf8')
+    expect(log.split('\n').filter(line => line.startsWith('## ['))).toHaveLength(12)
+  })
+
+  it('leaves no temporary file behind', async () => {
+    await files.writePage({ path: page('concepts/clean.md'), frontmatter: frontmatter(), body: 'Body.\n' }, 'write')
+
+    const names = await readdir(join(root, 'wiki', 'concepts'))
+    expect(names.filter(name => name.endsWith('.tmp'))).toEqual([])
   })
 })

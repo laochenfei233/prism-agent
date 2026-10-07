@@ -11,8 +11,8 @@
  * @module @prism-ai/prism-wiki/vault
  */
 
-import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import type { Dirent } from 'node:fs'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -550,6 +550,26 @@ export class VaultFiles {
    * @throws WikiVaultError with code `WIKI_REVISION_CONFLICT` when `expectedRevision` does not match the stored text.
    */
   async writePage(draft: WikiPageDraft, logKind: string): Promise<WikiPage> {
+    return await this.serialize(async () => await this.writePageLocked(draft, logKind))
+  }
+
+  /** Tail of the in-process mutation chain. */
+  private chain: Promise<unknown> = Promise.resolve()
+
+  /**
+   * Run one mutating operation after every queued one has settled, so two
+   * writers on this instance never interleave a read-modify-write of `index.md`
+   * or `log.md`. Two separate processes over one vault are still unarbitrated.
+   * @param operation - the exclusive operation to run.
+   * @returns the operation's own result.
+   */
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.chain.then(operation, operation)
+    this.chain = next.then(() => undefined, () => undefined)
+    return next
+  }
+
+  private async writePageLocked(draft: WikiPageDraft, logKind: string): Promise<WikiPage> {
     const normalized = normalizePagePath(draft.path)
     if (normalized === null) {
       throw new WikiVaultError(`${draft.path}: frontmatter field "path" is not a vault page path`, 'WIKI_FRONTMATTER_INVALID')
@@ -581,7 +601,7 @@ export class VaultFiles {
     const { frontmatter, body } = parsePageText(text, draft.path)
     const page: WikiPage = { path: draft.path, frontmatter, body, revision: revisionOf(text) }
     await this.rebuildIndex()
-    await this.appendLog(logKind, `${page.path} ${page.frontmatter.title}`)
+    await this.appendLogLocked(logKind, `${page.path} ${page.frontmatter.title}`)
     return page
   }
 
@@ -649,6 +669,10 @@ export class VaultFiles {
    * @returns nothing.
    */
   async appendLog(kind: string, summary: string): Promise<void> {
+    await this.serialize(async () => { await this.appendLogLocked(kind, summary) })
+  }
+
+  private async appendLogLocked(kind: string, summary: string): Promise<void> {
     const target = join(this.root, 'log.md')
     const existing = await readFileOrNull(target)
     const base = existing === null || existing.trim() === '' ? LOG_HEADING : existing.replace(/\s+$/, '')
@@ -900,9 +924,14 @@ async function walkFiles(directory: string, options: WalkOptions = {}): Promise<
  */
 async function writeAtomically(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
-  const temporary = `${path}.tmp`
-  await writeFile(temporary, content, 'utf8')
-  await rename(temporary, path)
+  const temporary = `${path}.${randomUUID()}.tmp`
+  try {
+    await writeFile(temporary, content, 'utf8')
+    await rename(temporary, path)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
 }
 
 /**

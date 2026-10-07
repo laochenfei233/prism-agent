@@ -85,8 +85,9 @@ export class WikiError extends Error {
 }
 
 /**
- * The markdown knowledge vault. Operations are safe to call concurrently; each
- * write is atomic and each read observes a whole file.
+ * The markdown knowledge vault. Each write is atomic, each read observes a whole
+ * file, and mutating operations on one instance serialize; two processes over
+ * one vault are not arbitrated.
  */
 export class WikiVaultService extends Service {
   /** Services required before the vault can be served. */
