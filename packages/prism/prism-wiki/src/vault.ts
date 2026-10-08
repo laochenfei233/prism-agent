@@ -668,6 +668,10 @@ export class VaultFiles {
    * carries the page's `[[wikilink]]`. A page whose frontmatter cannot be parsed
    * is listed under a `Needs attention` heading instead of aborting the rebuild.
    * The catalog's own frontmatter carries `generated: true`.
+   *
+   * This method is not itself queued on the mutation chain, so a direct caller
+   * must tolerate a concurrent `writePage`; writers reach it from inside
+   * `writePageLocked`, and `ensureLayout` calls it before the vault is published.
    * @returns nothing.
    * @throws WikiVaultError with code `WIKI_ROOT_NOT_VAULT` when `wiki/` is absent.
    */
