@@ -4,7 +4,7 @@
  * a real vault on disk, together with the request validation each route owns.
  */
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
@@ -297,6 +297,22 @@ describe('wiki browser routes', () => {
     const h = await webHarness(root)
 
     expect(failure(await h.post('read', json({ path: 'concepts/ghost.md' })))).toBe('prism-wiki/not-found')
+  })
+
+  it('keeps listing the vault when one page file cannot be parsed', async () => {
+    const h = await webHarness(root)
+    await writeFile(
+      join(root, 'wiki', 'concepts', 'broken.md'),
+      '---\ntitle: Broken\ntype: concept\ntags: [x]\n---\n\nBody.\n',
+      'utf8',
+    )
+
+    const answer = await h.post('list', json({}))
+
+    expect(answer.status).toBe(200)
+    const pages = (answer.body.value as { pages: readonly { path: string }[] }).pages
+    expect(pages.map(entry => entry.path)).toContain('concepts/alpha.md')
+    expect(pages.map(entry => entry.path)).not.toContain('concepts/broken.md')
   })
 
   it('withdraws every route on disposal', async () => {

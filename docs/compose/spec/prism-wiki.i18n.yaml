@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-wiki.md
-prism-wiki.md: 0a0db143b0c52f1bb1822987683c59534fad7ccf
-prism-wiki.zh.md: 07a1d4e2e0a9aaf21de7b5408d763310346d8847
+prism-wiki.md: 5cc074b971fb6b9c898a9fac85e8df55d347de9d
+prism-wiki.zh.md: 6fcc87816c50062cc75599f3da50ea90edb03ad3
