@@ -226,12 +226,37 @@ describe('writing pages', () => {
   })
 
   it('conflicts when a revision is expected for a page that does not exist', async () => {
-    await expect(files.writePage({
+    const failure = await files.writePage({
       path: page('concepts/absent.md'),
       frontmatter: frontmatter(),
       body: 'Body.\n',
       expectedRevision: 'anything',
-    }, 'write')).rejects.toMatchObject({ code: 'WIKI_REVISION_CONFLICT' })
+    }, 'write').catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(WikiVaultError)
+    if (!(failure instanceof WikiVaultError)) throw new Error('expected a vault error')
+    expect(failure.code).toBe('WIKI_REVISION_CONFLICT')
+    // There is no stored page to compare against, so none is fabricated.
+    expect(failure.current).toBeUndefined()
+  })
+
+  it('carries the stored page when the revision moved', async () => {
+    await files.writePage({
+      path: page('concepts/moved.md'),
+      frontmatter: frontmatter({ title: 'Moved' }),
+      body: 'Stored body.\n',
+    }, 'write')
+
+    const failure = await files.writePage({
+      path: page('concepts/moved.md'),
+      frontmatter: frontmatter({ title: 'Moved' }),
+      body: 'Replacement.\n',
+      expectedRevision: 'stale',
+    }, 'write').catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(WikiVaultError)
+    if (!(failure instanceof WikiVaultError)) throw new Error('expected a vault error')
+    expect(failure.current?.body).toContain('Stored body.')
   })
 
   it('reports a missing page by code', async () => {
