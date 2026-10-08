@@ -135,19 +135,19 @@ vault 自己的 `AGENTS.md` 则在每个会话中恰好追加一次：于该会�
 
 ## Tasks
 
-- [ ] T1: 注册 `packages/prism` 包组并搭建 `packages/prism/prism-wiki` 骨架 — acceptance: 该包能经 `pnpm run build` 构建，其 `exports` 覆盖 `.`、`./client`、`./web`、`./cordis.patch.yml` (covers: S2 插件的位置; depends: none)
-- [ ] T2: vault 核心——布局创建与接管守卫、frontmatter schema 与校验、原子读写、wikilink 与反向链接解析、修订哈希 — acceptance: 用例覆盖创建、拒绝接管、被拒绝的 frontmatter、原子写入与修订不匹配 (covers: S2 层次与布局, 页面 frontmatter, 文件访问; depends: T1)
-- [ ] T3: 派生产物——从 frontmatter 生成 `index.md`、追加 `log.md`、播种 `AGENTS.md` 模板 — acceptance: 一次 `wiki_write` 就让两个派生文件保持一致，且被编辑过的 schema 不会被重新生成 (covers: S2 分工, 种子 schema; depends: T2)
-- [ ] T4: 检索索引——使用 trigram 分词器的 FTS5、惰性打开、mtime 对账、重建路径 — acceptance: 中文查询能返回其页面，外部编辑在下一次检索时可见，`reindex` 能恢复被删除的索引 (covers: S2 检索; depends: T2)
-- [ ] T5: 面向模型的工具——`wiki_search`、`wiki_read`、`wiki_write`、`wiki_source`、`wiki_lint` — acceptance: 五个工具都在 `ctx.effect` 内通过 `ctx.tools.register` 注册，释放 fiber 后全部移除 (covers: S2 面向模型的工具; depends: T2, T3, T4)
-- [ ] T6: schema 投递——静态系统提示词段与每会话一次的 vault schema 尾部消息 — acceptance: 该段在两个请求之间字节完全相同，且 vault schema 每个会话恰好追加一次 (covers: S2 schema 的投递; depends: T2)
-- [ ] T7: 操作员命令 `/wiki` — acceptance: `status`、`lint`、`reindex`、`open`、`log`、`schema` 各自返回结果，未知子命令返回指明用法的错误 (covers: S2 操作员命令; depends: T5)
-- [ ] T8: 宿主 Fetch 路由 — acceptance: 格式错误的请求体返回 `{ ok: false, error }` 信封，携带过期 `expectedRevision` 的保存返回冲突码 (covers: S2 Web 页面, 并发; depends: T2, T4)
-- [ ] T9: Web 页面——vault 树、渲染器、wikilink 跳转、反向链接、检索、编辑器、健康标签页与 locale 词典 — acceptance: 页面通过 `ctx.slots.inject` 注册进 `main` 与 `sidebar.panellist`，且每个产品字符串都经类型化 `t` 席位解析 (covers: S2 Web 页面; depends: T8)
-- [ ] T10: 测试——vault 核心、frontmatter 校验、中文检索、巡检发现项、写入冲突、注册与释放、对生产服务的真实组合挂载，以及客户端页面 — acceptance: 测试套件通过，且真实组合用例驱动的是被挂载的服务 (covers: S2, S4; depends: T5, T9)
-- [ ] T11: 打包——构建配置、`cordis.patch.yml`、镜像到 `plugins/prism-wiki`，以及产物烟测 — acceptance: `node scripts/smoke.mjs` 针对产出的 `lib/` 通过，镜像中包含 `lib/`、`cordis.patch.yml`、`LICENSE` 与 README 三件套且不含源码 (covers: S2 插件的位置; depends: T5, T9)
-- [ ] T12: 文档——包 README 三件套（Summary、配置、工具约定、Model Experience、Known Limitations 与验证章节），以及记录该插件归属与位置的 Agent Note — acceptance: README 三件套通过配对门禁，Agent Note 通过 `verify-agent-note-format` (covers: S3; depends: T11)
-- [ ] T13: 按验收标准进行验证与独立评审 — acceptance: S4 中每一条标准都带有命令输出或 `file:line` 依据 (covers: S4; depends: T10, T11, T12)
+- [x] T1: 注册 `packages/prism` 包组并搭建 `packages/prism/prism-wiki` 骨架 — acceptance: 该包能经 `pnpm run build` 构建，其 `exports` 覆盖 `.`、`./client`、`./web`、`./cordis.patch.yml` (covers: S2 插件的位置; depends: none)
+- [x] T2: vault 核心——布局创建与接管守卫、frontmatter schema 与校验、原子读写、wikilink 与反向链接解析、修订哈希 — acceptance: 用例覆盖创建、拒绝接管、被拒绝的 frontmatter、原子写入与修订不匹配 (covers: S2 层次与布局, 页面 frontmatter, 文件访问; depends: T1)
+- [x] T3: 派生产物——从 frontmatter 生成 `index.md`、追加 `log.md`、播种 `AGENTS.md` 模板 — acceptance: 一次 `wiki_write` 就让两个派生文件保持一致，且被编辑过的 schema 不会被重新生成 (covers: S2 分工, 种子 schema; depends: T2)
+- [x] T4: 检索索引——使用 trigram 分词器的 FTS5、惰性打开、mtime 对账、重建路径 — acceptance: 中文查询能返回其页面，外部编辑在下一次检索时可见，`reindex` 能恢复被删除的索引 (covers: S2 检索; depends: T2)
+- [x] T5: 面向模型的工具——`wiki_search`、`wiki_read`、`wiki_write`、`wiki_source`、`wiki_lint` — acceptance: 五个工具都在 `ctx.effect` 内通过 `ctx.tools.register` 注册，释放 fiber 后全部移除 (covers: S2 面向模型的工具; depends: T2, T3, T4)
+- [x] T6: schema 投递——静态系统提示词段与每会话一次的 vault schema 尾部消息 — acceptance: 该段在两个请求之间字节完全相同，且 vault schema 每个会话恰好追加一次 (covers: S2 schema 的投递; depends: T2)
+- [x] T7: 操作员命令 `/wiki` — acceptance: `status`、`lint`、`reindex`、`open`、`log`、`schema` 各自返回结果，未知子命令返回指明用法的错误 (covers: S2 操作员命令; depends: T5)
+- [x] T8: 宿主 Fetch 路由 — acceptance: 格式错误的请求体返回 `{ ok: false, error }` 信封，携带过期 `expectedRevision` 的保存返回冲突码 (covers: S2 Web 页面, 并发; depends: T2, T4)
+- [x] T9: Web 页面——vault 树、渲染器、wikilink 跳转、反向链接、检索、编辑器、健康标签页与 locale 词典 — acceptance: 页面通过 `ctx.slots.inject` 注册进 `main` 与 `sidebar.panellist`，且每个产品字符串都经类型化 `t` 席位解析 (covers: S2 Web 页面; depends: T8)
+- [x] T10: 测试——vault 核心、frontmatter 校验、中文检索、巡检发现项、写入冲突、注册与释放、对生产服务的真实组合挂载，以及客户端页面 — acceptance: 测试套件通过，且真实组合用例驱动的是被挂载的服务 (covers: S2, S4; depends: T5, T9)
+- [x] T11: 打包——构建配置、`cordis.patch.yml`、镜像到 `plugins/prism-wiki`，以及产物烟测 — acceptance: `node scripts/smoke.mjs` 针对产出的 `lib/` 通过，镜像中包含 `lib/`、`cordis.patch.yml`、`LICENSE` 与 README 三件套且不含源码 (covers: S2 插件的位置; depends: T5, T9)
+- [x] T12: 文档——包 README 三件套（Summary、配置、工具约定、Model Experience、Known Limitations 与验证章节），以及记录该插件归属与位置的 Agent Note — acceptance: README 三件套通过配对门禁，Agent Note 通过 `verify-agent-note-format` (covers: S3; depends: T11)
+- [x] T13: 按验收标准进行验证与独立评审 — acceptance: S4 中每一条标准都带有命令输出或 `file:line` 依据 (covers: S4; depends: T10, T11, T12)
 
 ## [S4] Acceptance
 
