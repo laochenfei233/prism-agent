@@ -55,6 +55,8 @@ interface WikiDraft {
   readonly revision: string | null
   /** In-place notice shown beside the retained draft; null when the last save did not conflict. */
   readonly conflict: string | null
+  /** The stored page body, present when the last save conflicted, so the reader can compare the two. */
+  readonly conflictStored?: string | null
 }
 
 /** One transient outcome the page reports to the frame-wide toast host. */
@@ -552,7 +554,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
       // the draft, and nothing else is discarded either.
       if (error instanceof WikiRequestError && error.code === 'prism-wiki/revision-conflict') {
         const conflict = t('conflict')
-        patchDraft(current => ({ ...current, conflict }))
+        patchDraft(current => ({ ...current, conflict, conflictStored: error.current?.body ?? null }))
       } else {
         notify(t('saveFailed', { reason: reasonOf(error) }), 'warning')
       }
@@ -761,6 +763,9 @@ export function WikiPage(props: WikiPageProps): ReactNode {
                       {t('dismiss')}
                     </button>
                   </p>
+                )}
+                {draft.conflictStored != null && (
+                  <pre className={css.conflictStored}>{draft.conflictStored}</pre>
                 )}
                 <div className={css.fieldRow}>
                   <label className={css.field}>

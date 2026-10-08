@@ -108,7 +108,7 @@ Four writers touch the vault: the model's tools, the Web page, an external edito
 
 `index.md` and `log.md` are plugin-owned: the index declares `generated: true` and is regenerated rather than merged, and a hand edit to it is overwritten on the next mutation.
 
-A stale `expectedRevision` is refused with a conflict that carries the stored page to the model. The Web save route reports the conflict code and the page keeps the reader's draft beside the retained content; carrying the stored page into that envelope is deferred.
+A stale `expectedRevision` is refused with a conflict that carries the stored page. The model reads it in the tool result, the Web save route carries it in its failure envelope, and the editor shows it beside the retained draft.
 
 ### The Web page
 

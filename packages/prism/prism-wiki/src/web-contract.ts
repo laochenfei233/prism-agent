@@ -16,6 +16,8 @@ export interface WikiFailure {
   readonly code: string
   /** One plain-language sentence shown to the reader. */
   readonly message: string
+  /** The stored page, present when a revision conflict refused a save so the editor can show it. */
+  readonly current?: WikiPagePayload
 }
 
 /** The envelope every wiki route answers with. */

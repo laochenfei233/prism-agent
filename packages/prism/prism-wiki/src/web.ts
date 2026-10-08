@@ -232,7 +232,14 @@ async function guard(operation: () => Promise<Response>): Promise<Response> {
 function failureOf(error: unknown): Response {
   if (error instanceof z.ZodError) return fail('prism-wiki/invalid-request', error.message)
   if (error instanceof WikiVaultError) {
-    if (error.code === 'WIKI_REVISION_CONFLICT') return fail('prism-wiki/revision-conflict', error.message)
+    if (error.code === 'WIKI_REVISION_CONFLICT') {
+      const current = error.current
+      return fail(
+        'prism-wiki/revision-conflict',
+        error.message,
+        current === undefined ? undefined : pagePayload(current),
+      )
+    }
     if (error.code === 'WIKI_PAGE_NOT_FOUND') return fail('prism-wiki/not-found', error.message)
     return fail('prism-wiki/failed', error.message)
   }
@@ -253,10 +260,13 @@ function ok(value: unknown): Response {
  * Answer one rejected operation with the status the page reports as an error.
  * @param code - Stable discriminant the page branches on.
  * @param message - One plain-language sentence.
+ * @param current - The stored page, when a revision conflict refused the write.
  * @returns The JSON answer carrying `{ ok: false, error }` and HTTP 400.
  */
-function fail(code: string, message: string): Response {
-  const body: WikiResponse<never> = { ok: false, error: { code, message } }
+function fail(code: string, message: string, current?: WikiPagePayload): Response {
+  const body: WikiResponse<never> = current === undefined
+    ? { ok: false, error: { code, message } }
+    : { ok: false, error: { code, message, current } }
   return Response.json(body, { status: 400 })
 }
 

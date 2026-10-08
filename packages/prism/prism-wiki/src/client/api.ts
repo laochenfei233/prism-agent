@@ -36,8 +36,9 @@ export class WikiRequestError extends Error {
   /**
    * @param code - Host failure code, or the client-side validation code.
    * @param message - Operator-readable failure text.
+   * @param current - The stored page, present when a revision conflict refused a save.
    */
-  constructor(readonly code: string, message: string) {
+  constructor(readonly code: string, message: string, readonly current?: WikiPagePayload) {
     super(message)
     this.name = 'WikiRequestError'
   }
@@ -297,7 +298,7 @@ export function createWikiApi(doFetch: typeof fetch = (input, init) => globalThi
   const readEnvelope = async (response: Response, endpoint: string): Promise<unknown> => {
     const body: unknown = await response.json()
     if (!isEnvelope(body)) throw invalidResponse(endpoint)
-    if (!body.ok) throw new WikiRequestError(body.error.code, body.error.message)
+    if (!body.ok) throw new WikiRequestError(body.error.code, body.error.message, body.error.current)
     return body.value
   }
 

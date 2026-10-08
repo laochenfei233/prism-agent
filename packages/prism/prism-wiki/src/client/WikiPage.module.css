@@ -67,6 +67,19 @@
   line-height: 20px;
 }
 
+.conflictStored {
+  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-secondary);
+  color: var(--dsw-alias-text-primary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+}
+
 .dismiss {
   flex: none;
   padding: 0;

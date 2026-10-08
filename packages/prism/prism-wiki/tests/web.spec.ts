@@ -283,6 +283,10 @@ describe('wiki browser routes', () => {
       expectedRevision: original,
     }))
 
+    // The refusal carries the page that is actually stored, so the editor can show it.
+    expect(refused.body).toMatchObject({
+      error: { code: 'prism-wiki/revision-conflict', current: { path: 'concepts/alpha.md' } },
+    })
     expect(failure(refused)).toBe('prism-wiki/revision-conflict')
     const stored = await readFile(join(root, 'wiki', 'concepts', 'alpha.md'), 'utf8')
     expect(stored).toContain('First replacement')
