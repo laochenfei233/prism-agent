@@ -18,10 +18,11 @@ Review the [safety notice](SAFETY.md) before running the project.
 
 ### Run from `npm`
 
+<!-- PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8. Upstream's CLI is `npx @deepseek-ai/dsh`; this fork installs its own `prism-agent` package so the two never collide on npm or `~/.dsh`. -->
 Install `Node.js`, then run:
 
 ```sh
-npx @deepseek-ai/dsh web
+npx prism-agent web
 ```
 
 The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).

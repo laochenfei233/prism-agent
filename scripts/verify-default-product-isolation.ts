@@ -76,8 +76,10 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
     if (!existsSync(resolve(root, path))) failures.push(`missing default product root ${path}`)
   }
   const cli = directories.get(resolve(root, 'apps/cli'))
-  if (cli?.manifest.name !== '@deepseek-ai/dsh') {
-    failures.push('apps/cli/package.json must identify @deepseek-ai/dsh')
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+  // Upstream's default product root is `@deepseek-ai/dsh`; this fork's is `prism-agent`.
+  if (cli?.manifest.name !== 'prism-agent') {
+    failures.push('apps/cli/package.json must identify prism-agent')
   }
   // The bundles the launcher ships switched off: each a runtime dependency of the installation that is a bundle, none a default.
   const profilePath = resolve(root, PROFILE_SOURCE)

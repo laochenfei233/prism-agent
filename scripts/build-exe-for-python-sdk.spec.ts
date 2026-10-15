@@ -43,7 +43,7 @@ describe('Python runtime executable builder CLI', () => {
     expect(cliManifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subprocess-local')
     expect(cliManifest.devDependencies).toHaveProperty('@deepseek-ai/dsh-subprocess-local')
     expect(runtimeManifest.dependencies).toHaveProperty('@deepseek-ai/dsh-subprocess-local')
-    expect(bootstrap).toContain("import('@deepseek-ai/dsh/lib/bin.js')")
+    expect(bootstrap).toContain("import('prism-agent/lib/bin.js')")
     expect(bootstrap).toContain('await runCli()')
     expect(bootstrap).toContain("import('@deepseek-ai/dsh-subprocess-local/runner')")
     expect(bootstrap).toContain('await runSelectedSubprocessRunner(selection)')

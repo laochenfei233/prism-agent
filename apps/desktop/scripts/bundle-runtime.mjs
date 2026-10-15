@@ -3,7 +3,7 @@
 //
 //   apps/desktop/runtime/
 //     node/                         Node executable (node.exe / node)
-//     dsh/                          pnpm-deploy closure of @deepseek-ai/dsh
+//     dsh/                          pnpm-deploy closure of prism-agent
 //                                   (+ @deepseek-ai/dsh-web-frontend/dist, pnpm)
 //     plugins/dsh-win-terminal-inspector/   local Windows-only plugin
 //
@@ -44,7 +44,9 @@ const PLATFORM = argValue('--platform') ?? hostPlatform();
 // platforms are x64 only.
 const ARCH = argValue('--arch') ?? (PLATFORM === 'mac' ? 'arm64' : 'x64');
 const nodeArg = argValue('--node-version');
-const DSH = '@deepseek-ai/dsh';
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Deploy the fork's CLI package (`prism-agent`), not upstream's `@deepseek-ai/dsh`.
+const DSH = 'prism-agent';
 
 function hostPlatform() {
   if (process.platform === 'win32') return 'win';

@@ -1,18 +1,18 @@
 {
-  "name": "@deepseek-ai/dsh",
-  "description": "dsh CLI: profile launch, plugin management, and configuration inspection",
+  "name": "prism-agent",
+  "description": "prism CLI: profile launch, plugin management, and configuration inspection for the DeepSeek Harness fork",
   "version": "0.1.7-rc.1",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/laochenfei233/prism-agent.git",
     "directory": "apps/cli"
   },
   "type": "module",
   "bin": {
-    "dsh": "lib/bin.js"
+    "prism": "lib/bin.js"
   },
   "files": [
     "lib/*.js",

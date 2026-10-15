@@ -1,4 +1,4 @@
-"""Locate and execute the bundled dsh CLI shipped with the Python SDK runtime.
+"""Locate and execute the bundled CLI shipped with the Python SDK runtime.
 
 Two runtime carriers coexist under ``runtime/``, both injected by the repo's
 ``scripts/build-exe-for-python-sdk.ts`` build (neither is checked into git):
@@ -10,12 +10,12 @@ Two runtime carriers coexist under ``runtime/``, both injected by the repo's
   Node installation.
 - **node (dev-only)**: the full deploy closure under ``runtime/node/``
   (``package.json`` + ``node_modules/``), executed as ``node
-  runtime/node/node_modules/@deepseek-ai/dsh/lib/bin.js`` on a
+  runtime/node/node_modules/prism-agent/lib/bin.js`` on a
   system Node >= 22.19. It is the current checkout's source build, never
   selected automatically, and excluded from wheel/sdist distributions.
 
-Both carriers execute the same dsh command grammar. The Python SDK selects the
-``sdk`` profile and requires an explicit Harness home; the installed ``dsh``
+Both carriers execute the same launcher grammar. The Python SDK selects the
+``sdk`` profile and requires an explicit Harness home; the installed ``prism``
 console command requires ``DSH_HOME`` for the same reason.
 """
 
@@ -150,13 +150,14 @@ def _current_platform_tag() -> str:
     return f"{plat}-{arch}"
 
 
+# PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+# Upstream deploys its CLI closure as node_modules/@deepseek-ai/dsh; this fork's CLI package is prism-agent.
 def _node_launch_args() -> tuple[str, str]:
     node_root = bundled_package_dir() / "runtime" / "node"
     bin_js = (
         node_root
         / "node_modules"
-        / "@deepseek-ai"
-        / "dsh"
+        / "prism-agent"
         / "lib"
         / "bin.js"
     )
@@ -180,8 +181,8 @@ def main() -> None:
     """Launch the CLI with explicit DSH_HOME; wait on Windows, replace the process on POSIX."""
     if not os.environ.get("DSH_HOME", "").strip():
         print(
-            "dsh: the Python runtime command requires an explicit DSH_HOME; "
-            "it never uses ~/.dsh implicitly",
+            "prism: the Python runtime command requires an explicit DSH_HOME; "
+            "it never resolves a Harness home implicitly",
             file=sys.stderr,
         )
         raise SystemExit(2)

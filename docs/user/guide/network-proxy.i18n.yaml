@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/guide/network-proxy.md
-network-proxy.md: 78c0dad3635de5a7aa4d39d9616f7ca5eb25a11e
-network-proxy.zh.md: 1743e06ea6be25b6c9d44308cf81f51fa94cb700
+network-proxy.md: a864937346396b442c58b4a69a22d542b2640002
+network-proxy.zh.md: b61a4bd5a6f746c907f1101c5369c9598d512a95

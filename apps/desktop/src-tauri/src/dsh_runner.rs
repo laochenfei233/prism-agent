@@ -238,8 +238,8 @@ impl DshHandle {
             }
         };
         let mut cmd = Command::new(&self.node_path);
-        // The dsh child only understands `DSH_HOME`, so hand it Prism's
-        // resolved home; without this it falls back to `~/.dsh`.
+        // The dsh child reads its home from `$DSH_HOME`, so pin the shell's
+        // resolved Prism home instead of leaving the resolved default in play.
         cmd.env("DSH_HOME", crate::setup::dsh_home());
         cmd.arg(&self.dsh_bin)
             .arg("web")

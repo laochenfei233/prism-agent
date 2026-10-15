@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { appendFileSync, closeSync, mkdtempSync, openSync, realpathSync, writeFileSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
-import { availableParallelism, homedir, tmpdir } from 'node:os'
+import { availableParallelism, tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import { inspect, parseArgs } from 'node:util'
 import { Context } from '@deepseek-ai/cordis'
@@ -13,12 +13,13 @@ import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { encodeSegment, generationLogFilename, parseGenerationLogFilename, type JsonlCompression } from '../packages/session/session-persistence-jsonl/src/format.ts'
 import { JsonlGenerationSourceChangedError } from '../packages/session/session-persistence-jsonl/src/generation.ts'
+import { dshHomePath } from '../packages/util/home-paths/src/index.ts'
 import { classifyMigrationFailure, type MigrationFailureDiagnostic } from './migration-failure-summary.ts'
 
 const usage = `Usage: pnpm run migrate:sessions-to-v4 [--sessions-dir PATH] [--jobs N]
 
 Publish V4 successors beside unchanged historical Session generations.
-Defaults to ~/.dsh/sessions. Already-V4 Sessions are opened read-only.
+Defaults to the resolved Harness home's sessions directory (see the home-paths package). Already-V4 Sessions are opened read-only.
 No model or API key is used. Failures do not stop subsequent Sessions.
 The text log and final JSON summary are saved in a private OS temporary directory.
 
@@ -293,7 +294,8 @@ if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathS
       if (!Number.isSafeInteger(jobs) || jobs < 1) {
         throw new Error('--jobs must be a positive safe integer')
       }
-      process.exitCode = await migrate(resolve(values['sessions-dir'] ?? join(homedir(), '.dsh', 'sessions')), jobs)
+      // The corpus default follows the same resolved home the runtime uses, so a fork build migrates its own sessions root.
+      process.exitCode = await migrate(resolve(values['sessions-dir'] ?? dshHomePath('sessions')), jobs)
     }
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : String(error))

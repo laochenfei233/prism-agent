@@ -8,8 +8,10 @@ use std::path::{Path, PathBuf};
 use serde_yaml::Value as Yaml;
 use tauri::{AppHandle, Manager};
 
-/// Prism's harness home: `$PRISM_HOME` when set, otherwise Prism's own
-/// `~/.prism`, never the standalone dsh CLI's `~/.dsh`.
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A9.
+/// Prism's harness home: `$PRISM_HOME` when set, otherwise the fork's default
+/// `~/.prism` — the same root this fork's `prism` CLI defaults to — never a
+/// deepseek-harness build's `~/.dsh`.
 pub fn dsh_home() -> PathBuf {
     std::env::var("PRISM_HOME")
         .map(PathBuf::from)
