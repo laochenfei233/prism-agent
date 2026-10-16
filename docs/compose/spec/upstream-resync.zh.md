@@ -54,6 +54,7 @@ commits: pending
 | A7 进行中的导入 | 已落地进历史（`b4593d01`） | 从索引中移除该区域；导入不再进行中。 |
 | A8 CLI 安装身份 | `apps/cli/package.json` 30 个提交，多数是实验组合变化下的依赖变动 | 上游保持 `@deepseek-ai/dsh` / bin `dsh`：改名仍是 fork 偏离。在上游新的依赖列表之上重新施加包名、bin、程序名、帮助期望、网关行与四个门禁。 |
 | A9 默认 home | `home-paths` 1 个提交（新增 `.agents` 共享根与 `DSH_AGENTS_HOME`，纯增量） | 在上游新增之上重新施加 `DSH_HOME_DIR_NAME = '.prism'` 与其 JSDoc。上游对 `agent-instructions` 的 `dshHome` 移除与我们是同向的：我们对该包的 README/注释编辑会落在字段已消失的新文件上。 |
+| A10 上游 CI 套件 | `.github/workflows/**` 46 个提交 | 导入后再次删除 `.github/workflows/desktop-sync.yml`：该定时任务拉取上游、合并并推送，在本仓库被禁止（孤儿基线无法合并；同步属于本交接件）。 |
 
 **D5 — 行为反转是被消费的，不是被对抗的。** 不变式机制由上游移除，本 fork 不重新加入：重新导入会删除不变式文件，并整体采用上游更新的规则与文档，包括 `AGENTS.md`。本仓库自己的文档（CAPABILITY-PLAN.md 的计数、规则文本）凡仍在描述不变式层的，在同一次交付里更新。同一原则适用于退役的 `schedule` 组合包、收窄的安装依赖与子路径插件展示清单：fork 消费上游状态，只保留索引点名的偏离。
 
@@ -71,7 +72,7 @@ commits: pending
 - [ ] T1: 阶段 A——在 `../deepseek-harness` 中 `git fetch upstream` 并把 `upstream/master` 合并进 `master`；按 D2 冲突表解决，并处理 D1 重新测量发现的任何增量；运行姊妹仓的构建与关键门禁（depends: none）
 - [ ] T2: 阶段 A——提交合并，记录合并 SHA 与合并进的上游 SHA，并把两者回报给本仓库的工作会话（depends: T1）
 - [ ] T3: 阶段 B——重新导入姊妹仓合并后的树，用 S2 探测对每条路径分类（depends: T2）
-- [ ] T4: 阶段 B——按 D4 碰撞表重放 A1–A9，放置标记，并移除 A7（depends: T3）
+- [ ] T4: 阶段 B——按 D4 碰撞表重放 A1–A10，放置标记，并移除 A7（depends: T3）
 - [ ] T5: 阶段 B——重新生成生成物并重录 fork 的快照用例；更新仍在描述已移除机制的文档（depends: T4）
 - [ ] T6: 阶段 B——运行 [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) 点名的仓库门禁，逐条记录命令与 PASS/FAIL/PRE-EXISTING（depends: T5）
 - [ ] T7: 阶段 B——更新 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md)（S4 的新同步锚点、重放中学到的区域行）并定稿本文档（depends: T6）
