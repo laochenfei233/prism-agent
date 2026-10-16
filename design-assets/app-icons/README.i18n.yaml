@@ -1,6 +1,16 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write design-assets/app-icons/README.md
-README.md: 2404130cd77f4c25e9ac9852306ac7b57eeac394
-README.zh.md: 71b553ca12eeea57f9a7ebf4a37fefe96d123992
+/prism-logo:
+  en: e46febe89b2d801d
+  zh: 719037c687e03b08
+/prism-logo/section:
+  en: 5445dfbf8c235f56
+  zh: 5445dfbf8c235f56
+/prism-logo/section~2:
+  en: 23e4de4056016400
+  zh: 23e4de4056016400
+/prism-logo/section~3:
+  en: 3f73dbb8750f67f3
+  zh: 3f73dbb8750f67f3

@@ -23,7 +23,7 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { layerOf, MEMORY_LAYERS } from './layers.ts'
 import type { MemoryLayer } from './layers.ts'
 import type { PrismMemoryService } from './service.ts'
-import type { MemoryChainEntry, MemoryProvenance, MemoryView } from './types.ts'
+import type { MemoryChainEntry, MemoryAttribution, MemoryView } from './types.ts'
 
 /** Cordis plugin name for the tool registrant. */
 export const name = 'prism-memory-tools'
@@ -36,7 +36,7 @@ interface LineEntry {
   /** The detached memory. */
   readonly memory: MemoryView
   /** Its origin conversation. */
-  readonly provenance: MemoryProvenance
+  readonly attribution: MemoryAttribution
 }
 
 /** ISO-8601 rendering of a stored epoch-millisecond stamp, or null. */
@@ -77,7 +77,7 @@ interface ProjectableRecord {
   /** Explicit opens so far. */
   readonly hits: number
   /** Origin conversation. */
-  readonly evidence: MemoryProvenance
+  readonly evidence: MemoryAttribution
 }
 
 /** Project one stored record for the model, without its scope key or internals. */
@@ -101,8 +101,8 @@ function memoryView(record: ProjectableRecord): MemoryView {
   }
 }
 
-/** Project one record's provenance. */
-function provenanceOf(record: ProjectableRecord): MemoryProvenance {
+/** Project one record's attribution. */
+function attributionOf(record: ProjectableRecord): MemoryAttribution {
   return {
     sessionId: record.evidence.sessionId,
     messageId: record.evidence.messageId,
@@ -112,7 +112,7 @@ function provenanceOf(record: ProjectableRecord): MemoryProvenance {
 
 /** The projection of one hit: the memory plus its origin conversation. */
 function entryOf(record: ProjectableRecord): LineEntry {
-  return { memory: memoryView(record), provenance: provenanceOf(record) }
+  return { memory: memoryView(record), attribution: attributionOf(record) }
 }
 
 /** Field schema shared by every result that returns a memory. */
@@ -134,8 +134,8 @@ const memoryProperties = {
   hits: { type: 'integer', required: true },
 } as const
 
-/** Field schema of one record's provenance. */
-const provenanceProperties = {
+/** Field schema of one record's attribution. */
+const attributionProperties = {
   sessionId: { oneOf: [{ type: 'string' }, { type: 'null' }], required: true },
   messageId: { oneOf: [{ type: 'string' }, { type: 'null' }], required: true },
   note: { oneOf: [{ type: 'string' }, { type: 'null' }], required: true },
@@ -144,7 +144,7 @@ const provenanceProperties = {
 /** Property schema of one hit: a memory and where it came from. */
 const entryProperties = {
   memory: { type: 'object', additionalProperties: false, properties: memoryProperties, required: true },
-  provenance: { type: 'object', additionalProperties: false, properties: provenanceProperties, required: true },
+  attribution: { type: 'object', additionalProperties: false, properties: attributionProperties, required: true },
 } as const
 
 /** Item schema of a list of hits. */
@@ -171,11 +171,11 @@ const memoryListSchema = {
   },
 } as const
 
-/** Render one hit as a compact, provenance-carrying line. */
+/** Render one hit as a compact, attribution-carrying line. */
 function entryLine(entry: LineEntry): string {
   const memory = entry.memory
   const date = memory.createdAt === null ? 'unknown' : memory.createdAt.slice(0, 10)
-  const source = entry.provenance.sessionId
+  const source = entry.attribution.sessionId
   return `[${memory.id}] (${memory.layer}, ${memory.kind}, ${memory.scope}, ${memory.status}, ${date}${source === null ? '' : `, ${source}`}) ${memory.text}`
 }
 
@@ -285,7 +285,7 @@ function createMemoryTools(memory: PrismMemoryService): ToolDefinition[] {
 
   const open = defineTool({
     name: 'memory_open',
-    description: 'Read one memory in full by id, with its provenance and the chain of claims it replaced or was replaced by. Use it when a search summary is not enough to verify a claim or to see what it superseded.',
+    description: 'Read one memory in full by id, with its attribution and the chain of claims it replaced or was replaced by. Use it when a search summary is not enough to verify a claim or to see what it superseded.',
     parameters: {
       id: { type: 'string', required: true, description: 'Memory id exactly as memory_search rendered it.' },
     },
@@ -312,7 +312,7 @@ function createMemoryTools(memory: PrismMemoryService): ToolDefinition[] {
         },
       },
       render: (_args, value) => {
-        const lines = [entryLine(value), `provenance note: ${value.provenance.note ?? 'none'}`]
+        const lines = [entryLine(value), `attribution note: ${value.attribution.note ?? 'none'}`]
         if (value.chain.length > 1) {
           lines.push('Chain, oldest first:')
           for (const entry of value.chain) {

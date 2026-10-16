@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/path-lock/README.md
-README.md: 83ad6021aae7c85623341aafcf1b3fbbfd5137fd
-README.zh.md: 2425861ac0177aa16323ebcac408a837a857ea7d
+/:
+  en: 05955eb194410d86
+  zh: 7b6bf2bb4564603f
+/deepseek-ai-dsh-util-path-lock:
+  en: 24c613aa02454260
+  zh: 138ee1cf816d050c
+/deepseek-ai-dsh-util-path-lock/summary:
+  en: 7fd8a8d8f58d00d8
+  zh: c68202bf1056d22f
+/deepseek-ai-dsh-util-path-lock/table-of-contents:
+  en: ca5dc537b0599b2a
+  zh: 8f24e97207812466
+/deepseek-ai-dsh-util-path-lock/use-this-package:
+  en: c707bbace59f7caf
+  zh: c0aaf905552f47ae
+/deepseek-ai-dsh-util-path-lock/use-this-package/two-locks-two-problems:
+  en: 96764c9058e6cea2
+  zh: 08ed07b76d28c502
+/deepseek-ai-dsh-util-path-lock/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-util-path-lock/understand-the-implementation/source-map:
+  en: 672b6ae45496861b
+  zh: 3d4f5600d3eb009a
+/deepseek-ai-dsh-util-path-lock/understand-the-implementation/the-kernel-is-the-arbiter:
+  en: 9781507ed8cd1ded
+  zh: 9d00190c624cff3d
+/deepseek-ai-dsh-util-path-lock/known-limitations-and-deferred-work:
+  en: 9d4f511c5819915b
+  zh: c4b0a0424c45a482
+/deepseek-ai-dsh-util-path-lock/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

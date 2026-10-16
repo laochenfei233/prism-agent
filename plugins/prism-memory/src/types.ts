@@ -57,7 +57,7 @@ export interface MemoryView {
 }
 
 /** Where one claim came from, for a reference back into the originating conversation. */
-export interface MemoryProvenance {
+export interface MemoryAttribution {
   /** Session the claim was distilled from, or `null` for an operator write. */
   sessionId: string | null
   /** Message within that session, when known. */

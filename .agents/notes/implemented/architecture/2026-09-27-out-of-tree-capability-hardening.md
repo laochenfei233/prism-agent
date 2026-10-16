@@ -10,7 +10,7 @@ Nine capabilities constrain an agent only through prose. Four are DeepSeek Harne
 
 Hardening each capability inside its owning package is the direct route and, in this fork, the expensive one. Upstream is synchronized by importing a new tree rather than merging, so an edit to an upstream-owned file or a generated artifact must be replayed by hand at every import, while a new file or package is imported, or not, as a unit.
 
-Plan mode makes that cost concrete. Its owning decision ([plan-specific collaboration state](../simplification/2026-07-22-plan-specific-collaboration-state.md)) rejected a per-plan tool-name allowlist because mutability is a property of each tool rather than a list every plan deployment must maintain, and it left plan mode as guidance rather than enforcement. Adding filtering inside `@deepseek-ai/dsh-plan-mode` would reverse that decision for every deployment, including deployments that want guidance alone.
+Plan mode makes that cost concrete. Its owning decision (plan-specific collaboration state) rejected a per-plan tool-name allowlist because mutability is a property of each tool rather than a list every plan deployment must maintain, and it left plan mode as guidance rather than enforcement. Adding filtering inside `@deepseek-ai/dsh-plan-mode` would reverse that decision for every deployment, including deployments that want guidance alone.
 
 The method-pack rules have the same ownership problem in a different form. Neither pack is this repository's to change: `plugins/aegis` is an imported upstream pack whose own guide states that it "does not copy skill bodies, replace Harness's model-facing `skill` tool, add a daemon, install a hard pre-tool guard, or claim runtime authority", and its host adapters record a routing miss with an advisory marker rather than preventing it. Admitting an enforcement seam there would contradict a boundary its own ADR records.
 
@@ -42,8 +42,8 @@ The bundle declares one peer dependency. Every harness import in `src/` is `impo
 
 ## Related
 
-- [Plan-specific collaboration state](../simplification/2026-07-22-plan-specific-collaboration-state.md) owns plan mode's guidance stance and the rejected allowlist; this bundle adds an opt-in refusal without changing that package.
-- [Skill invocation policy](../feature/2026-07-28-skill-invocation-policy.md) owns the model and user invocation axes this bundle reads.
+- Plan-specific collaboration state owns plan mode's guidance stance and the rejected allowlist; this bundle adds an opt-in refusal without changing that package.
+- Skill invocation policy owns the model and user invocation axes this bundle reads.
 - [Tool call three phases](2026-09-22-tool-call-three-phases.md) owns the tool-call pipeline whose pre-execute and post-execute waterfalls these rails register on.
 - The Aegis method pack at `plugins/aegis` owns the routing contract's text, its own host adapters, and its ADR rejecting runtime authority; this bundle enforces the contract without changing that pack.
 - [Bundle README](../../../../plugins/prism-guardrails/README.md) owns the configuration surface, each rail's exact behavior, and the known limitations.

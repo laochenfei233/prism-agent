@@ -1,6 +1,7 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/aegis/tests/e2e/README.md
-README.md: 99743b3faaee73f1ccae7e2b1c9e0caf0c13aa8f
-README.zh.md: 9dbf7b1d261e4ddd304432bcb93073700a825ec1
+/aegis-e2e-bootstrap:
+  en: 8d4cba10760b8d1a
+  zh: dd48dea7c2be5a28

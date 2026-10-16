@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/cron-controller/README.md
-README.md: 2ca65058b2952fd442cd5f01946a0cb89ce109ca
-README.zh.md: 0d5d7a8dcacf5ccc2cfe06e5c555700003393c5c
+/:
+  en: a7765eb8dd54e1c4
+  zh: 6e0f10a6817f3143
+/cron-controller:
+  en: a3e602a5db795ea5
+  zh: 6665146cfd0ae52a
+/cron-controller/summary:
+  en: 3f621518fdadecf6
+  zh: 8271c97769a8f438
+/cron-controller/table-of-contents:
+  en: 4e53164159b5ce41
+  zh: 89582dc0294d0776
+/cron-controller/use-this-package:
+  en: 54ae4e7d17dea2ed
+  zh: 17111b6116af0888
+/cron-controller/model-experience:
+  en: 0049916300c46c9e
+  zh: e0fa640485e3fb48
+/cron-controller/model-experience/kv-cache-effect:
+  en: edb110a7592a8b05
+  zh: cf460ecdf6977ab8
+/cron-controller/known-limitations-and-deferred-work:
+  en: 8673a5080722c7c1
+  zh: 9503a88d120f9013
+/cron-controller/known-limitations-and-deferred-work/dev-note:
+  en: 195fb479c12c656a
+  zh: 9203d1df9c48f88e

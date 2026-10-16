@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for install-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/install-isolation.md
-install-isolation.md: 653f58c262ee0a08165c88e7e9c0d07de8a15b19
-install-isolation.zh.md: b9cff93d52fce9cf59c874006542ba2dae509c2d
+/:
+  en: 8df5111b3dac51c4
+  zh: 8df5111b3dac51c4
+/install-isolation:
+  en: fd28ac8e35d93482
+  zh: dba73f6dd773a47f
+/install-isolation/report:
+  en: 836c2ae7c261b3b6
+  zh: d21df5366f356d52
+/install-isolation/s1-problem:
+  en: 9431e7f7c0c221cb
+  zh: 50ec61a4173012e1
+/install-isolation/s2-design:
+  en: e93d4a855a85c1ba
+  zh: 55ffa0a50e806843
+/install-isolation/s3-scope:
+  en: ac7ef240373ef64c
+  zh: 50779175c3e601aa
+/install-isolation/tasks:
+  en: 23247d3cc1a52cce
+  zh: 2752851b554094b0
+/install-isolation/s4-acceptance:
+  en: 948d55d3a84e9060
+  zh: 2a33f689712e75ce

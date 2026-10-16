@@ -23,7 +23,7 @@ import { Command, CommanderError, InvalidArgumentError } from 'commander'
 interface ProfileInvocation {
   mode: 'profile'
   profile: string
-  /** Shipped template used once to initialize a missing profile. */
+  /** Shipped template that replaces the named profile. */
   fromDefaultProfile?: string | undefined
   /** Extra patch-list overlays applied after the profile's own layer, in argv order. */
   patches: string[]
@@ -35,7 +35,7 @@ interface ProfileInvocation {
 interface DumpConfigInvocation {
   mode: 'dump-config'
   profile: string
-  /** Shipped template used once to initialize a missing profile. */
+  /** Shipped template that replaces the named profile. */
   fromDefaultProfile?: string | undefined
   /** Omit the profile's user layer and --patch overlays; print bundle layers only. */
   defaultOnly: boolean
@@ -46,7 +46,7 @@ interface DumpConfigInvocation {
 interface DumpConfigSchemaInvocation {
   mode: 'dump-config-schema'
   profile: string
-  /** Shipped template used once to initialize a missing profile. */
+  /** Shipped template that replaces the named profile. */
   fromDefaultProfile?: string | undefined
   patches: string[]
 }
@@ -93,7 +93,7 @@ const HELP_EXAMPLES = `
 Examples:
   prism web                                 boot the web profile (same as: prism --profile web)
   prism rescue --from-default-profile web
-                                            create rescue from the shipped web template, then boot it
+                                            recreate rescue from the shipped web template, then boot it
   prism headless "run the tests"            answer one task, print the result, and exit
   prism tui --patch ./extra.yml             boot a custom profile with one extra overlay
   prism tui --resume <session>              arguments after the launcher flags reach the app
@@ -142,9 +142,10 @@ function resolveBoot(program: Command, profile: string, options: BootOptions, ar
  * error.
  * @param argv - arguments after the Node binary and script.
  * @param version - version string printed by `--version`.
+ * @param manageDesktopProfile - permit Desktop's installed carrier to manage its reserved profile's plugins.
  * @returns the resolved invocation.
  */
-export function parseDshArgs(argv: readonly string[], version: string): DshInvocation {
+export function parseDshArgs(argv: readonly string[], version: string, manageDesktopProfile = false): DshInvocation {
   const first = argv[0]
   let resolved: DshInvocation | undefined
   // Annotated, not inferred: the actions below call back into `program`, and an
@@ -169,7 +170,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     .enablePositionalOptions()
     .argument('[args...]', 'arguments for the booted profile\'s app (see: prism --profile <name> --help)')
     .option('--profile <name>', 'the profile under $DSH_HOME/profiles to boot', selectProfile)
-    .option('--from-default-profile <name>', 'initialize a new custom profile from a shipped profile template')
+    .option('--from-default-profile <name>', 'replace a custom profile with a fresh copy of a shipped profile template')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed profile tree and exit')
     .option('--dump-config-schema', 'print JSON Schema for profile entries and patches without mounting')
@@ -190,14 +191,18 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
   if (first === 'plugin') {
     const plugin = program.command('plugin').description('manage a profile\'s plugins by forwarding the remaining arguments to pnpm in the profile directory')
     plugin
+      // Commander copies the launcher's disabled help option into subcommands. The
+      // forwarder restores its own help and stops reading options at forwarded pnpm input.
+      .helpOption('-h, --help', 'show this help')
+      .passThroughOptions()
       .requiredOption('--profile <name>', 'the profile whose plugins to manage (initialized on first use)', selectProfile)
       .allowUnknownOption()
       .argument('[args...]', 'pnpm arguments, forwarded verbatim (add <pkg>, remove <pkg>, why <pkg>, ...)')
       .action((args: string[], options: { profile: string }) => {
         if (options.profile === '') program.error('error: --profile needs a name')
-        rejectElectronProfile(plugin, options.profile)
+        if (!manageDesktopProfile) rejectElectronProfile(plugin, options.profile)
         if (args.length === 0) program.error('error: plugin needs pnpm arguments to forward (e.g. add <package>)')
-        resolved = { mode: 'plugin', profile: options.profile, args }
+        resolved = { mode: 'plugin', profile: options.profile.toLowerCase() === 'desktop' ? 'desktop' : options.profile, args }
       })
   }
 

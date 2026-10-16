@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/cron/README.md
-README.md: 26836b8b7d245713788636b67d5e19cf9b7c3fe2
-README.zh.md: 7ee9c30adddcb604268843e718b3cb105d825208
+/:
+  en: 971cbaa6e7dee3ec
+  zh: 0e8edb36ec3d5b5b
+/cron-calendar-scheduled-tasks:
+  en: e42267969c16882c
+  zh: d5a5a8d3dfd53376
+/cron-calendar-scheduled-tasks/summary:
+  en: b1076941cc0147b1
+  zh: f74675116a24a3ad
+/cron-calendar-scheduled-tasks/table-of-contents:
+  en: 1eb35b015a6c423f
+  zh: a8a3dceee2c9e943
+/cron-calendar-scheduled-tasks/packages:
+  en: 65d7f3fdc7e68247
+  zh: a62365f5fbd2b3b6
+/cron-calendar-scheduled-tasks/related-documentation:
+  en: cbde88c805a28a02
+  zh: d21a24efb7c075fc
+/cron-calendar-scheduled-tasks/dev-note:
+  en: 5e9afa1ddcb32e21
+  zh: f495daf98ed66f2f

@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
+import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import { bundlePatchPaths, composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import * as SpeechToTextDefinition from '@deepseek-ai/dsh-experimental-speech-to-text'
 import * as DashScopeProvider from '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
@@ -41,6 +41,19 @@ afterEach(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true })
   root = undefined
 })
+
+/** Import mapped source modules without claiming support for Node's HMR internals. */
+function sourceModuleLoader(importModule: (specifier: string) => Promise<unknown>): ModuleLoaderV2 {
+  return {
+    version: 'v2',
+    import: importModule,
+    loadCache: new Map(),
+    register(): never { throw new Error('unexpected module hook registration') },
+    getOrCreateModuleJob(): never { throw new Error('unexpected module job creation') },
+    resolveSync(): never { throw new Error('unexpected synchronous module resolution') },
+    load(): never { throw new Error('unexpected module load') },
+  }
+}
 
 /**
  * Boot the shipped patch's rows through the real Loader.
@@ -78,13 +91,10 @@ async function boot(): Promise<Context> {
     ['@deepseek-ai/dsh-experimental-speech-to-text-dashscope', DashScopeProvider],
     ['@deepseek-ai/dsh-experimental-tool-meeting-minutes', MeetingMinutesTool],
   ])
-  ctx.loader.internal = {
-    version: 'v2',
-    async import(specifier: string) {
-      if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
-      return modules.get(specifier)
-    },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+  ctx.loader.internal = sourceModuleLoader(async (specifier) => {
+    if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+    return modules.get(specifier)
+  })
   await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
   await ctx.loader.await()
   for (const entry of ctx.loader.entries()) await entry.fiber?.await()

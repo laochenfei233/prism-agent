@@ -1,8 +1,8 @@
 /** Profile package management and explicit, exact-version compatibility approvals. */
 import { spawnSync } from 'node:child_process'
-import { runPluginCommand, setProfileVersionExemption } from '@deepseek-ai/dsh-plugin-manager/operations'
+import { runPluginCommand, runProfilePnpm, setProfileVersionExemption, type PackageOperationOptions } from '@deepseek-ai/dsh-plugin-manager/operations'
 import { INSTALL_ANCHOR } from './profile-boot.ts'
-import { DEFAULT_PROFILE_BUNDLES, initProfile, PROFILE_TEMPLATES, readProfileCompatibility, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { DEFAULT_PROFILE_BUNDLES, initProfile, PROFILE_TEMPLATES, readProfileCompatibility, resolveProfileDir, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -71,6 +71,12 @@ export function resolvePnpm(): ResolvedPnpm | undefined {
   return undefined
 }
 
+function requireDesktopProfile(dir: string): void {
+  if (!existsSync(join(dir, 'package.json'))) {
+    throw new Error('Open DeepSeek Harness Desktop once to initialize its profile, then fully quit it before running prism plugin --profile desktop.')
+  }
+}
+
 /** Parse only DSH-owned commands; all other arguments remain pnpm's responsibility. */
 async function versionCommand(profile: string, args: readonly string[]): Promise<number | undefined> {
   const [command, ...rest] = args
@@ -99,9 +105,10 @@ async function versionCommand(profile: string, args: readonly string[]): Promise
       process.stderr.write('dsh: warning: allowing incompatible plugin versions can break the application or corrupt data. Approval applies only to the exact package and DSH versions.\n')
     }
     const dir = resolveProfileDir(profile)
-    await mkdir(dir, { recursive: true })
+    if (profile !== 'desktop') await mkdir(dir, { recursive: true })
     await withFileLock(join(dir, 'package.json'), async () => {
-      if (!existsSync(join(dir, 'package.json'))) initProfile(dir, PROFILE_TEMPLATES[profile]?.bundles ?? DEFAULT_PROFILE_BUNDLES)
+      if (profile === 'desktop') requireDesktopProfile(dir)
+      else if (!existsSync(join(dir, 'package.json'))) initProfile(dir, PROFILE_TEMPLATES[profile]?.bundles ?? DEFAULT_PROFILE_BUNDLES)
       if (request === undefined) {
         const { exemptions, warnings } = readProfileCompatibility(dir)
         for (const warning of warnings) process.stderr.write(`dsh: warning: ${warning}\n`)
@@ -119,34 +126,46 @@ async function versionCommand(profile: string, args: readonly string[]): Promise
 }
 
 /** Run package management for a profile.
- * @param profile Profile name.
+ * @param profile Profile name; Desktop's reserved profile must already be initialized by the application.
  * @param args DSH exemption command or pnpm arguments relative to the invoking directory.
+ * @param packageManager Installation-owned executable and environment for pnpm operations.
  * @returns Zero on success; nonzero on invalid approval or package-manager failure.
  */
-export async function runPlugin(profile: string, args: readonly string[]): Promise<number> {
+export async function runPlugin(profile: string, args: readonly string[], packageManager?: ProfileContext['packageManager']): Promise<number> {
+  if (profile === 'desktop') {
+    try { requireDesktopProfile(resolveProfileDir(profile)) } catch (error) {
+      process.stderr.write(`dsh: ${String(error)}\n`)
+      return 1
+    }
+  }
   const versionResult = await versionCommand(profile, args)
   if (versionResult !== undefined) return versionResult
   const dir = resolveProfileDir(profile)
   if (existsSync(join(dir, 'package.json'))) {
     for (const warning of readProfileCompatibility(dir).warnings) process.stderr.write(`dsh: warning: ${warning}\n`)
   }
-  const pnpm = resolvePnpm()
-  if (pnpm === undefined) {
-    process.stderr.write(
-      'dsh: pnpm not found — install it with `npm install -g pnpm` or `corepack enable pnpm` to manage profile plugins\n',
-    )
-    return 127
-  }
-  const result = await runPluginCommand({ profile, installAnchor: INSTALL_ANCHOR, cwd: process.cwd() }, args, {
+  const context = { profile, dir, installAnchor: INSTALL_ANCHOR, cwd: process.cwd() }
+  // A packaged application supplies its own pnpm through ProfileContext; a plain
+  // CLI install falls back to PNPM_BINARY, PATH, then the runtime shim beside
+  // this CLI. A Windows `.cmd` shim needs a shell to run at all, and the shell
+  // also hides the transient console a GUI-launched prism would otherwise flash.
+  const pnpm = packageManager === undefined ? resolvePnpm() : undefined
+  const options: PackageOperationOptions = {
+    ...packageManager,
+    ...pnpm === undefined ? {} : { command: pnpm.command, shell: pnpm.shell },
+    windowsHide: true,
     execution: 'cli',
     outputBytes: 16384,
     lockWaitMs: 120000,
     lookupTimeoutMs: 120000,
-    command: pnpm.command,
-    shell: pnpm.shell,
-    windowsHide: true,
     onOutput: (text, stream) => { process[stream].write(text) },
-  })
+  }
+  const result = profile === 'desktop'
+    ? await withFileLock(join(dir, 'package.json'), async () => {
+      requireDesktopProfile(dir)
+      return runProfilePnpm(context, args, options)
+    }, { waitMs: 120000 })
+    : await runPluginCommand(context, args, options)
   if (result.exitCode === 127) process.stderr.write('dsh: pnpm was not found; install pnpm and make it available on PATH.\n')
   for (const { name, version, runtimeVersion } of result.incompatible ?? []) {
     // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.

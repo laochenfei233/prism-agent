@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
+import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -92,6 +92,19 @@ function resultText(result: { content: { type: string; text?: string }[] }): str
   return result.content.filter(block => block.type === 'text').map(block => block.text).join('')
 }
 
+/** Import mapped source modules without claiming support for Node's HMR internals. */
+function sourceModuleLoader(importModule: (specifier: string) => Promise<unknown>): ModuleLoaderV2 {
+  return {
+    version: 'v2',
+    import: importModule,
+    loadCache: new Map(),
+    register(): never { throw new Error('unexpected module hook registration') },
+    getOrCreateModuleJob(): never { throw new Error('unexpected module job creation') },
+    resolveSync(): never { throw new Error('unexpected synchronous module resolution') },
+    load(): never { throw new Error('unexpected module load') },
+  }
+}
+
 /**
  * Boot a cordis.yml composing the tool with the filesystem and speech seams.
  * @param configLines - YAML lines nested under the tool's `config:` key.
@@ -129,13 +142,10 @@ async function boot(configLines: readonly string[] = []): Promise<Context> {
     ['stub-speech-provider', StubSpeechProvider],
     ['@deepseek-ai/dsh-experimental-tool-meeting-minutes', MeetingMinutes],
   ])
-  ctx.loader.internal = {
-    version: 'v2',
-    async import(specifier: string) {
-      if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
-      return modules.get(specifier)
-    },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+  ctx.loader.internal = sourceModuleLoader(async (specifier) => {
+    if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+    return modules.get(specifier)
+  })
   await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
   await ctx.loader.await()
   for (const entry of ctx.loader.entries()) await entry.fiber?.await()

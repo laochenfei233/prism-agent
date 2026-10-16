@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-cron/README.md
-README.md: 51077760f440b33db79f76b3843f2bec85331e4a
-README.zh.md: e815627d72920fd18707b1118019efdac7fa2390
+/:
+  en: 51160f04a385c031
+  zh: 65c48d343241d8f0
+/deepseek-ai-dsh-client-ui-cron:
+  en: dc6efa11b15f283f
+  zh: 05c96a64942be25a
+/deepseek-ai-dsh-client-ui-cron/summary:
+  en: 97cd94c9f8c2eefd
+  zh: c23e691011923d51
+/deepseek-ai-dsh-client-ui-cron/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: dbb94479b1334720
+/deepseek-ai-dsh-client-ui-cron/use-this-package:
+  en: 7204801f3b0f9512
+  zh: ac70f9356a778335
+/deepseek-ai-dsh-client-ui-cron/use-this-package/what-a-row-shows:
+  en: 5c410f9fc23dffea
+  zh: e1ef0c59b836e64e
+/deepseek-ai-dsh-client-ui-cron/use-this-package/what-a-row-offers:
+  en: 354070724ddb3f1a
+  zh: 59d86f3ab302fd67
+/deepseek-ai-dsh-client-ui-cron/use-this-package/when-the-panel-cannot-serve:
+  en: 50c7a8e2cac30ba1
+  zh: f9d2f63481d645d5
+/deepseek-ai-dsh-client-ui-cron/understand-the-implementation:
+  en: 9c41e4433186a161
+  zh: 72532fa470413198
+/deepseek-ai-dsh-client-ui-cron/further-exploration:
+  en: c3466fb438b570c1
+  zh: e32dfb9a729148c8
+/deepseek-ai-dsh-client-ui-cron/model-experience:
+  en: d148eaddd0dbbace
+  zh: c266801213c33dd5
+/deepseek-ai-dsh-client-ui-cron/model-experience/kv-cache-effect:
+  en: 47f982e326fe77fd
+  zh: 94489959410eb4d2
+/deepseek-ai-dsh-client-ui-cron/known-limitations-and-deferred-work:
+  en: 17d5b8f8e22ba8b1
+  zh: a9de6face45f3490
+/deepseek-ai-dsh-client-ui-cron/known-limitations-and-deferred-work/dev-note:
+  en: 8cad21a427198bfd
+  zh: 1eb1c2cb2fbe8ed3

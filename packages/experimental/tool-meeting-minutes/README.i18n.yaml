@@ -1,6 +1,58 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/tool-meeting-minutes/README.md
-README.md: 8e7d4521430142b03a3177627e69b859b6851a20
-README.zh.md: a365918abedd294643e3973938ad4f59781b3180
+/:
+  en: b2e7a8f04b679df1
+  zh: 3bcc60ca0d597b14
+/deepseek-ai-dsh-experimental-tool-meeting-minutes:
+  en: d82fd9eb49adfd69
+  zh: e83e977077748647
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/summary:
+  en: 6aa35fe9ad983f88
+  zh: 91b5ddd9a6625e65
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 5134953c4f443383
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/use-this-package:
+  en: f0e57601b924444a
+  zh: 1ec8228620c443f0
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/understand-the-implementation:
+  en: 885f5cd209fdf425
+  zh: 8df1e0f7ce6191c5
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/further-exploration:
+  en: 5c64426add9d79d6
+  zh: 99377578e7b7c1ed
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-schema:
+  en: e4c7376d4f29dbd5
+  zh: e4c7376d4f29dbd5
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-schema/what-the-model-sees:
+  en: 5c2f5b12eb313481
+  zh: 5c2f5b12eb313481
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-schema/token-effect:
+  en: 9f5ba0274d0adbb3
+  zh: 9f5ba0274d0adbb3
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-schema/kv-cache-effect:
+  en: b385b04c94496e5b
+  zh: b385b04c94496e5b
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-call-history-and-result:
+  en: 9717b983b6a857e3
+  zh: 9717b983b6a857e3
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-call-history-and-result/what-the-model-sees:
+  en: e8517845a090363d
+  zh: e8517845a090363d
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-call-history-and-result/token-effect:
+  en: 33d041b2872dd2fe
+  zh: 33d041b2872dd2fe
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/model-experience/tool-call-history-and-result/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: f5d5f97a153f7c70
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/known-limitations-and-deferred-work:
+  en: 2d27f699889de520
+  zh: 08e0ed11ba54e33e
+/deepseek-ai-dsh-experimental-tool-meeting-minutes/known-limitations-and-deferred-work/dev-note:
+  en: 0225ba087c5266f3
+  zh: 9c1d441532d6e9e6

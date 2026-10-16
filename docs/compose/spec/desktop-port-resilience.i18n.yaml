@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for desktop-port-resilience.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/desktop-port-resilience.md
-desktop-port-resilience.md: 811a539076e5486e12b08a4ea38eb8b8c01f59bf
-desktop-port-resilience.zh.md: a1cc8109b75c91ba823c5ecb20177cd0ebd34e2c
+/:
+  en: ef4532d8cba2e8d6
+  zh: ef4532d8cba2e8d6
+/desktop-port-resilience:
+  en: d952f29844df64b0
+  zh: 8ecbf8bd3e543ff8
+/desktop-port-resilience/report:
+  en: b7490511dbce3d81
+  zh: b7490511dbce3d81
+/desktop-port-resilience/s1-problem:
+  en: 059ce396281af67f
+  zh: 059ce396281af67f
+/desktop-port-resilience/s2-design:
+  en: bffa4fe6ac6651ed
+  zh: bffa4fe6ac6651ed
+/desktop-port-resilience/s2-design/port-selection-rust-dsh-runner-rs:
+  en: 1cfc2ff13dfe9ceb
+  zh: 1cfc2ff13dfe9ceb
+/desktop-port-resilience/s2-design/csp-tauri-conf-json:
+  en: 6d81b7f7963f2c83
+  zh: 6d81b7f7963f2c83
+/desktop-port-resilience/s2-design/frontend-ui-dist-app-js:
+  en: bf48844ee6da8ba4
+  zh: bf48844ee6da8ba4
+/desktop-port-resilience/s2-design/not-changed:
+  en: 6216281f79edc55c
+  zh: 6216281f79edc55c
+/desktop-port-resilience/s3-out-of-scope:
+  en: 3a218ca2b9f4a075
+  zh: 3a218ca2b9f4a075
+/desktop-port-resilience/tasks:
+  en: f4cb635d6156c18a
+  zh: f4cb635d6156c18a

@@ -966,7 +966,7 @@ export class PrismMemoryService extends Service {
    * again, whatever confidence it carried, while a pending record never injects.
    * @param query - Literal query text.
    * @param agent - The calling agent, when the caller is model-facing.
-   * @param options - Optional result cap and provenance narrowing.
+   * @param options - Optional result cap and attribution narrowing.
    * @returns ranked hits.
    */
   search(

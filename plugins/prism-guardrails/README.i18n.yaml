@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
-README.md: 2823f480d419e4281e131ed1af1066879263b0d0
-README.zh.md: 863e803d43197236713159497ac8e1f9ba126446
+/prism-guardrails:
+  en: d3c9aa8a98b05aa9
+  zh: 45625a33da93e237
+/prism-guardrails/why-this-exists:
+  en: bd8db5d7ba000ab9
+  zh: cae49034cb6bd02d
+/prism-guardrails/configuration:
+  en: 1f54f6dc925da146
+  zh: 1814b62f7e71c37b
+/prism-guardrails/rails:
+  en: 72f7891b97c27a02
+  zh: ebcc7fab8b465344
+/prism-guardrails/rails/plan-mode-tool-denial:
+  en: e87c9d76094bb019
+  zh: 9e58655c16f77aed
+/prism-guardrails/rails/repeated-call-approval:
+  en: 7d3f9e0ca55ea9ff
+  zh: a3ed962b273e2b44
+/prism-guardrails/rails/turn-budget:
+  en: f6f435b17a36510a
+  zh: ae4a5ebb8a500f29
+/prism-guardrails/rails/skill-invocation-guidance:
+  en: 86cb593d0a429fd6
+  zh: 00c7c72823ab840e
+/prism-guardrails/rails/routing-contract:
+  en: 125a8b8635dbb37c
+  zh: a0d2f24eb7f3b431
+/prism-guardrails/rails/write-budget:
+  en: 37ab01194de41080
+  zh: 0d683e22467dc2c6
+/prism-guardrails/rails/ponytail-marker-discipline:
+  en: ff3738f2b27533c6
+  zh: 8422526f4d66851d
+/prism-guardrails/rails/dependency-approval:
+  en: 9c32c070e0713014
+  zh: 61b58c977ef15ab2
+/prism-guardrails/rails/verification-gate:
+  en: 55ffca0972e64c83
+  zh: db32c25688214930
+/prism-guardrails/wiring:
+  en: d2545073e0cae122
+  zh: b1a4060392290b3f
+/prism-guardrails/build-and-verify:
+  en: 31d5cb2dd5cb0bed
+  zh: a7ef3481f4ed0eb6
+/prism-guardrails/known-limitations-and-deferred-work:
+  en: eec49aa4b18fcfb8
+  zh: ebb705ecab1b1648

@@ -248,6 +248,6 @@ B1–B4 的实现与验证都做过，随后按要求整体还原。备份在：
 | OS 级沙箱四后端 | bwrap / Landlock / Seatbelt / Windows ACL 受限令牌 + Low IL（`packages/sandbox/sandbox-local`、`sandbox-windows-acl`） |
 | fail-closed 审批阶梯 | 缺审批服务 / agent / 通道一律拒绝；`allowed-once` 不持久化（`packages/sandbox/sandbox/src/escalation.ts:162-184`） |
 | 静态能力面 | `AGENTS.md` + profile/bundle/preset + `ctx.tools.restrict()` |
-| 运行时不变式 + 门禁密度 | 38 个 `invariant.ts`、69 个 `verify-*`、1660 个测试 |
+| 门禁密度 | 76 个 `verify-*` 门禁、约 2.5 万个测试用例（运行时不变式层已由上游 v0.2.0-rc.2 整体移除，本 fork 消费该状态） |
 | 工具链重复提醒（软） | `packages/guard/repeat-tool-reminder`，阈值 `[3,5,8]` |
 | spill / compaction / timeout | `packages/spill`、`packages/compaction`、`packages/guard/timeout-policy` |

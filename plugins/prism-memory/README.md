@@ -47,7 +47,7 @@ Mount the bundle, then let the model call the tools. No configuration is require
 |---|---|
 | `memory_remember` | Stores one claim with kind, layer, scope, optional tags, confidence, an optional due date, and TTL; `supersedes` invalidates a replaced record in the same write, and near-duplicates come back in the result |
 | `memory_search` | Ranked summaries for literal keywords, each line carrying its layer and originating session; an empty query lists the most recent memories, and `conversation` narrows to one session |
-| `memory_open` | One record in full, with provenance and the chain of claims it replaced or was replaced by |
+| `memory_open` | One record in full, with attribution and the chain of claims it replaced or was replaced by |
 | `memory_forget` | Retires one record so it stops being recalled; the record is retained, not deleted |
 | `memory_conversations` | The conversations that contributed memory, how much each holds, and their newest claims |
 
@@ -63,7 +63,7 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory review [limit]` | The review inbox: records held back until approved |
 | `/memory approve <id> [note]` | Promote one pending record to active |
 | `/memory reject <id> [reason]` | Archive one pending record |
-| `/memory show <id>` | One record with provenance, dates, tags, corroboration, and its supersede chain |
+| `/memory show <id>` | One record with attribution, dates, tags, corroboration, and its supersede chain |
 | `/memory restore <id> [reason]` | Roll a record back to current |
 | `/memory conversations [limit]` | Browse the corpus by originating conversation |
 | `/memory maintain [apply]` | Hygiene pass; a dry run unless `apply` is given |
@@ -171,7 +171,7 @@ The shipped base and Web layers mount `session-query-sqlite` with `path: ':memor
 
 That row is what puts `session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read` in front of the model. Its authority is the harness's own: cross-session access requires the target session's `cwd` to equal the caller's exactly.
 
-The two layers meet through provenance: `memory_search` and `memory_conversations` render the originating session id on every line, so a claim can be traced back into that conversation's original messages.
+The two layers meet through attribution: `memory_search` and `memory_conversations` render the originating session id on every line, so a claim can be traced back into that conversation's original messages.
 
 Drop `./session-search.patch.yml` from this package's `dsh.bundle.patch` list to keep the shipped ephemeral index; the memory rows are unaffected. The cost of keeping it is the derived database alone.
 
@@ -333,7 +333,7 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **The maintenance and consolidation passes are not scheduled.** They run on the turn path and on operator command; a deployment that wants them at a fixed hour needs a schedule row pointing at `/memory maintain apply` or `/memory dream apply`.
 - **The command surface is covered indirectly.** `/memory` is a thin adapter over service methods that the specs exercise directly; the specs do not yet drive a composed command invocation end to end.
 - **No review inbox UI.** The inbox is the `/memory review` command; the Web host has no dedicated page.
-- **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s provenance, but it has no tool that reads session history directly.
+- **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s attribution, but it has no tool that reads session history directly.
 - **Import layouts are hardcoded by id.** Adding a tool means adding an entry to `IMPORT_SOURCES`; there is no configuration format for a custom layout.
 
 ## Installation

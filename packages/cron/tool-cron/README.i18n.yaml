@@ -1,6 +1,64 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/cron/tool-cron/README.md
-README.md: 081fe2834af4f762cc2af0ce5251aff8133ce011
-README.zh.md: 5e08223a5d3d6836a753c7094c9e913836b61f26
+/:
+  en: a301508a2a4e89ea
+  zh: 765dc5a81700d453
+/deepseek-ai-dsh-tool-cron:
+  en: c3e991bab617f4a4
+  zh: f0b630f89d27a489
+/deepseek-ai-dsh-tool-cron/summary:
+  en: 8ffcf42878c8b571
+  zh: 33ba4c5cda49bced
+/deepseek-ai-dsh-tool-cron/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: f009bdd6b0122ac6
+/deepseek-ai-dsh-tool-cron/use-this-package:
+  en: 1933a30cf38aa247
+  zh: be2dc06e0e67037b
+/deepseek-ai-dsh-tool-cron/use-this-package/tools:
+  en: 69fcf204789f5231
+  zh: df0885b231d1ccca
+/deepseek-ai-dsh-tool-cron/use-this-package/configure-it:
+  en: 9c2be02084d8037a
+  zh: 3c51b91c4d702344
+/deepseek-ai-dsh-tool-cron/use-this-package/authority-rules:
+  en: 10bad3e069a9de29
+  zh: c960ef22c0f97ddc
+/deepseek-ai-dsh-tool-cron/use-this-package/errors:
+  en: 9804bc63aecce79a
+  zh: 5513f2cc29a77fa6
+/deepseek-ai-dsh-tool-cron/understand-the-implementation:
+  en: 3224e1438d412586
+  zh: 21c63e9db36d408d
+/deepseek-ai-dsh-tool-cron/understand-the-implementation/design:
+  en: 26cd841740555332
+  zh: 4a78779616d4424a
+/deepseek-ai-dsh-tool-cron/understand-the-implementation/source-map:
+  en: 29c6e5f3906b90a8
+  zh: b2930dbdb0f7eecd
+/deepseek-ai-dsh-tool-cron/further-exploration:
+  en: ffb020435b368d89
+  zh: 137fb3ea879c60fe
+/deepseek-ai-dsh-tool-cron/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-cron/model-experience/tool-schemas-and-results:
+  en: cadc497841430a21
+  zh: af4cc374d7d16917
+/deepseek-ai-dsh-tool-cron/model-experience/tool-schemas-and-results/what-the-model-sees:
+  en: e1c10fb5089ea959
+  zh: 12ba0a8a46b11e49
+/deepseek-ai-dsh-tool-cron/model-experience/tool-schemas-and-results/token-effect:
+  en: 31ec0353c2eb09c9
+  zh: c794779bcb98dc2c
+/deepseek-ai-dsh-tool-cron/model-experience/tool-schemas-and-results/kv-cache-effect:
+  en: c2d2e98ce08fb40e
+  zh: 13701fdef4d2a768
+/deepseek-ai-dsh-tool-cron/known-limitations-and-deferred-work:
+  en: a731b97fec7dd1d7
+  zh: e304a05d02b6e60a
+/deepseek-ai-dsh-tool-cron/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

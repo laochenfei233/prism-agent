@@ -1,6 +1,82 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-memory/README.md
-README.md: e09a290507bf9bfd96e80ce72a891828ed79f573
-README.zh.md: 69e22e9dc416e4a0718045de07b4be136e537edf
+/prism-prism-memory:
+  en: 6e668d5c78d2c4db
+  zh: fcd5ca971e7b3d75
+/prism-prism-memory/summary:
+  en: 0e344291726dd811
+  zh: 42158e319c8340b9
+/prism-prism-memory/design-constraint-the-cached-prefix-stays-byte-stable:
+  en: 9dd9a29160e3da6d
+  zh: ab269318fb8ce2f8
+/prism-prism-memory/use-this-package:
+  en: 618f233206f6fc3f
+  zh: 7caa586b7bd456de
+/prism-prism-memory/use-this-package/tools:
+  en: ab357ea99798b43b
+  zh: 15fb3215ef5ab026
+/prism-prism-memory/use-this-package/the-operator-command:
+  en: 93292f153315341b
+  zh: f68b064db06a5650
+/prism-prism-memory/the-layer-axis:
+  en: 67ea7a7767f57f37
+  zh: 885d94b05237f654
+/prism-prism-memory/retrieval:
+  en: cd1e6047c70c60c0
+  zh: b0a04eda488c22b8
+/prism-prism-memory/automatic-memory:
+  en: db12223f8d4095d3
+  zh: ef47f0acfc0f943e
+/prism-prism-memory/automatic-memory/distillation-on-the-turn-s-own-path:
+  en: 8af69de2e02e28f7
+  zh: 695e87d18cb42aae
+/prism-prism-memory/automatic-memory/consolidation-on-a-window:
+  en: 2f0d90f312bcb2b3
+  zh: 1bdbd4cc05ebf446
+/prism-prism-memory/automatic-memory/dates:
+  en: 5abe3062fc3a5dff
+  zh: 70e4c5c4112c6d3f
+/prism-prism-memory/automatic-memory/importing-another-tool-s-memory:
+  en: 7371962a8e964227
+  zh: ae0e83a62c0ea266
+/prism-prism-memory/governance-and-library-hygiene:
+  en: cdab79fbea2d232f
+  zh: e197e7a4d215f64c
+/prism-prism-memory/the-second-layer-a-durable-session-history-index:
+  en: 59e50235fc51fea8
+  zh: eb398facca3abdba
+/prism-prism-memory/the-second-layer-a-durable-session-history-index/scope-and-authority:
+  en: 09cf4a23971fae0b
+  zh: 534fcae1c1ea76ca
+/prism-prism-memory/the-second-layer-a-durable-session-history-index/configuration:
+  en: 754ab26209b8168b
+  zh: 438d14e11c5eb2b5
+/prism-prism-memory/record-model:
+  en: d74d16db6d06da2c
+  zh: 94db8672e973193d
+/prism-prism-memory/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/prism-prism-memory/model-experience/system-prompt:
+  en: 07e26beb4ca7fdb6
+  zh: b24240307d6f19de
+/prism-prism-memory/model-experience/tool-schemas:
+  en: 0e0ee2585172bf4c
+  zh: 49a9acd351941752
+/prism-prism-memory/model-experience/injected-frame:
+  en: 4956633a2d535e89
+  zh: bd2022ec569288a9
+/prism-prism-memory/model-experience/turn-end-passes:
+  en: 0823f4dc95cfd218
+  zh: dbabe32c451f481c
+/prism-prism-memory/verification:
+  en: de9a8c068ea1bf7e
+  zh: 2b5c1e1bd1f55c9f
+/prism-prism-memory/known-limitations-and-deferred-work:
+  en: f189c061b8d4eb16
+  zh: cb9f13cc6f567055
+/prism-prism-memory/installation:
+  en: 69521c4de892670f
+  zh: c2565d8a06956085

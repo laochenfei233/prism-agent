@@ -16,7 +16,7 @@ import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import { MEMORY_KINDS, MEMORY_ORIGINS, MEMORY_SCOPES, MEMORY_STATUSES } from './memory.ts'
 import { MEMORY_LAYERS } from './layers.ts'
 
-/** Provenance of one record: the session and message it was distilled from. */
+/** Attribution of one record: the session and message it was distilled from. */
 export const memoryEvidenceSchema = zod.object({
   /** Session the claim came from, or `null` for an operator write. */
   sessionId: zod.string().nullable(),

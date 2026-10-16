@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/desktop/README.md
-README.md: 1e0ca99c048620f7bbd668b05560c8f366b0c78e
-README.zh.md: e7391d42a2d9887acb02af21e488e6e3efe09b4a
+/dsh-desktop-prism-agent-desktop-client:
+  en: 49ada9fa65151192
+  zh: 2c54fc6949484794
+/dsh-desktop-prism-agent-desktop-client/architecture:
+  en: 106314eb2a777cbb
+  zh: 5702f4e6c3595ee9
+/dsh-desktop-prism-agent-desktop-client/development:
+  en: f85c4a68c3ee6ee5
+  zh: b1d0b4080db28111
+/dsh-desktop-prism-agent-desktop-client/building-a-release:
+  en: 234b60d7c105bec9
+  zh: 2255ddcf5ecf504a
+/dsh-desktop-prism-agent-desktop-client/first-launch:
+  en: 80ffa905609b3ce7
+  zh: d2a619b366fde97b

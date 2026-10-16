@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/aegis/docs/current/README.md
-README.md: 409a202567b98018ecf9a990aed517163100a2b6
-README.zh.md: b39e35cbf2caf7211b18d7c496a4347ab8eb1e09
+/aegis-current-docs:
+  en: cdc52f483b8e689f
+  zh: bef30394605cb905
+/aegis-current-docs/1-purpose:
+  en: 6ef23f824b1db86f
+  zh: ae9618498ba99527
+/aegis-current-docs/2-repository-boundary:
+  en: 4741b2c0ecb6bcec
+  zh: f81fce96aa69712b
+/aegis-current-docs/3-authority-order:
+  en: 06829c8500214b77
+  zh: db3149218447604a
+/aegis-current-docs/4-public-current-baseline:
+  en: f7dc26099eebb318
+  zh: f3ef98a9e7f5ac82
+/aegis-current-docs/5-document-roles:
+  en: eb263d739e1761c0
+  zh: 6824b9f863880c0b
+/aegis-current-docs/6-local-archive-rule:
+  en: 65446457887003b0
+  zh: 4c4f9bf7fec381b7
+/aegis-current-docs/7-update-rule:
+  en: 322192504e1cb685
+  zh: be219d6e860c73e3

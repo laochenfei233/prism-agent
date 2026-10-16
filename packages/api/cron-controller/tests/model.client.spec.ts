@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { RemoteStreamItem } from '@deepseek-ai/dsh-api-gateway/client'
+import { RemoteStream, type RemoteStreamItem, type RemoteStreamOptions } from '@deepseek-ai/dsh-api-gateway/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { RemoteFailure, RemoteResult, RemoteStreamHandle } from '@deepseek-ai/dsh-typert-protocol'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import {
@@ -49,6 +50,12 @@ function failure(code: 'cron/not-leader' | 'cron/not-found' = 'cron/not-leader')
 
 /** The generated namespace under test, with each verb scriptable. */
 class FakeRemote implements CronRemote {
+  /**
+   * @param frames - the frames one scripted follow generation delivers, in
+   * commit order; a case that never opens one leaves it absent.
+   */
+  constructor(private readonly frames?: readonly CronFollowFrame[]) {}
+
   createResult: RemoteResult<CronViewValue> = ok({ job: view() })
   updateResult: RemoteResult<CronViewValue> = ok({ job: view({ prompt: 'updated', updatedAt: 5 }) })
   /** Scripted removal failure; absent means the Host answers with the removed row. */
@@ -80,8 +87,74 @@ class FakeRemote implements CronRemote {
     return this.runNowResult
   }
 
+  /**
+   * One scripted physical generation: the frames this namespace carries, in the
+   * order the Host committed them.
+   * @returns the generation's downlink.
+   */
   follow(): RemoteStreamHandle<CronFollowFrame, never> {
-    throw new Error('these specs drive the model through its follow sink')
+    const frames = this.frames
+    if (frames === undefined) throw new Error('these specs drive the model through its follow sink')
+    return {
+      send(): never { throw new Error('a scripted follow generation sends nothing') },
+      end(): never { throw new Error('a scripted follow generation ends nothing') },
+      dispose(): void {},
+      async *[Symbol.asyncIterator]() {
+        for (const value of frames) {
+          yield value
+          await Promise.resolve()
+        }
+      },
+    }
+  }
+}
+
+/**
+ * One scripted physical generation, delivered as the Gateway stream class the
+ * factory's type declares: the frames the namespace's own opener yields,
+ * annotated with the one generation number a scripted connection carries.
+ */
+class ScriptedStream<Item> extends RemoteStream<Item> {
+  /**
+   * @param open - the generation's frame source: the domain opener the factory supplied.
+   */
+  constructor(private readonly open: (signal: AbortSignal) => AsyncIterable<Item>) {
+    // The class's own supervisor never runs on a scripted stream, so its
+    // classification is unreachable: this stream ends with its script.
+    super({ generation: createSnapshotStore(undefined) }, {
+      name: 'scripted stream',
+      open,
+      ended: () => new Error('a scripted stream ends only with its case'),
+    })
+  }
+
+  override [Symbol.asyncIterator](): AsyncIterator<RemoteStreamItem<Item>> {
+    return this.script()
+  }
+
+  /** The one generation this stream delivers, in the order its opener commits the frames. */
+  private async *script(): AsyncGenerator<RemoteStreamItem<Item>> {
+    // One physical connection carries the whole scripted sequence, so every
+    // frame shares one generation number: the number changes only when a
+    // reconnect opens a new baseline.
+    const signal = new AbortController().signal
+    for await (const value of this.open(signal)) {
+      yield { generation: 0, value, accept: () => {}, signal }
+      await Promise.resolve()
+    }
+  }
+}
+
+/**
+ * The factory the state stream opens: the namespace's scripted generation and
+ * the Gateway stream class it delivers through.
+ * @param frames - the frames the one follow generation delivers, in commit order.
+ * @returns the factory and namespace a state-stream case binds.
+ */
+function scriptedRemote(frames: readonly CronFollowFrame[]): CronStreamFactory & { readonly cron: CronRemote } {
+  return {
+    cron: new FakeRemote(frames),
+    $stream: <Item>(options: RemoteStreamOptions<Item>) => new ScriptedStream<Item>(options.open),
   }
 }
 
@@ -343,8 +416,8 @@ describe('createCronStateStream', () => {
     /**
      * The frames one generation delivers, in the order the Host committed them:
      * a complete baseline, a new row, a replacement of the opening row, and a
-     * removal. The generator awaits a microtask between frames so the consumer
-     * decodes them one at a time instead of racing the model.
+     * removal. The scripted generation awaits a microtask between frames so the
+     * consumer decodes them one at a time instead of racing the model.
      */
     const frames: CronFollowFrame[] = [
       { type: 'baseline', value: { items: [view()] } },
@@ -352,33 +425,7 @@ describe('createCronStateStream', () => {
       { type: 'upsert', job: view({ prompt: 'renamed', updatedAt: 6 }) },
       { type: 'remove', jobId: 'cron-1' as CronJobId },
     ]
-    const remote: CronStreamFactory & { readonly cron: CronRemote } = {
-      cron: new FakeRemote(),
-      // Production hands this factory the Gateway's own reconnecting stream, a
-      // class with private state. The scripted generation below answers the
-      // frames this consumer reads, which is the whole of its contract here.
-      $stream: (() => ({
-        restart: () => {},
-        dispose: async () => {},
-        async *[Symbol.asyncIterator]() {
-          for (const value of frames) {
-            // One physical generation carries the whole scripted sequence: the
-            // generation counter changes only when a reconnect delivers a new
-            // opening baseline, so a new number mid-sequence would tell the
-            // consumer a baseline is missing.
-            const item: RemoteStreamItem<CronFollowFrame> = {
-              generation: 0,
-              value,
-              accept: () => {},
-              signal: new AbortController().signal,
-            }
-            yield item
-            await Promise.resolve()
-          }
-        },
-      })) as unknown as CronStreamFactory['$stream'],
-    }
-    const stream = createCronStateStream(remote, {
+    const stream = createCronStateStream(scriptedRemote(frames), {
       accept: model,
       carrierFailed: () => { failures.push('carrier') },
       failed: (error) => { failures.push(error) },
@@ -399,25 +446,7 @@ describe('createCronStateStream', () => {
     model.subscribe(() => { notified += 1 })
 
     const replacement: CronFollowFrame[] = [{ type: 'baseline', value: { items: [view({ updatedAt: 9 })] } }]
-    const remote: CronStreamFactory & { readonly cron: CronRemote } = {
-      cron: new FakeRemote(),
-      $stream: (() => ({
-        restart: () => {},
-        dispose: async () => {},
-        async *[Symbol.asyncIterator]() {
-          for (const [generation, value] of replacement.entries()) {
-            const item: RemoteStreamItem<CronFollowFrame> = {
-              generation,
-              value,
-              accept: () => {},
-              signal: new AbortController().signal,
-            }
-            yield item
-          }
-        },
-      })) as unknown as CronStreamFactory['$stream'],
-    }
-    const stream = createCronStateStream(remote, { accept: model, failed: () => {} })
+    const stream = createCronStateStream(scriptedRemote(replacement), { accept: model, failed: () => {} })
     stream.start()
     await stream.dispose()
     // A reconnect generation replaces the published rows rather than merging

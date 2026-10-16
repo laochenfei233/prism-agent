@@ -149,7 +149,7 @@ function createMemoryTools(memory) {
 
   const open = defineTool({
     name: 'memory_open',
-    description: 'Read one memory in full by id, with its kind, dates, tags, confidence, and provenance. Use it when a search summary is not enough to verify a claim.',
+    description: 'Read one memory in full by id, with its kind, dates, tags, confidence, and attribution. Use it when a search summary is not enough to verify a claim.',
     parameters: {
       id: { type: 'string', required: true, description: 'Memory id exactly as memory_search rendered it.' },
     },

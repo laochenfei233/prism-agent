@@ -41,4 +41,4 @@ export type { DiscoveredFile, ImportedClaim, ImportSourceSpec } from './import.t
 export { dayPartOf, renderOrientation, renderTail } from './recall.ts'
 export type { DayPart, TailParts } from './recall.ts'
 export type { MemoryRecord } from './domain.ts'
-export type { MemoryChainEntry, MemoryProvenance, MemoryView, PrismMemoryInjectedState } from './types.ts'
+export type { MemoryChainEntry, MemoryAttribution, MemoryView, PrismMemoryInjectedState } from './types.ts'

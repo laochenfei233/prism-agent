@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/speech-to-text-dashscope/README.md
-README.md: 5fef0e265656ae2667addb18eecd371141a61070
-README.zh.md: bb13d6f8efb28fff64ea3bd328cf7ca1e82aca36
+/:
+  en: 8af3a848872df66c
+  zh: 5f91d911dd58844d
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope:
+  en: 76465fe94c52cffc
+  zh: 9aedde87dbeba85e
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/summary:
+  en: a533cc2d589fd44b
+  zh: ce22ef72f6d39354
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 5134953c4f443383
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/use-this-package:
+  en: 7d659bbf1a040e4f
+  zh: a0d357c084192c74
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/understand-the-implementation:
+  en: 38e57faa611d90a0
+  zh: ffc66c0edc93346c
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/further-exploration:
+  en: 5c64426add9d79d6
+  zh: 99377578e7b7c1ed
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/model-experience:
+  en: b1828ac7115f9d50
+  zh: 486a58ee0ee9db6a
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/model-experience/kv-cache-effect:
+  en: 9e093f4310a7f5a0
+  zh: 9e093f4310a7f5a0
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/known-limitations-and-deferred-work:
+  en: 6a2df517630d4cd1
+  zh: 184b158ff684c30c
+/deepseek-ai-dsh-experimental-speech-to-text-dashscope/known-limitations-and-deferred-work/dev-note:
+  en: 0225ba087c5266f3
+  zh: 9c1d441532d6e9e6

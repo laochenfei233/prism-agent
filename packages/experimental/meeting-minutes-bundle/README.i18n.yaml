@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/meeting-minutes-bundle/README.md
-README.md: 69d1cfdd01717554e83b5204a0a01253ecf76daf
-README.zh.md: 1906ecc73f2b8163da6658e3387e8d794e256ab3
+/:
+  en: 915a3a26f9837992
+  zh: fcfa7a2183737173
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle:
+  en: 034b8d467e2e6580
+  zh: f205d698cfdc17b2
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/summary:
+  en: 20a71158728b6f9f
+  zh: 6fbfb30eb3c2efcb
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/table-of-contents:
+  en: 4c42347e02106f3d
+  zh: 7b50f9a2918e497b
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/use-this-bundle:
+  en: beaf5871e04b13e0
+  zh: cfbc79612bf1924c
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/understand-the-implementation:
+  en: 81966a7fdde1212a
+  zh: 495838ac85cff3f3
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/further-exploration:
+  en: 5c64426add9d79d6
+  zh: 99377578e7b7c1ed
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/model-experience:
+  en: 69df0a168472b646
+  zh: dcb6a5857fc752b6
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/model-experience/kv-cache-effect:
+  en: 582e6996cb8ebcda
+  zh: 582e6996cb8ebcda
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/known-limitations-and-deferred-work:
+  en: 8b26869afb325327
+  zh: 1f15a170146f8be8
+/deepseek-ai-dsh-experimental-meeting-minutes-bundle/known-limitations-and-deferred-work/dev-note:
+  en: 0225ba087c5266f3
+  zh: 9c1d441532d6e9e6

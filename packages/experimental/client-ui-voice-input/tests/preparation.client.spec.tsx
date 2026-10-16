@@ -9,6 +9,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { PreparationCard, VoicePreparation } from '../src/client/PreparationCard.tsx'
 import type { VoiceInputProps } from '../src/client/VoiceInput.tsx'
 import type { SpeechReadiness } from '../src/client/readiness.ts'
+import { Recording } from '../src/client/audio.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -117,7 +118,9 @@ it('persists settings and reports disconnection in the detail card', async () =>
   } })
   const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
   const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
-    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn() }
+    useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })),
+    selectMicrophone: vi.fn(), createRecording: () => new Recording(() => {}),
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}) }
   const view = render(<VoicePreparation {...props} />)
   fireEvent.change(screen.getByLabelText(zh.provider), { target: { value: 'cloud' } })
   await waitFor(() => { expect(configure).toHaveBeenCalledWith({ providerId: 'cloud' }) })
@@ -151,7 +154,8 @@ it('offers the models a recognizer publishes and persists the choice', async () 
   } })
   const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
   const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
-    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn() }
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn(),
+    selectMicrophone: vi.fn(), useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })) }
   render(<VoicePreparation {...props} />)
   const select = (): HTMLSelectElement => screen.getByLabelText(zh.model) as HTMLSelectElement
   const selectProvider = (providerId: string, model?: string): void => {

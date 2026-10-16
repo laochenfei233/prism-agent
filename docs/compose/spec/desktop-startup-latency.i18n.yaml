@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for desktop-startup-latency.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/desktop-startup-latency.md
-desktop-startup-latency.md: e7e2562ca5db098f56727eb71cceb3f06badc268
-desktop-startup-latency.zh.md: 06439dc2befa4e2e7d3042ff15bad8ef894f47d7
+/:
+  en: 6d9a87659e25cc54
+  zh: 20e474a45ee82a32
+/desktop-startup-latency:
+  en: dd8eebda61b6cbe5
+  zh: 136534621e0b8405
+/desktop-startup-latency/report:
+  en: 7d906f9fb3e60242
+  zh: 980b899c954ffba4
+/desktop-startup-latency/s1-problem:
+  en: 6c6ac83bbd310691
+  zh: 4a1d1fe72952adb5
+/desktop-startup-latency/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/desktop-startup-latency/s2-design/measured-phases:
+  en: 0aa384652e4c965f
+  zh: 1c4f9fe1104dbe9f
+/desktop-startup-latency/s2-design/workspace-override:
+  en: 98003cebc3b1628a
+  zh: e2d4b462467551b3
+/desktop-startup-latency/s2-design/layer-1-adopt-the-hub-an-earlier-shell-start-left-running:
+  en: 4ed58e12e37667e9
+  zh: 0e012e23fcb477e2
+/desktop-startup-latency/s2-design/layer-2-keep-the-hub-warm-across-app-exit-rejected:
+  en: 4767183e793e312e
+  zh: a94ffb0fa429a637
+/desktop-startup-latency/s2-design/layer-3-compress-the-hub-boot-itself:
+  en: 42a164289bbdfb73
+  zh: ba428676709b3295
+/desktop-startup-latency/s2-design/rejected-approaches:
+  en: be28defc6fcd0f9a
+  zh: c10200fa78786115
+/desktop-startup-latency/s3-scope:
+  en: bf29feb35ce03efa
+  zh: f707265e7e383378
+/desktop-startup-latency/tasks:
+  en: b7cdd9cb81d6bef2
+  zh: c40d92a874ff6114
+/desktop-startup-latency/s4-acceptance:
+  en: 6b1f582462b6446f
+  zh: 4f77411b11a70550
+/desktop-startup-latency/s5-upstream-divergence:
+  en: 1bfb1e803557a3f0
+  zh: 6b0568c107b132a4

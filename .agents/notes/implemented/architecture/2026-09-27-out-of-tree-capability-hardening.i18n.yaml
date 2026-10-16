@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-27-out-of-tree-capability-hardening.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-out-of-tree-capability-hardening.md
-2026-09-27-out-of-tree-capability-hardening.md: 2e0d07469d5003c980c85d744f40286708797e17
-2026-09-27-out-of-tree-capability-hardening.zh.md: f4ea74738046a8a56396d8b943382a4d16487596
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle:
+  en: a2aade787ebe50e0
+  zh: 6f134698b8cd1db7
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle/problem:
+  en: e4c749bad9bb2569
+  zh: 101d9f9f84c3995f
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle/decision:
+  en: 3580d7e8dfa8fbc4
+  zh: e6325924e12d72a9
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle/related:
+  en: eae9439a49b08637
+  zh: da96d7487d1026a5
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle/alternatives-considered:
+  en: f41a4a36dc822511
+  zh: 2f6464ff5d2eea99
+/agent-note-enforce-nine-advisory-capabilities-from-an-out-of-tree-bundle/consequences:
+  en: 7c3871346a84229d
+  zh: 93d71c7237dce13b

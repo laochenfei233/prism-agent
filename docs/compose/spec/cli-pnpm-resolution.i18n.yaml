@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for cli-pnpm-resolution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/cli-pnpm-resolution.md
-cli-pnpm-resolution.md: 0bb0ea31626f76d1dc00ca4f2455e5c7aa96af89
-cli-pnpm-resolution.zh.md: dfb87212725b0dff85a77f0191e0763b0cbbb8ef
+/:
+  en: bf9116523ab13ba2
+  zh: bf9116523ab13ba2
+/cli-pnpm-resolution:
+  en: 14f8e6acbf88c698
+  zh: 5ded2c58964264f7
+/cli-pnpm-resolution/report:
+  en: 917ae3a190ec8573
+  zh: 917ae3a190ec8573
+/cli-pnpm-resolution/s1-problem:
+  en: e122d8b28a848af8
+  zh: e122d8b28a848af8
+/cli-pnpm-resolution/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/cli-pnpm-resolution/s2-design/ship-the-bundled-pnpm-shims-apps-desktop-scripts-bundle-runtime-mjs:
+  en: 6066d57e404fbca6
+  zh: 6066d57e404fbca6
+/cli-pnpm-resolution/s2-design/resolve-pnpm-in-the-cli-apps-cli-src-plugin-ts:
+  en: 7bccaa743f316fa8
+  zh: 7bccaa743f316fa8
+/cli-pnpm-resolution/s2-design/error-behaviour:
+  en: b3e1d79e6a655d0f
+  zh: b3e1d79e6a655d0f
+/cli-pnpm-resolution/s3-out-of-scope:
+  en: f8e9fbed83a8439f
+  zh: f8e9fbed83a8439f
+/cli-pnpm-resolution/tasks:
+  en: b9c5f887f5bfc6c8
+  zh: b9c5f887f5bfc6c8

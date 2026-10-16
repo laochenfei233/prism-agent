@@ -25,9 +25,9 @@ This Service Definition selects named speech recognizers through `ctx.speechToTe
 <a id="use-this-package"></a>
 ## Use this package
 
-Load through the [voice input bundle](../voice-input-bundle/README.md), or compose the service with a provider and consumer. `defaultProvider` is required and selects an exact registered id; the bundle supplies `sensevoice-local`. `language` supplies the omitted language hint, and `model` supplies the omitted model — the empty string leaves the selected recognizer's own configured default. A missing or duplicate provider fails explicitly.
+Load through the [voice input bundle](../voice-input-bundle/README.md), or compose the service with a provider and consumer. `defaultProvider` is required and selects an exact registered id; the bundle supplies `sensevoice-local`. `language` supplies the omitted language hint. A missing or duplicate provider fails explicitly.
 
-Providers advertise preparation origins through `downloadSources`. `prepare(id, options)` forwards an optional `downloadSource` for one task; the provider validates the choice and refuses source changes during active preparation. Omission retains provider policy. Source choices are not persisted recognition preferences. A provider may also advertise a `streaming` mode: `resolveStream()` pins that capability and `openStream()` opens one live session, into which audio is pushed in order and out of which partials, closed speaker-attributed segments, and one final transcript arrive.
+Providers advertise preparation origins through `downloadSources`. `prepare(id, options)` forwards an optional `downloadSource` for one task; the provider validates the choice and refuses source changes during active preparation. Omission retains provider policy. Source choices are not persisted recognition preferences.
 
 -----
 
@@ -37,9 +37,9 @@ Providers advertise preparation origins through `downloadSources`. `prepare(id, 
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-`resolve()` captures the provider instance, recording and language. `transcribe()` rejects a withdrawn or replaced registration. A registration disposer closes admission, aborts accepted requests and joins provider settlement; providers must honor cancellation. No fallback selects a different recognizer or uploads audio. No runtime invariant companion is published because the registry is the sole source of provider and preparation observations. Live sessions are owned like accepted transcriptions: the registration tracks every open session, cancels it when the registration withdraws, and stops tracking one the caller closed or cancelled.
+`resolve()` captures the provider instance, recording and language. `transcribe()` rejects a withdrawn or replaced registration. A registration disposer closes admission, aborts accepted requests and joins provider settlement; providers must honor cancellation. No fallback selects a different recognizer or uploads audio.
 
-`defaultProvider` and `language` are volatile Config fields: `configure()` writes the supplied fields into this plugin's profile entry through the `settings` service, and the running instance reads the updated values without remounting; composition defaults apply until an override is saved. Settings addresses the entry by its configured id (`entry.options.id`), without the Loader's Include path. `configure()` fails without `settings` or a profile entry, and rejects a language unsupported by the selected provider, or a model that provider does not offer, before saving. Naming a different provider without a model selects that provider's own default and replaces a stored model it cannot run. Providers advertise accepted language hints through `languages`, their configured default through `model`, and the models a deployment offers through `models`; `resolve()` validates the selected hint and model before transcription. Provider-owned preparation is observed through complete `SpeechSnapshot` values; closing an observer never cancels preparation.
+`defaultProvider` and `language` are volatile Config fields: `configure()` writes the supplied fields into this plugin's profile entry through the `settings` service, and the running instance reads the updated values without remounting; composition defaults apply until an override is saved. Settings addresses the entry by its configured id (`entry.options.id`), without the Loader's Include path. `configure()` fails without `settings` or a profile entry, and rejects a language unsupported by the selected provider before saving. Providers advertise accepted language hints through `languages`; `resolve()` validates the selected hint before transcription. Provider-owned preparation is observed through complete `SpeechSnapshot` values; closing an observer never cancels preparation.
 
 The `./wave` helper validates canonical 16 kHz mono PCM16 WAV for the Remote consumer and the native recognition process. Both reject inconsistent headers and lengths before decoding samples.
 
@@ -67,7 +67,7 @@ No direct effect; ordinary submission owns the message content.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Live recognition exists only where a provider advertises a `streaming` mode; every provider still accepts complete recordings, and speech synthesis has no service methods.
+- Only complete-recording transcription is supported. Streaming recognition and speech synthesis have no service methods.
 
 -----
 

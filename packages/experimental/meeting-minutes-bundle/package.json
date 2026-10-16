@@ -1,7 +1,8 @@
 {
   "name": "@deepseek-ai/dsh-experimental-meeting-minutes-bundle",
   "description": "Experimental meeting minutes: DashScope cloud transcription and the meeting_minutes tool",
-  "version": "0.1.7-rc.1",
+  "version": "0.2.1-alpha.4",
+  "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
   },
@@ -24,6 +25,7 @@
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
+    "icon.svg",
     "locale/*.json",
     "lib/index.js",
     "cordis.patch.yml",

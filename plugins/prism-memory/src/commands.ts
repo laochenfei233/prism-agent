@@ -30,7 +30,7 @@ const USAGE = [
   '  review [limit]             The review inbox: records held back until approved',
   '  approve <id> [note]        Promote one pending record to active',
   '  reject <id> [reason]       Archive one pending record',
-  '  show <id>                  One record with its provenance and supersede chain',
+  '  show <id>                  One record with its attribution and supersede chain',
   '  restore <id> [reason]      Roll a record back to current',
   '  conversations [limit]      Browse the corpus by originating conversation',
   '  maintain [apply]           Hygiene pass; dry run unless "apply" is given',

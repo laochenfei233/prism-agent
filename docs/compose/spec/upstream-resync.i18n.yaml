@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for upstream-resync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-resync.md
-upstream-resync.md: 83f158f0752f3b16385728275dc2032ed44971cd
-upstream-resync.zh.md: 1d4584e22e4395904c4ac306f2a0add60af1093c
+/:
+  en: 60dcdfe1ee36cff6
+  zh: bd3c2a7837c6eb7d
+/upstream-resync-dsh-0-2-x:
+  en: c2c093d8e73d102e
+  zh: bffcb47458648fee
+/upstream-resync-dsh-0-2-x/report:
+  en: 0c2d6bc4c8359c40
+  zh: b2dcc516d7f4193b
+/upstream-resync-dsh-0-2-x/s1-s1-problem:
+  en: a8168b8a2d886c2f
+  zh: d5269cba3eaa32e0
+/upstream-resync-dsh-0-2-x/s2-design:
+  en: 4d74231be212f31f
+  zh: da73f79ade7eadb8
+/upstream-resync-dsh-0-2-x/s3-scope:
+  en: c2f2af5dc1794021
+  zh: dd579146c3a27b24
+/upstream-resync-dsh-0-2-x/tasks:
+  en: 357641fbf39fac4d
+  zh: 5a5a44d27be234e8
+/upstream-resync-dsh-0-2-x/s4-acceptance:
+  en: 8694a0d781db1761
+  zh: 19b25f3eb1251efc

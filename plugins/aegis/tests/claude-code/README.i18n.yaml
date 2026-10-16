@@ -1,6 +1,73 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/aegis/tests/claude-code/README.md
-README.md: 236abcb661b58c9e7ded6d1066f6dbfc1a1ceaee
-README.zh.md: 77a56d824d8f91bc218886b8f6ab9c7cbd5327bd
+/claude-code-skills-tests:
+  en: 72ac28958aeccae4
+  zh: c241aa7bc9ee13d6
+/claude-code-skills-tests/overview:
+  en: b62839140de25888
+  zh: 6b096cc7da79f073
+/claude-code-skills-tests/requirements:
+  en: 8d72979916f09575
+  zh: 0e7d62ec292b38bb
+/claude-code-skills-tests/running-tests:
+  en: 4d7f16177825c2d7
+  zh: 543f240f218f382e
+/claude-code-skills-tests/running-tests/run-all-fast-tests-recommended:
+  en: 6c2723a2b914eeca
+  zh: 2a2b117d08d21875
+/claude-code-skills-tests/running-tests/run-integration-tests-slow-10-30-minutes:
+  en: 6c58d84a228d214b
+  zh: 7f6b24036b867ea2
+/claude-code-skills-tests/running-tests/run-specific-test:
+  en: bf2b2eb203ddbfa6
+  zh: 308e18ffcd211ba7
+/claude-code-skills-tests/running-tests/run-with-verbose-output:
+  en: 72a306da51315200
+  zh: 8299dc45709662f7
+/claude-code-skills-tests/running-tests/set-custom-timeout:
+  en: a0284bafb7e5adae
+  zh: 0ae7d4064028993e
+/claude-code-skills-tests/test-structure:
+  en: d9886f1799d351d7
+  zh: 053bbb8eeb1b4f99
+/claude-code-skills-tests/test-structure/test-helpers-sh:
+  en: a948f921fe1303b8
+  zh: b17746e0a2ddc713
+/claude-code-skills-tests/test-structure/test-files:
+  en: 2492b86e7bd6604e
+  zh: 15ef04d664bf767d
+/claude-code-skills-tests/example-test:
+  en: 23ec0eac3c238bb1
+  zh: a213ca08d9e8835d
+/claude-code-skills-tests/current-tests:
+  en: 0c66cd4831f0e8e5
+  zh: 38b537753d10f92b
+/claude-code-skills-tests/current-tests/fast-tests-run-by-default:
+  en: 2893d6903b2b3af3
+  zh: 6ec0a157d26fac38
+/claude-code-skills-tests/current-tests/fast-tests-run-by-default/test-subagent-driven-development-sh:
+  en: 3ea3ee81bfff727a
+  zh: 58f95817c2199269
+/claude-code-skills-tests/current-tests/integration-tests-use-integration-flag:
+  en: 0d4ded7e7fe273c7
+  zh: 6c75d55b99d6cf82
+/claude-code-skills-tests/current-tests/integration-tests-use-integration-flag/test-subagent-driven-development-integration-sh:
+  en: a1b478c2cf5297f5
+  zh: faf637be240b5135
+/claude-code-skills-tests/adding-new-tests:
+  en: a7b8845cb193570b
+  zh: 45249087c37c9b1e
+/claude-code-skills-tests/timeout-considerations:
+  en: 9366a1ce39b610d2
+  zh: 3509319bfdc84b2e
+/claude-code-skills-tests/debugging-failed-tests:
+  en: 5a664c61b0c5a10b
+  zh: 9763d6444ab844f2
+/claude-code-skills-tests/ci-cd-integration:
+  en: e627f6b566a428fc
+  zh: bf60bd4fe8fe59d3
+/claude-code-skills-tests/notes:
+  en: 02e0a2026b249181
+  zh: 238153de2c955165

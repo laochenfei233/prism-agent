@@ -59,7 +59,7 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 | A1 桌面应用 | `apps/desktop/**`——Tauri 壳、`src-tauri/**`、`ui/dist` 打包产物、`scripts/bundle-runtime.mjs`，以及带标记的 README 对 | 用本目录整体替换上游的 Electron 应用，然后重新施加 [desktop-startup-latency.md](desktop-startup-latency.zh.md) 的第 1、3 层与标记所指名的壳改动；检查项是 `apps/desktop/src-tauri` 下的 `cargo test` 与壳脚本的 `node --check` |
 | A2 上游包内的客户端品牌 | `packages/client/locale/src/locales/en.ts` 与 `zh.ts`、`packages/client/ui-primitives/**`（删除 `FishLogo.tsx`，重写 `BrandWordmark.tsx` 与图标测试，新增 `PrismLogo.tsx` 与 `PrismBadgeLogo.tsx`）、`packages/client/ui-brand-official/**`、`packages/client/ui-theme/**`（含新增的 `builtin-themes.ts` 与 `client/gallery.ts`）、`packages/client/ui-sidebar/**`、`packages/client/ui-layout/**`、`packages/client/ui-conversation/**`、`packages/client/web/**`，以及 `apps/web/**`（页面标题、manifest、favicon、PWA 测试） | 每个被改写的文件都以上游副本为起点重新施加品牌化，保留新增的 Prism 文件，并以客户端各包的单元测试与快照测试作为检查 |
 | A3 启动解析器的目录列表门禁 | `packages/boot/app-boot/src/profile.ts`、`packages/boot/app-boot/src/profile-resolution/resolver.ts`、`packages/boot/app-boot/tests/profile.spec.ts` | 以上游文件为起点重新施加 `DirectoryListings` 代码块、`packageDirFromAnchor` 内的门禁，以及返回 `realModuleDirectory(path)` 的 `canonicalPath`；[desktop-startup-latency.md](desktop-startup-latency.zh.md) 的 S5 逐行列出这些内容，少传 `listings` 参数编译器会直接报错，四条回归测试就是检查 |
-| A4 pnpm workspace 的 patch 行 | `pnpm-workspace.yaml` 与 `patches/@electron__osx-sign@1.3.3.patch` | 从 `patchedDependencies` 中删掉 `'@electron/osx-sign@1.3.3'`，并删掉它指向的 patch 文件：Electron 壳消失后 pnpm 会把它判为未使用而硬失败（`ERR_PNPM_UNUSED_PATCH`）；每次导入后、任何 `pnpm install` 之前都要重做，检查项是安装能读到 store 而不是因未使用 patch 失败 |
+| A4 pnpm workspace 的 patch 行 | `pnpm-workspace.yaml` 与它删除的 patch 文件：`patches/@electron__osx-sign@1.3.3.patch`，以及自 2026-10-16 再同步起的 `patches/app-builder-lib@26.17.0.patch` | 从 `patchedDependencies` 中删掉 `'@electron/osx-sign@1.3.3'` 与 `app-builder-lib@26.17.0`，并删掉它们指向的 patch 文件；两者都属于 Electron 打包链，Tauri 壳替换后 pnpm 会判为未使用而硬失败（`ERR_PNPM_UNUSED_PATCH`）；每次导入后、任何 `pnpm install` 之前都要重做，检查项是安装能读到 store 而不是因未使用 patch 失败 |
 | A5 树外插件与 profile home | `plugins/**`（`aegis`、`dsh-agent-progress`、`dsh-tauri`、`prism-guardrails`、`prism-meeting`）与 `home-mods/**` | 原样复制插件目录与该 profile home，但不要复制 `home-mods/.credentials.yaml`：它保存凭据且未被忽略 |
 | A6 Prism 独有的文档与资产 | `design-assets/**`、`docs/compose/spec/**`、`CAPABILITY-PLAN.md`、`MIMOCODE-REFERENCE.md` | 原样复制；上游没有对应物，这里不会有冲突 |
 | A7 进行中的导入 | `packages/cron/**`、`packages/api/cron-controller/**`、`packages/client/ui-cron/**`、`packages/util/path-lock/**`、`packages/experimental/speech-to-text-dashscope/**`、`docs/subsystems/cron.*`、`apps/cli/config/examples/cron/**`、`.agents/notes/proposed/feature/2026-09-26-cron-scheduled-tasks.*` | 不是 fork 偏离：先让这次导入落地，再在合并后的树上重新施加 A3 与 A4，并标注新树自身带来的变化 |
@@ -81,6 +81,8 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 - [ ] T5: 本索引的收尾动作（见 S3，待定）
 
 ## [S4] Replay checklist
+
+**同步锚点（2026-10-16）：** 上一次再同步把上游 `86a402200d`（`dsh-v0.2.1-alpha.4`）以合并提交 `6497148adb` 并入姊妹检出，并把该树重新导入本仓库、重放 A1 至 A10 区域。下一次再同步从这里测量：`git -C ../deepseek-harness rev-list --count 6497148adb..upstream/master`。
 
 1. 先在本仓库盘点：`git status --porcelain` 与 `rg -n PRISM-DIVERGENCE`，并在动其他东西之前决定进行中的导入（A7）怎么办。
 2. 在能合并的地方调和：在 `../deepseek-harness` 中 `git fetch upstream` 并合并 `upstream/master`，在那里重新施加 A1 到 A4——在那里它们都是普通提交。

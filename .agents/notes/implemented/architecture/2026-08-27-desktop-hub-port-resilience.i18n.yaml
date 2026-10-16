@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-desktop-hub-port-resilience.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-desktop-hub-port-resilience.md
-2026-08-27-desktop-hub-port-resilience.md: bc804108a1a1975c122375e7fb531312d94d189f
-2026-08-27-desktop-hub-port-resilience.zh.md: d42f6cdf0f0762d97a08176f457c722d58a8659d
+/agent-note-desktop-hub-port-resilience:
+  en: 4ec9c46750818675
+  zh: d8fcc1fb388ccb04
+/agent-note-desktop-hub-port-resilience/problem:
+  en: a36074b9677a1e5d
+  zh: 08f1b74a39a6ae01
+/agent-note-desktop-hub-port-resilience/decision:
+  en: b70fde81128167b1
+  zh: b0269502692c4ea1
+/agent-note-desktop-hub-port-resilience/alternatives-considered:
+  en: 74653293216f4281
+  zh: 7fc7b03f0cfb2080
+/agent-note-desktop-hub-port-resilience/verification:
+  en: 141e8efb1569f2ab
+  zh: 58ea63e379fb8bdd
+/agent-note-desktop-hub-port-resilience/consequences:
+  en: 0ea8181bb7207a67
+  zh: 80b1e77f8da9fff9

@@ -1,6 +1,61 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-meeting/README.md
-README.md: 7d2649e1cc14a04b2b39db4df815835a743c41a5
-README.zh.md: 1dd9417fd520454aae7807c628e71803364ac826
+/:
+  en: 794df76aa2f0f1c9
+  zh: de66b2f970a410d8
+/prism-ai-prism-meeting:
+  en: 4ba9a5d2872763e1
+  zh: cbb7cfe38f0ceaf8
+/prism-ai-prism-meeting/summary:
+  en: 1e4420356c026ab5
+  zh: 7596ee22b7faa025
+/prism-ai-prism-meeting/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/prism-ai-prism-meeting/use-this-package:
+  en: bbff250eba0f1b89
+  zh: 0a618f05cc88ee2b
+/prism-ai-prism-meeting/use-this-package/install-into-a-profile:
+  en: b72ff58d28665888
+  zh: bf7fe2a1037c02a6
+/prism-ai-prism-meeting/use-this-package/what-you-get:
+  en: 1c3a5b9209452058
+  zh: ac4a0e64a245488a
+/prism-ai-prism-meeting/understand-the-implementation:
+  en: 8273c7f49e60271b
+  zh: bd3c6dbd361938e6
+/prism-ai-prism-meeting/understand-the-implementation/composition-mechanics:
+  en: e934e87e92993687
+  zh: 7266c5e0f9a7348c
+/prism-ai-prism-meeting/understand-the-implementation/source-map:
+  en: f9861bbb8b34e65e
+  zh: eefc137468889b39
+/prism-ai-prism-meeting/understand-the-implementation/invariant-ownership:
+  en: 179fd3c08ab2eddf
+  zh: bd3a0d5467d0ad63
+/prism-ai-prism-meeting/further-exploration:
+  en: 00bbe8bf68e1f9a8
+  zh: 1b2c43af104f0b76
+/prism-ai-prism-meeting/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/prism-ai-prism-meeting/model-experience/tool-schema:
+  en: e4c7376d4f29dbd5
+  zh: 6b7a9eaf69c9ea53
+/prism-ai-prism-meeting/model-experience/tool-schema/what-the-model-sees:
+  en: e5042277298c08c2
+  zh: a39fa466f01915de
+/prism-ai-prism-meeting/model-experience/tool-schema/token-effect:
+  en: b2be075ac3057dcd
+  zh: e216c5a9a5e963d1
+/prism-ai-prism-meeting/model-experience/tool-schema/kv-cache-effect:
+  en: 2189df6d9dbd8088
+  zh: df85fc692cfe941d
+/prism-ai-prism-meeting/known-limitations-and-deferred-work:
+  en: 1a6465806ae7276d
+  zh: f9f61483db46a84a
+/prism-ai-prism-meeting/known-limitations-and-deferred-work/dev-note:
+  en: 47024cbb4cfb1d4a
+  zh: e360cfcf85fbe298

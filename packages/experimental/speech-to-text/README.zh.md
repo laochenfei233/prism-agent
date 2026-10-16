@@ -25,9 +25,9 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用此包
 
-通过[语音输入 Bundle](../voice-input-bundle/README.zh.md)加载，或组合此服务、Provider 与消费者。`defaultProvider` 为必填项，选择确切的注册 id；Bundle 提供 `sensevoice-local`。`language` 提供省略的语言提示，`model` 提供省略的模型——空字符串表示沿用所选识别器自身配置的默认值。缺失或重复的 Provider 会明确报错。
+通过[语音输入 Bundle](../voice-input-bundle/README.zh.md)加载，或组合此服务、Provider 与消费者。`defaultProvider` 为必填项，选择确切的注册 id；Bundle 提供 `sensevoice-local`。`language` 提供省略的语言提示。缺失或重复的 Provider 会明确报错。
 
-提供方通过 `downloadSources` 公布准备阶段可用的源。`prepare(id, options)` 为单次任务转发可选的 `downloadSource`；提供方校验选择，并拒绝在准备期间改源。省略时沿用提供方策略。下载源选择不属于持久化的识别偏好。提供方还可以公布 `streaming` 模式：`resolveStream()` 固定该能力，`openStream()` 打开一个实时会话，音频按顺序推入，partial、已关闭的带说话人分段与一份最终转写从中产出。
+提供方通过 `downloadSources` 公布准备阶段可用的源。`prepare(id, options)` 为单次任务转发可选的 `downloadSource`；提供方校验选择，并拒绝在准备期间改源。省略时沿用提供方策略。下载源选择不属于持久化的识别偏好。
 
 -----
 
@@ -37,9 +37,9 @@ kind: "package-reference"
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
-`resolve()` 捕获 Provider 实例、录音和语言。`transcribe()` 拒绝已撤销或替换的注册。注册的清理函数先拒绝新请求，再取消已接收的请求并等待 Provider 完成；Provider 必须响应取消。服务不会回退到其他识别器或上传音频。不发布运行时不变量伴随模块，因为注册表是 Provider 与准备状态观测的唯一来源。实时会话与已接收的转写同样归注册所有：注册表跟踪每个打开的会话，在注册撤销时取消它，并在调用方关闭或取消后停止跟踪。
+`resolve()` 捕获 Provider 实例、录音和语言。`transcribe()` 拒绝已撤销或替换的注册。注册的清理函数先拒绝新请求，再取消已接收的请求并等待 Provider 完成；Provider 必须响应取消。服务不会回退到其他识别器或上传音频。
 
-`defaultProvider` 与 `language` 是 volatile Config 字段：`configure()` 通过 `settings` 服务把传入的字段写入本插件的 profile 条目，运行中的实例无需重挂载即可读到更新值；保存覆盖值之前使用组合配置默认值。Settings 使用条目配置中的 id（`entry.options.id`）定位条目，不包含 Loader 的 Include 路径。没有 `settings` 或 profile 条目时 `configure()` 失败，并在保存前拒绝所选 Provider 不支持的语言，或该 Provider 未提供的模型。指定另一个 Provider 但未给出模型时，将选用该 Provider 自身的默认值，并替换掉它无法运行的已存模型。Provider 通过 `languages` 公布支持的语言提示，通过 `model` 公布配置的默认模型，通过 `models` 公布本部署提供的模型；`resolve()` 在转写前校验所选提示与模型。观察者通过完整 `SpeechSnapshot` 接收 Provider 拥有的准备状态；关闭观察者不会取消准备。
+`defaultProvider` 与 `language` 是 volatile Config 字段：`configure()` 通过 `settings` 服务把传入的字段写入本插件的 profile 条目，运行中的实例无需重挂载即可读到更新值；保存覆盖值之前使用组合配置默认值。Settings 使用条目配置中的 id（`entry.options.id`）定位条目，不包含 Loader 的 Include 路径。没有 `settings` 或 profile 条目时 `configure()` 失败，并在保存前拒绝所选 Provider 不支持的语言。Provider 通过 `languages` 公布支持的语言提示；`resolve()` 在转写前校验所选提示。观察者通过完整 `SpeechSnapshot` 接收 Provider 拥有的准备状态；关闭观察者不会取消准备。
 
 `./wave` 辅助函数为 Remote 消费者与原生识别进程校验规范的 16 kHz 单声道 PCM16 WAV。两者均在解码采样前拒绝不一致的头部和长度。
 
@@ -67,7 +67,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- 只有在提供方公布 `streaming` 模式处才存在实时识别；每个提供方仍接受完整录音，且语音合成没有服务方法。
+- 仅支持完整录音转写。服务没有流式识别或语音合成方法。
 
 -----
 

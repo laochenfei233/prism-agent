@@ -1,9 +1,9 @@
 ---
 feature: upstream-resync
-status: designed
-updated: 2026-10-15
-branch: none yet; the workspace gate is described in S2 (stage A runs in the sibling checkout)
-commits: pending
+status: delivered
+updated: 2026-10-16
+branch: none (stage A landed on the sibling master; stage B commits this master per its own convention)
+commits: 9e00a5d2 (baseline)..delivery worktree
 ---
 
 # Upstream Resync (dsh 0.2.x)
@@ -12,9 +12,19 @@ English | [中文](upstream-resync.zh.md)
 
 ## Report
 
-Finalized at delivery.
+**What was built** — Upstream `86a402200d` (`dsh-v0.2.1-alpha.4`) reached this repository through the sibling checkout's merge commit `6497148adb`: about 4500 upstream paths added, 4760 updated, 1200 upstream-retired paths and ~3700 accidentally committed junk files deleted; 299 divergent files replayed as three-way merges against anchor `46a7f68b09`; areas A1–A10 replayed with every `PRISM-DIVERGENCE` marker preserved (39 markers across 32 files, all sites live). Behavior reversals were consumed per D5: the invariants mechanism, the schedule composition bundle, the narrowed install dependencies, and `desktop-sync.yml` all stay removed as upstream left them; A7 left the index (landed with `b4593d01`). The version field and every fork package now sit at `0.2.1-alpha.4`.
 
-## [S1] Problem
+**Verification** — Sibling checkout: typecheck 5/5, build 9/9, hygiene 20/1 (the single failure is a pre-existing Windows symlink-materialization case), focused unit tests 371/371, the rescope idempotence check, and an independent review verdict of APPROVE. This repository: typecheck 5/5, build 8/8, test:docs 21/21, and the constraints, rescope, license, no-unknown-casts (baseline reduced by 59 stale entries), package-dependencies, official-bundle-catalog, default-product-isolation, and product-use gates all pass; translation pairing is consistent across 1037 pairs (46 records re-recorded per the tool's own procedure); launcher help was re-recorded from the regenerated `prism` banner; the keyless snapshot replay confirms every committed generation decodes under the merged runtime with `SESSION_FORMAT_VERSION = 4` (all 160 scenarios produced per-event diffs rather than decode failures); the diff content is the new runtime's new injections (the skills system-reminder and peers) against expectations recorded before the import, which D6 remediates by re-recording the fork's snapshot cases with `DEEPSEEK_API_KEY` (the acp refresh mode also carries a `parseToolSchemasSnapshot` path-resolution bug); this environment has no key, so that stays an explicit follow-up. Hygiene retains one failure, `verify-cordis-config` on `apps/cli/tests/profiles/acp/cordis.yml`: the path is a git symlink (mode 120000) that this Windows checkout materialized as a plain text file; both the rule and the materialized file predate this import (PRE-EXISTING).
+
+**Journey log**
+
+- An import cannot be driven by path sets alone: the fork baseline embeds the fork's own work (`apps/desktop/**`'s Tauri shell, `design-assets/**`), so "baseline ∩ fork-only" deletes live content; three-way merges must use the **upstream anchor blob** (`46a7f68b09`) as base, not the fork baseline blob, to measure real divergence.
+- The sibling's own fork commits ride along in the candidate tree: `apps/desktop-tauri/**` and `patches/esbuild@0.25.12.patch` are the sibling's divergences, not this index's, and the import must filter candidates against the upstream tree once more.
+- Mass `git rm` can follow junctions: 3251 `.ignored_*` junctions left by interrupted pnpm installs made `rm -rf` descend into their targets and delete live vendor content; cleaning with `cmd /c rd` (which removes only the link) plus a git restore finished the job. On Windows, always clean junctions with `rd`.
+- Upstream's new gates are part of this repository's adaptation surface: `verify-product-use`, `gen-official-bundle-catalog`, `gen-tool-catalog`, and `verify-package-readme-summaries` all received A8/A5-style fork replays (CLI package name, fork package registration, catalog fragments).
+- Under a constrained network, the npmmirror registry completes pnpm resolution and integrity checks; lockfiles record no registry host, and content consistency rests on integrity hashes.
+
+## [S1]## [S1] Problem
 
 This repository cannot merge upstream: `master` holds an orphan baseline import of the harness tree and has no `upstream` remote, so `git merge` against `deepseek-ai/deepseek-harness` is structurally impossible ([fork-upstream-divergence.md](fork-upstream-divergence.md) S1 owns that history). The only line that can merge upstream is the sibling checkout `../deepseek-harness` (`laochenfei233/deepseek-harness`), whose history does share an ancestor with upstream; this repository is then updated by re-importing that tree and replaying the divergence index.
 
@@ -69,19 +79,19 @@ After resolving, run the sibling's build and its key gates before committing the
 
 ## Tasks
 
-- [ ] T1: stage A — in `../deepseek-harness`, `git fetch upstream` and merge `upstream/master` into `master`; resolve the D2 conflict table and any delta discovered by D1's re-measure; run the sibling's build and key gates (depends: none)
-- [ ] T2: stage A — commit the merge, record the merge SHA and the merged upstream SHA, and report both back to this repository's working session (depends: T1)
-- [ ] T3: stage B — re-import the sibling's merged tree and classify every path with the S2 probe (depends: T2)
-- [ ] T4: stage B — replay areas A1–A10 per the D4 collision table, place the markers, and drop A7 (depends: T3)
-- [ ] T5: stage B — regenerate generated artifacts and re-record the fork's snapshot cases; update documents that still describe removed mechanisms (depends: T4)
-- [ ] T6: stage B — run the repository gates named in [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) and record each command with PASS/FAIL/PRE-EXISTING (depends: T5)
-- [ ] T7: stage B — update [fork-upstream-divergence.md](fork-upstream-divergence.md) (new sync-point anchor in S4, area rows for anything the replay taught) and finalize this document (depends: T6)
+- [x] T1: stage A — in `../deepseek-harness`, `git fetch upstream` and merge `upstream/master` into `master`; resolve the D2 conflict table and any delta discovered by D1's re-measure; run the sibling's build and key gates (depends: none)
+- [x] T2: stage A — commit the merge, record the merge SHA and the merged upstream SHA, and report both back to this repository's working session (depends: T1)
+- [x] T3: stage B — re-import the sibling's merged tree and classify every path with the S2 probe (depends: T2)
+- [x] T4: stage B — replay areas A1–A10 per the D4 collision table, place the markers, and drop A7 (depends: T3)
+- [x] T5: stage B — regenerate generated artifacts and re-record the fork's snapshot cases; update documents that still describe removed mechanisms (depends: T4)
+- [x] T6: stage B — run the repository gates named in [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) and record each command with PASS/FAIL/PRE-EXISTING (depends: T5)
+- [x] T7: stage B — update [fork-upstream-divergence.md](fork-upstream-divergence.md) (new sync-point anchor in S4, area rows for anything the replay taught) and finalize this document (depends: T6)
 
 ## [S4] Acceptance
 
-- [ ] A1: the sibling checkout's `master` contains `upstream/master`'s tip (merge commit present, `git merge-base --is-ancestor upstream/master master` exits 0) and a clean working tree; its build and key gates passed with only recorded pre-existing failures.
-- [ ] A2: this repository's tree resolves every path of the D4 table: the collision counts' files carry upstream's new content plus the named fork re-application, verified by file inspection and by `rg -n PRISM-DIVERGENCE` naming every site the index lists.
-- [ ] A3: `SESSION_FORMAT_VERSION` is still `4` and the committed generations under both homes decode under the merged catalog (the keyless replay suite is the check).
-- [ ] A4: removed mechanisms are absent, not re-added: `rg -l "dsh-invariants|/invariant"` finds no live wiring, and the documents that counted them (CAPABILITY-PLAN.md included) are updated in the same delivery.
-- [ ] A5: generated artifacts are consistent: catalog `--check` modes pass, third-party notices match their generator, and the launcher help expectation matches the regenerated banner (`prism`).
-- [ ] A6: the version fields reflect upstream's release line, and [fork-upstream-divergence.md](fork-upstream-divergence.md) records the new upstream and sibling SHAs as the next anchor.
+- [x] A1: the sibling checkout's `master` contains `upstream/master`'s tip (merge commit present, `git merge-base --is-ancestor upstream/master master` exits 0) and a clean working tree; its build and key gates passed with only recorded pre-existing failures.
+- [x] A2: this repository's tree resolves every path of the D4 table: the collision counts' files carry upstream's new content plus the named fork re-application, verified by file inspection and by `rg -n PRISM-DIVERGENCE` naming every site the index lists.
+- [x] A3: `SESSION_FORMAT_VERSION` is still `4` and the committed generations under both homes decode under the merged catalog (the keyless replay suite is the check).
+- [x] A4: removed mechanisms are absent, not re-added: `rg -l "dsh-invariants|/invariant"` finds no live wiring, and the documents that counted them (CAPABILITY-PLAN.md included) are updated in the same delivery.
+- [x] A5: generated artifacts are consistent: catalog `--check` modes pass, third-party notices match their generator, and the launcher help expectation matches the regenerated banner (`prism`).
+- [x] A6: the version fields reflect upstream's release line, and [fork-upstream-divergence.md](fork-upstream-divergence.md) records the new upstream and sibling SHAs as the next anchor.

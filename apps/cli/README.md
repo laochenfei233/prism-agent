@@ -1,42 +1,42 @@
-# `prism-agent`
+# `@deepseek-ai/dsh`
 
 English | [中文](README.zh.md)
 
-The `prism` command is the sole supported Node application launcher: profiles are ordered stacks of plugin-bundle patch layers under the user's own overrides. SDK and ACP are profiles, not separate public bins. The Python runtime wheel packages this same command; the SDK defaults to `sdk`, and the minimal example selects `sdk-minimal`. [`src/args.ts`](src/args.ts) owns the command grammar, and [`src/bin.ts`](src/bin.ts) loads only the selected runner. Invalid commands, options from another mode, and fatal configuration or boot failures exit nonzero.
+The `dsh` command is the sole supported Node application launcher: profiles are ordered stacks of plugin-bundle patch layers under the user's own overrides. SDK and ACP are profiles, not separate public bins. The Python runtime wheel packages this same command; the SDK defaults to `sdk`, and the minimal example selects `sdk-minimal`. [`src/args.ts`](src/args.ts) owns the command grammar, and [`src/bin.ts`](src/bin.ts) loads only the selected runner. Invalid commands, options from another mode, and fatal configuration or boot failures exit nonzero.
 
 ## Entry modes
 
 | Command | Purpose |
 |---|---|
-| `prism <name>` / `prism --profile <name>` | Boot the named profile under `$DSH_HOME/profiles/<name>`. |
-| `prism --profile <name> --from-default-profile <template>` | Create a new custom profile from a shipped template, then boot it. |
-| `prism --profile acp` | Serve automation clients over ACP stdio until disconnect. |
-| `prism --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
-| `prism --profile sdk` | Serve SDK clients over JSON-RPC stdio until shutdown or disconnect. |
-| `prism --profile sdk-minimal` | Serve SDK clients with the standalone minimal agent tree. |
-| `prism web` | Boot the Web profile. |
-| `prism plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
+| `dsh <name>` / `dsh --profile <name>` | Boot the named profile under `$DSH_HOME/profiles/<name>`. |
+| `dsh --profile <name> --from-default-profile <template>` | Replace a custom profile with a fresh copy of a shipped template, then boot it. |
+| `dsh --profile acp` | Serve automation clients over ACP stdio until disconnect. |
+| `dsh --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
+| `dsh --profile sdk` | Serve SDK clients over JSON-RPC stdio until shutdown or disconnect. |
+| `dsh --profile sdk-minimal` | Serve SDK clients with the standalone minimal agent tree. |
+| `dsh web` | Boot the Web profile. |
+| `dsh plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
 
-The invoking directory is the default workspace root. The `web`, `headless`, `sdk`, `sdk-minimal`, and `acp` profiles auto-initialize on first use from shipped templates. Create another profile at an unused, non-shipped name with `--from-default-profile`, or initialize a base-backed profile through `prism plugin`. The `desktop` name is reserved for the Electron-owned profile, so the CLI rejects boot, config-dump, and plugin-management requests for it.
+The invoking directory is the default workspace root. The `web`, `headless`, `sdk`, `sdk-minimal`, and `acp` profiles auto-initialize on first use from shipped templates. Create or reset another profile at a non-shipped name with `--from-default-profile`, or initialize a base-backed profile through `dsh plugin`. The `desktop` name is reserved for the Electron-owned profile, so the CLI rejects boot and config-dump requests for it. The npm CLI also rejects its plugin-management requests; the [Desktop-installed command](../desktop/README.md#bundled-command-runtime) can manage the initialized Desktop profile using that installation’s runtime.
 
 ## App arguments
 
 The launcher parses only its own flags and hands everything after them to the booted profile, where any injected app plugin may parse the shared immutable snapshot ([`dsh-cmdline`](../../packages/boot/cmdline/README.md)). The first token the launcher does not recognize starts the app's arguments:
 
 ```sh
-prism --profile web --port 8080       # --port belongs to the web app
-prism --profile tui --resume <id>     # example, assuming the tui profile is installed; --resume belongs to the terminal app
-prism --profile headless "run the tests"
-prism --profile web --help            # the web app's flags, not the launcher's
-prism --help                          # the launcher's own help
+dsh --profile web --port 8080       # --port belongs to the web app
+dsh --profile tui --resume <id>     # example, assuming the tui profile is installed; --resume belongs to the terminal app
+dsh --profile headless "run the tests"
+dsh --profile web --help            # the web app's flags, not the launcher's
+dsh --help                          # the launcher's own help
 ```
 
 <a id="profiles"></a>
 ## Profiles
 
-A profile directory holds a `package.json` (out-of-tree plugin dependencies plus the profile manifest `dsh.profile` with its ordered `bundles` list) and a `cordis.patch.yml` (the user's own patch layer). `dsh-hmr`, when enabled in YAML, watches the profile manifest and both profile and home patch files, then recomposes all layers through one serialized reload. Without HMR, changes apply on restart. Edits arriving during watcher registration use the same nonfatal reload reporting as later edits. [Plugin Manager](../../packages/boot/plugin-manager/README.md) shares package operations and the profile write lock with `prism plugin`; package updates retain disabled bundle selections. CLI package commands inherit authentication variables and terminal descriptors, including interactive build approval; service calls retain their scrubbed environment and captured diagnostics.
+A profile directory holds a `package.json` (out-of-tree plugin dependencies plus the profile manifest `dsh.profile` with its ordered `bundles` list) and a `cordis.patch.yml` (the user's own patch layer). `dsh-hmr`, when enabled in YAML, watches the profile manifest and both profile and home patch files, then recomposes all layers through one serialized reload. Without HMR, changes apply on restart. Edits arriving during watcher registration use the same nonfatal reload reporting as later edits. [Plugin Manager](../../packages/boot/plugin-manager/README.md) shares package operations and the profile write lock with `dsh plugin`; package updates retain disabled bundle selections. CLI package commands inherit authentication variables and terminal descriptors, including interactive build approval; service calls retain their scrubbed environment and captured diagnostics.
 
-Installation and profile startup enforce declared DSH peer ranges against the same runtime version shown by `prism --version`. Incompatible plugins require an explicitly acknowledged exact-version exemption. The [plugin manager's compatibility reference](../../packages/boot/plugin-manager/README.md#version-compatibility-and-exemptions) documents `version-exemptions`, `allow-version`, `revoke-version`, persistence, and risks.
+Installation and profile startup enforce the declared `engines.dsh` range, or DSH peer ranges when it is absent, against the same runtime version shown by `dsh --version`. Incompatible plugins require an explicitly acknowledged exact-version exemption. The [plugin manager's compatibility reference](../../packages/boot/plugin-manager/README.md#version-compatibility-and-exemptions) documents `version-exemptions`, `allow-version`, `revoke-version`, persistence, and risks.
 
 The tree composes over an empty root:
 - each bundle's patch in `dsh.profile.bundles` order
@@ -51,12 +51,14 @@ The [CLI behavior reference](reference/README.md) owns exact layer precedence, f
 
 ## Optional overlays
 
-`config/examples/` ships opt-in overlays for GitHub review webhooks, session-local Schedule, memory MCP servers, and runtime Cordis tools. They are never part of a default profile; the [user guides](../../docs/user/guide/index.md) and [developer practice guides](../../docs/user/develop/practice/index.md) own setup and safety instructions.
+`config/examples/` ships opt-in overlays for GitHub review webhooks, memory MCP servers, and runtime Cordis tools. They are never part of a default profile; the [user guides](../../docs/user/guide/index.md) and [developer practice guides](../../docs/user/develop/practice/index.md) own setup and safety instructions.
 
 ## Development
 
 Production runs require built package and frontend artifacts. From the repository root, run `pnpm run build` separately, then use `pnpm dsh <args...>` to run the TypeScript entry and forward every argument; the [source-execution reference](reference/README.md#source-execution) owns the module-resolution contract.
 
-The `prism-agent/profile-boot` export provides the shared profile lifecycle to the Desktop host. A resolved application profile supplies its own installation anchor for runtime package resolution while retaining the Harness home patch, proxy environment, telemetry switch, patch reload, and bounded shutdown.
+The `@deepseek-ai/dsh/profile-boot` export provides the shared profile lifecycle to the Desktop host. A resolved application profile supplies its own installation anchor for runtime package resolution while retaining the Harness home patch, proxy environment, telemetry switch, patch reload, and bounded shutdown.
+
+Packaged installations call the same `runCli()` entry with their package-manager executable. The Desktop carrier also enables plugin operations for its initialized profile; npm launches omit these options. Installation-owned package environments apply only to plugin package operations; the invoking directory, ordinary profile selection, and agent-shell PATH retain their CLI meanings.
 
 The [Web failure matrix](tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts) runs the built CLI through startup failures and native configuration HMR with `awaitWriteFinish` enabled in `test:expected`. It verifies authenticated HTTP responses, diagnostics, recovery, process exits, and disposal without model API calls; the [startup acceptance](tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts) also covers the shipped required Web dependencies and port conflicts.

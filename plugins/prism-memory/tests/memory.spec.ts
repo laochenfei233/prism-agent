@@ -248,7 +248,7 @@ describe('renderExport', () => {
     expect(second.index).toBe(first.index)
   })
 
-  it('carries the record text, status, and provenance into both mirrors', () => {
+  it('carries the record text, status, and attribution into both mirrors', () => {
     const exported = renderExport([record({ text: 'the domain stays version 1' })], { now: EPOCH })
     expect(exported.markdown).toContain('the domain stays version 1')
     expect(exported.markdown).toContain('session=session-a')

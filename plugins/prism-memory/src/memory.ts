@@ -249,7 +249,7 @@ export interface RankOptions {
   readonly limit?: number
   /** Current time in epoch milliseconds. */
   readonly now?: number
-  /** Optional provenance narrowing: keep only records distilled from this session. */
+  /** Optional attribution narrowing: keep only records distilled from this session. */
   readonly sessionId?: string
   /** Term-frequency saturation; higher means repetition keeps paying off longer. */
   readonly k1?: number
@@ -274,7 +274,7 @@ export interface RankOptions {
  * id, so the order is total and stable.
  * @param records - the corpus to rank.
  * @param query - the literal query text.
- * @param options - scope admission, status filter, provenance filter, result cap, BM25 parameters, and clock.
+ * @param options - scope admission, status filter, attribution filter, result cap, BM25 parameters, and clock.
  * @returns ranked hits, best first, capped at `limit`.
  */
 export function rankRecords(

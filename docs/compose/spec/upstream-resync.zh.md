@@ -1,9 +1,9 @@
 ---
 feature: upstream-resync
-status: designed
-updated: 2026-10-15
-branch: none yet; the workspace gate is described in S2 (stage A runs in the sibling checkout)
-commits: pending
+status: delivered
+updated: 2026-10-16
+branch: none（阶段 A 落在姊妹检出的 master；阶段 B 按本仓库惯例直接提交 master）
+commits: 9e00a5d2（基线）..交付工作树
 ---
 
 # 上游再同步（dsh 0.2.x）
@@ -12,7 +12,18 @@ commits: pending
 
 ## Report
 
-交付时填充。
+**What was built** — 上游 `86a402200d`（`dsh-v0.2.1-alpha.4`）经姊妹检出的合并提交 `6497148adb` 重新导入本仓库：新增约 4500 个上游路径、更新约 4760 个、删除 1200 个上游退役路径与约 3700 个误提交垃圾文件，299 个偏离文件以锚点 `46a7f68b09` 为基做三方合并重放，A1–A10 区域全部重放并保留 `PRISM-DIVERGENCE` 标记（32 文件 39 处，全部位点存活）。行为反转按 D5 消费：不变式机制、schedule 组合包、收窄的安装依赖与 `desktop-sync.yml` 均保持上游的移除状态；A7 从索引中移除（已随 `b4593d01` 落地）。版本字段与全部 fork 包对齐 `0.2.1-alpha.4`。
+
+**Verification** — 姊妹检出：typecheck 5/5、build 9/9、hygiene 20/1（唯一失败为合并前已存在的 Windows 符号链接物化）、聚焦单测 371/371、rescope 幂等检查通过，独立评审 APPROVE。本仓库：typecheck 5/5、build 8/8、test:docs 21/21、constraints/rescope/licenses/no-unknown-casts（baseline 净删 59 条）/package-dependencies/official-bundle-catalog/default-product-isolation/product-use 全部通过，translation-pairing 1037 对一致（46 条记录按工具规程重录），launcher-help 从重生成的 `prism` 横幅重录，无密钥快照回放确认 `SESSION_FORMAT_VERSION = 4` 下已提交代际可被合并后的运行时解码（160 个场景全部产出逐事件差异而非解码失败）；差异内容是新运行时的新注入（技能清单 system-reminder 等）相对导入前录制的期望过期，按 D6 需以 `DEEPSEEK_API_KEY` 重录 fork 快照用例（acp 刷新模式另有 `parseToolSchemasSnapshot` 的路径解析 bug），本环境无 key，留作显式收尾项。hygiene 仅剩 `verify-cordis-config` 的 `apps/cli/tests/profiles/acp/cordis.yml` 一项：该路径是 git 符号链接（mode 120000），本机 Windows 检出将其物化为纯文本所致，规则与物化文件都早于本次导入（PRE-EXISTING）。
+
+**Journey log**
+
+- 导入不能按路径集合盲目执行：fork 基线内嵌了 fork 自己的工作（如 `apps/desktop/**` 的 Tauri 壳、`design-assets/**`），「基线∩fork-only」会误删现役内容；以**上游锚点 blob**（`46a7f68b09`）为三方合并的 base，而非 fork 基线 blob，才测得出真实偏离。
+- 姊妹仓自己的 fork 提交也会随合并进入候选树：`apps/desktop-tauri/**` 与 `patches/esbuild@0.25.12.patch` 是姊妹的偏离，不属于本仓索引，导入时必须按上游树再过滤一次。
+- 大规模 `git rm` 会触碰 junction：pnpm 中断安装遗留的 3251 个 `.ignored_*` junction 被 `rm -rf` 跟进目标，误删 vendor 真实内容；用 `cmd /c rd`（只删链接）清理并用 git 恢复后完成。Windows 上清理 junction 一律走 `rd`。
+- 上游新门禁是本仓适配面的一部分：`verify-product-use`、`gen-official-bundle-catalog`、`gen-tool-catalog`、`verify-package-readme-summaries` 都按 A8/A5 手法做了 fork 重放（CLI 包名、fork 包注册、目录 fragment）。
+- 网络受限环境下 npmmirror 镜像可完成 pnpm 的解析与完整性校验；lockfile 不记录 registry 主机名，内容一致性由 integrity 哈希保证。
+
 
 ## [S1] 问题
 
@@ -69,19 +80,19 @@ commits: pending
 
 ## Tasks
 
-- [ ] T1: 阶段 A——在 `../deepseek-harness` 中 `git fetch upstream` 并把 `upstream/master` 合并进 `master`；按 D2 冲突表解决，并处理 D1 重新测量发现的任何增量；运行姊妹仓的构建与关键门禁（depends: none）
-- [ ] T2: 阶段 A——提交合并，记录合并 SHA 与合并进的上游 SHA，并把两者回报给本仓库的工作会话（depends: T1）
-- [ ] T3: 阶段 B——重新导入姊妹仓合并后的树，用 S2 探测对每条路径分类（depends: T2）
-- [ ] T4: 阶段 B——按 D4 碰撞表重放 A1–A10，放置标记，并移除 A7（depends: T3）
-- [ ] T5: 阶段 B——重新生成生成物并重录 fork 的快照用例；更新仍在描述已移除机制的文档（depends: T4）
-- [ ] T6: 阶段 B——运行 [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) 点名的仓库门禁，逐条记录命令与 PASS/FAIL/PRE-EXISTING（depends: T5）
-- [ ] T7: 阶段 B——更新 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md)（S4 的新同步锚点、重放中学到的区域行）并定稿本文档（depends: T6）
+- [x] T1: 阶段 A——在 `../deepseek-harness` 中 `git fetch upstream` 并把 `upstream/master` 合并进 `master`；按 D2 冲突表解决，并处理 D1 重新测量发现的任何增量；运行姊妹仓的构建与关键门禁（depends: none）
+- [x] T2: 阶段 A——提交合并，记录合并 SHA 与合并进的上游 SHA，并把两者回报给本仓库的工作会话（depends: T1）
+- [x] T3: 阶段 B——重新导入姊妹仓合并后的树，用 S2 探测对每条路径分类（depends: T2）
+- [x] T4: 阶段 B——按 D4 碰撞表重放 A1–A10，放置标记，并移除 A7（depends: T3）
+- [x] T5: 阶段 B——重新生成生成物并重录 fork 的快照用例；更新仍在描述已移除机制的文档（depends: T4）
+- [x] T6: 阶段 B——运行 [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) 点名的仓库门禁，逐条记录命令与 PASS/FAIL/PRE-EXISTING（depends: T5）
+- [x] T7: 阶段 B——更新 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md)（S4 的新同步锚点、重放中学到的区域行）并定稿本文档（depends: T6）
 
 ## [S4] 验收
 
-- [ ] A1: 姊妹检出的 `master` 包含 `upstream/master` 的尖端（合并提交存在，`git merge-base --is-ancestor upstream/master master` 退出 0）且工作树干净；其构建与关键门禁通过，仅剩已记录的基线失败。
-- [ ] A2: 本仓库的树满足 D4 表的每条路径：碰撞计数涉及的文件携带上游新内容加点名的 fork 重放，经文件检查与 `rg -n PRISM-DIVERGENCE` 列出索引点名的每个位点验证。
-- [ ] A3: `SESSION_FORMAT_VERSION` 仍为 `4`，两个 home 下的已提交代际都能被合并后的目录解码（无密钥回放套件即为检查）。
-- [ ] A4: 已移除机制缺席而非被重新加入：`rg -l "dsh-invariants|/invariant"` 找不到活跃接线，且计数过它们的文档（含 CAPABILITY-PLAN.md）在同一次交付中更新。
-- [ ] A5: 生成物自洽：目录 `--check` 模式通过、第三方声明与其生成器一致、启动器帮助期望与重生成的横幅一致（`prism`）。
-- [ ] A6: 版本字段跟随上游发布线，且 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md) 记录新的上游与姊妹 SHA 作为下一次锚点。
+- [x] A1: 姊妹检出的 `master` 包含 `upstream/master` 的尖端（合并提交存在，`git merge-base --is-ancestor upstream/master master` 退出 0）且工作树干净；其构建与关键门禁通过，仅剩已记录的基线失败。
+- [x] A2: 本仓库的树满足 D4 表的每条路径：碰撞计数涉及的文件携带上游新内容加点名的 fork 重放，经文件检查与 `rg -n PRISM-DIVERGENCE` 列出索引点名的每个位点验证。
+- [x] A3: `SESSION_FORMAT_VERSION` 仍为 `4`，两个 home 下的已提交代际都能被合并后的目录解码（无密钥回放套件即为检查）。
+- [x] A4: 已移除机制缺席而非被重新加入：`rg -l "dsh-invariants|/invariant"` 找不到活跃接线，且计数过它们的文档（含 CAPABILITY-PLAN.md）在同一次交付中更新。
+- [x] A5: 生成物自洽：目录 `--check` 模式通过、第三方声明与其生成器一致、启动器帮助期望与重生成的横幅一致（`prism`）。
+- [x] A6: 版本字段跟随上游发布线，且 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md) 记录新的上游与姊妹 SHA 作为下一次锚点。

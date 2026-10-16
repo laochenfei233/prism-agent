@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for desktop-client.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/desktop-client.md
-desktop-client.md: cbbd417fb155703717e8ea2a04a15c749ae4d447
-desktop-client.zh.md: de0352acd81620849d4c3f6d691243b15ccb5175
+/:
+  en: de19590558263c24
+  zh: de19590558263c24
+/desktop-client-tauri:
+  en: fe9e208def369b5e
+  zh: f34bf1bc554d2c18
+/desktop-client-tauri/report:
+  en: 061bbf7095adf6bb
+  zh: 061bbf7095adf6bb
+/desktop-client-tauri/s1-problem:
+  en: 2eb9951101de4f69
+  zh: 2eb9951101de4f69
+/desktop-client-tauri/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/desktop-client-tauri/s2-design/2-1:
+  en: 9f4df920491a8871
+  zh: 9f4df920491a8871
+/desktop-client-tauri/s2-design/2-2:
+  en: c442c5af7f090dd6
+  zh: c442c5af7f090dd6
+/desktop-client-tauri/s2-design/2-3-rpc:
+  en: c99c9316a497e80f
+  zh: c99c9316a497e80f
+/desktop-client-tauri/s2-design/2-4-node-dsh:
+  en: b7395d4864ee12cd
+  zh: b7395d4864ee12cd
+/desktop-client-tauri/s2-design/2-5:
+  en: a77d2209c572da43
+  zh: a77d2209c572da43
+/desktop-client-tauri/s2-design/2-6-preset:
+  en: 072add41d8f96e23
+  zh: 072add41d8f96e23
+/desktop-client-tauri/s2-design/2-7-ci-github-actions:
+  en: b1d22e95b2ba5ffa
+  zh: b1d22e95b2ba5ffa
+/desktop-client-tauri/s2-design/2-8:
+  en: 0ebcf0032a8a8431
+  zh: 0ebcf0032a8a8431
+/desktop-client-tauri/s2-design/2-9:
+  en: c92baca9d868bdc2
+  zh: c92baca9d868bdc2
+/desktop-client-tauri/s3-out-of-scope:
+  en: 7aff615e3e591841
+  zh: 7aff615e3e591841
+/desktop-client-tauri/tasks:
+  en: 42163c610ef42528
+  zh: 42163c610ef42528

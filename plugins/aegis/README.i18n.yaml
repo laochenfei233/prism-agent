@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/aegis/README.md
-README.md: 2d1943972c38ef4f8d04a6aac112ce393ce29eda
-README.zh.md: d1020105e62c63fe58075be3789ce73e38eee6af
+/:
+  en: 3b0d5df9561e40de
+  zh: c109b596b2a3ec97
+/aegis:
+  en: ee1ee2fb495e25e7
+  zh: e9e2f5200e914f0b
+/aegis/what-you-get:
+  en: 14102067e50f1d51
+  zh: 3722904038ea422f
+/aegis/measured-agentic-benchmark:
+  en: e7fe6558c440675d
+  zh: f17d62f8ea7ec0ec
+/aegis/quick-install:
+  en: c34867a00ef60181
+  zh: 72537e231ccd55d9
+/aegis/updating-aegis:
+  en: bf193b6e2675e864
+  zh: 7c22fa2bda118602
+/aegis/before-you-use-it:
+  en: 3d3e7aed529670cb
+  zh: c7490d9e6fb34104
+/aegis/supported-hosts:
+  en: 46d284144c1aa1bf
+  zh: d427b83e628718bd
+/aegis/start-fast-with-aegis:
+  en: cba5b10ff8cc3d85
+  zh: 9ad6d20bf95a724a
+/aegis/for-maintainers:
+  en: 204c4263c8b73a51
+  zh: d856e725c3aa5223
+/aegis/community-extending:
+  en: 0aece9c08a2c9b5c
+  zh: 23d0a4ef72df62a0
+/aegis/relationship-to-superpowers:
+  en: 9b849cef1cff0e60
+  zh: ab22147bfca13cb2
+/aegis/license:
+  en: a0d25088ca353c92
+  zh: 574fcb8ac0e15214

@@ -6,7 +6,7 @@ Status: proposed
 
 ## 问题
 
-harness 只能在已经活着的会话中开始工作。[`@deepseek-ai/dsh-schedule`](../../../../packages/schedule/schedule/README.zh.md) 拥有会话本地的提醒，其规则并集是 `after`、`at` 和最短 300 秒的固定间隔 `every`；它的协议没有日历或 cron 表达式，而冷会话不执行任何工作、也不发送任何外部通知，直到它重新变活（[Web 持久化 schedule](../../implemented/feature/2026-08-05-durable-web-schedule.zh.md)）。[harness 层 loop 决策](../../implemented/feature/2026-07-16-harness-level-loop.zh.md) 有意把基于时间的执行留作未建，并记录它「属于调度器，而不属于任一 goal 家族」。
+harness 只能在已经活着的会话中开始工作。[`@deepseek-ai/dsh-schedule`](../../../../packages/schedule/schedule/README.zh.md) 拥有会话本地的提醒，其规则并集是 `after`、`at` 和最短 300 秒的固定间隔 `every`；它的协议没有日历或 cron 表达式，而冷会话不执行任何工作、也不发送任何外部通知，直到它重新变活（Web 持久化 schedule）。harness 层 loop 决策 有意把基于时间的执行留作未建，并记录它「属于调度器，而不属于任一 goal 家族」。
 
 因此，已交付的东西无法回答「每个工作日 09:00 运行这个任务」：无人值守、基于日历、带显式时区、且不需要人先打开一个会话。今天想这么做的人只能保持一个会话打开并使用间隔提醒，这改变了规则形状、要求对话一直活着，且不留下这次运行是否发生的记录。
 
@@ -34,7 +34,7 @@ harness 只能在已经活着的会话中开始工作。[`@deepseek-ai/dsh-sched
 - `session-persistence-jsonl` 目前拥有唯一的内核锁实现。其锁与 Win32 辅助代码迁入 `dsh-util-path-lock`，会话写租约改为消费该包。
 - `dsh-schedule` 目前拥有唯一的本地日历解析。`resolveLocalInstant` 与 `localProjection` 作为导出迁入 `dsh-util-time`，schedule 的域改为消费它们。
 
-组合以一份示例 overlay 交付，即 `apps/cli/config/examples/cron/cordis.yml`，形态对齐 [schedule overlay](../../../../apps/cli/config/examples/schedule/cordis.yml)：为三个 Host 包 `insert` 行，并将 Web 组合包中以 `disabled` 交付的 `ui-cron` 行改为 `disabled: false`。
+组合以一份示例 overlay 交付，即 `apps/cli/config/examples/cron/cordis.yml`，形态对齐 [schedule overlay](../../../../apps/cli/config/examples/cron/cordis.yml)：为三个 Host 包 `insert` 行，并将 Web 组合包中以 `disabled` 交付的 `ui-cron` 行改为 `disabled: false`。
 
 ### cron 表达式与日历语义
 
@@ -68,13 +68,13 @@ CronJob = { id, expression, timeZone, enabled,
 
 到期任务重新读取自己的记录并从规则重新推导 `nextDueAt`，而不是信任缓存目标；随后应用 `misfirePolicy`，按 `overlapPolicy` 占用运行槽（默认 `skip`：同一任务同时只跑一次），解析目标，投递，记录这次运行，推进下次触发，最后释放槽。
 
-目标解析收敛到一个可交付物：一个能接受 follow-up 的 agent。`new-session` 任务以生成的 id、声明的 workspace 作为 `meta.cwd`、以及声明的各项预设调用 `ctx.agents.create`，形态对齐 [`createWebhookSession`](../../../../packages/webhook/webhook/src/session.ts)。`session` 任务若其会话已有活着的 agent，就直接用 `followup` 投递；只有冷会话才用 `ctx.agents.resume`，因为 resume 一个本进程已拥有的会话会被拒绝。两条路径都不在启动时扫描会话：绑定任务直接写明了它的会话 id，因此记录在全局调度器名下的「启动扫描」成本在这里并不适用。
+目标解析收敛到一个可交付物：一个能接受 follow-up 的 agent。`new-session` 任务以生成的 id、声明的 workspace 作为 `meta.cwd`、以及声明的各项预设调用 `ctx.agents.create`，形态对齐 [`createWebhookSession`](../../../../packages/experimental/webhook/src/session.ts)。`session` 任务若其会话已有活着的 agent，就直接用 `followup` 投递；只有冷会话才用 `ctx.agents.resume`，因为 resume 一个本进程已拥有的会话会被拒绝。两条路径都不在启动时扫描会话：绑定任务直接写明了它的会话 id，因此记录在全局调度器名下的「启动扫描」成本在这里并不适用。
 
 触发后的任务不会唤醒任何被 harness 当作人类输入的东西。投递携带一个由 cron 声明的消息来源，这是 `MessageSourceMap` 要求的，因为它没有通用的 `plugin` 种类；框架格式沿用 schedule 的约定，即对动态字段做 JSON 转义，并显式说明既定提示词是不可信内容、而不是新的用户指令。
 
 无人值守执行是能在无人看管下花掉真实资源的部分，因此权限是显式的：
 
-- 创建任务即是授权未来的无人值守花费。Web 面板与 Remote 是直接的人类权限。模型工具要求当前活 root-agent 轮次中有一条直接的人类消息，形态对齐[模型 goal 工具权限](../../implemented/feature/2026-07-16-harness-level-loop.zh.md)规则，因此模型无法在自己的自主轮次里排入无人值守工作。
+- 创建任务即是授权未来的无人值守花费。Web 面板与 Remote 是直接的人类权限。模型工具要求当前活 root-agent 轮次中有一条直接的人类消息，形态对齐模型 goal 工具权限规则，因此模型无法在自己的自主轮次里排入无人值守工作。
 - 任务声明一个 `permissionPreset`，部署默认值是保守的那一个。在随附的 `ask` 审批策略下，一次需要人类决定的无人值守工具调用本来会挂住，因此在 `maxRunMs` 到期时以 `blocked` 结束；既不会静默自动批准，也不会静默跳过。
 - 每次运行都受 `maxRunMs` 约束；到期会取消 agent 并记录 `timeout`。
 - 没有「无人值守全权限」便利开关。要取得全权限，必须写出一个在配置中可见的全权限预设。
@@ -160,7 +160,7 @@ Web 面板是一个基于 `ctx.remote.cron` 的独立可选插件。禁用它，
 - **依赖既有的 cron 库**，例如零依赖且支持时区的 `croner`（[croner](https://croner.56k.guru/index.html)、[时区与夏令时说明](https://www.nodecron.com/timezones-and-dst.md)）。否决：日历解析无论如何都必须与 `dsh-schedule` 共享，以保持 harness 只有一套夏令时语义，于是留给库去删除的只剩字段解析与发生时刻算术；为这点代码引入第二套时区引擎和第二个外部依赖、以及与之并存的第二套夏令时策略，不划算。
 - **在 cron 包内复制内核锁与日历解析。** 否决：`packages/util/` 的存在正是为了防止这种重复；而「跨进程独占锁住一个路径」若有两个 owner，就会在最难测试的平台特定路径上漂移。
 - **只跑 shell、不涉及模型的任务类型。** 首版范围否决：促成这项工作的运维意图就是无人值守的 agent 工作，而加入第二条执行路径会在第一条路径尚不存在时，把失败、取消与并发语义翻倍。它以后仍可作为独立任务类型，配自己的权限模型。
-- **面向模型的通用 `loop` 工具 + 通用 loop 服务。** 已被 [harness 层 loop 决策](../../implemented/feature/2026-07-16-harness-level-loop.zh.md)否决，理由是它会制造投机表面并重复会话、workflow、subagent 与 job 机制。cron 正是那次决策在等的具体调度器消费者，它不新增任何迭代抽象。
+- **面向模型的通用 `loop` 工具 + 通用 loop 服务。** 已被 harness 层 loop 决策否决，理由是它会制造投机表面并重复会话、workflow、subagent 与 job 机制。cron 正是那次决策在等的具体调度器消费者，它不新增任何迭代抽象。
 - **会话恢复时自动续行。** 同一决策已否决，这里予以保留：打开会话是观察，而不是花费权限。cron 的权限来自任务的创建，而不是来自某个会话变活。
 
 ## 验收标准

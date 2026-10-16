@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write design-assets/README.md
-README.md: 8fe7ad4c7435a2857e510d008f6d390be055dfeb
-README.zh.md: 6b630c014764436e49074b999a604c4acb4f155d
+/design-assets:
+  en: 497f396d77981d7e
+  zh: 28673cfc1e622df8
+/design-assets/section:
+  en: e7ed18deb4d03ba4
+  zh: e7ed18deb4d03ba4
+/design-assets/section/app-icons:
+  en: 8f6d24c8cccc8029
+  zh: ffbe3ff87e422aed
+/design-assets/section/agent-logos:
+  en: df28f804d3bc91a6
+  zh: df28f804d3bc91a6
+/design-assets/section/readme-design:
+  en: ba0232b5283841b4
+  zh: ba0232b5283841b4
+/design-assets/section/design-docs:
+  en: 1e4aa84cee5e3db0
+  zh: 1e4aa84cee5e3db0
+/design-assets/logo:
+  en: d34730b1a66ffea3
+  zh: d34730b1a66ffea3

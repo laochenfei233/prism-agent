@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/cron/cron/README.md
-README.md: 7b20e8e29015a0fb25b7b738538787873cd9e82a
-README.zh.md: 9af99940ca383e19c9bc740111441625f9c992c6
+/:
+  en: a9b796180939042a
+  zh: 22137b5596a48c90
+/deepseek-ai-dsh-cron:
+  en: 95b9747799c3a106
+  zh: 6706e90c634ef5c4
+/deepseek-ai-dsh-cron/summary:
+  en: 4dfc69e88039df7f
+  zh: 717fcb52491da513
+/deepseek-ai-dsh-cron/table-of-contents:
+  en: a33dba2df7792de2
+  zh: 0b3eb621fb7d52ff
+/deepseek-ai-dsh-cron/use-this-package:
+  en: 9028348f1db546b9
+  zh: 4242ecfb566c0520
+/deepseek-ai-dsh-cron/use-this-package/the-two-day-fields:
+  en: 36d29561fdc8a16c
+  zh: 02c37a1837a28c94
+/deepseek-ai-dsh-cron/use-this-package/composing-the-plugin:
+  en: 0dc6ecfe417f360b
+  zh: d9ff1fcafd542286
+/deepseek-ai-dsh-cron/api:
+  en: 9bca3e1f68db351a
+  zh: d821e593b5087c83
+/deepseek-ai-dsh-cron/model-experience:
+  en: 0439c6cde8c812ed
+  zh: 173a4dedb92c10a4
+/deepseek-ai-dsh-cron/model-experience/kv-cache-effect:
+  en: 3f7344eb7bfff1c7
+  zh: 5fa0973851145634
+/deepseek-ai-dsh-cron/known-limitations-and-deferred-work:
+  en: 4f052bdfc17dbeb4
+  zh: 0bde6958b1c9071c
+/deepseek-ai-dsh-cron/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98
