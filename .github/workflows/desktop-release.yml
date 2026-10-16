@@ -129,7 +129,7 @@ jobs:
           echo "runtime node arch: $node_arch (expected $EXPECTED)"
           echo "$node_arch" | grep -qw "$EXPECTED" || { echo "ERROR: node arch mismatch"; exit 1; }
           bad=0
-          for f in $(find runtime/dsh/node_modules -name '*.node'); do
+          for f in $(find runtime/prism/node_modules -name '*.node'); do
             a=$(archs_of "$f" || true)
             echo "  $(basename "$f") -> $a"
             # An unidentifiable file cannot be loaded by node, so it cannot
@@ -163,9 +163,9 @@ jobs:
         with:
           projectPath: apps/desktop
           tagName: v__VERSION__
-          releaseName: 'DeepSeek Harness Desktop v__VERSION__'
+          releaseName: 'Prism Agent Desktop v__VERSION__'
           releaseBody: |
-            Tauri 桌面客户端，内置 Node 运行时与 dsh（四预设 standard / minimal / code / cordis 完整保留）。
+            Prism Agent 桌面客户端，内置 Node 运行时与 harness（四预设 standard / minimal / code / cordis 完整保留）。
             首次启动向导默认安装插件中心与 Windows 终端检测，可选 IM 频道（企微/飞书/钉钉/微信/QQ）等插件。
           releaseDraft: true
           prerelease: false
@@ -174,7 +174,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          name: prism-agent-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
           path: |
             apps/desktop/src-tauri/target/release/bundle/nsis/*.exe

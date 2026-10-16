@@ -816,7 +816,7 @@ where
 ///
 /// Production layout (bundled by `scripts/bundle-runtime.mjs`):
 ///   <resource>/runtime/node/<node>          node binary
-///   <resource>/runtime/dsh/.../lib/bin.js   @deepseek-ai/dsh CLI
+///   <resource>/runtime/prism/.../lib/bin.js   this fork's CLI (prism-agent)
 ///
 /// Dev fallback: `node` from PATH and `DSH_DESKTOP_DSH_BIN`, defaulting to
 /// the repo's built `apps/cli/lib/bin.js` when present.
@@ -830,7 +830,7 @@ pub(crate) fn resolve_runtime(app: &AppHandle) -> Result<(PathBuf, PathBuf), Str
     let node_exe = if cfg!(windows) { "node.exe" } else { "node" };
     let bundled_node = runtime_root.join("node").join(node_exe);
     // pnpm deploy lays the target package out at the closure root: lib/bin.js.
-    let bundled_bin = runtime_root.join("dsh").join("lib").join("bin.js");
+    let bundled_bin = runtime_root.join("prism").join("lib").join("bin.js");
 
     if bundled_node.exists() && bundled_bin.exists() {
         return Ok((plain_path(&bundled_node), plain_path(&bundled_bin)));

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/install-isolation.md
-install-isolation.md: 32245037533884834f84aa228d17443421c4926e
-install-isolation.zh.md: e6075b1956c168368c28f5ca762c811ab230abcc
+install-isolation.md: 653f58c262ee0a08165c88e7e9c0d07de8a15b19
+install-isolation.zh.md: b9cff93d52fce9cf59c874006542ba2dae509c2d

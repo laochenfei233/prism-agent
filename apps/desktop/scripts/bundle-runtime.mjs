@@ -3,7 +3,7 @@
 //
 //   apps/desktop/runtime/
 //     node/                         Node executable (node.exe / node)
-//     dsh/                          pnpm-deploy closure of prism-agent
+//     prism/                        pnpm-deploy closure of prism-agent
 //                                   (+ @deepseek-ai/dsh-web-frontend/dist, pnpm)
 //     plugins/dsh-win-terminal-inspector/   local Windows-only plugin
 //
@@ -25,7 +25,7 @@ import { readFileSync, statSync, realpathSync } from 'node:fs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RUNTIME = join(ROOT, 'runtime');
 const NODE_DIR = join(RUNTIME, 'node');
-const DSH_DIR = join(RUNTIME, 'dsh');
+const DSH_DIR = join(RUNTIME, 'prism');
 const PLUGINS_DIR = join(RUNTIME, 'plugins');
 
 const args = process.argv.slice(2);
