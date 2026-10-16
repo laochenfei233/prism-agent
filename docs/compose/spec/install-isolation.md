@@ -1,9 +1,9 @@
 ---
 feature: install-isolation
-status: in-progress
+status: delivered
 updated: 2026-10-15
 branch: feat/install-isolation
-commits: pending (filled at delivery)
+commits: 002a46d2..39d9f636
 ---
 
 # Install Isolation
@@ -12,7 +12,29 @@ English | [中文](install-isolation.zh.md)
 
 ## Report
 
-Finalized at delivery.
+**What was built** — The fork's CLI now installs under its own identity. The npm package is `prism-agent` with bin `prism` (commander program name, help banner, recorded help expectation, and the risk-acceptance instruction follow); the Python runtime wheel's console script renames to `prism`; the consumers that resolve the CLI by name follow (`packages/sdk/client` and `python/sdk-runtime` dependency rows plus `import.meta.resolve` specs, the desktop deploy filter, the bundled carrier's `node_modules/prism-agent/lib/bin.js`, the pnpm release family and its naming guard, and the publish baseline). Four repository gates that keyed the CLI by name now cover `prism-agent` instead of silently skipping it: `verify-application-entrypoints`, `verify-default-product-isolation`, `check-workspace-constraints` (version family, payload files, repository URL, shipped-optional-bundle offer), and `verify-dsh-package-licenses`.
+
+The default harness home moved from `~/.dsh` to `~/.prism` in `packages/util/home-paths`, the single resolution point every entry (including the desktop child spawn, which still passes `DSH_HOME` explicitly) already routes through. Precedence and the `DSH_HOME` protocol are unchanged; the session-migration command's corpus default now derives from the same resolver (`dshHomePath('sessions')`), and the package READMEs and guides that stated the old default were brought along.
+
+Areas A8 (CLI install identity) and A9 (default home) of the fork divergence index record every site with the standard markers, `package.json` and the help expectation excepted (no comment syntax; the index row says so). D4b states the boundary: launcher-owned strings and the documents this change touches follow `prism`; the harness kernel's `dsh` vocabulary — kernel JSDoc, package READMEs, the generated catalog rows they feed, stderr diagnostics, inner-app help banners — stays upstream's, recorded as a follow-up rather than part of install separation.
+
+**Verification** — All run in `.worktrees/install-isolation` at 39d9f636 (base 002a46d2):
+
+- `resolveDshHome()` default resolves `~/.prism`, `$DSH_HOME` still wins (home-paths suite, `vitest run packages/util/home-paths` — PASS).
+- `npm pack --dry-run` in `apps/cli` → `prism-agent-0.1.7-rc.1.tgz`, manifest bin `prism → lib/bin.js` (PASS).
+- `node --import tsx/esm apps/cli/src/bin.ts --help` prints `Usage: prism …` and matches the regenerated `apps/cli/tests/expected/launcher-help.txt` (PASS).
+- `rg -n PRISM-DIVERGENCE` — 32 markers naming this fork's index, 6 naming `desktop-startup-latency.md`, no non-canonical marker text left (PASS).
+- `vitest run` — packages/util/home-paths, packages/sdk/client, apps/cli (args, plugin, startup-diagnostics, profile-\*, memory-mcp-configs, telemetry-switch, dump-config-schema) PASS; scripts/release/families.spec.ts PASS except its speech-to-text-dashscope list PRE-EXISTING at base; scripts/verify-default-product-isolation.spec.ts and scripts/check-workspace-constraints.spec.ts PASS (177 tests) after this change re-covered the CLI; scripts/migrate-sessions-to-v4.spec.ts PASS except two 5s-timeout fixtures (environment slowness, PRE-EXISTING); packages/context/agent-instructions has one PRE-EXISTING ambient-home failure red at base.
+- Gates — `verify-application-entrypoints` PASS, `verify-default-product-isolation` PASS, `check-workspace-constraints` only the PRE-EXISTING apps/desktop version failure, `verify-dsh-package-licenses` only the PRE-EXISTING apps/desktop MIT declaration failure (prism-agent itself is inside the checked set), `gen-config-catalog --check` PASS, `verify-md-wrap` PASS, `verify-doc-budgets` PASS, `verify-md-links` 69 PRE-EXISTING failures none on changed paths, README model-experience/limitations gates PRE-EXISTING (speech-to-text-dashscope README absent).
+- Bilingual pairs — `verify-translation-pairing --cached` reports all 22 changed pairs consistent; `git diff --cached --check` clean; the vendor manifest guard passes. The lefthook pre-commit jobs cannot spawn `sh.exe` under this host's sandbox (msys 0xC0000022), so those staged checks were run by hand and the commit message records that.
+
+**Journey log**
+
+- The task arrived half-started: a prior session (2026-10-15) had completed Orient and stopped at the Grill with two unanswered decision axes; both were re-asked here and answered, so no requirement was inferred.
+- One editor pass wrote the CLI READMEs back with CRLF while the repository keeps LF on disk; the working-tree pairing check passed but the staged (`--cached`) check caught the split — the fix is to match each file's existing line endings, and the staged check is the one that sees it.
+- The first review round found the rename's true blast radius: four repository gates that keyed the CLI by name silently stopped covering it. Extending those gates (and their specs) belongs to the feature, not to a follow-up.
+- Renaming the Python wheel's console script was discovered while tracing the carrier and folded into the scope (a wheel installed beside another build would otherwise shadow the same `dsh` command).
+- The kernel-vocabulary boundary was re-derived during review instead of sweeping every `dsh` string in the tree; D4b records what stays and the wider documentation sweep is listed as out of scope.
 
 ## [S1] Problem
 
@@ -52,9 +74,9 @@ The decisions below were asked in a prior session (2026-10-15) and confirmed by 
 
 ## [S4] Acceptance
 
-- [ ] A1: with neither `$DSH_HOME` nor a configured path, `resolveDshHome()` in the built package resolves to `~/.prism`; a set `$DSH_HOME` still wins.
-- [ ] A2: `npm pack` from `apps/cli` (built `lib/`) produces `prism-agent-<version>.tgz` whose manifest declares bin `prism → lib/bin.js`.
-- [ ] A3: a source launch `node --import tsx/esm apps/cli/src/bin.ts --help` prints a banner whose usage lines say `prism`.
-- [ ] A4: `rg -n PRISM-DIVERGENCE` reports the A8 sites it can (source files) and none of the removed markers; `fork-upstream-divergence.md` lists A8 and A9 with the JSON-no-marker exception named.
-- [ ] A5: `packages/util/home-paths` and the `args.ts` unit segment pass their vitest run; the changed bilingual pairs pass `verify-translation-pairing` and `verify-md-wrap`; `verify-md-links` and `verify-doc-budgets` report no new failure for changed paths.
-- [ ] A6: the desktop spawn path is untouched at the code level: `dsh_runner.rs` passes `DSH_HOME = setup::dsh_home()` and its adopt record key remains the bin file identity, so no colliding hub of another build is ever adopted.
+- [x] A1: with neither `$DSH_HOME` nor a configured path, `resolveDshHome()` in the built package resolves to `~/.prism`; a set `$DSH_HOME` still wins.
+- [x] A2: `npm pack` from `apps/cli` (built `lib/`) produces `prism-agent-<version>.tgz` whose manifest declares bin `prism → lib/bin.js`.
+- [x] A3: a source launch `node --import tsx/esm apps/cli/src/bin.ts --help` prints a banner whose usage lines say `prism`.
+- [x] A4: `rg -n PRISM-DIVERGENCE` reports the A8 sites it can (source files) and none of the removed markers; `fork-upstream-divergence.md` lists A8 and A9 with the JSON-no-marker exception named.
+- [x] A5: `packages/util/home-paths` and the `args.ts` unit segment pass their vitest run; the changed bilingual pairs pass `verify-translation-pairing` and `verify-md-wrap`; `verify-md-links` and `verify-doc-budgets` report no new failure for changed paths.
+- [x] A6: the desktop spawn path is untouched at the code level: `dsh_runner.rs` passes `DSH_HOME = setup::dsh_home()` and its adopt record key remains the bin file identity, so no colliding hub of another build is ever adopted.

@@ -1,9 +1,9 @@
 ---
 feature: install-isolation
-status: in-progress
+status: delivered
 updated: 2026-10-15
 branch: feat/install-isolation
-commits: pending (filled at delivery)
+commits: 002a46d2..39d9f636
 ---
 
 # 安装隔离
@@ -12,7 +12,29 @@ commits: pending (filled at delivery)
 
 ## Report
 
-交付时填充。
+**建成了什么** — fork 的 CLI 现在以自有身份安装。npm 包为 `prism-agent`，bin 为 `prism`（commander 程序名、帮助横幅、录制帮助期望与风险接受指令随之）；Python 运行时 wheel 的控制台脚本改为 `prism`；按名解析 CLI 的消费端全部跟随（`packages/sdk/client` 与 `python/sdk-runtime` 的依赖行与 `import.meta.resolve` 规格、桌面部署过滤、bundled 载体的 `node_modules/prism-agent/lib/bin.js`、pnpm 发布族及其命名守卫、发布基线）。四个以名字匹配 CLI 的仓库门禁改为覆盖 `prism-agent`，而不是静默跳过它：`verify-application-entrypoints`、`verify-default-product-isolation`、`check-workspace-constraints`（版本族、发布文件策略、仓库 URL、随包可关组合包的供给）与 `verify-dsh-package-licenses`。
+
+默认 harness home 在 `packages/util/home-paths` 从 `~/.dsh` 移到 `~/.prism`——所有入口（包括显式传 `DSH_HOME` 的桌面子进程 spawn）本就经过这一个解析点。优先级与 `DSH_HOME` 协议不变；会话迁移命令的语料默认根改由同一解析器推导（`dshHomePath('sessions')`），陈述旧默认的各包 README 与指南一并跟随。
+
+分叉索引的 A8（CLI 安装身份）与 A9（默认 home）区域以标准标记记录每个位点，`package.json` 与帮助期望除外（无注释语法，索引行已写明）。D4b 说明边界：启动器自有字符串与本次触及的文档跟随 `prism`；harness 内核的 `dsh` 词汇——内核 JSDoc、包 README、它们喂出的生成目录行、stderr 诊断、应用内帮助横幅——保持上游，作为后续跟进而非安装拆分的一部分记录在案。
+
+**Verification** — 全部在 `.worktrees/install-isolation` 的 39d9f636（基线 002a46d2）上运行：
+
+- `resolveDshHome()` 默认解析 `~/.prism`，`$DSH_HOME` 仍然优先（home-paths 套件 PASS）。
+- `apps/cli` 下 `npm pack --dry-run` → `prism-agent-0.1.7-rc.1.tgz`，清单 bin `prism → lib/bin.js`（PASS）。
+- `node --import tsx/esm apps/cli/src/bin.ts --help` 打印 `Usage: prism …`，与重录的 `launcher-help.txt` 一致（PASS）。
+- `rg -n PRISM-DIVERGENCE`——32 个指向本索引的标记、6 个指向 `desktop-startup-latency.md`，无残留非规范标记文本（PASS）。
+- `vitest run`——util/home-paths、sdk/client、apps/cli（args、plugin、startup-diagnostics、profile-*、memory-mcp-configs、telemetry-switch、dump-config-schema）PASS；`scripts/release/families.spec.ts` PASS，仅其 speech-to-text-dashscope 清单为基线既有；`scripts/verify-default-product-isolation.spec.ts` 与 `scripts/check-workspace-constraints.spec.ts` 在本改动重新覆盖 CLI 后 PASS（177 项）；`scripts/migrate-sessions-to-v4.spec.ts` PASS，仅两个 5 秒超时的慢夹具（环境性，基线既有）；`packages/context/agent-instructions` 有一项基线既有的环境 home 失败。
+- 门禁——`verify-application-entrypoints` PASS、`verify-default-product-isolation` PASS、`check-workspace-constraints` 仅剩基线既有的 apps/desktop 版本失败、`verify-dsh-package-licenses` 仅剩基线既有的 apps/desktop MIT 声明失败（`prism-agent` 本身在受检集合内）、`gen-config-catalog --check` PASS、`verify-md-wrap` PASS、`verify-doc-budgets` PASS、`verify-md-links` 69 项基线失败均不在改动路径、README 模型体验/限制门禁为基线既有（speech-to-text-dashscope 无 README）。
+- 双语 pair——`verify-translation-pairing --cached` 报告全部 22 个变更 pair 一致；`git diff --cached --check` 干净；vendor manifest guard 通过。lefthook 的 pre-commit 作业在本机沙箱内无法 spawn `sh.exe`（msys 0xC0000022），这些 staged 检查改由手工执行并将此记入提交信息。
+
+**Journey log**
+
+- 任务接手时已完成一半：早前会话（2026-10-15）做完 Orient 后停在 Grill 的两个未答决策轴；本次重新提问并获得答复，没有任何需求是推断的。
+- 一轮编辑把 CLI README 写回 CRLF，而仓库磁盘约定是 LF；工作树配对检查通过但 staged（`--cached`）检查抓住了分裂——修法是匹配每个文件既有的行尾约定，而 staged 检查才看得见它。
+- 首轮评审揭出改名的真实爆炸半径：四个以名字匹配 CLI 的仓库门禁悄悄不再覆盖它。扩展这些门禁（及其规格）属于本特性，而不是后续事项。
+- Python wheel 的控制台脚本是追查载体时发现的，已并入范围（否则与另一构建并存的 wheel 会遮蔽同一个 `dsh` 命令）。
+- 内核词汇边界是评审中重新推导出来的，而不是把树里每个 `dsh` 字符串都扫一遍；D4b 记录哪些保留、更广的文档清扫列为范围外。
 
 ## [S1] 问题
 
@@ -52,9 +74,9 @@ commits: pending (filled at delivery)
 
 ## [S4] 验收
 
-- [ ] A1: 既无 `$DSH_HOME` 也无显式配置时，构建产物中的 `resolveDshHome()` 解析为 `~/.prism`；设置了 `$DSH_HOME` 仍然优先。
-- [ ] A2: 对 `apps/cli`（已构建 `lib/`）`npm pack` 产出 `prism-agent-<version>.tgz`，清单声明 bin `prism → lib/bin.js`。
-- [ ] A3: 源码启动 `node --import tsx/esm apps/cli/src/bin.ts --help` 打印的横幅 usage 行写 `prism`。
-- [ ] A4: `rg -n PRISM-DIVERGENCE` 报告 A8 中可标记的位点，且没有残留旧标记；`fork-upstream-divergence.md` 列出 A8 与 A9，并写明 JSON 无标记例外。
-- [ ] A5: `packages/util/home-paths` 与 `args.ts` 单元段通过 vitest；双语 pair 通过 `verify-translation-pairing` 与 `verify-md-wrap`；`verify-md-links`、`verify-doc-budgets` 对本改动路径无新增失败。
-- [ ] A6: 桌面 spawn 路径在代码层不被触及：`dsh_runner.rs` 传 `DSH_HOME = setup::dsh_home()`，采纳记录键仍是 bin 文件身份，因此永远不会采纳另一构建的 hub。
+- [x] A1: 既无 `$DSH_HOME` 也无显式配置时，构建产物中的 `resolveDshHome()` 解析为 `~/.prism`；设置了 `$DSH_HOME` 仍然优先。
+- [x] A2: 对 `apps/cli`（已构建 `lib/`）`npm pack` 产出 `prism-agent-<version>.tgz`，清单声明 bin `prism → lib/bin.js`。
+- [x] A3: 源码启动 `node --import tsx/esm apps/cli/src/bin.ts --help` 打印的横幅 usage 行写 `prism`。
+- [x] A4: `rg -n PRISM-DIVERGENCE` 报告 A8 中可标记的位点，且没有残留旧标记；`fork-upstream-divergence.md` 列出 A8 与 A9，并写明 JSON 无标记例外。
+- [x] A5: `packages/util/home-paths` 与 `args.ts` 单元段通过 vitest；双语 pair 通过 `verify-translation-pairing` 与 `verify-md-wrap`；`verify-md-links`、`verify-doc-budgets` 对本改动路径无新增失败。
+- [x] A6: 桌面 spawn 路径在代码层不被触及：`dsh_runner.rs` 传 `DSH_HOME = setup::dsh_home()`，采纳记录键仍是 bin 文件身份，因此永远不会采纳另一构建的 hub。
