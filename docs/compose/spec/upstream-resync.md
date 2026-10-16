@@ -54,6 +54,7 @@ After resolving, run the sibling's build and its key gates before committing the
 | A7 import in progress | now landed in history (`b4593d01`) | Drop this area from the index; the import is no longer in progress. |
 | A8 CLI install identity | `apps/cli/package.json` 30 commits, mostly dependency churn under the experimental-composition change | Upstream keeps `@deepseek-ai/dsh` / bin `dsh`: the rename stays a fork divergence. Re-apply the name, bin, program name, help expectation, gateway rows, and the four gates on top of upstream's new dependency list. |
 | A9 default home | `home-paths` 1 commit (adds the `.agents` shared root and `DSH_AGENTS_HOME`, purely additive) | Re-apply `DSH_HOME_DIR_NAME = '.prism'` and the JSDoc over upstream's additions. Upstream's `agent-instructions` `dshHome` removal is same-direction: our README/comment edits for that package land on a file whose `dshHome` field is gone. |
+| A10 upstream CI suite | `.github/workflows/**` 46 commits | After the import, delete `.github/workflows/desktop-sync.yml` again: the scheduled job fetches upstream, merges, and pushes, which is forbidden in this repository (the orphan baseline cannot merge; the sync belongs to this handoff). |
 
 **D5 — Behavior reversals are consumed, not fought.** The invariant mechanism is removed by upstream and is not re-added by this fork: the re-import deletes the invariant files and takes upstream's updated rules and documents wholesale, including `AGENTS.md`. Where this repository's own documents (CAPABILITY-PLAN.md counts, rule text) still describe the invariant layer, they are updated in the same delivery. The same principle applies to the retired `schedule` bundle, the narrowed installation dependencies, and the subpath plugin display manifest: the fork consumes upstream's state and keeps only the divergences the index names.
 
@@ -71,7 +72,7 @@ After resolving, run the sibling's build and its key gates before committing the
 - [ ] T1: stage A — in `../deepseek-harness`, `git fetch upstream` and merge `upstream/master` into `master`; resolve the D2 conflict table and any delta discovered by D1's re-measure; run the sibling's build and key gates (depends: none)
 - [ ] T2: stage A — commit the merge, record the merge SHA and the merged upstream SHA, and report both back to this repository's working session (depends: T1)
 - [ ] T3: stage B — re-import the sibling's merged tree and classify every path with the S2 probe (depends: T2)
-- [ ] T4: stage B — replay areas A1–A9 per the D4 collision table, place the markers, and drop A7 (depends: T3)
+- [ ] T4: stage B — replay areas A1–A10 per the D4 collision table, place the markers, and drop A7 (depends: T3)
 - [ ] T5: stage B — regenerate generated artifacts and re-record the fork's snapshot cases; update documents that still describe removed mechanisms (depends: T4)
 - [ ] T6: stage B — run the repository gates named in [dsh-pre-push-checks](../../../.agents/skills/dsh-pre-push-checks/SKILL.md) and record each command with PASS/FAIL/PRE-EXISTING (depends: T5)
 - [ ] T7: stage B — update [fork-upstream-divergence.md](fork-upstream-divergence.md) (new sync-point anchor in S4, area rows for anything the replay taught) and finalize this document (depends: T6)

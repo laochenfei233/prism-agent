@@ -1,0 +1,17 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `node --version`
+v24.19.0
+   Compiling dsh-desktop v0.1.1-rc.2 (C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri)
+warning: linker stdout: 正在创建库 C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\deps\dsh_desktop_lib.dll.lib 和对象 C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\deps\dsh_desktop_lib.dll.exp
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `dsh-desktop` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 2m 12s
+       Built application at: C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\dsh-desktop.exe
+        Info Patching C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\dsh-desktop.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\bundle\nsis\Prism Agent_0.1.1-rc.2_x64-setup.exe
+    Finished 1 bundle at:
+        C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\src-tauri\target\release\bundle\nsis\Prism Agent_0.1.1-rc.2_x64-setup.exe
+

@@ -1,0 +1,15 @@
+# Verification overlay for the built Prism memory bundle.
+#
+# It mounts the plugin into a profile WITHOUT changing that profile's installed
+# composition, using the file-URL form the plugin guide documents for a checkout
+# that has not installed the bundle. The artifact it points at is byte-identical
+# to the one packed into the profile tarball.
+- insert:
+    - id: prism-memory
+      name: 'file:///C:/Users/chenfei/Documents/GitHub/prism-agent/plugins/prism-memory/lib/index.js'
+      config:
+        exportDir: !!js dshHomePath('prism-memory')
+    - id: tool-prism-memory
+      name: 'file:///C:/Users/chenfei/Documents/GitHub/prism-agent/plugins/prism-memory/lib/tools.js'
+    - id: command-prism-memory
+      name: 'file:///C:/Users/chenfei/Documents/GitHub/prism-agent/plugins/prism-memory/lib/commands.js'

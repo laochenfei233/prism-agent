@@ -1,0 +1,95 @@
+[WARN] Unsupported engine: wanted: {"node":"^22.19.0 || >=24.0.0"} (current: {"node":"v23.9.0","pnpm":"11.7.0"})
+native/system/packages/darwin-arm64      | [WARN] Unsupported platform: wanted: {"cpu":["arm64"],"os":["darwin"],"libc":["any"]} (current: {"os":"win32","cpu":"x64","libc":"unknown"})
+native/system/packages/darwin-x64        | [WARN] Unsupported platform: wanted: {"cpu":["x64"],"os":["darwin"],"libc":["any"]} (current: {"os":"win32","cpu":"x64","libc":"unknown"})
+native/system/packages/linux-arm64       | [WARN] Unsupported platform: wanted: {"cpu":["arm64"],"os":["linux"],"libc":["any"]} (current: {"os":"win32","cpu":"x64","libc":"unknown"})
+native/system/packages/linux-x64         | [WARN] Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["any"]} (current: {"os":"win32","cpu":"x64","libc":"unknown"})
+Scope: all 329 workspace projects
+[WARN] There are cyclic workspace dependencies: C:\Users\chenfei\Documents\GitHub\prism-agent\apps\web, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\test-support\client-runtime, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\bundle\web-app; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\api\remotes, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\client\ui-plugin-manager, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\client\ui-sidebar, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\client\ui-workspace, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\client\ui-conversation; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\compaction\compaction-basic, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\compaction\compaction-image-offload; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\compaction\compaction-tool-result-pruner, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\llm\token-meter, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\llm\llm-retry, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\llm\llm-deepseek, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\llm\plugin-package-inventory-deepseek, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\preset\agent-preset-registry, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\preset\agent-preset; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\core\agent-default-model, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\settings\settings; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\sandbox\sandbox-local, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\sandbox\sandbox-windows-acl; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\ssh\fs-ssh, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\ssh\ssh; C:\Users\chenfei\Documents\GitHub\prism-agent\packages\subagent\subagent-spawn-in-process, C:\Users\chenfei\Documents\GitHub\prism-agent\packages\subagent\tool-subagent; C:\Users\chenfei\Documents\GitHub\prism-agent\vendor\cordis, C:\Users\chenfei\Documents\GitHub\prism-agent\vendor\include
+✓ Lockfile passes supply-chain policies (verified 11h ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1207
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1207, reused 625, downloaded 0, added 0
+Progress: resolved 1207, reused 958, downloaded 0, added 0
+Progress: resolved 1207, reused 1201, downloaded 0, added 82
+Progress: resolved 1207, reused 1202, downloaded 0, added 193
+Progress: resolved 1207, reused 1202, downloaded 0, added 310
+Progress: resolved 1207, reused 1202, downloaded 0, added 414
+Progress: resolved 1207, reused 1202, downloaded 0, added 502
+Progress: resolved 1207, reused 1202, downloaded 0, added 598
+Progress: resolved 1207, reused 1202, downloaded 0, added 728
+Progress: resolved 1207, reused 1202, downloaded 0, added 768
+Progress: resolved 1207, reused 1202, downloaded 0, added 876
+Progress: resolved 1207, reused 1202, downloaded 0, added 943
+Progress: resolved 1207, reused 1202, downloaded 0, added 1077
+Progress: resolved 1207, reused 1202, downloaded 0, added 1135
+Progress: resolved 1207, reused 1202, downloaded 0, added 1151
+Progress: resolved 1207, reused 1202, downloaded 0, added 1199
+Progress: resolved 1207, reused 1202, downloaded 0, added 1201
+Progress: resolved 1207, reused 1202, downloaded 0, added 1206
+Progress: resolved 1207, reused 1202, downloaded 0, added 1207, done
+
+devDependencies:
++ @deepseek-ai/dsh-agent 0.1.7-rc.1 <- packages\core\agent
++ @deepseek-ai/dsh-browser-use 0.1.7-rc.1 <- packages\browser-use\browser-use
++ @deepseek-ai/dsh-computer-use 0.1.7-rc.1 <- packages\computer-use\computer-use
++ @deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp 0.1.7-rc.1 <- packages\experimental\browser-use-chrome-devtools-mcp
++ @deepseek-ai/dsh-experimental-browser-use-playwright-mcp 0.1.7-rc.1 <- packages\experimental\browser-use-playwright-mcp
++ @deepseek-ai/dsh-experimental-browser-use-runtime 0.1.7-rc.1 <- packages\experimental\browser-use-runtime
++ @deepseek-ai/dsh-experimental-browser-use-stagehand-native 0.1.7-rc.1 <- packages\experimental\browser-use-stagehand-native
++ @deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp 0.1.7-rc.1 <- packages\experimental\computer-use-cua-driver-mcp
++ @deepseek-ai/dsh-experimental-computer-use-cua-driver-native 0.1.7-rc.1 <- packages\experimental\computer-use-cua-driver-native
++ @deepseek-ai/dsh-llm-replay 0.1.7-rc.1 <- packages\test-support\llm-replay
++ @deepseek-ai/dsh-mcp-client 0.1.7-rc.1 <- packages\mcp\mcp-client
++ @deepseek-ai/dsh-skill-office 0.1.7-rc.1 <- packages\skill\skill-office
++ @deepseek-ai/dsh-tool-session-query 0.1.7-rc.1 <- packages\session-query\tool-session-query
++ @deepseek-ai/dsh-tool-workspace-dependencies 0.1.7-rc.1 <- packages\skill\tool-workspace-dependencies
++ @deepseek-ai/dsh-web-fetch-http 0.1.7-rc.1 <- packages\web\web-fetch-http
++ @stylistic/eslint-plugin 5.10.0
++ @testing-library/dom 10.4.2
++ @testing-library/react 16.3.2
++ @types/js-yaml 4.0.9
++ @types/jsdom 28.0.3
++ @types/mdast 4.0.4
++ @types/node 22.20.0
++ @types/spdx-expression-parse 4.0.0
++ @vitest/coverage-v8 4.1.8
++ @yao-pkg/pkg 6.21.0
++ @yarnpkg/cli-dist 4.17.1
++ eslint-plugin-sonarjs 4.1.0
++ execa 10.0.0
++ extract-zip 2.0.1
++ fast-check 4.8.0
++ fflate 0.8.3
++ istanbul-lib-report 3.0.1
++ js-yaml 4.2.0
++ jscpd 5.0.12
++ jsdom 29.1.1
++ lefthook 2.1.9
++ lightningcss 1.32.0
++ mdast-util-from-markdown 2.0.3
++ mdast-util-gfm 3.1.0
++ mermaid 11.16.0
++ micromark-extension-gfm 3.0.0
++ oxlint 1.76.0
++ oxlint-tsgolint 7.0.2001
++ pnpm 11.7.0
++ publint 0.3.21
++ smol-toml 1.7.1
++ spdx-expression-parse 5.0.0
++ tar 7.5.22
++ tsdown 0.22.2
++ tsx 4.22.4
++ typescript 6.0.3
++ vite-tsconfig-paths 6.1.1
++ vitest 4.1.8
+
+packages/subprocess/subprocess-local postinstall$ node scripts/ensure-spawn-helper.mjs
+packages/subprocess/subprocess-local postinstall: Done
+. postinstall$ node scripts/install-lefthook.mjs
+. postinstall: sync hooks: ✔️(pre-commit, pre-merge-commit, pre-push)
+. postinstall: (node:36956) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+. postinstall: (Use `node --trace-deprecation ...` to show where the warning was created)
+. postinstall: Done
+Done in 33.3s using pnpm v11.7.0

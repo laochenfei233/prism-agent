@@ -1,0 +1,49 @@
+0 verbose cli C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\runtime\node\node.exe C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\runtime\node\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.9
+2 info using node@v22.23.3
+3 silly config load:file:C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\runtime\node\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\runtime\.tmp\pnpm-prefix\.npmrc
+5 silly config load:file:C:\Users\chenfei\.npmrc
+6 silly config load:file:C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop\runtime\.tmp\pnpm-prefix\etc\npmrc
+7 verbose title npm install pnpm@11.7.0
+8 verbose argv "install" "--no-save" "--no-audit" "--no-fund" "--prefix" "C:\\Users\\chenfei\\Documents\\GitHub\\prism-agent\\apps\\desktop\\runtime\\.tmp\\pnpm-prefix" "pnpm@11.7.0"
+9 verbose logfile logs-max:10 dir:C:\Users\chenfei\Documents\GitHub\prism-agent\.tmp-npm-cache\_logs\2026-10-01T16_04_00_191Z-
+10 verbose logfile C:\Users\chenfei\Documents\GitHub\prism-agent\.tmp-npm-cache\_logs\2026-10-01T16_04_00_191Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly idealTree buildDeps
+14 silly fetch manifest pnpm@11.7.0
+15 silly packumentCache full:https://registry.npmjs.org/pnpm cache-miss
+16 http fetch GET 200 https://registry.npmjs.org/npm 2698ms
+17 http fetch GET 200 https://registry.npmjs.org/pnpm 3332ms (cache miss)
+18 silly packumentCache full:https://registry.npmjs.org/pnpm set size:undefined disposed:false
+19 silly placeDep ROOT pnpm@11.7.0 OK for:  want: 11.7.0
+20 silly reify moves {}
+21 http cache pnpm@https://registry.npmjs.org/pnpm/-/pnpm-11.7.0.tgz 0ms (cache hit)
+22 silly tarball no local data for pnpm@https://registry.npmjs.org/pnpm/-/pnpm-11.7.0.tgz. Extracting by manifest.
+23 verbose stack Error: read ECONNRESET
+23 verbose stack     at TLSWrap.onStreamRead (node:internal/stream_base_commons:216:20)
+24 error code ECONNRESET
+25 error syscall read
+26 error errno -4077
+27 error network read ECONNRESET
+28 error network This is a problem related to network connectivity.
+28 error network In most cases you are behind a proxy or have bad network settings.
+28 error network
+28 error network If you are behind a proxy, please make sure that the
+28 error network 'proxy' config is set properly.  See: 'npm help config'
+29 silly unfinished npm timer reify 1790870641124
+30 silly unfinished npm timer reify:unpack 1790870644535
+31 silly unfinished npm timer reifyNode:node_modules/pnpm 1790870644535
+32 verbose cwd C:\Users\chenfei\Documents\GitHub\prism-agent\apps\desktop
+33 verbose os Windows_NT 10.0.19044
+34 verbose node v22.23.3
+35 verbose npm  v10.9.9
+36 notice
+36 notice New major version of npm available! 10.9.9 -> 12.2.0
+36 notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+36 notice To update run: npm install -g npm@12.2.0
+36 notice  { force: true, [Symbol(proc-log.meta)]: true }
+37 verbose exit -4077
+38 verbose code -4077
+39 error A complete log of this run can be found in: C:\Users\chenfei\Documents\GitHub\prism-agent\.tmp-npm-cache\_logs\2026-10-01T16_04_00_191Z-debug-0.log
