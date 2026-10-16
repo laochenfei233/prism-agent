@@ -1,7 +1,7 @@
 ---
 feature: fork-upstream-divergence
 status: delivered
-updated: 2026-10-01
+updated: 2026-10-15
 branch: 无，见 desktop-startup-latency.zh.md（S2）的工作区覆盖
 commits: 未提交的工作区改动
 ---
@@ -12,9 +12,9 @@ commits: 未提交的工作区改动
 
 ## Report
 
-**What was built** — 为「本检出相对 `deepseek-ai/deepseek-harness` 的全部偏离」建立单一索引，使后续的上游更新不必先读功能文档就能逐处重放。索引分两半：每个偏离点上的 `PRISM-DIVERGENCE` 注释，以及本文档——它把这些点归入七个区域，并说明每个区域的重放动作。其中四个区域改写或删除上游拥有的内容：桌面应用（上游是 Electron 壳，本树是 Tauri 壳）、客户端品牌、启动解析器的目录列表门禁，以及 `pnpm-workspace.yaml` 中的 `@electron/osx-sign` 行（上游仍在声明，本树删掉它，因为 Tauri 壳让这个 patch 变成未被使用）；其余区域新增上游没有对应物的路径。标记文本为 `PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).`，因此 `rg -n PRISM-DIVERGENCE` 就是机器索引。
+**What was built** — 为「本检出相对 `deepseek-ai/deepseek-harness` 的全部偏离」建立单一索引，使后续的上游更新不必先读功能文档就能逐处重放。索引分两半：每个偏离点上的 `PRISM-DIVERGENCE` 注释，以及本文档——它把这些点归入九个区域，并说明每个区域的重放动作（A8 与 A9 随 [install-isolation.md](install-isolation.zh.md) 加入）。其中四个区域改写或删除上游拥有的内容：桌面应用（上游是 Electron 壳，本树是 Tauri 壳）、客户端品牌、启动解析器的目录列表门禁，以及 `pnpm-workspace.yaml` 中的 `@electron/osx-sign` 行（上游仍在声明，本树删掉它，因为 Tauri 壳让这个 patch 变成未被使用）；其余区域新增上游没有对应物的路径。标记文本为 `PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).`，因此 `rg -n PRISM-DIVERGENCE` 就是机器索引。
 
-**Verification** — `rg -n PRISM-DIVERGENCE` 列出 17 个标记位置：其中 11 个指向本文档，6 个指向 [desktop-startup-latency.md](desktop-startup-latency.zh.md) 的 S5，而那一节又指回本文档；这对文档里另有 4 处行文提到该标记，但它们不是标记。S2 中的每一条路径断言都用同级检出 `bafb0f3abf` 探测过（该检出的 `upstream` 远端是 `deepseek-ai/deepseek-harness` 的 `46a7f68b09`）：那里 `apps/desktop` 是 408 个 Electron 文件且没有 `src-tauri`，`packages/boot/app-boot` 与 `packages/client` 与本检出基线的 blob 相同，`patchedDependencies` 仍含 `'@electron/osx-sign@1.3.3'`，而 `plugins`、`design-assets`、`docs/compose`、`CAPABILITY-PLAN.md`、`packages/cron`、`docs/subsystems/cron.md` 都不存在。`verify-md-wrap` 在新 pair 上通过，`verify-translation-pairing` 报告三个变更 pair 一致。
+**Verification** — 交付时（2026-10-01）`rg -n PRISM-DIVERGENCE` 列出 17 个标记位置：其中 11 个指向本文档，6 个指向 [desktop-startup-latency.md](desktop-startup-latency.zh.md) 的 S5，而那一节又指回本文档；这对文档里另有 4 处行文提到该标记，但它们不是标记。截至 2026-10-15，索引中指向本文档的标记为 32 个，指向延迟文档的仍为 6 个，新增位点即 A8 与 A9 两个区域。S2 中的每一条路径断言都用同级检出 `bafb0f3abf` 探测过（该检出的 `upstream` 远端是 `deepseek-ai/deepseek-harness` 的 `46a7f68b09`）：那里 `apps/desktop` 是 408 个 Electron 文件且没有 `src-tauri`，`packages/boot/app-boot` 与 `packages/client` 与本检出基线的 blob 相同，`patchedDependencies` 仍含 `'@electron/osx-sign@1.3.3'`，而 `plugins`、`design-assets`、`docs/compose`、`CAPABILITY-PLAN.md`、`packages/cron`、`docs/subsystems/cron.md` 都不存在。`verify-md-wrap` 在新 pair 上通过，`verify-translation-pairing` 报告三个变更 pair 一致。
 
 **Journey log**
 
@@ -63,6 +63,8 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 | A5 树外插件与 profile home | `plugins/**`（`aegis`、`dsh-agent-progress`、`dsh-tauri`、`prism-guardrails`、`prism-meeting`）与 `home-mods/**` | 原样复制插件目录与该 profile home，但不要复制 `home-mods/.credentials.yaml`：它保存凭据且未被忽略 |
 | A6 Prism 独有的文档与资产 | `design-assets/**`、`docs/compose/spec/**`、`CAPABILITY-PLAN.md`、`MIMOCODE-REFERENCE.md` | 原样复制；上游没有对应物，这里不会有冲突 |
 | A7 进行中的导入 | `packages/cron/**`、`packages/api/cron-controller/**`、`packages/client/ui-cron/**`、`packages/util/path-lock/**`、`packages/experimental/speech-to-text-dashscope/**`、`docs/subsystems/cron.*`、`apps/cli/config/examples/cron/**`、`.agents/notes/proposed/feature/2026-09-26-cron-scheduled-tasks.*` | 不是 fork 偏离：先让这次导入落地，再在合并后的树上重新施加 A3 与 A4，并标注新树自身带来的变化 |
+| A8 CLI 安装身份 | `apps/cli/package.json` 与 `apps/cli/tests/expected/launcher-help.txt`（JSON 与录制期望没有注释语法，所以本行是它们的帐目）、在程序名与入口文档处标记的 `apps/cli/src/args.ts` 与 `apps/cli/src/bin.ts`、`apps/cli/src/plugin.ts` 里的风险接受指令、`packages/sdk/client/package.json` 与 `src/launch.ts`（resolve 处标记）、`python/sdk-runtime/package.json` 与 `src/deepseek_harness_runtime/__init__.py`（载体路径处标记）、`apps/desktop/scripts/bundle-runtime.mjs`（部署过滤处标记）、`python/sdk-runtime/pyproject.toml`（控制台脚本，其上方标记），以及四个以名字匹配 CLI 的仓库门禁（`scripts/verify-application-entrypoints.ts`、`scripts/verify-default-product-isolation.ts`、`scripts/check-workspace-constraints.ts`、`scripts/verify-dsh-package-licenses.ts`，各自在规则处标记），、`README.md`（含中文对照件）的 npm 运行小节（HTML 注释里标记）、`tsconfig.base.json` 的源码面别名（其上方标记）、`scripts/release/families.ts`（命名守卫与 `installedEntry`，两处均标记），以及 `scripts/publish-npm-baseline.ts`（条目钉住处标记） | 把 CLI 包名改为 `prism-agent`，bin 与程序名改为 `prism`，并随动横幅、usage、示例、风险接受命令、消费端依赖行与 `import.meta.resolve` 规格、部署过滤、载体的 `node_modules/prism-agent/lib/bin.js` 路径；`scripts/dependency-catalog/` 里录制的解析保持上游（`prism-agent` 未发布）；harness 内核的 `dsh` 词汇（内核 JSDoc、包 README、它们喂出的目录行、stderr 诊断、应用内帮助横幅）保持上游拼写；只有安装面与用户键入的命令名（含风险接受命令）跟随 `prism`；重录 `launcher-help.txt`：运行 `node --import tsx/esm apps/cli/src/bin.ts --help`；Python wheel 的控制台脚本改为 `prism`，PyPI 载体包名保持不变；特性文档是 [install-isolation.md](install-isolation.zh.md)，其 D4b 拥有该边界 |
+| A9 默认 harness home | `packages/util/home-paths/src/index.ts`（`DSH_HOME_DIR_NAME` 上方标记）、其 `tests/home-paths.spec.ts`，以及 `apps/desktop/src-tauri/src/setup.rs` 与 `apps/desktop/src-tauri/src/dsh_runner.rs` 里的 home 注释（`setup.rs` 在 `dsh_home` 处标记） | 默认 home 改为 `~/.prism` 而非 `~/.dsh`；优先级（配置路径、然后 `$DSH_HOME`、然后默认值）与 `DSH_HOME` 变量名不变；桌面端已显式传 `DSH_HOME`，行为不受影响；对应规格是 [install-isolation.md](install-isolation.zh.md) |
 
 ## [S3] Scope
 
@@ -81,13 +83,15 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 
 1. 先在本仓库盘点：`git status --porcelain` 与 `rg -n PRISM-DIVERGENCE`，并在动其他东西之前决定进行中的导入（A7）怎么办。
 2. 在能合并的地方调和：在 `../deepseek-harness` 中 `git fetch upstream` 并合并 `upstream/master`，在那里重新施加 A1 到 A4——在那里它们都是普通提交。
-3. 把该树重新导入本仓库，然后用 S2 的探测对 A1、A2、A3、A5、A6 的每条路径分类：新增的整条复制，偏离的以上游文件为起点手工重新施加。
+3. 把该树重新导入本仓库，然后用 S2 的探测对 A1、A2、A3、A5、A6、A8、A9 的每条路径分类：新增的整条复制，偏离的以上游文件为起点手工重新施加。
 4. 在跑任何安装之前先重做 A4，否则 `pnpm install` 会以 `ERR_PNPM_UNUSED_PATCH` 失败。
 5. A3 放到最后重做，因为新树可能改过同一个解析器文件；然后运行 [desktop-startup-latency.md](desktop-startup-latency.zh.md) S4 记录的 `tsc` 与 app-boot 命令。
-6. 重新施加标记：`rg -n PRISM-DIVERGENCE` 必须列出 A1 到 A4 的每一处，且没有任何标记指向新树已删除的路径。
+6. 重新施加标记：`rg -n PRISM-DIVERGENCE` 必须列出 A1 到 A4 以及 A8 与 A9 中可注释文件的每一处，且没有任何标记指向新树已删除的路径；A8 的 `package.json` 与帮助期望两处只存在于索引行。
 7. 原样复制 A5 与 A6，然后重跑 `verify-md-wrap`、对变更 pair 的 `verify-translation-pairing`、`verify-md-links`，以及 `apps/desktop/src-tauri` 下的 `cargo test`。
 
 ## [S5] Related documents
+
+- [install-isolation.md](install-isolation.zh.md) — A8 与 A9 的特性文档（CLI 安装身份与默认 home）。
 
 - [desktop-startup-latency.md](desktop-startup-latency.zh.md)——启动门禁与 hub 采纳，以及 A3 的逐文件清单。
 - [desktop-client.md](desktop-client.zh.md)、[desktop-port-resilience.md](desktop-port-resilience.zh.md)、[cli-pnpm-resolution.md](cli-pnpm-resolution.zh.md)——A1 所承载的桌面功能。

@@ -29,7 +29,9 @@ const DEPENDENCY_SECTIONS = [
   'peerDependencies',
 ] as const
 const RELEASE_MANIFEST_NAME = 'manifest.json'
-const RELEASE_ENTRY_PACKAGE = '@deepseek-ai/dsh'
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Upstream pins its published entry `@deepseek-ai/dsh`; this fork's publish baseline pins `prism-agent`, its own install identity.
+const RELEASE_ENTRY_PACKAGE = 'prism-agent'
 const LATEST_DIST_TAG = 'latest'
 const POSIX_WEB_PROBE = String.raw`
 import errno, os, pty, select, signal, sys, time
@@ -449,8 +451,8 @@ class InstalledBundleSmoke {
         `--registry=${this.bundle.manifest.registry}`,
       ], consumerRoot, npmClientEnvironment())
 
-      const bin = resolve(consumerRoot, 'node_modules/@deepseek-ai/dsh/lib/bin.js')
-      assertPathWithin(consumerRoot, bin, 'installed dsh bin')
+      const bin = resolve(consumerRoot, 'node_modules/prism-agent/lib/bin.js')
+      assertPathWithin(consumerRoot, bin, 'installed prism bin')
       const environment = installedArtifactEnvironment(consumerRoot)
       const version = this.runner.capture(
         process.execPath,
@@ -460,12 +462,12 @@ class InstalledBundleSmoke {
       )
       if (version !== this.bundle.manifest.version) {
         throw new Error(
-          `installed dsh --version returned ${JSON.stringify(version)}; `
+          `installed prism --version returned ${JSON.stringify(version)}; `
           + `expected ${this.bundle.manifest.version}`,
         )
       }
       this.probeWeb(bin, consumerRoot, environment)
-      console.log('publish-npm-baseline: installed dsh entry and Web startup probes passed')
+      console.log('publish-npm-baseline: installed prism entry and Web startup probes passed')
     } finally {
       rmSync(consumerRoot, { recursive: true, force: true })
     }

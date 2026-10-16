@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Upstream ships this entry as bin `dsh`; this fork renames the bin to `prism`.
 /**
- * Command-line entry for dsh.
- * @module @deepseek-ai/dsh/bin
+ * Command-line entry for prism.
+ * @module prism-agent/bin
  */
 
 /* v8 ignore file -- built-bin acceptance exercises this self-executing dispatch. */
@@ -12,7 +14,7 @@ import { parseDshArgs } from './args.ts'
 import { reportStartupFailure } from './startup-diagnostics.ts'
 
 /**
- * Run the public dsh command-line interface.
+ * Run the public prism command-line interface.
  * @returns a promise that settles when the selected command mode finishes.
  */
 export async function runCli(): Promise<void> {

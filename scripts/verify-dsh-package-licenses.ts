@@ -7,7 +7,9 @@ import { globSync, readFileSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const DSH_PACKAGE_NAME = /^@deepseek-ai\/dsh(?:-|$)/
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Upstream matches its `@deepseek-ai/dsh` family; the fork's `prism-agent` CLI joins the same MIT gate.
+const DSH_PACKAGE_NAME = /^(?:@deepseek-ai\/dsh(?:-|$)|prism-agent$)/
 
 /** Result of checking every DSH package reachable through the root workspace list. */
 export interface DshPackageLicenseReport {

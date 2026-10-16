@@ -2,7 +2,7 @@
 
 [English](python-sdk.md) | 中文
 
-本教程安装已发布的 Python SDK，运行随附的独立极简 profile，并说明如何从自己的程序自定义同一个 `dsh` profile。
+本教程安装已发布的 Python SDK，运行随附的独立极简 profile，并说明如何从自己的程序自定义同一个 harness profile。
 
 ## 前置条件
 
@@ -39,7 +39,7 @@ python -m pip install deepseek-harness-sdk
 
 :::
 
-安装内容包含匹配的原生运行时 wheel 与 `dsh` 命令。普通 SDK 运行不需要系统 Node.js。需要构建产物的仓库贡献者应使用 [Python 贡献者工作流](../../../python/development.zh.md)。
+安装内容包含匹配的原生运行时 wheel 与 `prism` 命令。普通 SDK 运行不需要系统 Node.js。需要构建产物的仓库贡献者应使用 [Python 贡献者工作流](../../../python/development.zh.md)。
 
 ## 运行检入示例
 
@@ -91,7 +91,7 @@ python python/sdk/examples/minimal.py `
 
 :::
 
-脚本会打印最终 assistant 响应。所选 home 会保存生成的 `sdk-minimal` profile、已安装插件，以及 `sessions/` 下的未压缩 JSONL 会话日志。示例与 SDK 绝不会静默读取 `~/.dsh`。
+脚本会打印最终 assistant 响应。所选 home 会保存生成的 `sdk-minimal` profile、已安装插件，以及 `sessions/` 下的未压缩 JSONL 会话日志。示例与 SDK 绝不会静默解析默认主目录。
 
 ## 在程序中使用 SDK
 
@@ -118,11 +118,11 @@ with DeepSeekHarness(
 print(result.final_response)
 ```
 
-SDK 会延迟启动内置的 `dsh --profile sdk-minimal` 进程，并复用到上下文管理器退出。Profile、其持久 patch、home patch 与任何有序 `patches` tuple 共同组成应用配置。不存在独立 Python 运行时 bin 或完整配置选项。
+SDK 会延迟启动内置的 `prism --profile sdk-minimal` 进程，并复用到上下文管理器退出。Profile、其持久 patch、home patch 与任何有序 `patches` tuple 共同组成应用配置。不存在独立 Python 运行时 bin 或完整配置选项。
 
 ## 安装或定义插件
 
-需要在该 home 中持久保存依赖与 bundle 层时，使用 `dsh plugin`：
+需要在该 home 中持久保存依赖与 bundle 层时，使用 `prism plugin`：
 
 <div>
 <a id="linux-与-macos-3"></a>
@@ -133,14 +133,14 @@ SDK 会延迟启动内置的 `dsh --profile sdk-minimal` 进程，并复用到�
 
 ```sh [Linux/macOS]
 export DSH_HOME=/absolute/path/to/example-dsh-home
-dsh --profile sdk-minimal --dump-default-config >/dev/null
-dsh plugin --profile sdk-minimal add file:/absolute/path/to/my-plugin-bundle
+prism --profile sdk-minimal --dump-default-config >/dev/null
+prism plugin --profile sdk-minimal add file:/absolute/path/to/my-plugin-bundle
 ```
 
 ```powershell [Windows PowerShell]
 $env:DSH_HOME = "C:\work\example-dsh-home"
-dsh --profile sdk-minimal --dump-default-config | Out-Null
-dsh plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
+prism --profile sdk-minimal --dump-default-config | Out-Null
+prism plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
 ```
 
 :::
@@ -183,4 +183,4 @@ dsh plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
 
 需要隔离 profile、插件、凭据、设置与会话时，应使用新的 home。独立工作应使用新的 session id；只有继续同一段持久对话和会话资源时，才同时复用 harness、home 与 id。
 
-[组合包参考](../../../packages/bundle/sdk-minimal/README.zh.md)定义确切配置树，[示例参考](../../../python/sdk/examples/README.zh.md)定义可运行程序。[Python SDK 参考](../../../python/sdk/README.zh.md)介绍生命周期、结果、通知与底层行为；[dsh CLI 参考](../../../apps/cli/reference/README.zh.md)介绍 profile 分层。
+[组合包参考](../../../packages/bundle/sdk-minimal/README.zh.md)定义确切配置树，[示例参考](../../../python/sdk/examples/README.zh.md)定义可运行程序。[Python SDK 参考](../../../python/sdk/README.zh.md)介绍生命周期、结果、通知与底层行为；[prism CLI 参考](../../../apps/cli/reference/README.zh.md)介绍 profile 分层。

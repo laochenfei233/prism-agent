@@ -154,7 +154,7 @@ it('names the exact grant command for each package a compatibility check refused
   })
   expect(await runPlugin('test', ['add', '@example/plugin'])).toBe(1)
   expect(stderr.mock.calls.map(call => call[0])).toEqual([
-    'dsh: to accept the risk, run: dsh plugin --profile test allow-version @example/plugin@1.2.3 --dsh-version 0.1.0 --accept-risk\n',
+    'dsh: to accept the risk, run: prism plugin --profile test allow-version @example/plugin@1.2.3 --dsh-version 0.1.0 --accept-risk\n',
     'dsh: plugin command failed; diagnostics: /profile/log\n',
   ])
 })

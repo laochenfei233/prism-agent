@@ -47,7 +47,8 @@
       "@deepseek-ai/dsh-experimental-api-speech-to-text/types": ["./packages/experimental/api-speech-to-text/src/types.ts"],
       "@deepseek-ai/dsh-experimental-client-ui-voice-input/client": ["./packages/experimental/client-ui-voice-input/src/client/index.ts"],
 
-      "@deepseek-ai/dsh/profile-boot": ["./apps/cli/src/profile-boot.ts"],
+      // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8. Upstream aliases its CLI package; this fork's CLI package is prism-agent.
+      "prism-agent/profile-boot": ["./apps/cli/src/profile-boot.ts"],
       "@deepseek-ai/dsh-browser-use": ["./packages/browser-use/browser-use/src/index.ts"],
       "@deepseek-ai/dsh-browser-use/brand": ["./packages/browser-use/browser-use/src/brand.ts"],
       "@deepseek-ai/dsh-experimental-browser-use-runtime": ["./packages/experimental/browser-use-runtime/src/index.ts"],

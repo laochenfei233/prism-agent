@@ -207,7 +207,7 @@ def test_runtime_requires_complete_resource_sidecars(
 def test_node_mode_runs_the_deployed_dsh_cli(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bin_js = tmp_path / "runtime" / "node" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
+    bin_js = tmp_path / "runtime" / "node" / "node_modules" / "prism-agent" / "lib" / "bin.js"
     bin_js.parent.mkdir(parents=True)
     bin_js.touch()
     monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
@@ -234,7 +234,7 @@ def test_python_dsh_command_executes_the_bundled_cli(
     called: dict[str, object] = {}
     monkeypatch.setenv("DSH_HOME", "/explicit/home")
     monkeypatch.setattr(runtime, "resolve_bundled_launch_args", lambda: ("/runtime",))
-    monkeypatch.setattr(runtime, "sys", SimpleNamespace(platform="linux", argv=["dsh", "plugin", "--profile", "sdk", "list"]))
+    monkeypatch.setattr(runtime, "sys", SimpleNamespace(platform="linux", argv=["prism", "plugin", "--profile", "sdk", "list"]))
 
     def execvpe(file: str, args: tuple[str, ...], env: dict[str, str]) -> None:
         called.update(file=file, args=args, home=env.get("DSH_HOME"))
@@ -253,7 +253,7 @@ def test_python_dsh_command_executes_the_bundled_cli(
 @pytest.mark.parametrize("returncode", [0, 37, 513])
 def test_windows_console_waits_and_forwards_runtime_status(monkeypatch: pytest.MonkeyPatch, returncode: int) -> None:
     monkeypatch.setenv("DSH_HOME", "/explicit/home")
-    monkeypatch.setattr(runtime, "sys", SimpleNamespace(platform="win32", argv=["dsh", "plugin", "argument with spaces", "中文"]))
+    monkeypatch.setattr(runtime, "sys", SimpleNamespace(platform="win32", argv=["prism", "plugin", "argument with spaces", "中文"]))
     monkeypatch.setattr(runtime, "resolve_bundled_launch_args", lambda: ("runtime.exe",))
     called = []
 
@@ -287,7 +287,7 @@ def test_windows_console_branch_preserves_real_child_io_and_completion(tmp_path:
     )
     driver = (
         "import deepseek_harness_runtime as runtime; from types import SimpleNamespace; "
-        f"runtime.sys = SimpleNamespace(platform='win32', argv=['dsh', 'argument with spaces', '中文']); "
+        f"runtime.sys = SimpleNamespace(platform='win32', argv=['prism', 'argument with spaces', '中文']); "
         f"runtime.resolve_bundled_launch_args = lambda: ({sys.executable!r}, {str(child)!r}); runtime.main()"
     )
     result = subprocess.run([sys.executable, "-c", driver], capture_output=True, text=True, encoding="utf-8",

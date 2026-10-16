@@ -34,7 +34,9 @@ if (aclRunner !== undefined && process.argv[2] === aclRunner) {
     const platform = process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'win' : process.platform
     process.env.DSH_BUNDLED_PRIMARY_RUNTIME = join(dirname(process.execPath), `${platform}-${process.arch}`, 'primary-runtime')
   }
-  const { runCli } = await import('@deepseek-ai/dsh/lib/bin.js')
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+  // Upstream imports its CLI closure as '@deepseek-ai/dsh/lib/bin.js'; this fork's CLI package is prism-agent.
+  const { runCli } = await import('prism-agent/lib/bin.js')
   await runCli()
 } else {
   Reflect.deleteProperty(process.env, selectorName)

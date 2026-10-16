@@ -159,11 +159,11 @@ describe('SDK dsh launch resolution', () => {
   })
 
   it.each([null, {}, ''])(
-    'rejects a manifest without a usable dsh executable (%j)',
+    'rejects a manifest without a usable prism executable (%j)',
     (bin) => {
       const pair = manifestPair({ version: '1.0.0', bin }, { version: '1.0.0' })
       expect(() => resolveDshBinFromManifests(pair.dshUrl, pair.clientUrl))
-        .toThrow('declares no dsh executable')
+        .toThrow('prism-agent declares no prism executable')
     },
   )
 })

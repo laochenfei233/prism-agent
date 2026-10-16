@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness Python SDK 的平台运行时 wheel 包。它把普通 `dsh` CLI（命令行界面）及其封闭的 Node 依赖树打包成原生可执行程序，因此使用 SDK 不需要系统 Node.js。本包只发布 wheel 包。
+DeepSeek Harness Python SDK 的平台运行时 wheel 包。它把普通 `prism` CLI（命令行界面）及其封闭的 Node 依赖树打包成原生可执行程序，因此使用 SDK 不需要系统 Node.js。本包只发布 wheel 包。
 
 ## 安装命令与产物
 
-wheel 包会安装 `dsh` 控制台命令和 `deepseek_harness_runtime` Python 模块。`dsh` 将参数转发给内置可执行程序，并要求非空 `DSH_HOME`；它不会回退到 `~/.dsh`。
+wheel 包会安装 `prism` 控制台命令和 `deepseek_harness_runtime` Python 模块。`prism` 将参数转发给内置可执行程序，并要求非空 `DSH_HOME`；它不会隐式回退到默认主目录。
 
 生产可执行程序位于模块的 `runtime/` 目录，命名为 `deepseek-harness-sdk-runtime-<platform>-<arch>`；Windows 使用 `.exe` 后缀。Linux 与 macOS wheel 包含目标平台原生的 `-rg` 伴随程序，Windows 包含 `-rg.exe`，macOS 还包含 `node-pty` 使用的 `-spawn-helper`。已发布目标是 Linux x64、Linux arm64、macOS arm64、macOS x64 与 Windows x64。wheel 包标签必须与载荷严格匹配；不发布 Windows arm64 wheel 包。
 
@@ -25,26 +25,26 @@ wheel 包会安装 `dsh` 控制台命令和 `deepseek_harness_runtime` Python �
 
 要成套替换三个 Office 工作流与共用检查脚本，可将 `skill-office.config.assetRoot` 配置为另一个绝对资源目录。任意 skill 集合通过文件系统 skill 提供方加载。配置 patch 在进程启动时生效；切换 skills 无需重建 runtime wheel 或 Python 环境。
 
-仓库构建还会物化仅限开发的 `runtime/node/` 载体。它在系统 Node 22.19 或更高版本上运行 `node runtime/node/node_modules/@deepseek-ai/dsh/lib/bin.js`。系统不会自动选择它，而且 wheel 包与 sdist 均不包含它。
+仓库构建还会物化仅限开发的 `runtime/node/` 载体。它在系统 Node 22.19 或更高版本上运行 `node runtime/node/node_modules/prism-agent/lib/bin.js`。系统不会自动选择它，而且 wheel 包与 sdist 均不包含它。
 
-两种载体执行相同的 `dsh` 语法与随附 profile，包括独立的 `sdk-minimal` 配置树，以及包含前端产物的完整 `web` profile。私有 `dsh-python-runtime-closure` manifest（元数据清单）定义打包依赖闭包；不存在 Python 专用 Node 应用或检入的默认 `cordis.yml`。
+两种载体执行相同的启动器语法与随附 profile，包括独立的 `sdk-minimal` 配置树，以及包含前端产物的完整 `web` profile。私有 `dsh-python-runtime-closure` manifest（元数据清单）定义打包依赖闭包；不存在 Python 专用 Node 应用或检入的默认 `cordis.yml`。
 
 ## Python 模块 API
 
 - `bundled_package_dir() -> Path` 返回已安装模块数据根目录，并校验发布元数据。
 - `bundled_runtime_path() -> Path` 返回当前平台可执行程序，并校验必需伴随文件。
 - `resolve_bundled_launch_args(mode=None) -> tuple[str, ...]` 默认返回可执行程序 argv。显式 `mode="node"` 或 `DSH_RUNTIME_MODE=node` 会选择仅限仓库使用的 Node 载体。
-- `main()` 实现已安装的 `dsh` 控制台命令，并拒绝缺失或空白的 `DSH_HOME`。在 Windows 上，它让打包进程继承标准流，等待其结束并转发退出状态；在 POSIX 上，它替换 Python 进程。
+- `main()` 实现已安装的 `prism` 控制台命令，并拒绝缺失或空白的 `DSH_HOME`。在 Windows 上，它让打包进程继承标准流，等待其结束并转发退出状态；在 POSIX 上，它替换 Python 进程。
 
 不支持的平台以及缺失的可执行程序或伴随文件会抛出 `FileNotFoundError`，并指出构建与安装路径。未知运行时模式会抛出 `ValueError`。
 
 ## 打包后的 profile 解析
 
-`dsh` 在显式指定的主目录下初始化随附 profile、组合其 bundle patch，并从可执行程序的虚拟文件系统加载内置插件。运行时解析使用内存中的 generation，不创建磁盘符号链接或代理包。fallback 导入使用记录的声明包路径，包括可执行程序虚拟文件系统内的路径，因此内置配置项与外部插件 peer 共享内置的 Cordis／模块实例。原生共享库与 Windows ConPTY addon 会同其他原生 addon 一起打包；ripgrep 与 macOS PTY helper 仍是可执行伴随程序。
+`prism` 在显式指定的主目录下初始化随附 profile、组合其 bundle patch，并从可执行程序的虚拟文件系统加载内置插件。运行时解析使用内存中的 generation，不创建磁盘符号链接或代理包。fallback 导入使用记录的声明包路径，包括可执行程序虚拟文件系统内的路径，因此内置配置项与外部插件 peer 共享内置的 Cordis／模块实例。原生共享库与 Windows ConPTY addon 会同其他原生 addon 一起打包；ripgrep 与 macOS PTY helper 仍是可执行伴随程序。
 
 Python bootstrap 从相邻目录解析 Office kit，让原生辅助程序与 URL Worker 使用真实文件系统路径。kit 负责引擎选择与校验；Python bootstrap 不增加运行时下载或编译。Office smoke 还从已加载技能获取 CLI 路径，并在空 PATH 下执行 capabilities 和 DOCX 转换。
 
-外部 profile 管理使用 `dsh plugin --profile <name> ...`。该命令要求 `PATH` 中存在 `pnpm`；普通 SDK／profile 运行不需要它。
+外部 profile 管理使用 `prism plugin --profile <name> ...`。该命令要求 `PATH` 中存在 `pnpm`；普通 SDK／profile 运行不需要它。
 
 ## 构建与分发
 

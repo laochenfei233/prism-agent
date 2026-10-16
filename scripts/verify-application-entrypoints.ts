@@ -24,8 +24,10 @@ interface LauncherPolicy {
 }
 
 /** Public product launcher plus the build-only WebWorker packer. */
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Upstream's launcher bin is `dsh`; this fork's published CLI declares `prism`.
 const MANIFEST_BIN_ALLOWLIST = new Map<string, ManifestBin>([
-  ['apps/cli/package.json', { dsh: 'lib/bin.js' }],
+  ['apps/cli/package.json', { prism: 'lib/bin.js' }],
   ['packages/experimental/webworker-packer/package.json', { 'dsh-pack-vfs-image': './bin.js' }],
 ])
 
