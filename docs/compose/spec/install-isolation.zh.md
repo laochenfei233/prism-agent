@@ -44,7 +44,7 @@ commits: 002a46d2..39d9f636
 
 ## [S2] 设计
 
-**D1 — 范围：安装产物加数据根。** 更名的面是 CLI 的 npm 包名、bin 名、CLI 默认 home，以及被这些名字改变后变假的引用。内部 workspace 命名空间 `@deepseek-ai/*` 不动——几百个包经由 tsconfig paths 与 `workspace:*` 图解析，把它们全部改名会整体作废可重放的 fork 分叉清单。桌面应用、桌面 bundled runtime 布局、`package.json` 的 `dsh.` 前缀清单键（`dsh.bundle`、`dsh.client`）、`DSH_HOME` 环境变量协议都保留原名。
+**D1 — 范围：安装产物加数据根。** 更名的面是 CLI 的 npm 包名、bin 名、CLI 默认 home，以及被这些名字改变后变假的引用。内部 workspace 命名空间 `@deepseek-ai/*` 不动——几百个包经由 tsconfig paths 与 `workspace:*` 图解析，把它们全部改名会整体作废可重放的 fork 分叉清单。`package.json` 的 `dsh.` 前缀清单键（`dsh.bundle`、`dsh.client`）与 `DSH_HOME` 环境变量协议保留原名。桌面壳保留产品名与标识符，但在后续一轮（2026-10-16，安装器仍被识别为 dsh、且其按镜像名全局 `taskkill /IM dsh-desktop.exe` 可能关掉另一构建之后）其主二进制改名为 `prism-agent.exe`（`mainBinaryName`）、bundled 闭包目录改名 `runtime/dsh` 为 `runtime/prism`、安装器钩子严格按安装目录路径杀进程。
 
 **D2 — 命名。** bin `prism`，npm 包 `prism-agent`，默认 home `~/.prism`。home 与桌面端一致，一个数据根同时服务两端；`PRISM_HOME` 仍是桌面壳的覆盖变量，`DSH_HOME` 仍是子进程协议变量，所以 `~/.prism` 是两端的零配置根。
 
@@ -61,7 +61,7 @@ commits: 002a46d2..39d9f636
 ## [S3] 范围
 
 - 范围内：CLI 包身份变更、默认 home 变更、D4 的消费环、A8/A9 索引行与标记、本文档。
-- 范围外：内部 `@deepseek-ai/*` 包命名空间；根 `pnpm dsh` 源码启动脚本别名（对外无名字，即 `node --import tsx/esm apps/cli/src/bin.ts`）；`docs/dependency-catalog.json` 及其生成器（见 D5）；桌面产品身份、安装器和 `runtime/dsh` 闭包目录名；Python PyPI 载体包名（`deepseek-harness-runtime-bin`）及其 SDK profile 语法（其控制台脚本随 D4 改名）；按 D4b 的 harness 内核 `dsh` 词汇，包括内核包 README、内核 JSDoc、它们喂出的生成目录行，以及本次改动触及文件之外的文档站示例（记为后续跟进，而非缺陷）；`package.json` 的 `dsh.` 前缀清单键改名；存量 `~/.dsh` 用户的数据搬迁（fork 未发布；已交付的跨 home 会话导入计划显式点名候选 home，落地时必须把 `~/.dsh` 保留为可选来源）；`plugins/` 与 `home-mods/` 下的配置与布置。
+- 范围外：内部 `@deepseek-ai/*` 包命名空间；根 `pnpm dsh` 源码启动脚本别名（对外无名字，即 `node --import tsx/esm apps/cli/src/bin.ts`）；`docs/dependency-catalog.json` 及其生成器（见 D5）；桌面产品名、bundle 标识符与安装目录（早已分离）；桌面主二进制改名、`runtime/prism` 闭包目录与按路径的安装器钩子自 2026-10-16 起属于范围内（见 D1）；Python PyPI 载体包名（`deepseek-harness-runtime-bin`）及其 SDK profile 语法（其控制台脚本随 D4 改名）；按 D4b 的 harness 内核 `dsh` 词汇，包括内核包 README、内核 JSDoc、它们喂出的生成目录行，以及本次改动触及文件之外的文档站示例（记为后续跟进，而非缺陷）；`package.json` 的 `dsh.` 前缀清单键改名；存量 `~/.dsh` 用户的数据搬迁（fork 未发布；已交付的跨 home 会话导入计划显式点名候选 home，落地时必须把 `~/.dsh` 保留为可选来源）；`plugins/` 与 `home-mods/` 下的配置与布置。
 
 ## Tasks
 
