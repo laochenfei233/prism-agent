@@ -39,6 +39,7 @@ packages/**/__pycache__/
 apps/web/dist/
 .artifacts/
 .dsh-build/
+.dsh-report/
 .playwright-mcp/
 .orig
 .worktrees/
@@ -53,3 +54,15 @@ native/system/test/bin/
 # Local harness-home copies carry per-install identity and credentials; never commit them.
 home-mods/.credentials.yaml
 home-mods/.anonymous-user-id
+
+# Session scratch and diagnostics - never commit (see the 2026-10-16 cleanup).
+.tmp-*/
+.scratch-*/
+.explicit-service-*/
+--path
+.lockfile-new-importers.diff
+cleanup-ran.txt
+debug.log
+esc-test.txt
+install.err.log
+install.out.log
