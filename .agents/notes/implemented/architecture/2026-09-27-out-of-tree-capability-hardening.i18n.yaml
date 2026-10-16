@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-out-of-tree-capability-hardening.md
-2026-09-27-out-of-tree-capability-hardening.md: 960a67888a4e0ecbffb87f787c58d1163b9f45d1
-2026-09-27-out-of-tree-capability-hardening.zh.md: bf9ccc6dfbfe6e88df34d610d04ec6d28216be0a
+2026-09-27-out-of-tree-capability-hardening.md: 2e0d07469d5003c980c85d744f40286708797e17
+2026-09-27-out-of-tree-capability-hardening.zh.md: f4ea74738046a8a56396d8b943382a4d16487596

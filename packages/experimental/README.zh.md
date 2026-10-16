@@ -26,9 +26,12 @@ kind: "package-group"
 |---|---|---|
 | [`speech-to-text`](speech-to-text/README.zh.md) | 具名语音识别 Provider | `ctx.speechToText` |
 | [`speech-to-text-sensevoice`](speech-to-text-sensevoice/README.zh.md) | 托管本地 SenseVoice 推理 | — |
+| [`speech-to-text-dashscope`](speech-to-text-dashscope/README.zh.md) | DashScope 实时云端识别 | — |
 | [`api-speech-to-text`](api-speech-to-text/README.zh.md) | 带认证的临时转写 Remote | `ctx.speechController` |
 | [`client-ui-voice-input`](client-ui-voice-input/README.zh.md) | 麦克风录音与版本检查后的草稿插入 | — |
 | [`voice-input-bundle`](voice-input-bundle/README.zh.md) | 默认禁用的可选语音输入组合 | — |
+| [`tool-meeting-minutes`](tool-meeting-minutes/README.zh.md) | 面向模型的录音转写与纪要结构 | 在 `ctx.tools` 注册 `meeting_minutes` |
+| [`meeting-minutes-bundle`](meeting-minutes-bundle/README.zh.md) | 默认禁用的可选会议纪要组合 | — |
 | [`agent-team-profile`](agent-team-profile/README.zh.md) | Agent Teams 协作、工具与 Web UI 组合包 | — |
 | [`agent-team`](agent-team/README.zh.md) | 具名 teammate，成员之间持久消息与共享任务板 | `ctx.agentTeams` |
 | [`client-ui-agent-team`](client-ui-agent-team/README.zh.md) | Web Team roster、任务板与 teammate 导航 | — |

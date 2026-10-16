@@ -1,5 +1,7 @@
 # Aegis E2E Bootstrap
 
+English | [中文](README.zh.md)
+
 This directory hosts the Phase 5 E2E verification suite for the Aegis fork.
 
 Current status:

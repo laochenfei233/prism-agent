@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "DeepSeek Harness bundle turning four advisory capabilities into enforced ones: plan-mode tool denial, repeated-call approval, a per-turn step budget, and an actionable user-only skill denial",
+  "description": "DeepSeek Harness bundle turning nine advisory capabilities into enforced ones: plan-mode tool denial, repeated-call approval, a per-turn step budget, an actionable user-only skill denial, an enforced routing contract, a per-turn write budget, `ponytail:` marker discipline, dependency-change approval, and a verification gate at the turn boundary",
   "license": "MIT",
   "main": "lib/index.js",
   "exports": {
@@ -30,5 +30,8 @@
     "test:e2e": "npm run build && vitest run --config vitest.config.ts tests/capability.e2e.spec.ts",
     "test:all": "npm run build && vitest run --config vitest.config.ts",
     "smoke": "node scripts/smoke.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "0.1.7-rc.1"
   }
 }

@@ -49,3 +49,7 @@ worktrees/
 # Standalone repo staging (dsh-desktop)
 .standalone/
 native/system/test/bin/
+
+# Local harness-home copies carry per-install identity and credentials; never commit them.
+home-mods/.credentials.yaml
+home-mods/.anonymous-user-id

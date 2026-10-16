@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/desktop-startup-latency.md
-desktop-startup-latency.md: ceea9781b66a8bd1d1079b586bc9b4e31d14655e
-desktop-startup-latency.zh.md: 3af55826a253c9f2484aae268fe97ecafa02e2c4
+desktop-startup-latency.md: e7e2562ca5db098f56727eb71cceb3f06badc268
+desktop-startup-latency.zh.md: 06439dc2befa4e2e7d3042ff15bad8ef894f47d7

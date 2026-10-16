@@ -6,9 +6,17 @@ Experimental speech recognition has three roles: the [Service Definition](../../
 
 ## Provider selection
 
-`SpeechProviderId` brands the registration identity. `SpeechProviderInfo` carries a display name, accepted `languages` hints and `host-local` or `cloud` processing location. `SpeechRequest` contains WAV bytes and optional provider/language selection; `resolve()` produces `SpeechSpec` with one captured provider instance. A missing provider or unsupported language fails; replacement or withdrawal invalidates resolved work. Audio never falls back to a different provider.
+`SpeechProviderId` brands the registration identity. `SpeechProviderInfo` carries a display name, accepted `languages` hints, the `model` it runs when the selection names none, the `models` a deployment offers, and `host-local` or `cloud` processing location. `SpeechRequest` contains WAV bytes and optional provider/language/model selection; `resolve()` produces `SpeechSpec` with one captured provider instance. A missing provider, unsupported language, or unoffered model fails; replacement or withdrawal invalidates resolved work. Audio never falls back to a different provider.
 
-`SpeechProvider.transcribe()` accepts one complete `SpeechInput` and an `AbortSignal`. `Transcript` returns plain `text`, `audioSeconds` and `inferenceSeconds`. Providers honor cancellation and settle their work before deregistration completes. The local provider serializes calls, bounds its queue and manages its worker lifetime independently of Sessions.
+`SpeechProvider.transcribe()` accepts one complete `SpeechInput` and an `AbortSignal`. `Transcript` returns plain `text`, `audioSeconds` and `inferenceSeconds`, plus `segments` when the recognizer separates speakers: each `SpeechSegment` carries its text, a service-assigned `speaker`, and, when the recognizer reports timing, its start and end offsets. Providers honor cancellation and settle their work before deregistration completes. The local provider serializes calls, bounds its queue and manages its worker lifetime independently of Sessions.
+
+## Live sessions
+
+A provider may publish a `streaming` capability beside its preparation state. `SpeechStreaming` declares how much of one recognition it streams — `duplex` accepts audio while results arrive, `incremental-output` accepts one complete recording and returns its text progressively — and opens a `SpeechStream`.
+
+`push()` appends canonical PCM16 samples in order and resolves once the provider accepted them, so a live source applies backpressure. `close()` drains the session; `cancel()` abandons it. `events()` delivers `SpeechStreamUpdate` values: a `partial` carries text for one still-open span under an id the provider assigns, a `segment` closes a span as a `SpeechSegment`, and one `final` carries the complete `Transcript`. Observers may be abandoned without ending the session.
+
+`snapshot()` reports each provider's mode, so a consumer selects a live-capable recognizer instead of discovering the gap at call time. `resolveStream()` applies the composition defaults and fails when the selected provider streams nothing. `openStream()` opens exactly the resolved session and tracks it: withdrawing the registration cancels it, while a caller that closed or cancelled its own session is no longer tracked.
 
 ## Browser and Host ownership
 
@@ -158,6 +166,22 @@ resolve(request: SpeechRequest): SpeechSpec
  * @returns final transcript after provider settlement.
  */
 async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>
+
+/**
+ * Apply composition defaults and capture the selected provider's live capability.
+ * @param request - optional provider and language selection.
+ * @returns provider-pinned input for openStream().
+ * @throws {Error} The selected provider offers no live session.
+ */
+resolveStream(request: SpeechStreamRequest): SpeechStreamSpec
+
+/**
+ * Open one live session on exactly the resolved provider; withdrawing the registration cancels it.
+ * @param spec - resolved selection; a withdrawn or replaced registration is rejected.
+ * @param signal - caller cancellation.
+ * @returns the open session, tracked until it closes, cancels, or the registration withdraws.
+ */
+async openStream(spec: SpeechStreamSpec, signal: AbortSignal): Promise<SpeechStream>
 ```
 
 Source: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)

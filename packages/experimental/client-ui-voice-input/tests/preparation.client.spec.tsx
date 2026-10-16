@@ -138,6 +138,39 @@ it('persists settings and reports disconnection in the detail card', async () =>
   expect(screen.getByText(zh.loading)).toBeTruthy()
   expect(screen.getByRole('alert').textContent).toContain('disconnected')
 })
+it('offers the models a recognizer publishes and persists the choice', async () => {
+  const store = createSnapshotStore<SpeechReadiness>({ connected: true, error: null, catalog: {
+    selection: { providerId: id, language: 'auto' }, maxAudioBytes: 100, maxDurationSeconds: 120,
+    providers: [
+      { id, name: 'SenseVoiceSmall', location: 'host-local', languages: ['auto'], preparation: { phase: 'ready' } },
+      { id: 'cloud' as SpeechProviderId, name: 'Cloud', location: 'cloud', languages: ['auto'], model: 'whisper-1',
+        models: ['whisper-1', 'gpt-4o-transcribe'], preparation: { phase: 'ready' } },
+      { id: 'unnamed' as SpeechProviderId, name: 'Unnamed', location: 'cloud', languages: ['auto'],
+        models: ['a', 'b'], preparation: { phase: 'ready' } },
+    ],
+  } })
+  const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
+  const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn() }
+  render(<VoicePreparation {...props} />)
+  const select = (): HTMLSelectElement => screen.getByLabelText(zh.model) as HTMLSelectElement
+  const selectProvider = (providerId: string, model?: string): void => {
+    const current = store.getSnapshot()
+    act(() => { store.set({ ...current, catalog: { ...current.catalog!,
+      selection: { providerId: providerId as SpeechProviderId, language: 'auto', ...model === undefined ? {} : { model } } } }) })
+  }
+  // A recognizer that offers no choice runs the model its deployment configured.
+  expect(screen.queryByLabelText(zh.model)).toBeNull()
+  selectProvider('cloud')
+  expect(select().value).toBe('whisper-1')
+  fireEvent.change(select(), { target: { value: 'gpt-4o-transcribe' } })
+  await waitFor(() => { expect(configure).toHaveBeenCalledWith({ model: 'gpt-4o-transcribe' }) })
+  selectProvider('cloud', 'gpt-4o-transcribe')
+  expect(select().value).toBe('gpt-4o-transcribe')
+  // A recognizer that lists choices without naming a default has no current value to show.
+  selectProvider('unnamed')
+  expect(screen.queryByLabelText(zh.model)).toBeNull()
+})
 it.each(['cancelled', 'standby', 'cancelling'] as const)('displays Host state %s', (phase) => {
   fixture(phase === 'cancelling' ? { phase, startedAt: Date.now() } : { phase })
   expect(screen.getByText(zh[`preparation.${phase}`])).toBeTruthy()

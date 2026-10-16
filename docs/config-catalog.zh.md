@@ -1160,6 +1160,24 @@ export interface Config {
 
 来源： [`packages/experimental/tool-agent-team/src/index.ts:17`](../packages/experimental/tool-agent-team/src/index.ts)
 
+<a id="deepseek-aidsh-experimental-tool-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-experimental-tool-meeting-minutes`
+
+需要： `tools` · `fs` · `speechToText`
+
+```ts config-catalog
+/** Meeting-minutes tool configuration. */
+export interface Config {
+  /** Largest recording this tool reads into memory, in bytes. */
+  maxAudioBytes: number
+  /** Characters of the transcript carried into the model-visible result. */
+  maxPreviewCharacters: number
+}
+```
+
+来源： [`packages/experimental/tool-meeting-minutes/src/index.ts:33`](../packages/experimental/tool-meeting-minutes/src/index.ts)
+
 <a id="deepseek-aidsh-file-reference-local"></a>
 
 ## `@deepseek-ai/dsh-file-reference-local`
@@ -4339,6 +4357,7 @@ export interface Config {
 - `@deepseek-ai/dsh-deque`（[`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-agent-team-profile`（[`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-browser-use-runtime`（[`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts)）
+- `@deepseek-ai/dsh-experimental-meeting-minutes-bundle`（[`packages/experimental/meeting-minutes-bundle/src/index.ts`](../packages/experimental/meeting-minutes-bundle/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-voice-input-bundle`（[`packages/experimental/voice-input-bundle/src/index.ts`](../packages/experimental/voice-input-bundle/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-webworker-packer`（[`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-webworker-runtime`（[`packages/experimental/webworker-runtime/src/index.ts`](../packages/experimental/webworker-runtime/src/index.ts)）

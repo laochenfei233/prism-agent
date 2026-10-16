@@ -137,6 +137,10 @@ export function VoicePreparation({ useSpeechReadiness, ...props }: InjectFace<Vo
     finally { setSaving(false) }
   }
   const selected = catalog?.providers.find(provider => provider.id === catalog.selection.providerId)
+  // A recognizer that offers no choice runs the model its deployment configured,
+  // so the picker appears only where there is something to pick and a current value.
+  const models = selected?.models ?? []
+  const currentModel = catalog?.selection.model ?? selected?.model
   const languageNames: Readonly<Record<string, string>> = {
     auto: props.t('auto'), zh: props.t('zh'), en: props.t('en'), yue: props.t('yue'), ja: props.t('ja'), ko: props.t('ko'),
   }
@@ -146,6 +150,11 @@ export function VoicePreparation({ useSpeechReadiness, ...props }: InjectFace<Vo
         onChange={(event) => { void configure({ providerId: event.target.value as SpeechProviderId }) }}>
         {catalog.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
       </select></label>
+      {models.length > 1 && currentModel !== undefined && <label>{props.t('model')}
+        <select value={currentModel} disabled={!readiness.connected || saving}
+          onChange={(event) => { void configure({ model: event.target.value }) }}>
+          {models.map(model => <option key={model} value={model}>{model}</option>)}
+        </select></label>}
       <label>{props.t('language')}<select value={catalog.selection.language} disabled={!readiness.connected || saving}
         onChange={(event) => { void configure({ language: event.target.value }) }}>
         {selected?.languages.map(language =>

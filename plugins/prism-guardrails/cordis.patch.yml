@@ -8,11 +8,26 @@
 # Every rail is off until its key names a value, so this row is the deployment
 # policy the bundle was written for, not a set of built-in fallbacks. A key that
 # is present but unusable fails plugin load rather than silently disabling a rail.
+#
+# `writeTools` and `routingContract.readOnlyTools` name DeepSeek Harness's own
+# tool set (`packages/fs/tool-fs`, `packages/fs/tool-fs-search`,
+# `packages/shell/tool-bash`, `packages/shell/tool-pwsh`). A profile whose tools
+# differ edits these names; nothing else in the bundle assumes them.
 - insert:
     - id: prism-guardrails
       name: 'prism-guardrails'
       config:
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
-        maxStepsPerTurn: 20
+        maxStepsPerTurn: 200
         skillInvocationGuidance: true
+        writeTools:
+          - { tool: write, pathArgument: file_path, contentArgument: content }
+          - { tool: edit, pathArgument: file_path, contentArgument: new_string }
+        maxWrittenFilesPerTurn: 8
+        requirePonytailUpgradePaths: true
+        dependencyManifests: [package.json]
+        routingContract:
+          readOnlyTools: [read, read_image, glob, grep]
+        verificationGate:
+          verifyTools: [bash, pwsh]

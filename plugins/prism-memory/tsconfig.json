@@ -1,0 +1,46 @@
+{
+  // The bundle is out of tree, so it borrows the checkout's packages instead of
+  // declaring workspace dependencies. These `paths` entries replace the base map
+  // (an extending config does not merge `paths`) and point at the checkout's
+  // BUILT declarations, which is how the repository's own packages consume each
+  // other through project references. Everything those declarations import
+  // resolves through the checkout's node_modules. Run `pnpm run build` in the
+  // checkout first.
+  //
+  // Unlike prism-guardrails this plugin has real runtime imports (cordis,
+  // schemastery, zod, and the harness seams), so the built artifact keeps those
+  // as external imports resolved from the profile.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "paths": {
+      // The bundle is out of the pnpm workspace, so its own dependency tree is
+      // never materialized in this directory. `zod` is resolved through the
+      // checkout package that declares it; the profile resolves the real one at
+      // runtime, and vitest.config.ts aliases the same directory.
+      "zod": ["../../packages/storage/storage-domain/node_modules/zod"],
+      "vitest": ["../../node_modules/vitest"],
+      "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-agent": ["../../packages/core/agent/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-agent-loop": ["../../packages/core/agent-loop/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-agent-loop-testkit": ["../../packages/test-support/agent-loop-testkit/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-commands": ["../../packages/interaction/commands/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-commands/brand": ["../../packages/interaction/commands/lib/types/brand.d.ts"],
+      "@deepseek-ai/dsh-llm": ["../../packages/llm/llm/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-projection": ["../../packages/session/session-projection/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-storage": ["../../packages/storage/storage/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-storage-domain": ["../../packages/storage/storage-domain/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-storage-sqlite": ["../../packages/storage/storage-sqlite/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-system-prompt": ["../../packages/core/system-prompt/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

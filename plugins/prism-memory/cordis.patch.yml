@@ -1,0 +1,100 @@
+# Prism memory bundle patch. Three rows: the durable service (domain, prompt
+# protocol, cache-safe tail recall), the model-facing tool registrant, and the
+# operator command registrant.
+#
+# Retrieval, injection, hygiene, governance, distillation, consolidation, and
+# import bounds are stated here rather than defaulted in code so a deployment can
+# tighten them from a later patch layer. The defaults below are the shipped
+# values.
+
+- insert:
+    - id: prism-memory
+      name: '@prism/prism-memory'
+      config:
+        # Injection is the only per-turn cost. Off means the tools still work.
+        injectEnabled: true
+        maxInjectedRecords: 3
+        maxInjectedChars: 900
+        # Matched BM25 weight divided by the square root of the query's own
+        # weight. Raise it to inject less and more surely.
+        minInjectScore: 0.6
+        # A resident index block costs tokens on every turn; off by default.
+        residentIndex: false
+        maxIndexChars: 600
+        searchLimit: 6
+        maxTextChars: 2000
+        maxTags: 8
+        maxRecords: 5000
+        # true routes every new memory through status `pending`, which never
+        # injects and is settled only by `/memory approve` or `/memory reject`.
+        requireApproval: false
+        pendingBelowConfidence: 0.5
+        # Write-time hygiene. A paraphrase at or above dedupeJaccard is reported
+        # back to the writer; one at or above dedupeReplaceJaccard is not stored
+        # twice at all. `/memory maintain` merges at the reporting floor.
+        dedupeJaccard: 0.85
+        dedupeReplaceJaccard: 0.97
+        # Derive recall tags for a write that supplied none.
+        autoTag: true
+        # Expiry applied to writes that request no time-to-live; 0 means never.
+        defaultTtlDays: 0
+        # The Markdown mirror target. `/memory export <dir>` overrides it.
+        exportDir: !!js dshHomePath('prism-memory')
+
+        # Layers recalled on a session's first turn without a keyword match, in
+        # injection order. A record on one of these layers is stated before it is
+        # mentioned, which is what makes a stated preference or a hard rule stick.
+        # Set to [] to turn the always-on path off entirely.
+        identityLayers: [soul, user, rule]
+        maxIdentityRecords: 4
+
+        # BM25. k1 is term-frequency saturation; b is document-length
+        # normalization. The classic 1.2/0.75 pair is the shipped default.
+        bm25K1: 1.2
+        bm25B: 0.75
+        # Recall on a turn's later steps too, when that step admitted new user
+        # text. Off by default: a step usually admits tool results, not requests.
+        injectEveryStep: false
+
+        # The orientation line carries the local date, weekday, and a greeting.
+        # Off by default and deliberately so: it is the one contribution that says
+        # something on a turn with no memory behind it, so turning it on is a
+        # deployment's decision rather than a side effect of installing this.
+        orientationEnabled: false
+        # Records whose recorded due date has arrived are surfaced as reminders.
+        reminderEnabled: true
+        reminderWindowDays: 7
+        maxReminders: 3
+
+        # Read each turn's own text for durable claims, with no extra model call.
+        # `pending` is the shipped status: an inference about what a person meant
+        # is offered for review rather than injected on the strength of a regex.
+        autoDistill: true
+        autoDistillStatus: pending
+        autoDistillConfidence: 0.4
+        autoDistillLimit: 3
+
+        # The consolidation pass. Its window boundary is the last journal entry,
+        # so it survives a restart without a private counter.
+        dreamEnabled: true
+        dreamEveryWrites: 25
+        dreamWindowRecords: 200
+        dreamConflictFloor: 0.5
+        dreamClusterFloor: 3
+        dreamMaxTopics: 3
+        dailyReflection: true
+
+        # External layouts `/memory import` may read. Empty by default: another
+        # tool's memory directories are not enumerated behind the user's back.
+        importSources: []
+        importStatus: pending
+        importConfidence: 0.6
+
+    - id: tool-prism-memory
+      name: '@prism/prism-memory/tools'
+
+    # Governance a model must not perform on its own: approving, rejecting,
+    # restoring, expiring, consolidating, importing, and exporting. A human
+    # command costs no tool schema.
+    - id: command-prism-memory
+      name: '@prism/prism-memory/commands'

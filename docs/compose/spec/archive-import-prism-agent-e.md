@@ -3,83 +3,85 @@ feature: archive-import-prism-agent-e
 status: delivered
 updated: 2026-09-24
 branch: master
-commits: 79966036 (orphan baseline)
+commits: the orphan baseline commit
 ---
 
 # Archive Prism-Agent and Import DeepSeek Harness as prism-agent-e
 
+English | [中文](archive-import-prism-agent-e.zh.md)
+
 ## Report
 
-**What was built** — Prism-Agent 旧代码整体退出主线：工作区 WIP 先提交（4 commits），随后提取图标与设计内容到 `design-assets/`（26 文件），把含 `.git` 的完整工作区打包为 `archives/prism-agent-final-20260924-153522.zip`（38.3 MB），移除两个遗留 worktree，云端 Gitea 与 GitHub 仓库双端改名为 `prism-agent-e` 并同步本地 remote，最后以 orphan 历史把仓库重置为 deepseek-harness 源码基线（`@deepseek-ai/dsh-root`）+ `design-assets/`，force push 覆盖双端 master。
+**What was built** — The Prism-Agent codebase left the mainline entirely: the workspace WIP was committed first (4 commits), the icons and design content were then extracted into `design-assets/` (26 files), the complete workspace including `.git` was packaged as `archives/prism-agent-final-20260924-153522.zip` (38.3 MB), the two leftover worktrees were removed, the cloud Gitea and GitHub repositories were both renamed to `prism-agent-e` with the local remotes synchronized, and finally the repository was reset onto an orphan history holding the deepseek-harness source baseline (`@deepseek-ai/dsh-root`) plus `design-assets/`, with a force push overwriting `master` on both ends.
 
-**Verification** — T1 后 `git status` 干净（4 commits: 34dc7fd/4fc4613/6c38cc0/aad8908 + 设计资源 713203b）。T2 `design-assets/` 26 文件，8 个 agent-logo SVG 逐个 XML 解析通过。T3 zip 38.3 MB，`tar -tf` 列出 `prism-agent/.git/HEAD`、`design-assets/README.md`、`prism-agent/package.json`、`prism-agent/src/main/`，7459 条目（排除 node_modules/dist/out）。T4 `git worktree list` 仅主 checkout。T5 Gitea `PATCH /api/v1/repos/.../Prism-Agent` → `laochenfei233/prism-agent-e`，GitHub `PATCH /repos/laochenfei233/prism-agent` → `laochenfei233/prism-agent-e`，`git remote -v` 两端 URL 均含 `prism-agent-e`。T6 orphan commit 79966036，根目录含 DSH 标志文件且无旧 `src/main`。T7 双端 force push 后 `git ls-remote` 均返回 `79966036f5cba125063e1e1d45677a646863b315`，与本地 `rev-parse master` 一致。
+**Verification** — After T1, `git status` is clean (four commits plus the design-assets commit). T2: `design-assets/` holds 26 files, and all 8 agent-logo SVGs parse as XML one by one. T3: the zip is 38.3 MB, and `tar -tf` lists `prism-agent/.git/HEAD`, `design-assets/README.md`, `prism-agent/package.json`, and `prism-agent/src/main/`, 7459 entries (excluding node_modules/dist/out). T4: `git worktree list` shows only the main checkout. T5: Gitea `PATCH /api/v1/repos/.../Prism-Agent` → `laochenfei233/prism-agent-e`, GitHub `PATCH /repos/laochenfei233/prism-agent` → `laochenfei233/prism-agent-e`, and both remote URLs in `git remote -v` contain `prism-agent-e`. T6: the orphan commit, whose root holds the DSH marker files and no old `src/main`. T7: after the force push to both ends, `git ls-remote` returns the same revision on both, matching the local `rev-parse master`.
 
 **Journey log**
 
-- 全量 zip 首次用 `tar -a` 直打包仓库，因 `node_modules` 2.1 GB + `dist` 1.45 GB 超过 5 分钟超时；改为 robocopy 暂存（`/XD node_modules dist out .vite coverage .pnpm-store .worktrees`，`/XF *.tsbuildinfo`）后再打包，降到 38.3 MB。
-- 清空工作区时 PowerShell `Remove-Item -Recurse` 同样被大目录拖到超时；改用 `cmd /c "rd /s /q"` 逐目录删除，剩余散落文件再用 `Remove-Item` 收尾，最终仅剩 `.git`。
-- `gh` CLI 的独立 token 已失效（`gh auth status` 报 invalid），但 `~/.git-credentials` 中的 token 有效（scopes `gist,repo,workflow`）——双端改名改为直调 REST API，绕过 `gh`。
-- Gitea Basic auth 需要先对 `.git-credentials` 中的密码做 URL 解码（`%3a` → `:`），否则 401；GitHub `PATCH` 需带 `Accept: application/vnd.github+json` 与 `User-Agent`。
-- 定稿 spec 一度只存在于 orphan 前的旧提交中；用 `git show 713203b:docs/compose/spec/…` 取回后写入新树再提交，避免交付文档只留在归档 zip 里。
+- The first full zip packed the repository directly with `tar -a` and ran past the 5-minute timeout, because `node_modules` at 2.1 GB plus `dist` at 1.45 GB dominated; packaging after a robocopy staging pass (`/XD node_modules dist out .vite coverage .pnpm-store .worktrees`, `/XF *.tsbuildinfo`) brought it down to 38.3 MB.
+- Clearing the workspace hit the same timeout: PowerShell `Remove-Item -Recurse` was dragged past it by the large directories. Deleting directory by directory with `cmd /c "rd /s /q"` and finishing the scattered leftovers with `Remove-Item` left only `.git`.
+- The `gh` CLI's own token had expired (`gh auth status` reported invalid), while the token in `~/.git-credentials` still worked (scopes `gist,repo,workflow`), so the two renames call the REST APIs directly and bypass `gh`.
+- Gitea Basic auth requires URL-decoding the password from `.git-credentials` first (`%3a` → `:`), otherwise it answers 401; the GitHub `PATCH` requires `Accept: application/vnd.github+json` and a `User-Agent`.
+- The finalized spec existed only in the pre-orphan commit for a while; a `git show` against the pre-orphan tip recovered it, and it was written into the new tree before the commit, so the delivery document does not survive only inside the archive zip.
 
 ## [S1] Problem
 
-Prism-Agent 项目要整体转型：旧代码全部归档退出主线，云端仓库统一改名为 `prism-agent-e`，并以 DeepSeek Harness（deepseek-harness）源码作为新仓库内容。同时需要把旧项目中有复用价值的应用图标、智能体 logo、设计内容提取出来，随新代码一起保留。
+The Prism-Agent project was transforming as a whole: all the old code would be archived out of the mainline, the cloud repositories would be renamed to `prism-agent-e`, and the DeepSeek Harness (deepseek-harness) source would become the content of the new repository. At the same time, the application icons, agent logos, and design content that still had reuse value in the old project had to be extracted and kept alongside the new code.
 
-转型前的阻碍：
+Obstacles before the transformation:
 
-- 工作区有 14 个已修改 + 6 个未跟踪文件（会议校验、ASR 等 WIP）未提交。
-- Gitea 仓库名是 `Prism-Agent`（`http://192.168.100.28:32396/laochenfei233/Prism-Agent`），`prism-agent-e` 不存在；GitHub 为 `laochenfei233/prism-agent`。
-- 两个遗留 worktree（wiki-redesign、wiki-refactor）占用分支，orphan 重置前必须清理。
-- 会议纪要 UI 无独立 logo 文件（全部 lucide-react 图标），可提取的是应用图标、Agent SVG logo 集、README/设计文档。
+- The workspace held 14 modified plus 6 untracked files (WIP on meeting validation, ASR, and more) that were uncommitted.
+- The Gitea repository was named `Prism-Agent` (`http://192.168.100.28:32396/laochenfei233/Prism-Agent`) and `prism-agent-e` did not exist; GitHub held `laochenfei233/prism-agent`.
+- Two leftover worktrees (wiki-redesign, wiki-refactor) held branches and had to be cleaned up before the orphan reset.
+- The meeting-minutes UI has no standalone logo files (every icon is lucide-react), so what could be extracted is the application icons, the Agent SVG logo set, and the README and design documents.
 
 ## [S2] Design
 
-**Grill 已确认决策（2026-09-24）：**
+**Decisions confirmed in the grill (2026-09-24):**
 
-| 轴 | 决策 |
+| Axis | Decision |
 |---|---|
-| 归档方式 | 导出压缩包后重置（orphan 新历史） |
-| 云端改名 | Gitea + GitHub 都改为 `prism-agent-e` |
-| 图标去向 | `design-assets/` 新目录，放进导入后的新仓库根目录（DSH 顶层无同名目录，不冲突） |
-| WIP 处置 | 先 commit 再归档 |
-| 云端旧历史 | force push 覆盖（zip 为归档载体） |
-| 新仓库内容 | 仅 deepseek-harness 代码 + `design-assets/` |
+| Archival method | Export an archive, then reset (a new orphan history) |
+| Cloud rename | Both Gitea and GitHub become `prism-agent-e` |
+| Icon destination | A new `design-assets/` directory at the root of the imported repository (DSH's top level has no directory of that name, so nothing collides) |
+| WIP handling | Commit first, then archive |
+| Old cloud history | Overwritten by the force push (the zip is the archival carrier) |
+| New repository content | Only the deepseek-harness code plus `design-assets/` |
 
-**D1 — 执行顺序**：提交 WIP → 提取 design-assets → 仓库外 zip → 移除 worktree → 双端改名 + 更新 remote → orphan 重置导入 DSH → force push → 更新记忆。每步以可核验的输出作为进入下一步的条件。
+**D1 — Execution order**: commit the WIP → extract design-assets → zip outside the repository → remove the worktrees → rename both ends and update the remotes → orphan-reset and import DSH → force push → update memory. Each step's verifiable output is the condition for starting the next one.
 
-**D2 — 归档 zip**：落在仓库目录之外（`C:\Users\chenfei\Documents\GitHub\archives\`），避免被重置波及；内容为完整工作区含 `.git`，排除 `node_modules`/`dist`/`out`/`.vite`/`coverage`/`.pnpm-store`/`.worktrees` 与 `*.tsbuildinfo`。
+**D2 — Archival zip**: it lands outside the repository directory (`C:\Users\chenfei\Documents\GitHub\archives\`) so the reset cannot reach it; its content is the complete workspace including `.git`, excluding `node_modules`/`dist`/`out`/`.vite`/`coverage`/`.pnpm-store`/`.worktrees` and `*.tsbuildinfo`.
 
-**D3 — design-assets/ 提取清单**：`app-icons/`（build 的 icon/logo/avatar/tray 全套 + renderer 的 logo/avatar 副本）、`agent-logos/agent-logo-1..8.svg`（按 `AgentLogo.tsx` 的渐变 stop 与几何形状导出为不依赖 React 的静态 SVG）、`readme-design/`（`assets/readme/hero.svg`、`features.svg`）、`design-docs/`（`appleDesign.ts`、design-audit、design-conformity-audit-and-mimo-fix、meeting-ui-apple-design-review），附 `README.md` 来源清单。会议纪要无可提取的 logo 文件——界面图标均为 lucide-react，相关视觉规范归入 `design-docs/`。
+**D3 — `design-assets/` extraction list**: `app-icons/` (build's full icon/logo/avatar/tray set plus the renderer's logo/avatar copies), `agent-logos/agent-logo-1..8.svg` (exported from `AgentLogo.tsx`'s gradient stops and geometry as static SVGs that do not depend on React), `readme-design/` (`assets/readme/hero.svg`, `features.svg`), and `design-docs/` (`appleDesign.ts`, design-audit, design-conformity-audit-and-mimo-fix, meeting-ui-apple-design-review), with a `README.md` listing the sources. The meeting minutes had no logo files to extract — their interface icons are all lucide-react — and their visual specifications went into `design-docs/`.
 
-**D4 — 云端改名**：Gitea 走 Basic auth（密码需 URL 解码）`PATCH /api/v1/repos/laochenfei233/Prism-Agent`；GitHub 走 `.git-credentials` 中的 token `PATCH /repos/laochenfei233/prism-agent`；两者成功后同步 `git remote set-url`。`gh` CLI 的独立 token 已失效，改名不走 `gh`。旧云端历史在 force push 后从默认分支消失，唯一完整备份是 D2 的 zip。
+**D4 — Cloud rename**: Gitea goes through Basic auth (the password needs URL-decoding) against `PATCH /api/v1/repos/laochenfei233/Prism-Agent`; GitHub goes through the token in `.git-credentials` against `PATCH /repos/laochenfei233/prism-agent`; once both succeed, `git remote set-url` follows. The `gh` CLI's own token had expired, so the rename does not go through `gh`. The old cloud history disappears from the default branch after the force push, and the only complete backup is the D2 zip.
 
-**D5 — orphan 重置与 DSH 导入**：`git checkout --orphan` → 清空工作区（保留 `.git`）→ 从 `C:\Users\chenfei\Documents\GitHub\deepseek-harness` 拷贝文件（不带其 `.git`，排除 `node_modules`、`.pnpm-store`、`.worktrees`、`.tmp-*`、`.standalone`、`.dsh-build`、`*.tsbuildinfo`、`.mimocode`）→ 拷回 `design-assets/` → 提交基线 → 分支改名为 `master`。旧本地 feat/* 分支保留，作为旧历史的本地补充备份。
+**D5 — Orphan reset and DSH import**: `git checkout --orphan` → clear the workspace (keeping `.git`) → copy the files from `C:\Users\chenfei\Documents\GitHub\deepseek-harness` (without its `.git`, excluding `node_modules`, `.pnpm-store`, `.worktrees`, `.tmp-*`, `.standalone`, `.dsh-build`, `*.tsbuildinfo`, `.mimocode`) → copy `design-assets/` back → commit the baseline → rename the branch to `master`. The old local feat/* branches stay as a local supplementary backup of the old history.
 
-**D6 — gitea 地址结论（用户点名确认）**：转型前 `git ls-remote gitea` 与 API Basic auth 均成功，仓库 `laochenfei233/Prism-Agent`（private）；改名后地址为 `http://192.168.100.28:32396/laochenfei233/prism-agent-e.git`。另有历史凭据指向旧 IP `192.168.3.50:32396`，与当前 remote 无关，未改动。
+**D6 — Gitea address conclusion (confirmed by the user by name)**: before the transformation both `git ls-remote gitea` and the API Basic auth succeeded, and the repository was `laochenfei233/Prism-Agent` (private); after the rename the address is `http://192.168.100.28:32396/laochenfei233/prism-agent-e.git`. Separate historical credentials point at the old IP `192.168.3.50:32396`; they are unrelated to the current remote and were left alone.
 
 ## [S3] Scope
 
-- In scope: 提交 master WIP；提取图标/设计到 `design-assets/` 并写来源清单；仓库外全量 zip 归档（含 `.git`）；移除 2 个遗留 worktree；Gitea + GitHub 改名 `prism-agent-e` 并更新本地 remote；orphan 重置 master 并导入 deepseek-harness 源码 + `design-assets/`；force push 两端 master；更新项目记忆。
-- Out of scope: 修改 deepseek-harness 源码内容或合并 Prism-Agent 功能；安装 DSH 依赖或跑 DSH 构建；删除旧本地分支/标签；会议 lucide 图标的逐个导出。
+- In scope: commit the master WIP; extract icons and design into `design-assets/` with a source list; archive the full zip outside the repository (including `.git`); remove the 2 leftover worktrees; rename Gitea and GitHub to `prism-agent-e` and update the local remotes; orphan-reset `master` and import the deepseek-harness source plus `design-assets/`; force push `master` to both ends; update the project memory.
+- Out of scope: changing the deepseek-harness source content or merging Prism-Agent features; installing DSH dependencies or running a DSH build; deleting the old local branches or tags; exporting the meeting lucide icons one by one.
 
 ## Tasks
 
-- [x] T1: 提交 master 全部 WIP（34dc7fd, 4fc4613, 6c38cc0, aad8908）
-- [x] T2: 创建 `design-assets/` 并完成 D3 清单提取 + README.md（713203b）
-- [x] T3: 仓库外生成全量 zip 归档并抽检（38.3 MB，含 `.git` 与 `design-assets/`）
-- [x] T4: 移除 wiki-redesign / wiki-refactor worktree（分支保留）
-- [x] T5: Gitea + GitHub API 改名 prism-agent-e，更新 remote URL
-- [x] T6: orphan 重置 master，导入 DSH + design-assets，基线 commit 79966036
-- [x] T7: force push gitea/github master，双端 ls-remote 验证
-- [x] T8: 更新 MEMORY.md 项目状态 + spec Finalize
+- [x] T1: commit all master WIP (four commits)
+- [x] T2: create `design-assets/`, complete the D3 extraction list, and write its README.md (one commit)
+- [x] T3: produce the full zip archive outside the repository and spot-check it (38.3 MB, including `.git` and `design-assets/`)
+- [x] T4: remove the wiki-redesign and wiki-refactor worktrees (branches kept)
+- [x] T5: rename to prism-agent-e through the Gitea and GitHub APIs, update the remote URLs
+- [x] T6: orphan-reset master, import DSH plus design-assets, the baseline commit
+- [x] T7: force push gitea/github master and verify both ends with ls-remote
+- [x] T8: update the MEMORY.md project status and finalize the spec
 
 ## [S4] Acceptance
 
-- [x] A1: T1 后 `git status` 干净；zip 存在且 `tar -tf` 列出 `.git/HEAD` 与 `design-assets/`
-- [x] A2: `design-assets/` 26 文件（8 个 agent-logo SVG 全部 XML 解析通过、app-icons 11、readme-design 2、design-docs 4、README.md）
-- [x] A3: `git worktree list` 仅剩主 checkout
-- [x] A4: 双端 API 返回 `laochenfei233/prism-agent-e`；`git remote -v` 两端 URL 均含 `prism-agent-e`
-- [x] A5: 本地 master 根目录含 DSH 标志文件（`package.json` name = `@deepseek-ai/dsh-root`、`AGENTS.md`、`pnpm-workspace.yaml`）+ `design-assets/`，旧 `src/main` 已不存在
-- [x] A6: `git ls-remote gitea master` 与 `git ls-remote github master` 均返回 `79966036f5cba125063e1e1d45677a646863b315`，与本地 master 一致
-- [x] A7: MEMORY.md 已记录新 remote URL、归档 zip 路径、deepseek-harness 基线状态
+- [x] A1: `git status` is clean after T1; the zip exists and `tar -tf` lists `.git/HEAD` and `design-assets/`
+- [x] A2: `design-assets/` holds 26 files (8 agent-logo SVGs that all parse as XML, app-icons 11, readme-design 2, design-docs 4, README.md)
+- [x] A3: `git worktree list` leaves only the main checkout
+- [x] A4: both APIs return `laochenfei233/prism-agent-e`; both URLs in `git remote -v` contain `prism-agent-e`
+- [x] A5: the local master root holds the DSH marker files (`package.json` name = `@deepseek-ai/dsh-root`, `AGENTS.md`, `pnpm-workspace.yaml`) plus `design-assets/`, and the old `src/main` no longer exists
+- [x] A6: `git ls-remote gitea master` and `git ls-remote github master` both return the same revision as the local master
+- [x] A7: MEMORY.md records the new remote URLs, the archival zip path, and the deepseek-harness baseline state

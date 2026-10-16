@@ -6,21 +6,21 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 `@deepseek-ai/dsh-api-cron-controller` 拥有 Host 的 `ctx.cronController` 服务与生成的 Client `ctx.remote.cron` 命名空间。它的 Remote 方法创建、编辑、删除已存任务并按需运行其中一个，`follow()` 流先给出完整基线，再按顺序给出增量。当 Client 需要修改或跟踪定时任务时，通过 API Gateway 使用它。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
 Host 控制器在调用时读取 [`ctx.cron`](../../cron/cron/README.zh.md)，并把每个已声明的拒绝映射为稳定的 Remote 码，因此界面只需根据 `cron/invalid-expression`、`cron/invalid-time-zone`、`cron/not-found`、`cron/not-leader` 或 `cron/run-in-progress` 分支，而不必匹配消息文本。不持有调度器租约的进程对每个动词都回答 `cron/not-leader`，它的 follow 世代也以同一个拒绝开头，而不是一个空列表：面板上的空列表会被读作"该部署没有任务"，而这是跟随者无法支持的唯一结论。
 
@@ -41,7 +41,7 @@ Client 入口提供 `ClientCronModel`、`CronJobs` 与 `createCronStateStream()`
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
 无。本包是定时任务的浏览器与 Host 控制面，不注册任何提示、工具或会话事件。模型通过 [`dsh-tool-cron`](../../cron/tool-cron/README.zh.md) 触达同一能力；任务自身的运行才会到达模型请求，而那属于执行该运行的会话。
 
@@ -49,16 +49,15 @@ Client 入口提供 `ClientCronModel`、`CronJobs` 与 `createCronStateStream()`
 
 无直接影响；调度控制不改动模型请求。
 
-## Known Limitations and Deferred Work
-
 <a id="known-limitations-and-deferred-work"></a>
+## 已知限制与延期工作
 
 - `follow()` 在重连后替换整个投影，没有持久游标或增量补齐协议。
 - Client 模型在其自身生命周期内保留进程内的删除标记，因此延迟帧只能在该模型存活期间无法复活已删除任务。
 - 以 `cron/not-leader` 开头的世代会保持打开且不再有后续帧；面板只能从之后的世代得知领导权已变化。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
 <summary>供维护者的工作上下文 — 点击展开</summary>

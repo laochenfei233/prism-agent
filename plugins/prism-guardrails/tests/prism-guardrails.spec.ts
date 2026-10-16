@@ -104,6 +104,12 @@ describe('configuration validation', () => {
       repeatAskAfter: undefined,
       maxStepsPerTurn: undefined,
       skillInvocationGuidance: true,
+      writeTools: undefined,
+      maxWrittenFilesPerTurn: undefined,
+      requirePonytailUpgradePaths: false,
+      dependencyManifests: undefined,
+      routingContract: undefined,
+      verificationGate: undefined,
     })
   })
 
@@ -113,15 +119,31 @@ describe('configuration validation', () => {
       repeatAskAfter: 5,
       maxStepsPerTurn: 20,
       skillInvocationGuidance: false,
+      writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }],
+      maxWrittenFilesPerTurn: 4,
+      requirePonytailUpgradePaths: true,
+      dependencyManifests: ['package.json'],
+      routingContract: { readOnlyTools: ['read'] },
+      verificationGate: { verifyTools: ['bash'] },
     })
     expect([...(resolved.planDeniedTools ?? [])]).toEqual(['write', 'edit'])
     expect(resolved.repeatAskAfter).toBe(5)
     expect(resolved.maxStepsPerTurn).toBe(20)
     expect(resolved.skillInvocationGuidance).toBe(false)
+    expect(resolved.writeTools?.get('write')).toEqual({ pathArgument: 'path', contentArgument: 'content' })
+    expect(resolved.maxWrittenFilesPerTurn).toBe(4)
+    expect(resolved.requirePonytailUpgradePaths).toBe(true)
+    expect([...(resolved.dependencyManifests ?? [])]).toEqual(['package.json'])
+    expect([...(resolved.routingContract ?? [])]).toEqual(['read'])
+    expect([...(resolved.verificationGate ?? [])]).toEqual(['bash'])
   })
 
   it('treats repeatAskAfter 0 as the off switch rather than a threshold', () => {
     expect(resolveConfig({ repeatAskAfter: 0 }).repeatAskAfter).toBeUndefined()
+  })
+
+  it('treats maxWrittenFilesPerTurn 0 as the off switch rather than a budget', () => {
+    expect(resolveConfig({ maxWrittenFilesPerTurn: 0 }).maxWrittenFilesPerTurn).toBeUndefined()
   })
 
   it.each([
@@ -137,8 +159,41 @@ describe('configuration validation', () => {
     ['a fractional step budget', { maxStepsPerTurn: 2.5 }, 'integer >= 1'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
+    ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
+    ['an empty write list', { writeTools: [] }, 'must not be empty'],
+    ['a write entry naming no tool', { writeTools: [{ pathArgument: 'path' }] }, 'must name a tool'],
+    ['a write entry naming no path argument', { writeTools: [{ tool: 'write' }] }, 'must name its pathArgument'],
+    ['a blank content argument', { writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: '' }] }, 'non-empty contentArgument'],
+    ['a duplicated write tool', { writeTools: [{ tool: 'write', pathArgument: 'path' }, { tool: 'write', pathArgument: 'p' }] }, 'names "write" twice'],
+    ['an unknown write entry key', { writeTools: [{ tool: 'write', pathArgument: 'path', content: 'body' }] }, 'unknown writeTools key'],
+    ['a negative write budget', { maxWrittenFilesPerTurn: -1 }, 'integer >= 0'],
+    ['a non-boolean marker switch', { requirePonytailUpgradePaths: 'yes' }, 'must be a boolean'],
+    ['an empty manifest list', { dependencyManifests: [] }, 'must not be empty'],
+    ['a duplicated manifest', { dependencyManifests: ['package.json', 'package.json'] }, 'names "package.json" twice'],
+    ['a non-object routing contract', { routingContract: ['read'] }, 'must be an object'],
+    ['an empty read-only list', { routingContract: { readOnlyTools: [] } }, 'non-empty array of tool names'],
+    ['an unknown routing-contract key', { routingContract: { readOnly: ['read'] } }, 'unknown routingContract key'],
+    ['a non-object verification gate', { verificationGate: ['bash'] }, 'must be an object'],
+    ['an empty verify list', { verificationGate: { verifyTools: [] } }, 'non-empty array of tool names'],
+    ['an unknown verification-gate key', { verificationGate: { verify: ['bash'] } }, 'unknown verificationGate key'],
   ])('rejects %s', (_label, config, message) => {
     expect(() => resolveConfig(config as Config)).toThrow(message)
+  })
+
+  it.each([
+    ['a write budget', { maxWrittenFilesPerTurn: 3 }],
+    ['the marker rail', { requirePonytailUpgradePaths: true }],
+    ['dependency approval', { dependencyManifests: ['package.json'] }],
+    ['the verification gate', { verificationGate: { verifyTools: ['bash'] } }],
+  ])('refuses to load %s without the writing tools it reads', (_label, config) => {
+    expect(() => resolveConfig(config as Config)).toThrow('name writeTools as well')
+  })
+
+  it('refuses the marker rail when no write tool names its text argument', () => {
+    expect(() => resolveConfig({
+      writeTools: [{ tool: 'write', pathArgument: 'path' }],
+      requirePonytailUpgradePaths: true,
+    })).toThrow('must name its contentArgument')
   })
 
   it('fails plugin load rather than silently disabling a rail', async () => {
@@ -596,5 +651,322 @@ describe('skill-invocation guidance', () => {
     const result = await callSkill(ctx, 'skill-off', { name: 'user-only' })
     expect(runs).toEqual(['skill'])
     expect(textOf(result)).not.toContain('user-invoked only')
+  })
+})
+
+/** The writing-tool surface every rail that reads written content is configured with. */
+const WRITE_TOOLS = [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }] as const
+
+/** One call id per invocation, so a spec's calls are distinguishable in the log. */
+let nextCallId = 0
+
+/** Call a tool directly with one argument record, bypassing the loop. */
+function toolCall(ctx: Context, agent: Agent, name: string, args: object): Promise<ToolExecutionResult> {
+  nextCallId += 1
+  return ctx.tools.execute({
+    signal: testToolSignal, callId: ToolCallId(`call-${String(nextCallId)}`), name, arguments: args, agent,
+  })
+}
+
+/** Make a fresh agent on a harness whose rails are already installed. */
+async function newAgent(ctx: Context, session: string): Promise<Agent> {
+  return await ctx.agentLoop.create(SessionId(session), { provider: 'mock', model: 'mock' })
+}
+
+describe('routing contract', () => {
+  const CONFIG = { routingContract: { readOnlyTools: ['read'] } } as const
+
+  it('refuses the first non-readonly call until a route is on the record', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    ctx.tools.register(fixture('skill', runs))
+    const agent = await newAgent(ctx, 'routing-first')
+
+    const refused = await toolCall(ctx, agent, 'write', { path: 'a.ts' })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('the routing contract is not satisfied')
+    expect(textOf(refused)).toContain('Route: fast-path')
+    expect(runs).toEqual([])
+
+    // Loading a skill is the other accepted decision, and it is itself an
+    // allowed call, so the model answers the refusal without a dead end.
+    expect((await toolCall(ctx, agent, 'skill', { name: 'brainstorming' })).isError).toBe(false)
+    expect((await toolCall(ctx, agent, 'write', { path: 'a.ts' })).isError).toBe(false)
+    expect(runs).toEqual(['skill', 'write'])
+  })
+
+  it('leaves a read-only call alone', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await newAgent(ctx, 'routing-readonly')
+
+    expect((await toolCall(ctx, agent, 'read', { path: 'a.ts' })).isError).toBe(false)
+    expect(runs).toEqual(['read'])
+  })
+
+  it('accepts the declaration a committed assistant message carries', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'routing-declared')
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'write', { path: 'a.ts' }, 'Route: fast-path — a single fixture write.'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual(['write'])
+  })
+
+  it('records one decision per session rather than per call', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    ctx.tools.register(fixture('skill', runs))
+    const agent = await newAgent(ctx, 'routing-session')
+    const other = await newAgent(ctx, 'routing-other-session')
+
+    await toolCall(ctx, agent, 'skill', { name: 'brainstorming' })
+    expect((await toolCall(ctx, agent, 'write', { path: 'a.ts' })).isError).toBe(false)
+    // Another session holds its own record: the decision is not global state.
+    expect((await toolCall(ctx, other, 'write', { path: 'b.ts' })).isError).toBe(true)
+    expect(runs).toEqual(['skill', 'write'])
+  })
+
+  it('leaves every call alone when the rail is off', async () => {
+    const ctx = await harness({})
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'routing-off')
+
+    expect((await toolCall(ctx, agent, 'write', { path: 'a.ts' })).isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+})
+
+describe('write budget', () => {
+  const CONFIG = { writeTools: WRITE_TOOLS, maxWrittenFilesPerTurn: 2 } as const
+
+  it('sends the path beyond the budget to approval, which denies with no channel', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'budget-over')
+
+    expect((await toolCall(ctx, agent, 'write', { path: 'a.ts' })).isError).toBe(false)
+    expect((await toolCall(ctx, agent, 'write', { path: 'b.ts' })).isError).toBe(false)
+    const refused = await toolCall(ctx, agent, 'write', { path: 'c.ts' })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('beyond the 2 the deployment allows')
+    expect(runs).toEqual(['write', 'write'])
+  })
+
+  it('counts a path once, so re-editing a written file stays free', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'budget-repeat')
+
+    await toolCall(ctx, agent, 'write', { path: 'a.ts' })
+    await toolCall(ctx, agent, 'write', { path: 'a.ts' })
+    await toolCall(ctx, agent, 'write', { path: 'a.ts' })
+
+    expect(runs).toEqual(['write', 'write', 'write'])
+  })
+
+  it('spends no budget on a call that never wrote', async () => {
+    // Budget 1 with dependency approval on: the manifest write is refused by
+    // the other rail, and the source write that follows must still be the
+    // turn's first written path. Counting the refusal would refuse it too.
+    const ctx = await harness({ writeTools: WRITE_TOOLS, maxWrittenFilesPerTurn: 1, dependencyManifests: ['package.json'] })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'budget-refused')
+
+    expect((await toolCall(ctx, agent, 'write', { path: 'package.json', content: '{}' })).isError).toBe(true)
+    expect((await toolCall(ctx, agent, 'write', { path: 'src/a.ts', content: '' })).isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+
+  it('leaves writes alone when the rail is off', async () => {
+    const ctx = await harness({ writeTools: WRITE_TOOLS })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'budget-off')
+
+    for (const path of ['a.ts', 'b.ts', 'c.ts', 'd.ts']) await toolCall(ctx, agent, 'write', { path })
+    expect(runs).toHaveLength(4)
+  })
+})
+
+describe('ponytail marker discipline', () => {
+  const CONFIG = { writeTools: WRITE_TOOLS, requirePonytailUpgradePaths: true } as const
+
+  it('refuses a marker that names no upgrade path', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-bare')
+
+    const refused = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// ponytail: global lock\n',
+    })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('no upgrade path')
+    expect(textOf(refused)).toContain('global lock')
+    expect(runs).toEqual([])
+  })
+
+  it('accepts a marker naming its ceiling and upgrade path', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-complete')
+
+    const allowed = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// ponytail: global lock, per-account locks if throughput matters\n',
+    })
+    expect(allowed.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+
+  it('ignores prose that mentions the convention without a comment prefix', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-prose')
+
+    const allowed = await toolCall(ctx, agent, 'write', {
+      path: 'notes.md', content: 'Mark it `ponytail: <ceiling>, <upgrade path>` when you cut a corner.\n',
+    })
+    expect(allowed.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+
+  it('reads every marker in the written text, not only the first', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-later')
+
+    const refused = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts',
+      content: '// ponytail: global lock, per-account locks if throughput matters\nconst a = 1\n// ponytail: naive scan\n',
+    })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('naive scan')
+  })
+})
+
+describe('dependency approval', () => {
+  const CONFIG = { writeTools: WRITE_TOOLS, dependencyManifests: ['package.json'] } as const
+
+  it('sends a dependency manifest write to approval, which denies with no channel', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'dependency-manifest')
+
+    const refused = await toolCall(ctx, agent, 'write', { path: 'package.json', content: '{}' })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('changes the dependency manifest')
+    expect(runs).toEqual([])
+  })
+
+  it('matches the file name on either separator', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'dependency-subdirectory')
+
+    const refused = await toolCall(ctx, agent, 'write', { path: 'apps\\web\\package.json', content: '{}' })
+    expect(refused.isError).toBe(true)
+    expect(runs).toEqual([])
+  })
+
+  it('leaves an ordinary source write alone', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'dependency-source')
+
+    expect((await toolCall(ctx, agent, 'write', { path: 'src/a.ts', content: '' })).isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+})
+
+describe('verification gate', () => {
+  const CONFIG = { writeTools: WRITE_TOOLS, verificationGate: { verifyTools: ['bash'] } } as const
+
+  /** Boot a harness whose adapter is scripted with the given responses. */
+  async function turnHarness(
+    session: string,
+    responses: ReturnType<typeof textResponse>[],
+  ): Promise<{ ctx: Context; agent: Agent; runs: string[]; adapter: MockAdapter }> {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await newAgent(ctx, session)
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, runs, adapter }
+  }
+
+  it('sends a turn that wrote without verifying back for evidence', async () => {
+    const { ctx, agent, runs, adapter } = await turnHarness('verify-missing', [
+      toolCallResponse('c1', 'write', { path: 'a.ts', content: '' }),
+      textResponse('done'),
+      toolCallResponse('c2', 'bash', { command: 'pnpm test' }),
+      textResponse('verified'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    // The stop boundary steered, the model ran its check, and the second stop
+    // boundary was left alone.
+    expect(runs).toEqual(['write', 'bash'])
+    expect(adapter.requests).toHaveLength(4)
+  })
+
+  it('does not interrupt a turn that ran its verification', async () => {
+    const { ctx, agent, runs, adapter } = await turnHarness('verify-present', [
+      toolCallResponse('c1', 'write', { path: 'a.ts', content: '' }),
+      toolCallResponse('c2', 'bash', { command: 'pnpm test' }),
+      textResponse('done'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual(['write', 'bash'])
+    expect(adapter.requests).toHaveLength(3)
+  })
+
+  it('interrupts a turn at most once, so a model that ignores it still stops', async () => {
+    const { ctx, agent, runs, adapter } = await turnHarness('verify-ignored', [
+      toolCallResponse('c1', 'write', { path: 'a.ts', content: '' }),
+      textResponse('done'),
+      textResponse('still done'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual(['write'])
+    expect(adapter.requests).toHaveLength(3)
+  })
+
+  it('leaves a turn that wrote nothing alone', async () => {
+    const { ctx, agent, runs, adapter } = await turnHarness('verify-readonly', [
+      textResponse('nothing to do'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual([])
+    expect(adapter.requests).toHaveLength(1)
   })
 })

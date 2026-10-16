@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>prism-memory · 设计说明与验证证据</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="masthead">
+  <p class="eyebrow">DeepSeek Harness · 插件设计说明</p>
+  <h1>@prism/prism-memory</h1>
+  <p class="lede">
+    一个长期记忆插件：<strong>缓存命中率不下降</strong>的前提下提高记忆能力，让记忆<strong>跨对话可访问</strong>，
+    并且<strong>不需要模型主动记录</strong>也会生长。每一节末尾的证据都指向同一仓库里可执行的检查。
+  </p>
+  <ul class="facts">
+    <li><span>7</span>记忆分层</li>
+    <li><span>3</span>写入生产者（工具 / 回合 / 导入）</li>
+    <li><span>1</span>每回合最多追加的消息数</li>
+    <li><span>146</span>通过的规格</li>
+  </ul>
+</header>
+
+<nav class="toc" aria-label="目录">
+  <ol>
+    <li><a href="#invariant">核心不变式</a></li>
+    <li><a href="#paths">写入路径与读取路径</a></li>
+    <li><a href="#quality">记忆能力：写入时把重活做完</a></li>
+    <li><a href="#layers">七层分类与 BM25 检索</a></li>
+    <li><a href="#automatic">自动记忆：沉淀、整理、导入</a></li>
+    <li><a href="#cross">跨对话访问：两条腿</a></li>
+    <li><a href="#governance">治理面：模型工具 vs 人命令</a></li>
+    <li><a href="#evidence">验证证据</a></li>
+    <li><a href="#limits">已知边界</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="invariant">
+  <h2><span class="num">01</span>核心不变式：缓存前缀字节稳定</h2>
+  <p>
+    每回合的请求是 <code>[系统提示词][工具定义][历史]</code>。这三段是前缀缓存的目标；只要其中任何一个字节变了，
+    这一整段复用就作废。生态里最常见的记忆插件做法恰恰是「每回合改写 system prompt」或「把 top-k 直接塞进提示词」，
+    那等于把缓存优势还回去。
+  </p>
+  <p>本插件的全部动态贡献只有一件事：把召回块作为一条普通 user 消息<strong>追加到已准入消息之后</strong>。</p>
+
+  <figure>
+    <svg viewBox="0 0 680 250" role="img" aria-label="三回合的前缀与尾部追加示意">
+      <style>
+        .lbl{font:400 11px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#5A6270}
+        .lbl-b{font:500 11px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#14161A}
+        .box-prefix{fill:#EEF1EF;stroke:#0F5C4E;stroke-width:0.5}
+        .box-tail{fill:#0F5C4E;stroke:#0F5C4E;stroke-width:0.5}
+        .dash{stroke:#9AA3AE;stroke-width:0.5;stroke-dasharray:3 3}
+        .brace{fill:none;stroke:#0F5C4E;stroke-width:1}
+      </style>
+
+      <text class="lbl-b" x="40" y="34">回合 N</text>
+      <rect class="box-prefix" x="40" y="42" width="430" height="24" rx="4"/>
+      <rect class="box-tail" x="470" y="42" width="90" height="24" rx="4"/>
+      <text class="lbl" x="52" y="58">系统提示词 + 工具定义 + 已准入历史</text>
+      <text class="lbl" x="476" y="58" fill="#FFFFFF">本轮召回块</text>
+
+      <text class="lbl-b" x="40" y="106">回合 N+1</text>
+      <rect class="box-prefix" x="40" y="114" width="520" height="24" rx="4"/>
+      <rect class="box-tail" x="560" y="114" width="40" height="24" rx="4"/>
+      <line class="dash" x1="470" y1="36" x2="470" y2="146"/>
+      <text class="lbl" x="628" y="130">新增</text>
+
+      <text class="lbl-b" x="40" y="178">回合 N+2</text>
+      <rect class="box-prefix" x="40" y="186" width="560" height="24" rx="4"/>
+      <rect class="box-tail" x="600" y="186" width="20" height="24" rx="4"/>
+      <line class="dash" x1="560" y1="102" x2="560" y2="218"/>
+      <text class="lbl" x="628" y="202">新增</text>
+
+      <path class="brace" d="M30 42 L24 42 L24 210 L30 210" />
+      <text class="lbl" x="14" y="126" text-anchor="middle" transform="rotate(-90 14 126)">稳定前缀 · 缓存命中</text>
+      <text class="lbl" x="40" y="238">上一轮的召回块落在尾部；下一轮它已经成为稳定前缀的一部分，不再产生新的未命中 token。</text>
+    </svg>
+    <figcaption>同一会话连续三轮：虚线标出上一轮的边界，它随着尾部追加整体右移，前缀从不被重写。</figcaption>
+  </figure>
+
+  <h3>七条落地纪律</h3>
+  <ul class="rules">
+    <li><strong>静态 section。</strong>系统提示词里只有一段固定的记忆协议（order 2500），文本从配置读取，但不逐回合组装。</li>
+    <li><strong>无话可说就不输出。</strong>没有任何一节有内容时，决策原样返回——该回合与「没装插件」字节相同。</li>
+    <li><strong>有话说就只说一条。</strong>日期、常驻记忆、到期提醒、关键词召回全部合并在<em>同一条</em>消息里，不各发一条。</li>
+    <li><strong>同输入同字节。</strong>渲染是确定性的：全序排序、固定外框、不带生成时间戳，日期也精确到「哪一天」而不是「哪一分钟」。</li>
+    <li><strong>不重复注入。</strong>已注入的 id 由 <code>prismMemory</code> 会话投影从插件自己记录的日志折叠而来。</li>
+    <li><strong>预算硬顶。</strong>整帧受 <code>maxInjectedChars</code> 限制，外框与固定尾注也计入其中。</li>
+    <li><strong>工具面固定。</strong>5 个工具定义；治理命令挂载后新增 0 个 schema。</li>
+  </ul>
+  <p class="note">
+    其中两条是<strong>部署决定</strong>，出厂默认取的是不变式的强形式：<code>orientationEnabled</code> 默认关（问候是唯一会在「本回合无记忆」时仍开口的贡献，
+    开它应该是一次选择而不是安装副作用）；<code>identityLayers</code> 默认开，但对旧库<strong>惰性</strong>——分层轴之前写入的记录不会落在身份层上，
+    所以升级后的语料注入的字节数与升级前完全一致。
+  </p>
+</section>
+
+<section id="paths">
+  <h2><span class="num">02</span>写入路径与读取路径</h2>
+  <p>
+    记忆写一次、读很多次，而且读发生在延迟敏感路径上。因此重活全部放在<strong>写入时</strong>：去重、归一、打标、双时间标注。
+    读取保持同步且无 I/O——记录常驻在 storage domain 的内存态里。
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 680 288" role="img" aria-label="写入路径与读取路径">
+      <style>
+        .t{font:400 11px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#14161A}
+        .tm{font:400 9px ui-monospace,'SFMono-Regular',Consolas,monospace;fill:#5A6270}
+        .h{font:500 12px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#14161A}
+        .n{fill:#FFFFFF;stroke:#C9D1CE;stroke-width:0.5}
+        .nio{fill:#F5F7F6;stroke:#0F5C4E;stroke-width:0.5}
+        .edge{stroke:#9AA3AE;stroke-width:1;fill:none}
+        .bandL{fill:#F7F9F8;stroke:#E1E6E3;stroke-width:0.5}
+      </style>
+      <defs>
+        <marker id="ch" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M1 1 L8 5 L1 9" fill="none" stroke="#9AA3AE" stroke-width="1"/>
+        </marker>
+      </defs>
+
+      <rect class="bandL" x="24" y="16" width="632" height="104" rx="8"/>
+      <text class="h" x="40" y="38">写入 · 同步、可失败</text>
+
+      <rect class="nio" x="40" y="50" width="132" height="46" rx="8"/>
+      <text class="tm" x="52" y="70">memory_remember</text>
+      <text class="t" x="52" y="86">写入请求</text>
+
+      <rect class="n" x="196" y="50" width="132" height="46" rx="8"/>
+      <text class="t" x="208" y="70">近重复检测</text>
+      <text class="tm" x="208" y="86">Jaccard ≥ 阈值</text>
+
+      <rect class="n" x="352" y="50" width="118" height="46" rx="8"/>
+      <text class="t" x="364" y="70">自动打标</text>
+      <text class="tm" x="364" y="86">低频 token</text>
+
+      <rect class="n" x="494" y="50" width="144" height="46" rx="8"/>
+      <text class="t" x="506" y="70">双时间标注</text>
+      <text class="tm" x="506" y="86">valid / invalid /</text>
+      <text class="tm" x="506" y="96">expires</text>
+
+      <line class="edge" x1="172" y1="73" x2="194" y2="73" marker-end="url(#ch)"/>
+      <line class="edge" x1="328" y1="73" x2="350" y2="73" marker-end="url(#ch)"/>
+      <line class="edge" x1="470" y1="73" x2="492" y2="73" marker-end="url(#ch)"/>
+
+      <rect class="bandL" x="24" y="140" width="632" height="104" rx="8"/>
+      <text class="h" x="40" y="162">读取 · 同步、零 I/O</text>
+
+      <rect class="nio" x="40" y="174" width="132" height="46" rx="8"/>
+      <text class="tm" x="52" y="194">agent/pre-step</text>
+      <text class="t" x="52" y="210">第一步（可配后续步）</text>
+
+      <rect class="n" x="196" y="174" width="132" height="46" rx="8"/>
+      <text class="t" x="208" y="194">作用域准入</text>
+      <text class="tm" x="208" y="210">global / 项目 / 会话</text>
+
+      <rect class="n" x="352" y="174" width="118" height="46" rx="8"/>
+      <text class="t" x="364" y="194">BM25 排序</text>
+      <text class="tm" x="364" y="210">饱和 / 长度 / 近因</text>
+
+      <rect class="nio" x="494" y="174" width="144" height="46" rx="8"/>
+      <text class="t" x="506" y="194">尾部追加一条</text>
+      <text class="tm" x="506" y="210">四节合并、user 角色</text>
+
+      <line class="edge" x1="172" y1="197" x2="194" y2="197" marker-end="url(#ch)"/>
+      <line class="edge" x1="328" y1="197" x2="350" y2="197" marker-end="url(#ch)"/>
+      <line class="edge" x1="470" y1="197" x2="492" y2="197" marker-end="url(#ch)"/>
+
+      <text class="tm" x="40" y="266">被拒绝、已过期、超出作用域、以及本会话已收到过的记录，都在排序之前出局。</text>
+      <text class="tm" x="40" y="280">四节全空时监听器不返回任何消息，本回合请求与未安装插件时逐字节相同。</text>
+    </svg>
+  </figure>
+</section>
+
+<section id="quality">
+  <h2><span class="num">03</span>记忆能力：写入时把重活做完</h2>
+  <p>
+    语料是「一组主张」，不是「一堆同义改写」。三件事在写入时就处理掉，避免后期靠排序去掩盖语料重复。
+  </p>
+  <div class="cards">
+    <article>
+      <h3>写入时去重</h3>
+      <p>
+        相似度达到 <code>dedupeReplaceJaccard</code> 的写入视为同一主张，直接复用已有记录并抬高复用计数，不再入库；
+        达到 <code>dedupeJaccard</code> 的近似改写会被写进去，但把竞争记录一并回给模型，让它决定是否用
+        <code>supersedes</code> 覆盖。全量保留历史版本，默认只注入当前有效的那条。
+      </p>
+    </article>
+    <article>
+      <h3>双时间与失效而非删除</h3>
+      <p>
+        每条记录带 <code>validAt</code> / <code>invalidAt</code>。supersede、过期、合并、遗忘都走失效语义，
+        因此「1 月谁是负责人」和「现在谁是负责人」都能回答，旧答案留在库里可审计。
+      </p>
+    </article>
+    <article>
+      <h3>维护流水线</h3>
+      <p>
+        <code>/memory maintain</code> 默认<b>空跑</b>并报告计划：过期记录归档、近重复合并到「读者会保留的那条」
+        （更高置信度，其次更新）、容量满时淘汰已归档记录、以及报告已断链的 supersede 引用。
+        加 <code>apply</code> 才落盘，这样一次无人值守的清扫在改数据之前是可检查的。
+      </p>
+    </article>
+  </div>
+</section>
+
+<section id="layers">
+  <h2><span class="num">04</span>七层分类与 BM25 检索</h2>
+  <p>
+    一条主张同时在三个<strong>互不相干</strong>的轴上归档，每个轴回答一个不同的问题：<code>layer</code>（它讲的是谁的事）、
+    <code>kind</code>（它是什么类型的陈述）、<code>scope</code>（谁能看见它）。三者拆开之后，召回质量才有提升空间：
+    同一个「用户偏好」在不同作用域下的价值完全不同。
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 680 250" role="img" aria-label="记忆的三个归档轴">
+      <style>
+        .lt{font:400 11px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#14161A}
+        .lm{font:400 9px ui-monospace,'SFMono-Regular',Consolas,monospace;fill:#5A6270}
+        .lh{font:500 12px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;fill:#14161A}
+        .lb{fill:#FFFFFF;stroke:#C9D1CE;stroke-width:0.5}
+        .lon{fill:#0F5C4E;stroke:#0F5C4E;stroke-width:0.5}
+        .loff{fill:#F5F7F6;stroke:#0F5C4E;stroke-width:0.5}
+      </style>
+      <text class="lh" x="40" y="30">layer · 讲的是谁的事</text>
+      <rect class="lon" x="40" y="42" width="86" height="26" rx="6"/>
+      <rect class="lon" x="132" y="42" width="86" height="26" rx="6"/>
+      <rect class="lon" x="224" y="42" width="86" height="26" rx="6"/>
+      <rect class="loff" x="316" y="42" width="86" height="26" rx="6"/>
+      <rect class="loff" x="408" y="42" width="86" height="26" rx="6"/>
+      <rect class="loff" x="500" y="42" width="86" height="26" rx="6"/>
+      <text class="lt" x="83" y="59" text-anchor="middle" fill="#FFFFFF">soul</text>
+      <text class="lt" x="175" y="59" text-anchor="middle" fill="#FFFFFF">user</text>
+      <text class="lt" x="267" y="59" text-anchor="middle" fill="#FFFFFF">rule</text>
+      <text class="lt" x="359" y="59" text-anchor="middle">project</text>
+      <text class="lt" x="451" y="59" text-anchor="middle">fact</text>
+      <text class="lt" x="543" y="59" text-anchor="middle">lesson / topic</text>
+      <text class="lm" x="40" y="86">深色三格 = 常驻层：首轮无需关键词命中即注入；浅色四格 = 相关性层，命中才注入。</text>
+
+      <text class="lh" x="40" y="122">kind · 是什么类型的陈述</text>
+      <rect class="lb" x="40" y="134" width="120" height="26" rx="6"/>
+      <rect class="lb" x="168" y="134" width="120" height="26" rx="6"/>
+      <rect class="lb" x="296" y="134" width="120" height="26" rx="6"/>
+      <rect class="lb" x="424" y="134" width="120" height="26" rx="6"/>
+      <rect class="lb" x="552" y="134" width="88" height="26" rx="6"/>
+      <text class="lt" x="100" y="151" text-anchor="middle">fact</text>
+      <text class="lt" x="228" y="151" text-anchor="middle">decision</text>
+      <text class="lt" x="356" y="151" text-anchor="middle">pitfall</text>
+      <text class="lt" x="484" y="151" text-anchor="middle">preference</text>
+      <text class="lt" x="596" y="151" text-anchor="middle">procedure</text>
+
+      <text class="lh" x="40" y="188">scope · 谁能看见</text>
+      <rect class="lb" x="40" y="200" width="180" height="26" rx="6"/>
+      <rect class="lb" x="228" y="200" width="180" height="26" rx="6"/>
+      <rect class="lb" x="416" y="200" width="224" height="26" rx="6"/>
+      <text class="lt" x="130" y="217" text-anchor="middle">global</text>
+      <text class="lt" x="318" y="217" text-anchor="middle">project（cwd）</text>
+      <text class="lt" x="528" y="217" text-anchor="middle">conversation（session id）</text>
+    </svg>
+    <figcaption>三个轴彼此独立。分层轴之前写入的旧记录不声明 layer，按 <code>fact</code> 这个<em>相关性</em>层参与排序——所以升级不会让任何旧记录突然变成常驻项。</figcaption>
+  </figure>
+
+  <h3>检索：真 BM25，而不是「看起来像 BM25」</h3>
+  <p>
+    排序是字面 token 上的 BM25（ASCII 词 + CJK 单字与相邻二元组，不需要分词器）。三件事在起作用：词的权重随它在语料里出现得越广而下降，
+    所以记录是靠「区别于其他记录的部分」被找到的；同一条记录里的重复会<strong>饱和</strong>，不会让一条记录靠反复说同一个词排到前面；
+    更长的记录会被<strong>折价</strong>，所以一句短语在短主张里比埋在一段话中间更容易被召回。
+  </p>
+  <p>
+    分数按<strong>查询词权重之和的平方根</strong>归一（而不是直接用和）。这个选择是刻意的：用户的消息很长且大部分是顺带的话，
+    用总权重做分母会让「命中了唯一重要的那个词」的记录得分和「什么都没命中」一样低。
+    <code>minInjectScore: 0.6</code> 的语义因此与升级前可比——升级不会悄悄停止召回原本会被召回的东西。
+  </p>
+  <p class="note">
+    分层轴还带来第二个效果：命中的 <code>rule</code> 与 <code>lesson</code> 排在同样措辞的 <code>fact</code> 之前。
+    两个旋钮是 <code>bm25K1</code>（词频饱和）与 <code>bm25B</code>（长度归一）；<code>k1: 0</code> 关闭词频加权，<code>b: 0</code> 关闭长度归一。
+  </p>
+</section>
+
+<section id="automatic">
+  <h2><span class="num">05</span>自动记忆：沉淀、整理、导入</h2>
+  <p>
+    只靠模型主动调用 <code>memory_remember</code> 的记忆库，长出来的速度取决于模型有多自觉。这里补了三条写入路径，
+    但它们的共同前提是：<strong>任何自动写入都不能把未经复核的主张送进模型</strong>。沉淀与导入默认落 <code>pending</code>，
+    只由 <code>/memory approve</code> 或 <code>/memory reject</code> 定夺。
+  </p>
+
+  <div class="cards">
+    <article>
+      <h3>① 回合沉淀 · 零额外调用</h3>
+      <p>
+        <code>agent/turn-stopping</code> 读刚结束的这一回合——人的那句和助手自己的交代——抽出陈述了持久内容的句子：
+        约束（<code>must never…</code> / <code>禁止…</code>）、偏好（<code>I prefer…</code> / <code>以后都…</code>）、
+        已确立的成因（<code>the root cause was…</code> / <code>根因是…</code>）、本工作区的约定。
+        <strong>这条路径里没有模型调用</strong>，所以每回合零成本、且对相同文本完全确定——这是它能每回合跑而不是挂在调度器后面的原因。
+      </p>
+      <p>
+        它也不动复用计数：语料里已有的主张直接跳过，因为 <code>hits</code> 被当成「人真的去拿过这条」的证据，
+        自动流程抬高它等于造假。
+      </p>
+    </article>
+    <article>
+      <h3>② 梦境整理 · 按窗口</h3>
+      <p>
+        窗口边界取自<strong>语料本身</strong>（上一条 journal 的写入时间），而不是私有计数器：因此它能跨重启、跨 fork、跨第二个读同一份库的进程。
+        整理会得出三件事：跨会话被印证的主张（写入路径在「同一主张来自另一个会话」时记下印证数）、同类标签聚成的主题摘要、
+        以及一条 journal。每日反思只报告<strong>已经过完</strong>的那一天。
+      </p>
+      <p>
+        <strong>矛盾只上报、不裁决。</strong>两条存活主张共享召回标签、措辞重叠却又不是同一个主张时，会被摆到人面前。
+        在两份主张之间做选择是判断，自动选错的代价比留一个开放问题更大。
+      </p>
+    </article>
+    <article>
+      <h3>③ 跨工具继承 · 有界读取</h3>
+      <p>
+        <code>/memory import</code> 读取按 id 认识的外部布局：<code>claude-code</code>、<code>mimocode</code>、<code>cursor</code>、
+        以及 <code>workspace</code>（调用方工作区根目录的 <code>AGENTS.md</code> / <code>CLAUDE.md</code>）。
+        文件的小标题决定层，布局决定作用域。每次读都受文件数、单文件字节数、目录深度三重约束；根目录不存在或目录读不了是<strong>正常结果</strong>而不是失败——
+        那些目录属于别的工具。
+      </p>
+      <p>
+        不点名就一条都不读（<code>importSources</code> 默认为空），所以不会在用户背后枚举别的工具的记忆。
+        已经知道的主张计入 skipped 而不重复入库——包括本导入器自己停在待审的那条，以及操作者后来归档掉的那条，避免「退役的主张」被下一次运行复活。
+      </p>
+    </article>
+  </div>
+
+  <h3>日期与问候</h3>
+  <p>
+    记录可以带一个 <strong>dueAt</strong>，它与 <code>expiresAt</code> 是两回事：过期让主张退役，到期让主张保持存活、并在日期到来后作为提醒浮出来
+    （窗口由 <code>reminderWindowDays</code> 控制）。这是本插件全部的提醒面——它是「变得可执行的记忆」，不是调度器。
+    问候则是一行本地日期、星期与时段，默认关闭；它用「哪一天」而不是「哪一分钟」，否则一个本该相同的回合会因为时间戳而渲染出不同字节。
+  </p>
+</section>
+
+<section id="cross">
+  <h2><span class="num">06</span>跨对话访问：两条腿</h2>
+  <p>
+    只做语义或关键词检索是不够的。真实需求里很大一部分是「上次那个聊 X 的会话里的结论是什么」——这种指代式提问，
+    检索的落点是<strong>会话</strong>而不是短语。所以要有两个入口。
+  </p>
+  <div class="split">
+    <div>
+      <h3>① 蒸馏后的 claim：会话是一等维度</h3>
+      <p>
+        <code>memory_conversations</code> 把调用方可见的语料按来源会话分桶，给出每个会话的存活/总数与最新几条；
+        再用 <code>memory_search</code> 的 <code>conversation</code> 参数窄化到某一个会话。这个参数只能缩小可见集，
+        不会放大，所以不构成越权面。
+      </p>
+    </div>
+    <div>
+      <h3>② 会话原文：官方检索路径</h3>
+      <p>
+        摘要答不了「原话是什么」。这一半由 <code>session-search.patch.yml</code> 单独挂载官方的
+        <code>session_search</code> / <code>session_event_read</code> 等 5 个工具，并把
+        <code>session-query-sqlite</code> 从出厂的内存库 + <code>openAt: never</code> 改成
+        <code>$DSH_HOME</code> 下的持久 FTS5 索引。成本因此可分离：删掉这一层，记忆行照常工作。
+      </p>
+    </div>
+  </div>
+  <p class="note">
+    两层之间靠溯源缝合：<code>memory_search</code> 与 <code>memory_conversations</code> 的每一行都渲染来源 session id，
+    所以一条 claim 可以顺着 id 回到那个会话的原始消息区间。
+  </p>
+</section>
+
+<section id="governance">
+  <h2><span class="num">07</span>治理面：模型工具 vs 人命令</h2>
+  <p>
+    最后一个设计取舍：哪些操作属于模型，哪些必须由人做。把审批、回滚、清扫、导出留在命令行，不只是一种分工，
+    而是<strong>结构性强制</strong>——模型没有调用它们的工具，前缀里也不会多出它们的 schema。
+  </p>
+  <table>
+    <thead>
+      <tr><th>操作</th><th>面向模型（工具，进缓存前缀）</th><th>面向人（<code>/memory</code>，零 schema）</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>写入一条主张</td><td><code>memory_remember</code></td><td>—</td></tr>
+      <tr><td>检索 / 精读 / 退役</td><td><code>memory_search</code> · <code>memory_open</code> · <code>memory_forget</code></td><td>—</td></tr>
+      <tr><td>浏览来源会话</td><td><code>memory_conversations</code></td><td><code>conversations</code></td></tr>
+      <tr><td>审批 / 驳回待审条目</td><td>不可调用</td><td><code>review</code> · <code>approve</code> · <code>reject</code></td></tr>
+      <tr><td>回滚到旧主张</td><td>不可调用</td><td><code>restore</code></td></tr>
+      <tr><td>清扫（TTL / 合并 / 淘汰）</td><td>不可调用</td><td><code>maintain [apply]</code></td></tr>
+      <tr><td>梦境整理（印证 / 主题 / 日志）</td><td>不可调用</td><td><code>dream [apply]</code> · <code>journal</code></td></tr>
+      <tr><td>导入其他工具的记忆</td><td>不可调用</td><td><code>import [apply] [sources]</code></td></tr>
+      <tr><td>导出可提交的镜像</td><td>不可调用</td><td><code>export [dir]</code></td></tr>
+    </tbody>
+  </table>
+  <p class="note">
+    判定被放在做出判定的那个操作里：<code>memory_remember</code> 没有「跳过审批」的参数，
+    <code>requireApproval</code> 下写入直接落 <code>pending</code>，而 <code>pending</code> 从不注入。
+  </p>
+</section>
+
+<section id="evidence">
+  <h2><span class="num">08</span>验证证据</h2>
+  <p>每条断言都能在本仓库里重跑。测试驱动的是<strong>真实服务</strong>：storage hub + SQLite 后端、domain facility、session 存储、系统提示词注册表、会话投影注册表、工具运行时、agent loop。</p>
+  <table class="evidence">
+    <thead><tr><th>命令</th><th>覆盖</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td><code>tsc -p tsconfig.json --noEmit</code></td><td>src 与 tests 对检出目录的声明文件</td><td class="ok">0 error</td></tr>
+      <tr><td><code>vitest run --config vitest.config.ts</code></td><td>memory · layers · distill · dream · import · recall · cache-safety · service · automatic 九组规格</td><td class="ok">146 passed</td></tr>
+      <tr><td><code>tsdown --config tsdown.config.ts</code></td><td>三个入口的 ESM 产物</td><td class="ok">5 files</td></tr>
+      <tr><td><code>node scripts/smoke.mjs</code></td><td>产物平面：默认导出形态、外部依赖未被内联、patch 行名一致</td><td class="ok">ok</td></tr>
+    </tbody>
+  </table>
+
+  <h3>缓存安全那一组测的是什么</h3>
+  <ol class="checks">
+    <li>无话可说的回合：<strong>没有新增消息</strong>，准入的那条原样保留。</li>
+    <li>有内容的回合：<strong>恰好追加一条</strong>，且前缀里的消息是同一个对象引用。</li>
+    <li>确定性：固定语料下两次渲染<strong>逐字节相同</strong>。</li>
+    <li>去重：已投递过的记录在同一会话里<strong>不会第二次注入</strong>。</li>
+    <li>预算：整帧长度不超过 <code>maxInjectedChars</code>，含外框与固定尾注。</li>
+    <li>工具面：5 个 schema 跨读取<strong>字节稳定</strong>，挂载治理命令后<strong>数量不变</strong>。</li>
+  </ol>
+
+  <h3>自动记忆那一组测的是什么</h3>
+  <ol class="checks">
+    <li>沉淀：一回合的自述文本被抽成主张、落 <code>pending</code>，且<strong>不注入</strong>。</li>
+    <li>幂等：同一句话两回合不会入库两次，也<strong>不会抬高 <code>hits</code></strong>。</li>
+    <li>窗口：整理按语料推进而不是计数器，未到窗口时保持安静。</li>
+    <li>矛盾：两条主张都存活，整理只把它<strong>报告</strong>出来。</li>
+    <li>常驻：身份层记录在没有关键词命中的首轮也会出现；相关性层则不会。</li>
+    <li>导入：dry-run 不落盘；apply 之后作用域、层、来源都正确，重跑计入 skipped。</li>
+  </ol>
+</section>
+
+<section id="limits">
+  <h2><span class="num">09</span>已知边界</h2>
+  <p>这一节是设计的一部分，不是免责声明——它标出了下一次该往哪里走，以及当前为什么没去。</p>
+  <ul class="limits">
+    <li><strong>没有向量检索。</strong>排序是 BM25 上的字面 token（ASCII 词 + CJK 字与二元组）。改写式召回偏弱，没有重排器。harness 目前没有 embedding provider，向量路线需要先有它。</li>
+    <li><strong>记忆语料没有 FTS 索引。</strong>记录放在 storage domain 里并在内存中排序，换来读取同步、模型路径上零 I/O。在 <code>maxRecords</code> 上限之下这是对的取舍；超过该规模、或改写式召回比延迟更重要时，下一步是给同一批记录加 <code>node:sqlite</code> 的 FTS5 索引。</li>
+    <li><strong>沉淀认的是句式，不是语义。</strong>它是一张正则表：换种说法的持久主张会漏掉，读起来像约束却不是的句子会被收进来。两者都正是出厂状态为 <code>pending</code> 的理由。</li>
+    <li><strong>矛盾检测是启发式的。</strong>要求共享召回标签 + 落在相似度区间内，措辞完全不同的矛盾会漏，同一主题下两条各有分寸的主张会被标出来。它只上报，不裁决。</li>
+    <li><strong>每日反思报告的是前一天。</strong>因此它总是在次日出现；一个跨月不跨越本地午夜的会话不会产生反思。</li>
+    <li><strong>整理跑在回合路径上。</strong>整理本身受 <code>dreamWindowRecords</code> 约束，但它是在回合关闭前被 await 的，所以语料很大时「跨过窗口的那一回合」会变慢。</li>
+    <li><strong>回合末的失败属于该回合。</strong>沉淀与整理不吞异常——库坏了应该响。宁可丢掉一次整理也不愿失败一回合的部署，应该在自己的层上加宽捕获。</li>
+    <li><strong>语料常驻内存。</strong>受 <code>maxRecords</code> 约束，但不受字节数约束。</li>
+    <li><strong><code>hits</code> 只统计显式打开</strong>，所以复用权重是弱信号；沉淀刻意不碰它。</li>
+    <li><strong>维护与整理都没挂调度。</strong>它们跑在回合路径与操作者命令上；想要固定时刻执行，需要一条 schedule 行指向 <code>/memory maintain apply</code> 或 <code>/memory dream apply</code>。</li>
+    <li><strong>命令面是间接覆盖的。</strong><code>/memory</code> 是服务方法的薄适配层，规格直接覆盖了那些方法，尚未端到端驱动一次组合后的命令调用。</li>
+    <li><strong>导入布局是按 id 硬编码的。</strong>新增一个工具意味着往 <code>IMPORT_SOURCES</code> 加一条；自定义布局没有配置格式。</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p><code>@prism/prism-memory</code> · 领域 <code>prism_memory</code> v1 · 7 个记忆分层 · 记录格式与配置表见插件 README</p>
+  <p class="dim">本页是静态设计说明，不联网、不读取任何运行时状态。</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

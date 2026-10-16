@@ -85,11 +85,9 @@ No runtime invariant companion is published: the service owns the only independe
 <a id="further-exploration"></a>
 ## Further Exploration
 
-- [Meetings subsystem](../../../docs/subsystems/meetings.md) — the record vocabulary, the recording lifecycle, the service semantics, and the browser interface.
-- [Speech-to-text](../../speech/speech-to-text/README.md) — the recognition seam `ctx.meetingMinutes` resolves.
-- [Generated tool catalog](../../../docs/tool-catalog.md#prism-aiprism-meeting) — the exact schemas the model sees.
-- [Generated composition graph](../../../apps/cli/composition.md) — how a shipped profile resolves these rows.
-- [Prism package group](../README.md) — the other Prism surfaces.
+- [Speech-to-text](../../packages/experimental/speech-to-text/README.md) — the recognition seam `ctx.meetingMinutes` resolves.
+- [Generated tool catalog](../../docs/tool-catalog.md) — the exact schemas the model sees.
+- [Generated composition graph](../../apps/cli/composition.md) — how a shipped profile resolves these rows.
 
 -----
 
@@ -100,7 +98,7 @@ No runtime invariant companion is published: the service owns the only independe
 
 #### What the model sees
 
-The `./tools` subpath registers `meeting_minutes_create`, `meeting_minutes_list`, `meeting_minutes_get`, `meeting_minutes_summarize`, and `meeting_minutes_ask` in the [generated tool catalog](../../../docs/tool-catalog.md#prism-aiprism-meeting). Create requires a title and complete transcript; list takes no input; get, summarize, and ask require the meeting id, and ask also requires the question. Success results are compact JSON projections; failures preserve validation, not-found, model, storage, and cancellation errors.
+The `./tools` subpath registers `meeting_minutes_create`, `meeting_minutes_list`, `meeting_minutes_get`, `meeting_minutes_summarize`, and `meeting_minutes_ask` in the [generated tool catalog](../../docs/tool-catalog.md). Create requires a title and complete transcript; list takes no input; get, summarize, and ask require the meeting id, and ask also requires the question. Success results are compact JSON projections; failures preserve validation, not-found, model, storage, and cancellation errors.
 
 #### Token effect
 

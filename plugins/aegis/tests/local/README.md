@@ -1,5 +1,7 @@
 # Local Development Tests
 
+English | [中文](README.zh.md)
+
 This directory is for development-only Aegis test cases.
 
 Files placed here are ignored by git by default and are not part of the public

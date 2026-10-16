@@ -2,20 +2,27 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns four **advisory** capabilities into **enforced** ones.
+An out-of-tree DeepSeek Harness bundle that turns nine **advisory** capabilities into **enforced** ones.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
+Four of the nine are hardenings of DeepSeek Harness's own advice. The other five turn the rules of two method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one) and **Aegis** (route before you act, verify before you claim) — from text the model is asked to follow into decisions the tool pipeline makes. Neither method pack is bundled here: the rails read what the model does, and the skills that teach it what to do stay where they are installed.
+
 ## Why this exists
 
-| Rail | What DeepSeek Harness ships on its own | What this bundle adds |
+| Rail | What ships on its own | What this bundle adds |
 |---|---|---|
 | Plan mode | A prompt section. `packages/plan/plan-mode/README.md` calls it "Guidance, not enforcement", and the recorded decision behind it explicitly rejected tool-name filtering | A monotonic `tools.guard()` that refuses deployment-named tools while plan mode is in force |
 | Repeated calls | `@deepseek-ai/dsh-repeat-tool-reminder`: advisory reminders, and it never vetoes a call | The call after a configured run of identical calls goes to approval |
 | Turn length | `packages/core/agent-loop/README.md` states "No built-in turn budget"; no step or iteration cap exists anywhere | A turn cannot open a step beyond the configured number |
 | Skill invocation | The loader throws `skill "X" is not available for model invocation`, which names no next step | The denial names the `/name` gesture that would actually load it |
+| Routing (Aegis) | The method pack asks for a routing decision before the first non-readonly call; on its other hosts it appends a marker **after** the call that broke the contract | The call itself is refused until the decision is on the record |
+| Write breadth (Ponytail) | The ladder prefers the existing helper over a new one, with no mechanism behind it | A turn writing more distinct files than the deployment allows sends the next new path to approval |
+| Marker discipline (Ponytail) | The convention is `ponytail: <ceiling>, <upgrade path>`; the pack's own debt report flags a marker with no trigger as the one that rots | A marker with no upgrade path is refused before it is written |
+| Dependency changes (Ponytail) | "Never add a new one for what a few lines can do" is prose | A write to a dependency manifest goes to approval |
+| Verification (Aegis) | `verification-before-completion` states the required evidence in a skill the model is asked to load | A turn that wrote files and ran no verification is sent back for its evidence before it can stop |
 
-The bundle is independent of the packages it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline through the documented waterfalls and guard seam, so it composes with a stock checkout and degrades to a no-op when a service is absent.
+The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
 
 ## Configuration
 
@@ -27,6 +34,14 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `repeatAskAfter` | integer `0` or `>= 2` | Consecutive identical calls tolerated before the next one goes to approval; `0` disables | rail off |
 | `maxStepsPerTurn` | integer `>= 1` | Steps one turn may open | rail off |
 | `skillInvocationGuidance` | boolean | Whether a user-only skill's model-invocation denial names the way forward | `true` |
+| `writeTools` | non-empty array of `{ tool, pathArgument, contentArgument? }` | The deployment's file-writing tools; required by every rail that reads written content | required by those rails |
+| `maxWrittenFilesPerTurn` | integer `>= 0` | Distinct files one turn may write before the next new path goes to approval; `0` disables | rail off |
+| `requirePonytailUpgradePaths` | boolean | Whether a written `ponytail:` comment must name its ceiling and upgrade path | `false` |
+| `dependencyManifests` | non-empty array of distinct, non-blank file names | File names whose write goes to approval | rail off |
+| `routingContract.readOnlyTools` | non-empty array of distinct, non-blank tool names | The tools that only read; the first call to any other is the contract's trigger | rail off |
+| `verificationGate.verifyTools` | non-empty array of distinct, non-blank tool names | The tools whose completed call is accepted as verification | rail off |
+
+`writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
 Load-time rejections, each with the message asserted by the test suite:
 
@@ -40,7 +55,22 @@ Load-time rejections, each with the message asserted by the test suite:
 | `repeatAskAfter: 1` | `repeatAskAfter must be 0 (off) or >= 2 — one call is not a loop` |
 | `maxStepsPerTurn` not an integer, or `< 1` | `maxStepsPerTurn must be an integer >= 1` |
 | `skillInvocationGuidance` not a boolean | `skillInvocationGuidance must be a boolean` |
-| any other key | `unknown config key(s) …` |
+| `writeTools` not an array, or empty | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
+| an entry naming no tool or no path argument | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
+| a blank `contentArgument` | `writeTools entry "write" must name a non-empty contentArgument or omit it` |
+| a repeated tool name | `writeTools names "write" twice` |
+| an unknown entry key | `unknown writeTools key(s) …` |
+| `maxWrittenFilesPerTurn` not an integer, or `< 0` | `maxWrittenFilesPerTurn must be an integer >= 0` |
+| `requirePonytailUpgradePaths` not a boolean | `requirePonytailUpgradePaths must be a boolean` |
+| `dependencyManifests` empty, blank, or repeated | `dependencyManifests must not be empty — omit the key to disable the dependency rail`, `… entries must be non-empty file names`, `… names "package.json" twice` |
+| `routingContract` not an object, or an unknown key | `routingContract must be an object { readOnlyTools }`, `unknown routingContract key(s) …` |
+| `verificationGate` not an object, or an unknown key | `verificationGate must be an object { verifyTools }`, `unknown verificationGate key(s) …` |
+| an empty `readOnlyTools` / `verifyTools` list | `… must be a non-empty array of tool names` |
+| a written-content rail without `writeTools` | `… all read written files — name writeTools as well` |
+| `requirePonytailUpgradePaths` with no `contentArgument` anywhere | `… at least one writeTools entry must name its contentArgument` |
+| any other top-level key | `unknown config key(s) …` |
+
+The last two rows are the bundle's cross-field rule: a rail that reads written content owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.
 
 ## Rails
 
@@ -86,6 +116,72 @@ Error: skill "user-only" is user-invoked only: ask the user to type /user-only i
 
 The decision reads the resolved catalog through the public registry — the same lookup the skill tool performs. A skill that neither interface can invoke keeps the loader's own rejection, because there is no route to offer and inventing one would be wrong. An unknown name, a call naming another tool, a call whose `name` argument is absent, non-string or empty, a deployment with no skill service, and a deployment with `skillInvocationGuidance: false` all delegate unchanged.
 
+### Routing contract
+
+The first call to a tool that is not in `routingContract.readOnlyTools` is refused until a routing decision is on the record:
+
+```
+Error: the routing contract is not satisfied: `write` is the first non-readonly call of this session. Load the task's skill with the `skill` tool, or declare `Route: fast-path` with a one-line reason, then repeat this call.
+```
+
+Two decisions satisfy the contract, and both are recorded for the session rather than the call: a call to the `skill` tool, or an assistant message whose text contains `Route: fast-path`. The declaration is read from the committed `assistant/message` session event rather than from the streaming attempt, so a retried or discarded attempt cannot satisfy the contract.
+
+`Route: fast-path` is a protocol constant rather than configuration. It is the phrase both sides of the Aegis method pack agree on, and a deployment that reworded it would be asking the model for a phrase the pack's own skills do not name.
+
+A refusal costs one round trip, not a loop: the model answers with a decision, and answering is itself an allowed call. When the declaration arrives in the same response as the call it precedes, the gate is satisfied on the first attempt; when it arrives after the call, the model sees one refusal and repeats the call. A model that neither loads a skill nor declares a route meets the repeat rail instead.
+
+The record is dropped at `compaction/end`, because the model's next request no longer carries the decision it once made. The record is keyed by session, so one session's decision does not license another's, and it is dropped when the agent is disposed.
+
+### Write budget
+
+The call that would make a new path the `maxWrittenFilesPerTurn + 1`th distinct file of the turn goes to approval:
+
+```
+this turn has already written 8 distinct files and `write` would make `src/late.ts` the 9th, beyond the 8 the deployment allows; approve only if the wider change is intended
+```
+
+The count is distinct **paths**, not writes, so a turn that edits one file repeatedly is not priced for the editing — breadth is what an unreviewed turn's diff cannot recover from. A path already in the set is free.
+
+Only a call that completed without an error spends the budget. A refused or failed call reaches `tools/post-execute` too, and counting it would spend the budget on writes that never landed — a model that kept proposing new paths would exhaust the budget without writing anything.
+
+The turn number and the written-path set live in one per-turn record, advanced from the loop's own `agent/pre-step` payload. Nothing counts turns here: the record is reset exactly when the loop opens a turn it has not seen, so retries, refused steps, resume, and fork stay correct by construction.
+
+### Ponytail marker discipline
+
+A write whose text contains a comment-prefixed `ponytail:` marker naming no upgrade path is refused:
+
+```
+Error: `src/lock.ts` writes a `ponytail:` marker with no upgrade path: "global lock". The convention is `ponytail: <ceiling>, <upgrade path>`; name the limit and the trigger that would revisit it, or delete the marker.
+```
+
+The convention is a separator with something after it — `ponytail: global lock, per-account locks if throughput matters` is accepted, `ponytail: global lock` is not. Every marker line in the written text is read, not only the first.
+
+Refusing the write is the only point where the fix is free: after the file lands, an untriggered marker is a debt entry nobody reads. Only comment-prefixed markers count, so prose that merely mentions the convention — this file's own JSDoc included — is not a marker.
+
+### Dependency approval
+
+A write whose file name is in `dependencyManifests` goes to approval, matched on the last path segment under either separator:
+
+```
+`write` changes the dependency manifest `package.json`; approve only if the new dependency is genuinely needed rather than already covered by the standard library, the platform, or a library this project already depends on
+```
+
+The ladder puts the standard library, the platform, and an already-installed dependency above a new one, and a manifest write is where that ordering is actually spent. Pricing the write puts the choice in front of a human at the only moment the alternative is still cheap.
+
+### Verification gate
+
+A turn that wrote files and ran no verification is interrupted at its stopping boundary:
+
+```
+This turn wrote src/lock.ts and ran no verification (`bash`, `pwsh`). Run the check that would fail if the change is wrong, then report what you ran, its result, what it covers, and what remains unverified — or say plainly why no check is available. Do not claim the work is complete until then.
+```
+
+The stop boundary has no veto — nothing in DeepSeek Harness can refuse the assistant's final text — so the rail uses the machine's own continuation path: steering at `agent/turn-stopping` makes the loop observe pending input and run another step. This is the mechanism `packages/hooks/hooks-claude-code` uses for a blocking `Stop` hook.
+
+A completed call to any `verifyTools` tool is the evidence, and a **failing** check counts: the rail asks whether a check was run, not whether it passed, and a report of a failing check is exactly the outcome this gate exists to make possible.
+
+The turn is interrupted at most once. A model that ignores the request stops at the next boundary rather than looping, so the worst case is one extra step.
+
 ## Wiring
 
 The bundle patches one row over the profile root, and `cordis.patch.yml` ships that row under the package name — the form a profile resolves once the bundle is installed or published. Both forms below were booted for real against the shipped `headless` profile.
@@ -106,11 +202,21 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
       config:
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
-        maxStepsPerTurn: 20
+        maxStepsPerTurn: 200
         skillInvocationGuidance: true
+        writeTools:
+          - { tool: write, pathArgument: file_path, contentArgument: content }
+          - { tool: edit, pathArgument: file_path, contentArgument: new_string }
+        maxWrittenFilesPerTurn: 8
+        requirePonytailUpgradePaths: true
+        dependencyManifests: [package.json]
+        routingContract:
+          readOnlyTools: [read, read_image, glob, grep]
+        verificationGate:
+          verifyTools: [bash, pwsh]
 ```
 
-`tests/fixtures/cli-boot.patch.yml` is exactly that overlay, and it drives the plan-mode rail through the product's own one-shot path:
+`tests/fixtures/cli-boot.patch.yml` is an overlay of that shape, and it drives the plan-mode rail through the product's own one-shot path:
 
 ```sh
 node --import tsx/esm apps/cli/src/bin.ts --profile headless \
@@ -124,27 +230,36 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## Build and verify
 
-The bundle borrows the checkout's packages instead of declaring workspace dependencies: every `@deepseek-ai/*` import in `src/` is `import type`, so the emitted module imports nothing and a deployment installs nothing. `tsconfig.json` resolves those types through the checkout's **built** declarations, which is how the repository's own packages consume each other — run `pnpm run build` in the checkout first.
+The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except one — `createUserMessage`, which the verification gate needs as a value to steer the agent — so the emitted module carries exactly that one external import, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` is therefore the bundle's only peer dependency.
+
+`tsconfig.json` resolves those types through the checkout's **built** declarations, which is how the repository's own packages consume each other — run `pnpm run build` in the checkout first. `tsdown.config.ts` keeps `@deepseek-ai/*` external, as the sibling `plugins/prism-memory` does: a bundled copy would shadow the profile's own service instances across the cross-instance identity the harness relies on.
 
 ```sh
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
-npm run build       # lib/index.js, no runtime imports
-npm run smoke       # artifact: exports, registered surfaces, fail-loud config
-npm test            # 42 composed unit tests
+npm run build       # lib/index.js with one external harness import
+npm run smoke       # artifact: imports, exports, fail-loud config
+npm test            # 85 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
-`vitest.config.ts` reuses the checkout's `tsconfig.base.json` paths facade and decorator pre-transform, so `tests/prism-guardrails.spec.ts` composes the **real** services — the production tool pipeline, the production agent loop against a scripted mock adapter, the real plan-mode controller, and the real skill registry — rather than a hand-built stand-in for the extension points. Assertions are on model-visible tool results, executed effects, and request counts.
+`vitest.config.ts` reuses the checkout's `tsconfig.base.json` paths facade and decorator pre-transform, so `tests/prism-guardrails.spec.ts` composes the **real** services — the production tool pipeline, the production agent loop against a scripted mock adapter, the real plan-mode controller, the real skill registry, and the loop's own stopping boundary — rather than a hand-built stand-in for the extension points. Assertions are on model-visible tool results, executed effects, and request counts.
 
-`tests/capability.e2e.spec.ts` goes further: it boots the shipped **headless** profile through the real Loader with the bundle loaded from its built artifact by relative path, scripts the model through a mock adapter, and asserts each rail's enforcement in the resulting session events — the plan-mode denial text, two refused repeated calls after two permitted ones, a turn ending `blocked` at the step budget, and the user-only skill's guidance. That run is why the overlay fixtures disable the session-title provider: it issues its own model call through the same route.
+`tests/capability.e2e.spec.ts` goes further: it boots the shipped **headless** profile through the real Loader with the bundle loaded from its built artifact by relative path, scripts the model through a mock adapter, and asserts each rail's enforcement in the resulting session events — the plan-mode denial text, two refused repeated calls after two permitted ones, a turn ending `blocked` at the step budget, and the user-only skill's guidance. That run is why the overlay fixtures disable the session-title provider: it issues its own model call through the same route. It is also what proves the built artifact's one external import resolves in a real profile.
+
+`scripts/smoke.mjs` asserts on the built file's text rather than executing it, because the artifact imports the profile's harness package, which a checkout without a profile install cannot resolve. Rail registration is the Vitest suite's job.
 
 Vitest needs vite's Windows real-path probe to spawn a child process, which a confined file sandbox denies; run it outside that confinement.
 
 ## Known Limitations and Deferred Work
 
 - **The bundle is outside the repository test runner.** It lives in `plugins/`, which the checkout's `vitest.config.ts` does not collect, so it carries its own config and does not run under `pnpm run test` or the per-file coverage gate. Its evidence is the suites above, not CI.
+- **Written paths compare as the call wrote them.** `a.ts` and `./a.ts` are two paths and spend two files of the write budget. Canonicalizing them needs the filesystem resolved against the call's working directory, which would give this rail a provider dependency it does not otherwise have. The verification gate's message reports the same strings.
+- **`writeTools` names one content argument per tool.** A tool whose written text lives in a different argument per command — `str_replace_editor`'s `file_text` for `create` against `new_str` for `str_replace` — is not covered by the marker rail, and the shipped patch leaves it out of `writeTools` for that reason. Covering it needs a per-command argument map, which no current consumer has asked for.
+- **The routing record latches for the session.** A session that declares `Route: fast-path` once is never asked again until `compaction/end`. Detecting a per-task lapse in the declaration's meaning is a larger capability than a gate can infer from one message.
+- **The verification gate asks, it cannot require.** The stop boundary has no veto, so a model that ignores the steering and stops anyway ends the turn. The rail's enforcement is one extra step and a stated request, not a refusal; only the tool pipeline can refuse, and it has no say over the final text.
+- **The verification gate does not read the evidence it asks for.** It checks that a `verifyTools` call completed, not that the claim the model then makes matches that result.
 - **`skillNameArgument`'s non-object guard is unreachable through the shipped tool set.** The registry validates a call against the tool's compiled object schema before the pre-execute waterfall, so a non-object argument list is rejected first — the test suite pins that rejection. The two lines are kept so the function stays total at a model tool-JSON boundary rather than throwing inside a listener, which would fail every call to the tool.
 - **The repeat rail has no `include`/`exclude` patterns.** `@deepseek-ai/dsh-repeat-tool-reminder` offers wildcard tool selection and this rail does not; a deployment that needs it must say so with a concrete consumer.
 - **Reasoning-streak loop governance is not implemented.** This bundle detects repetition by tool name plus arguments only. Detecting a repeated *thinking* prefix and pruning the polluted span from the request view while the log keeps the full trajectory is a separate, larger capability.
-- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools`, `repeatAskAfter: 5`, and `maxStepsPerTurn: 20` come from the fork's `CAPABILITY-PLAN.md`; a deployment that disagrees edits the row.
+- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools` and `repeatAskAfter: 5` come from the fork's `CAPABILITY-PLAN.md`. `maxStepsPerTurn: 200` is a runaway backstop rather than a working limit: the plan's `20` truncated 11 of the 20 turns recorded in the fork's own deployment, each after about a minute of work, and no recorded turn ever finished naturally at that ceiling. `maxWrittenFilesPerTurn: 8` and the routing contract's read-only list are this bundle's own first pass over DeepSeek Harness's tool set; a deployment that disagrees edits the row.
 - **No Chinese README pair is required for `plugins/`.** The repository's translation-pairing gate already reports the sibling `plugins/dsh-agent-progress/` for a missing pair; this bundle ships the pair so it adds no failure of its own.

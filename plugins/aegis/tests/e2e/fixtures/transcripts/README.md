@@ -1,5 +1,7 @@
 # Transcript Fixtures
 
+English | [中文](README.zh.md)
+
 This directory contains fixture-backed transcripts for the active Layer 2
 behavior check and controlled replay samples.
 

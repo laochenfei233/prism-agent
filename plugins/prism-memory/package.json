@@ -1,0 +1,51 @@
+{
+  "name": "@prism/prism-memory",
+  "description": "Prism memory plugin: durable, scope-filtered, supersede-tracked long-term memory with a cache-safe tail recall block, five model-facing tools, an operator governance command, and a Markdown mirror export",
+  "version": "0.2.2",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./tools": "./lib/tools.js",
+    "./commands": "./lib/commands.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./session-search.patch.yml": "./session-search.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "session-search.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml",
+        "./session-search.patch.yml"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-agent": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-commands": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-llm": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-session": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-session-projection": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-storage-domain": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.1"
+  }
+}

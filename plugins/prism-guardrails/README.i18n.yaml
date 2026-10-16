@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
-README.md: d3e8b74af74a09738ed08fb451274bd43c9c3d38
-README.zh.md: 1137839101d856cf75effc55f5e346a36a912e20
+README.md: 2823f480d419e4281e131ed1af1066879263b0d0
+README.zh.md: 863e803d43197236713159497ac8e1f9ba126446

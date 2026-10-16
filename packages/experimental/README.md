@@ -26,9 +26,12 @@ The experimental group contains prototype capabilities whose contracts can chang
 |---|---|---|
 | [`speech-to-text`](speech-to-text/README.md) | Named speech recognition providers | `ctx.speechToText` |
 | [`speech-to-text-sensevoice`](speech-to-text-sensevoice/README.md) | Managed local SenseVoice inference | — |
+| [`speech-to-text-dashscope`](speech-to-text-dashscope/README.md) | DashScope realtime cloud recognition | — |
 | [`api-speech-to-text`](api-speech-to-text/README.md) | Authenticated transient transcription Remote | `ctx.speechController` |
 | [`client-ui-voice-input`](client-ui-voice-input/README.md) | Microphone capture and guarded draft insertion | — |
 | [`voice-input-bundle`](voice-input-bundle/README.md) | Default-disabled optional voice input composition | — |
+| [`tool-meeting-minutes`](tool-meeting-minutes/README.md) | Model-facing recording transcription and minutes structure | registers `meeting_minutes` on `ctx.tools` |
+| [`meeting-minutes-bundle`](meeting-minutes-bundle/README.md) | Default-disabled optional meeting-minutes composition | — |
 | [`agent-team-profile`](agent-team-profile/README.md) | Agent Teams collaboration, tools, and Web UI bundle | — |
 | [`agent-team`](agent-team/README.md) | Named teammates with durable messages and a shared task board | `ctx.agentTeams` |
 | [`client-ui-agent-team`](client-ui-agent-team/README.md) | Team roster, task board, and teammate navigation for Web | — |

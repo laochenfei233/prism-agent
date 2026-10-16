@@ -1,5 +1,7 @@
 # Scenario D: Interrupted Long Task
 
+English | [中文](README.zh.md)
+
 This scenario validates long-task continuation discipline.
 
 It checks that Aegis can represent:

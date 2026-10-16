@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-cron/README.md
 README.md: 51077760f440b33db79f76b3843f2bec85331e4a
-README.zh.md: d1468fac4e6557e5a15444b72fbcba29cb1a68a9
+README.zh.md: e815627d72920fd18707b1118019efdac7fa2390

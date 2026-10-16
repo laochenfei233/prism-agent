@@ -27,6 +27,9 @@ const SERVER_RECORD_NAME: &str = "desktop-server.json";
 /// milliseconds; anything slower is treated as absent so the cold path never
 /// waits on a dead record.
 const ADOPT_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+/// Bound on reaping the hub at exit. The kill itself is immediate; a hub that
+/// somehow outlives it must not hold the shell's exit open.
+const HUB_KILL_TIMEOUT: Duration = Duration::from_secs(3);
 
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
 /// The live server a previous shell start left behind, named by the launch URL
@@ -147,6 +150,12 @@ impl DshHandle {
             };
             if !ready {
                 if self.stopping.load(Ordering::SeqCst) {
+                    // Quit landed while this hub was still booting: it was not
+                    // in the child slot yet when the exit path looked, so it is
+                    // ended here instead of being left serving the port.
+                    if let Some(mut child) = self.child.lock().await.take() {
+                        end_owned_child(&mut child).await;
+                    }
                     return;
                 }
                 // Process died before the port ever answered.
@@ -364,17 +373,34 @@ impl DshHandle {
         Ok((child, port))
     }
 
-    /// Stop the dsh process for good — app exit and tray Quit. A hub this shell
-    /// only adopted has no child to end and keeps serving, so its record stays
-    /// for the next start; nothing here touches it.
+    /// End every hub this home is serving, then return — app exit and tray
+    /// Quit. Nothing this app runs outlives its window, so a hub this shell only
+    /// adopted is ended here too: an earlier shell that died abruptly leaves the
+    /// hub it started on the loopback port, and quitting is the last point that
+    /// can end it.
+    ///
+    /// The kill runs to completion before the process exits rather than on a
+    /// spawned task: a task is dropped with the runtime, and the hub of every
+    /// quit survived it.
     pub fn stop(&self) {
         self.stopping.store(true, Ordering::SeqCst);
-        let child = self.child.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Some(mut child) = child.lock().await.take() {
+        tauri::async_runtime::block_on(async {
+            if let Some(mut child) = self.child.lock().await.take() {
+                end_owned_child(&mut child).await;
                 forget_server();
-                let _ = child.kill().await;
-                let _ = child.wait().await;
+                return;
+            }
+            // An adopted hub is no longer this shell's child, so it is ended by
+            // pid — and only a pid the record still proves: re-reading it
+            // requires the process on that port to answer with the launch token
+            // the recorded hub printed, which the pid of a replaced hub cannot.
+            let path = server_record_path();
+            let bin = self.dsh_bin.clone();
+            let adopted =
+                tauri::async_runtime::spawn_blocking(move || adopt_decision(&path, &bin)).await;
+            if let Ok(Some(record)) = adopted {
+                terminate_pid(record.pid);
+                forget_server();
             }
         });
     }
@@ -567,6 +593,21 @@ fn remember_server(port: u16, url: &str, pid: u32, bin: &Path) {
 
 fn forget_server() {
     let _ = std::fs::remove_file(server_record_path());
+}
+
+/// End the hub this shell spawned, together with everything it derived. The
+/// hub's own children — language servers, persistent terminals, commands
+/// started through the shell tool, MCP servers — hold the workspace and the
+/// loopback port; ending the hub alone leaves them with no parent and no record
+/// for a later shell to adopt, which is how a quit used to leave a workspace in
+/// use by nobody.
+async fn end_owned_child(child: &mut Child) {
+    if let Some(pid) = child.id() {
+        terminate_pid(pid);
+    }
+    // The tree kill runs as another process and can lose the race against a hub
+    // that exits on its own; this one cannot, and it reaps.
+    let _ = tokio::time::timeout(HUB_KILL_TIMEOUT, child.kill()).await;
 }
 
 /// Stop a server an earlier shell start left running. Windows has no portable
@@ -1059,6 +1100,37 @@ mod tests {
         let _ = std::fs::remove_file(&record);
 
         assert!(adopt_decision(&record, &bin).is_none());
+    }
+
+    /// Quitting ends the hub through `end_owned_child`, so prove that primitive
+    /// ends a live process rather than only the shell's pid bookkeeping. A
+    /// machine without the runtime the hub runs on cannot pose the question.
+    #[test]
+    fn ends_a_live_child_process() {
+        let Some(mut child) = spawn_sleeper() else {
+            return;
+        };
+        assert!(
+            child.try_wait().expect("probe the sleeper").is_none(),
+            "the sleeper runs before the quit"
+        );
+
+        tauri::async_runtime::block_on(end_owned_child(&mut child));
+
+        assert!(
+            matches!(child.try_wait(), Ok(Some(_))),
+            "the quit ended the hub"
+        );
+    }
+
+    /// A live process standing in for a hub: what the quit must end.
+    fn spawn_sleeper() -> Option<Child> {
+        Command::new("node")
+            .args(["-e", "setTimeout(() => {}, 60000)"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()
     }
 
     /// Cross-process check of the adoption contract against a real `dsh web`

@@ -66,6 +66,9 @@ import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-us
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import SpeechToText from '@deepseek-ai/dsh-experimental-speech-to-text'
+import type { SpeechProviderId } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
+import * as ToolMeetingMinutes from '@deepseek-ai/dsh-experimental-tool-meeting-minutes'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
@@ -619,6 +622,24 @@ const TOOL_PACKAGES: ToolPackage[] = [
     scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
       'All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-meeting-minutes',
+    dir: 'tool-meeting-minutes',
+    source: 'packages/experimental/tool-meeting-minutes/src/index.ts',
+    requires: ['ctx.tools', 'ctx.fs', 'ctx.speechToText', 'a registered recognizer accepting the resolved language'],
+    writes: ['tool/call', 'fs/observed after the transcript write', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(SpeechToText, { defaultProvider: 'catalog', language: 'zh' })
+      ctx.speechToText.register({
+        info: { id: 'catalog' as SpeechProviderId, name: 'Catalog recognizer', location: 'cloud', languages: ['zh'] },
+        transcribe: async () => ({ text: '', audioSeconds: 0, inferenceSeconds: 0 }),
+      })
+      await ctx.plugin(ToolMeetingMinutes)
+    },
+    note:
+      'The tool writes the transcript beside the recording and returns the minutes structure; the calling agent writes the minutes itself. The bundled recognizer is DashScope\'s realtime service, so a deployment without one leaves `resolve()` failing rather than returning partial text.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',

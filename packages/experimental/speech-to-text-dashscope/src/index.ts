@@ -26,8 +26,8 @@ export {
   runTaskFrame,
 } from './protocol.ts'
 export type { RecognitionEvent, RecognitionSentence } from './protocol.ts'
-export { DASHSCOPE_TIMEOUT_CODE, DashScopeSpeechProvider } from './provider.ts'
-export type { DashScopeProviderOptions } from './provider.ts'
+export { DASHSCOPE_DRAIN_TIMEOUT_CODE, DASHSCOPE_TIMEOUT_CODE, DashScopeSpeechProvider, DashScopeTimeoutError } from './provider.ts'
+export type { DashScopeProviderOptions, DashScopeTimeoutPhase } from './provider.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'experimental-speech-to-text-dashscope'
@@ -50,8 +50,10 @@ export interface Config {
   languages: string[]
   /** Duplex recognition endpoint. */
   url: string
-  /** Realtime recognition model name. */
+  /** Realtime recognition model name; the deployment's default and initial selection. */
   model: string
+  /** Models this deployment offers for selection, in order; empty offers no choice. */
+  models: string[]
   /** Whether the model labels speakers in its results. */
   speakerDiarization: boolean
   /** Maximum accepted recording duration in seconds. */
@@ -70,6 +72,7 @@ export const Config = z.object({
   languages: z.array(z.string().min(1)).default(['zh']),
   url: z.string().min(1).default(DASHSCOPE_DEFAULT_URL),
   model: z.string().min(1).default(DASHSCOPE_DEFAULT_MODEL),
+  models: z.array(z.string().min(1)).default([]),
   speakerDiarization: z.boolean().default(true),
   maxDurationSeconds: z.number().min(1).default(4 * 3600),
   timeoutMs: z.number().step(1).min(1).default(600_000),
@@ -89,6 +92,7 @@ export function apply(ctx: Context, config: Config): void {
     name: `DashScope ${config.model}`,
     url: config.url,
     model: config.model,
+    models: config.models,
     languages: config.languages,
     speakerDiarization: config.speakerDiarization,
     maxDurationSeconds: config.maxDurationSeconds,

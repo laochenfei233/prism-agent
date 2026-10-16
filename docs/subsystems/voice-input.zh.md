@@ -6,9 +6,17 @@
 
 ## Provider 选择
 
-`SpeechProviderId` 为注册标识添加类型品牌。`SpeechProviderInfo` 携带显示名称、支持的 `languages` 语言提示及 `host-local` 或 `cloud` 处理位置。`SpeechRequest` 包含 WAV 字节和可选的 Provider、语言选择；`resolve()` 生成捕获一个 Provider 实例的 `SpeechSpec`。缺失的 Provider 或不支持的语言会报错；替换或撤销会使已解析的任务失效。音频不会回退到其他 Provider。
+`SpeechProviderId` 为注册标识添加类型品牌。`SpeechProviderInfo` 携带显示名称、支持的 `languages` 语言提示、未指定选择时运行的 `model`、本部署提供的 `models`，以及 `host-local` 或 `cloud` 处理位置。`SpeechRequest` 包含 WAV 字节和可选的 Provider、语言、模型选择；`resolve()` 生成捕获一个 Provider 实例的 `SpeechSpec`。缺失的 Provider、不支持的语言或未提供的模型会报错；替换或撤销会使已解析的任务失效。音频不会回退到其他 Provider。
 
-`SpeechProvider.transcribe()` 接收完整的 `SpeechInput` 与 `AbortSignal`。`Transcript` 返回纯文本 `text`、`audioSeconds` 和 `inferenceSeconds`。Provider 响应取消，并在注销完成前结束其任务。本地 Provider 串行执行调用、限制队列，并独立于 Session 管理工作进程生命周期。
+`SpeechProvider.transcribe()` 接收完整的 `SpeechInput` 与 `AbortSignal`。`Transcript` 返回纯文本 `text`、`audioSeconds` 和 `inferenceSeconds`，并在识别器区分说话人时返回 `segments`：每个 `SpeechSegment` 携带其文本、服务分配的 `speaker`，以及识别器报告时序时的起止偏移。Provider 响应取消，并在注销完成前结束其任务。本地 Provider 串行执行调用、限制队列，并独立于 Session 管理工作进程生命周期。
+
+## 实时会话
+
+提供方可以在准备状态之外公布 `streaming` 能力。`SpeechStreaming` 声明单次识别流式到什么程度——`duplex` 在结果返回的同时接受音频，`incremental-output` 接受一份完整录音并逐步返回文本——并打开一个 `SpeechStream`。
+
+`push()` 按顺序追加规范的 PCM16 采样，并在提供方接收后 resolve，因此实时音源可以施加背压。`close()` 排空会话；`cancel()` 放弃会话。`events()` 投递 `SpeechStreamUpdate`：`partial` 携带某个仍未关闭片段在提供方分配 id 下的文本，`segment` 以 `SpeechSegment` 关闭一个片段，一个 `final` 携带完整 `Transcript`。观察者可以被放弃而不结束会话。
+
+`snapshot()` 报告每个提供方的模式，因此消费者会选择具备实时能力的识别器，而不是在调用时才发现缺口。`resolveStream()` 应用组合默认值，并在所选提供方不做任何流式时失败。`openStream()` 打开确切的已解析会话并跟踪它：撤销注册会取消它，而调用方自行关闭或取消的会话不再被跟踪。
 
 ## 浏览器与 Host 所有权
 
@@ -158,6 +166,22 @@ resolve(request: SpeechRequest): SpeechSpec
  * @returns final transcript after provider settlement.
  */
 async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>
+
+/**
+ * Apply composition defaults and capture the selected provider's live capability.
+ * @param request - optional provider and language selection.
+ * @returns provider-pinned input for openStream().
+ * @throws {Error} The selected provider offers no live session.
+ */
+resolveStream(request: SpeechStreamRequest): SpeechStreamSpec
+
+/**
+ * Open one live session on exactly the resolved provider; withdrawing the registration cancels it.
+ * @param spec - resolved selection; a withdrawn or replaced registration is rejected.
+ * @param signal - caller cancellation.
+ * @returns the open session, tracked until it closes, cancels, or the registration withdraws.
+ */
+async openStream(spec: SpeechStreamSpec, signal: AbortSignal): Promise<SpeechStream>
 ```
 
 Source: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)

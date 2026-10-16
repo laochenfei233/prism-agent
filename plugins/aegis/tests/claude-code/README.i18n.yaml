@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write plugins/aegis/tests/claude-code/README.md
+README.md: 236abcb661b58c9e7ded6d1066f6dbfc1a1ceaee
+README.zh.md: 77a56d824d8f91bc218886b8f6ab9c7cbd5327bd

@@ -85,11 +85,9 @@ patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 
 <a id="further-exploration"></a>
 ## 进一步探索
 
-- [会议子系统](../../../docs/subsystems/meetings.zh.md) —— 记录词汇、录音生命周期、服务语义和浏览器接口。
-- [语音转文字](../../speech/speech-to-text/README.md) —— `ctx.meetingMinutes` 解析的识别接缝。
-- [生成的工具目录](../../../docs/tool-catalog.zh.md#prism-aiprism-meeting) —— 模型看到的精确 schema。
-- [生成的组合图](../../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
-- [Prism 包分组](../README.zh.md) —— 其他 Prism 能力面。
+- [语音转文字](../../packages/experimental/speech-to-text/README.zh.md) —— `ctx.meetingMinutes` 解析的识别接缝。
+- [生成的工具目录](../../docs/tool-catalog.zh.md) —— 模型看到的精确 schema。
+- [生成的组合图](../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
 
 -----
 
@@ -100,7 +98,7 @@ patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 
 
 #### 模型看到的内容
 
-`./tools` 子路径在[生成的工具目录](../../../docs/tool-catalog.zh.md#prism-aiprism-meeting)中注册 `meeting_minutes_create`、`meeting_minutes_list`、`meeting_minutes_get`、`meeting_minutes_summarize` 和 `meeting_minutes_ask`。创建需要标题和完整转写；列表无输入；读取、摘要和提问需要会议 id，提问还需要问题。成功结果是紧凑 JSON 投影；失败保留验证、未找到、模型、存储和取消错误。
+`./tools` 子路径在[生成的工具目录](../../docs/tool-catalog.zh.md)中注册 `meeting_minutes_create`、`meeting_minutes_list`、`meeting_minutes_get`、`meeting_minutes_summarize` 和 `meeting_minutes_ask`。创建需要标题和完整转写；列表无输入；读取、摘要和提问需要会议 id，提问还需要问题。成功结果是紧凑 JSON 投影；失败保留验证、未找到、模型、存储和取消错误。
 
 #### Token 影响
 

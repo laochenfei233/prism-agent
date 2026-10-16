@@ -1,5 +1,7 @@
 # Scenario C: Cross Host
 
+English | [中文](README.zh.md)
+
 Goal:
 
 - compare the same planning-oriented request across at least two hosts

@@ -12,9 +12,9 @@ commits: 未提交的工作区改动
 
 ## Report
 
-**构建内容** —— 本功能分两层。第 1 层：壳记录自己启动的 hub（`$DSH_HOME/desktop-server.json`），并在下次启动时采纳该 hub，而不是再启动第二个；判定受三重约束：CLI 入口的 runtime 身份、启动 URL 自身的端口与 token，以及回环 `GET /?token=…` 仍须返回 303。采纳在 supervisor 中先于任何 spawn 执行，对外发布的 `dsh://ready` 与 `dsh_status` 与启动出的 hub 完全相同，并跳过 `ensure_home_node_modules`、`ensure_default_plugins`、端口选择、spawn，以及约 4.1 s 的 `dsh web` 启动。"Restart service" 会先复核记录、再按 pid 结束被采纳的 hub，让 supervisor 替换它；记录会在所指的 hub 停止服务后丢弃，或在壳收尾自己拥有的那个 hub 时随之丢弃。第 3 层：解析器的前缀表改为经载体的 realpath（`realModuleDirectory`）规范化，不再走 JavaScript 的 `realpathSync`；`packageDirFromAnchor` 每次解析构建最多列一次被搜索的 `node_modules` 目录，且只依据列表所证明的内容否决候选项——不存在的目录装不下任何东西，可读目录的名字按大小写折叠匹配——`package.json` 探测始终是最终判定。在打包 runtime 上，这两处改动把 `dsh web --help` 从 3346 ms 降到 3039 ms，把冷启动到启动 URL 从 4269 ms 降到 3903 ms（三轮交替测量的最小值）。
+**构建内容** —— 本功能分两层。第 1 层：壳记录自己启动的 hub（`$DSH_HOME/desktop-server.json`），并在下次启动时采纳该 hub，而不是再启动第二个；判定受三重约束：CLI 入口的 runtime 身份、启动 URL 自身的端口与 token，以及回环 `GET /?token=…` 仍须返回 303。采纳在 supervisor 中先于任何 spawn 执行，对外发布的 `dsh://ready` 与 `dsh_status` 与启动出的 hub 完全相同，并跳过 `ensure_home_node_modules`、`ensure_default_plugins`、端口选择、spawn，以及约 4.1 s 的 `dsh web` 启动。"Restart service" 会先复核记录、再按 pid 结束被采纳的 hub，让 supervisor 替换它；退出会结束本 home 正在服务的每一个 hub——自己 spawn 的那个连同它派生的子进程一起结束，只被采纳的那个在重跑一次鉴权复核后按 pid 结束——记录在所指的 hub 停止服务后丢弃，或随着这两种收尾丢弃。第 3 层：解析器的前缀表改为经载体的 realpath（`realModuleDirectory`）规范化，不再走 JavaScript 的 `realpathSync`；`packageDirFromAnchor` 每次解析构建最多列一次被搜索的 `node_modules` 目录，且只依据列表所证明的内容否决候选项——不存在的目录装不下任何东西，可读目录的名字按大小写折叠匹配——`package.json` 探测始终是最终判定。在打包 runtime 上，这两处改动把 `dsh web --help` 从 3346 ms 降到 3039 ms，把冷启动到启动 URL 从 4269 ms 降到 3903 ms（三轮交替测量的最小值）。
 
-**验证** —— `node ./node_modules/typescript/bin/tsc -p packages/boot/app-boot/tsconfig.json --noEmit` 通过。在加上差异标记与 ACL 测试修复后，于 2026-10-01 重跑 `node ./node_modules/vitest/vitest.mjs run packages/boot/app-boot`：19 个文件、5575 项通过、跳过 2 项；这两项都是本机无法构造的平台条件——POSIX 专有的权限用例，以及 `package-meta.spec.ts` 中大小写敏感文件系统的用例——而单独运行 `profile.spec.ts` 为 37 通过 | 1 跳过，`-t "probes a search path"` 在整个包上把 Windows ACL 用例报为唯一通过项，因此无法列出目录的修复在本机确实被执行；该用例也确实约束了修复——把 `isMissingDirectory` 无条件改为返回 `true` 会让它失败。同一套件在 `--coverage` 下的未覆盖位置只出现在既有基线（`compatibility-preflight.ts:57`、`profile-context.ts:67-68`，以及 `resolver.ts` 中一处向上查找分支，PRE-EXISTING），本功能代码没有未覆盖行。对三个改动文件运行 `run-oxlint` 干净。打包 runtime 的 A/B：`dsh web --help` 之前 3346/3391/3527 ms、之后 3039/3150/3165 ms，冷启动之前 4269/4301/4356 ms、之后 3903/3987/4018 ms，两侧激活日志相同。`cargo fmt --check` 干净，`apps/desktop/src-tauri` 下 `cargo test` 通过 13 项；默认跳过的跨进程测试 `DSH_DESKTOP_ADOPT_E2E="<node>|<bin>" cargo test adopts_a_live -- --nocapture` 在单独一次运行中针对打包 runtime 通过（不带该环境变量时它会提前返回）。`verify-md-wrap` 检查 2245 个文件，`verify-translation-pairing` 报告本文档配对一致。共进行三轮独立复查——两轮针对主体改动，一轮针对复查后的新增内容——三处 critical 均已修复并有测试覆盖：门禁最初缺少的大小写折叠、不得被读成空目录的无法列出目录，以及最初因 deny 指定账户名而非 Everyone SID 而毫无证明力的 Windows 回归测试。
+**验证** —— `node ./node_modules/typescript/bin/tsc -p packages/boot/app-boot/tsconfig.json --noEmit` 通过。在加上差异标记与 ACL 测试修复后，于 2026-10-01 重跑 `node ./node_modules/vitest/vitest.mjs run packages/boot/app-boot`：19 个文件、5575 项通过、跳过 2 项；这两项都是本机无法构造的平台条件——POSIX 专有的权限用例，以及 `package-meta.spec.ts` 中大小写敏感文件系统的用例——而单独运行 `profile.spec.ts` 为 37 通过 | 1 跳过，`-t "probes a search path"` 在整个包上把 Windows ACL 用例报为唯一通过项，因此无法列出目录的修复在本机确实被执行；该用例也确实约束了修复——把 `isMissingDirectory` 无条件改为返回 `true` 会让它失败。同一套件在 `--coverage` 下的未覆盖位置只出现在既有基线（`compatibility-preflight.ts:57`、`profile-context.ts:67-68`，以及 `resolver.ts` 中一处向上查找分支，PRE-EXISTING），本功能代码没有未覆盖行。对三个改动文件运行 `run-oxlint` 干净。打包 runtime 的 A/B：`dsh web --help` 之前 3346/3391/3527 ms、之后 3039/3150/3165 ms，冷启动之前 4269/4301/4356 ms、之后 3903/3987/4018 ms，两侧激活日志相同。`cargo fmt --check` 干净，`apps/desktop/src-tauri` 下 `cargo test` 通过 14 项；默认跳过的跨进程测试 `DSH_DESKTOP_ADOPT_E2E="<node>|<bin>" cargo test adopts_a_live -- --nocapture` 在单独一次运行中针对打包 runtime 通过（不带该环境变量时它会提前返回）。`verify-md-wrap` 检查 2245 个文件，`verify-translation-pairing` 报告本文档配对一致。共进行三轮独立复查——两轮针对主体改动，一轮针对复查后的新增内容——三处 critical 均已修复并有测试覆盖：门禁最初缺少的大小写折叠、不得被读成空目录的无法列出目录，以及最初因 deny 指定账户名而非 Everyone SID 而毫无证明力的 Windows 回归测试。
 
 **过程记录**
 
@@ -61,7 +61,7 @@ commits: 未提交的工作区改动
 2. 记录中的 URL 是该端口的回环启动 URL，并携带它自己的 token。
 3. 对该端口发出回环 `GET /?token=…` 会得到 303，只有当初打印该 URL 的进程会这样应答：token 属于进程，被复用的端口或外来监听者无法应答。
 
-被采纳的 hub 在其他方面与全新启动的没有区别。supervisor 用采纳到的端口发布 `dsh://ready`，`dsh_status` 报告同样的端口与 URL，前端加载同一个带鉴权的 URL，因此客户端约定没有变化。采纳会跳过 `ensure_home_node_modules`、`ensure_default_plugins`、端口选择、spawn 以及那 4.1 s 的启动。"Restart service" 会先重读并复核记录，然后才通过 pid 结束被采纳的 hub（Windows 用 `taskkill`，其他平台用 `kill`），于是 supervisor 的端口监听把这次请求变成一次冷启动；如果记录已无法通过鉴权，壳不会去结束它，而是在空闲端口上替换它，因为被替换服务的 pid 可能已被回收。记录会在所指的 hub 停止服务后忘掉，或在壳收尾自己拥有的 hub 时随之忘掉；绝不在被采纳的 hub 仍在监听时忘掉——比壳活得更久的 hub 恰恰就是下次启动要采纳的对象。对于不指向产生该记录的端口与 token 的 URL，记录不会被写入；记录的写入也不依赖应用日志目录可写。
+被采纳的 hub 在其他方面与全新启动的没有区别。supervisor 用采纳到的端口发布 `dsh://ready`，`dsh_status` 报告同样的端口与 URL，前端加载同一个带鉴权的 URL，因此客户端约定没有变化。采纳会跳过 `ensure_home_node_modules`、`ensure_default_plugins`、端口选择、spawn 以及那 4.1 s 的启动。"Restart service" 会先重读并复核记录，然后才通过 pid 结束被采纳的 hub（Windows 用 `taskkill`，其他平台用 `kill`），于是 supervisor 的端口监听把这次请求变成一次冷启动；如果记录已无法通过鉴权，壳不会去结束它，而是在空闲端口上替换它，因为被替换服务的 pid 可能已被回收。退出会结束本 home 正在服务的每一个 hub：自己 spawn 的那个连同它派生的子进程一起结束，只被采纳的那个在重跑一次鉴权复核后按 pid 结束，因此没有任何 hub 活得比窗口更久；记录在所指的 hub 停止服务后忘掉，或随着这两种收尾忘掉，但绝不在被采纳的 hub 仍在监听时忘掉——上一个壳意外退出留下的 hub，正是下一次启动要采纳的对象。对于不指向产生该记录的端口与 token 的 URL，记录不会被写入；记录的写入也不依赖应用日志目录可写。
 
 ### 第 2 层 —— 让 hub 跨应用退出保活（已否决）
 
@@ -104,14 +104,14 @@ commits: 未提交的工作区改动
 
 ## [S3] Scope
 
-- 范围内：记录启动出的 hub；带 runtime 身份与 token 检查的采纳判定；supervisor 中的采纳；对被采纳 hub 的按 pid 重启；在自有收尾时忘掉记录；单元测试与一个默认跳过的跨进程测试；把解析器的前缀路径改为经载体的文件系统规范化；每次解析构建只列一次被搜索的 `node_modules` 目录；本文档。
+- 范围内：记录启动出的 hub；带 runtime 身份与 token 检查的采纳判定；supervisor 中的采纳；对被采纳 hub 的按 pid 重启；退出时结束自有 hub 的整棵进程树与已复核的被采纳 hub；单元测试与一个默认跳过的跨进程测试；把解析器的前缀路径改为经载体的文件系统规范化；每次解析构建只列一次被搜索的 `node_modules` 目录；本文档。
 - 范围外：应用退出后继续保活 hub（第 2 层，已否决：本应用的任何东西都不得比窗口活得更久）；预打包插件闭包，它对应的是 Node 的逐模块解析，且会改变 profile 按包名解析各行的方式；采纳不是本壳启动的 hub，因为没有存储的 token 能通过它的鉴权；客户端载荷，已测量且不在关键路径上。
 
 ## Tasks
 
-- [x] T1：记录启动出的 hub 并在下次启动采纳它——验收：`apps/desktop/src-tauri` 下 `cargo test` 通过 13 项，包含采纳判定的各个用例（覆盖：S2 第 1 层）
+- [x] T1：记录启动出的 hub 并在下次启动采纳它——验收：`apps/desktop/src-tauri` 下 `cargo test` 通过 14 项，包含采纳判定的各个用例（覆盖：S2 第 1 层）
 - [x] T2：对真实 hub 验证该约定——验收：`DSH_DESKTOP_ADOPT_E2E="<node>|<bin>" cargo test adopts_a_live -- --nocapture` 采纳一个真实的打包服务、按 pid 结束它，并停止采纳它（覆盖：S2 第 1 层）
-- [x] T3：否决第 2 层——验收：受监督的 hub 仍随窗口一起结束（`dsh_runner.rs`：`stop`），且 S2 第 2 层记录了该决定（覆盖：S2 第 2 层）
+- [x] T3：否决第 2 层——验收：退出结束自有 hub 的整棵进程树，也结束重跑鉴权复核后的被采纳 hub（测试：`ends_a_live_child_process`），且 S2 第 2 层记录了该决定（覆盖：S2 第 2 层）
 - [x] T4：把解析器的前缀路径改为经载体的 realpath 规范化——验收：`profile.spec.ts`、`profile-resolution.spec.ts`、`linked-resolution-matrix.spec.ts` 通过，且打包 `dsh web --help` 的 A/B 在三轮交替测量中从 3346 ms 降到 3039 ms（覆盖：S2 第 3 层）
 - [x] T5：每次解析构建只列一次被搜索的 `node_modules` 目录——验收：`skips a declared dependency whose node_modules entry holds no manifest` 通过，且整个 `packages/boot/app-boot` 套件通过 5575 项、跳过 2 项（覆盖：S2 第 3 层）
 
@@ -120,16 +120,17 @@ commits: 未提交的工作区改动
 - [x] 由本次构建记录、且仍以其启动 token 提供服务的 hub，会在不启动子进程的情况下被采纳（测试：`adopts_the_recorded_server_while_its_token_is_accepted`、`adopts_a_live_dsh_web_server_and_rejects_it_once_gone`）
 - [x] URL、token、runtime 身份或服务本身不再匹配的记录不会被采纳（测试：`rejects_urls_that_name_another_port_or_no_token`、`rejects_a_record_whose_token_no_longer_authenticates`、`rejects_a_record_from_a_runtime_this_shell_no_longer_runs`、`reports_no_adoption_without_a_record`）
 - [x] 被采纳期间执行重启会按 pid 结束该 hub 并释放端口（测试：`adopts_a_live_dsh_web_server_and_rejects_it_once_gone`、`terminate_pid`）
-- [x] 仅采纳过某 hub 的壳退出后，该记录仍然保留；而该 hub 停止服务后记录被丢弃（`dsh_runner.rs`：采纳停驻处仅在 `!port_open(port)` 时忘掉）
+- [x] 退出会结束本 home 正在服务的 hub：自有 hub 连同它派生的子进程一起结束，只被采纳的 hub 在重跑鉴权复核后按 pid 结束（测试：`ends_a_live_child_process`；`dsh_runner.rs`：`stop`）
+- [x] 记录在所指的 hub 停止服务后丢弃；采纳停驻期间不会丢弃仍在监听的 hub（`dsh_runner.rs`：采纳停驻处仅在 `!port_open(port)` 时忘掉）
 - [x] 重启请求绝不会结束一条记录已无法通过鉴权的 pid（`dsh_runner.rs`：`request_restart` 在 `terminate_pid` 之前重跑 `adopt_decision`）
-- [x] 只有已经在运行的 hub 会被复用；本壳所监督的 hub 仍随窗口一起结束（`dsh_runner.rs`：`stop`；S2 第 2 层）
+- [x] 只有已经在运行的 hub 会被复用；退出之后没有任何 hub 仍在服务，被采纳的也不例外（`dsh_runner.rs`：`stop`；S2 第 2 层）
 - [x] 前缀表经载体的文件系统规范化，因此一条路径只花一次文件系统调用，而不是每段一次（`resolver.ts`：`canonicalPath` 调用 `realModuleDirectory`）
 - [x] `node_modules` 目录存在但不含 `package.json` 的已声明依赖仍被跳过，而不会被当成已安装（测试：`skips a declared dependency whose node_modules entry holds no manifest`）
 - [x] 与磁盘目录大小写不同的请求名会得到与文件系统一致的答复，因此列目录绝不会把已安装的包变成缺失的包（测试：`answers a requested name that differs in case from the installed directory as the filesystem does`）
 - [x] 进程可搜索但无法列出的搜索路径交给 `package.json` 探测处理，而不会被当成装不下任何包（测试：POSIX 用 `probes a search path whose entries cannot be read rather than reporting the package as missing`，Windows 用 `probes a search path whose entries an ACL hides rather than reporting the package as missing`；Windows 用例在本机执行——`-t "probes a search path"` 在整个包上把它报为唯一通过项——两种用例只在本平台无法构造该条件时跳过）
 - [x] 一次解析构建最多列一次被搜索的 `node_modules` 目录（`profile.ts`：`createRuntimeResolution` 中新建、经 `listingOf` 读取的 `DirectoryListings` 映射）
 - [x] 冷启动更快到达启动 URL 且激活输出一致：之前 4269 ms、之后 3903 ms（交替测量最小值），激活日志相同（打包 runtime A/B）
-- [ ] 连续启动壳两次时，第二个窗口落在第一个 hub 的端口上且不会再次启动（人工：需要 GUI 壳）
+- [ ] 连续启动壳两次时，第二个窗口落在第一个 hub 的端口上且不会再次启动，且其中任一个退出都会结束该 hub（人工：需要 GUI 壳）
 
 ## [S5] 与上游的差异
 
@@ -142,7 +143,7 @@ commits: 未提交的工作区改动
 | `packages/boot/app-boot/src/profile-resolution/resolver.ts` | `canonicalPath` 返回 `realModuleDirectory(path)`，上游调用的是 `fs.realpathSync` | 那一行载体 realpath |
 | `packages/boot/app-boot/src/profile.ts` | 列表相关代码块（`DirectoryListings`、`DirectoryListing`、`ABSENT_DIRECTORY`、`isMissingDirectory`、`listingOf`、`listedDirectory`、`listingHolds`）与 `packageDirFromAnchor` 内的门禁 | 代码块与门禁；`collectInstallationScopePackages`、`dependencyClosure`、`collectProfileScopePackages`、`createRuntimeResolution`、`resolveBundleDir` 上多出的 `listings` 参数由它们派生，少传参数编译器会直接报错 |
 | `packages/boot/app-boot/tests/profile.spec.ts` | 无 manifest 用例、大小写折叠用例，以及两条搜索路径用例（POSIX 权限、Windows ACL） | 四条都要保留，它们共同构成这道门禁的回归覆盖——列表持有的名字仍会去探测、大小写不同的名字仍能解析、无法列出的目录仍经探测解析 |
-| `apps/desktop/src-tauri/src/dsh_runner.rs` | 第 1 层：`ServerRecord` 以及采纳、停驻、重启、遗忘、停止这些路径 | 整个文件的功能；它的 13 项测试就是重放验收 |
+| `apps/desktop/src-tauri/src/dsh_runner.rs` | 第 1 层：`ServerRecord` 以及采纳、停驻、重启、遗忘、停止这些路径 | 整个文件的功能；它的 14 项测试就是重放验收 |
 | `docs/compose/spec/desktop-startup-latency.*` | 本文档 | 无需保留，上游没有这个文件 |
 
 `vendor/` 未被改动，因此其本地修改清单不需要新增条目。重放是否成立，以仓库根目录下 `node ./node_modules/typescript/bin/tsc -p packages/boot/app-boot/tsconfig.json --noEmit`、`node ./node_modules/vitest/vitest.mjs run packages/boot/app-boot` 通过，且 `apps/desktop/src-tauri` 下 `cargo test` 通过为准。

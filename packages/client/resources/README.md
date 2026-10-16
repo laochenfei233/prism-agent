@@ -78,6 +78,8 @@ One record per address holds a snapshot store, a holder count (hook subscribers 
 
 A failure is a frame, not a throw: a provider yields `{ ok: false, error }` and the resource turns `failed` with that error beside the last value; the next `ok` frame clears it. A stream that ends on its own keeps its last state. Frames that arrive after the release that aborted the stream are dropped, and the iterator is returned. A throw inside a provider's stream is a programming error and is not caught.
 
+An address whose protocol cannot be read is not a failure frame: it reports `none` for the page lifetime, which a consumer renders as a missing service. The protocol key is therefore read from the address text when the engine's URL parser leaves a non-special scheme's host empty — the WebView2 runtime behind the Desktop shell (Chromium 132) does, while Node and current Chromium report the host — so an address never silently loses its provider lookup.
+
 <a id="model-experience"></a>
 ## Model Experience
 

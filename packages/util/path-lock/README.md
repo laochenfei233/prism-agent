@@ -85,3 +85,13 @@ These limits define where the package is not the right tool. They are current pa
 - **The caller owns the directory and its permissions** — `acquire` creates the lock file but not its parent, and it never changes an existing directory's mode.
 - **Locking is not a transaction** — the package orders writers over a path; it does not make the work inside the lock durable, atomic, or recoverable.
 - **Same-process reuse is excluded too** — the kernel arbitrates descriptors, so a second acquisition anywhere, including in the same process, reports contention rather than reentering.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

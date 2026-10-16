@@ -41,6 +41,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/message/queued`, `team/message/delivered`, `team/task`, `tool/result` | - | All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
+| `@deepseek-ai/dsh-experimental-tool-meeting-minutes` | `meeting_minutes` | `ctx.tools`, `ctx.fs`, `ctx.speechToText`, `a registered recognizer accepting the resolved language` | `tool/call`, `fs/observed after the transcript write`, `tool/result` | - | The tool writes the transcript beside the recording and returns the minutes structure; the calling agent writes the minutes itself. The bundled recognizer is DashScope's realtime service, so a deployment without one leaves `resolve()` failing rather than returning partial text. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
@@ -2308,6 +2309,58 @@ Wait for the next teammate status, mailbox, or shared-task change after this cal
 Source: [`packages/experimental/tool-agent-team/src/index.ts`](../packages/experimental/tool-agent-team/src/index.ts)
 
 All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.
+
+<a id="deepseek-aidsh-experimental-tool-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-experimental-tool-meeting-minutes`
+
+### `meeting_minutes`
+
+Transcribe one meeting recording and prepare a meeting-minutes structure for it. The recording must be a 16 kHz mono 16-bit PCM WAV file; convert anything else first. This tool writes the transcript next to the recording and returns a preview of it. It does NOT write the minutes: read the returned transcript (the file, when the preview is truncated), then write the minutes yourself to the suggested path, filling in the returned structure.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "audio_path": {
+      "type": "string",
+      "description": "Path to the recording, relative to the workspace or absolute. Must be 16 kHz mono PCM16 WAV."
+    },
+    "title": {
+      "type": "string",
+      "description": "Meeting title. Defaults to the recording file name."
+    },
+    "participants": {
+      "type": "array",
+      "description": "Names of the people in the meeting. The recognizer does not identify speakers, so only what you are told.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "template": {
+      "type": "string",
+      "description": "Minutes structure to fill. Defaults to default.",
+      "enum": [
+        "default",
+        "detailed",
+        "action-focused",
+        "decision"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "description": "Language hint for the recognizer; omit to use this composition's configured default."
+    }
+  },
+  "required": [
+    "audio_path"
+  ]
+}
+```
+
+Source: [`packages/experimental/tool-meeting-minutes/src/index.ts`](../packages/experimental/tool-meeting-minutes/src/index.ts)
+
+The tool writes the transcript beside the recording and returns the minutes structure; the calling agent writes the minutes itself. The bundled recognizer is DashScope's realtime service, so a deployment without one leaves `resolve()` failing rather than returning partial text.
 
 <a id="deepseek-aidsh-tool-todo"></a>
 

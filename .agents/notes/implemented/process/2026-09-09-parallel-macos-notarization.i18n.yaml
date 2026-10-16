@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-09-parallel-macos-notarization.md
-2026-09-09-parallel-macos-notarization.md: 18358444426575e27a21f0f56541e22e37fcdf2c
-2026-09-09-parallel-macos-notarization.zh.md: a69d586eff1413debe096656a7572a53f0938e98
+2026-09-09-parallel-macos-notarization.md: f1922f5936e598ac6f85cb74fb64d36f915b14a8
+2026-09-09-parallel-macos-notarization.zh.md: b03bf79e6fad070c58d7c7a3150f5c036ab13dd8

@@ -46,10 +46,35 @@ interface ResourceRecord {
 export const RESOURCE_SCHEME = 'dsh-resource'
 
 /**
- * The protocol key of one address: the host of a `dsh-resource://` URL, as the
- * URL parser reads it (lower-cased). Any other string — another scheme, or one
- * the URL parser rejects — names no protocol and is treated like an address
- * whose protocol has no provider.
+ * The authority text of one address: what the address writes between its `://`
+ * and the first `/`, `?`, or `#`.
+ *
+ * Read from the text rather than from a parsed URL because a non-special
+ * scheme's authority is not universally parsed: the WebView2 runtime behind the
+ * Desktop shell (Chromium 132) folds `dsh-resource://file/session/…` into the
+ * path, leaving `hostname` empty, while Node and current Chromium report
+ * `file`. The scheme is matched case-insensitively because a URL parser
+ * lower-cases it while the address text keeps its spelling.
+ * @param address - the full address.
+ * @returns the authority text, or `undefined` when the address carries none.
+ */
+function authorityOf(address: string): string | undefined {
+  const authority = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/([^/?#]*)/.exec(address)?.[1]
+  return authority === undefined || authority === '' ? undefined : authority
+}
+
+/**
+ * The protocol key of one address: the host of a `dsh-resource://` URL
+ * (lower-cased). Any other string — another scheme, or one the URL parser
+ * rejects — names no protocol and is treated like an address whose protocol has
+ * no provider.
+ *
+ * The parsed host is preferred, so a compliant engine answers without the text
+ * fallback; an engine that leaves a non-special host empty is answered from
+ * {@link authorityOf}. Skipping that fallback is not survivable: the protocol
+ * key selects the provider, so an address read as protocol-less keeps a `none`
+ * snapshot for the page lifetime and renders as a missing service even though
+ * its provider is registered.
  * @param address - the full address.
  * @returns the protocol key, or `undefined` when the address is not a resource address.
  */
@@ -63,8 +88,8 @@ export function protocolOf(address: string): string | undefined {
     return undefined
   }
   if (parsed.protocol !== `${RESOURCE_SCHEME}:`) return undefined
-  // A non-special scheme's host is opaque to the URL parser and keeps its case.
-  return parsed.hostname === '' ? undefined : parsed.hostname.toLowerCase()
+  const host = parsed.hostname === '' ? authorityOf(address) : parsed.hostname
+  return host === undefined ? undefined : host.toLowerCase()
 }
 
 function idle(status: 'none' | 'loading'): ResourceSnapshot<unknown> {

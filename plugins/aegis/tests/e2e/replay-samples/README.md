@@ -1,5 +1,7 @@
 # Controlled Replay Samples
 
+English | [中文](README.zh.md)
+
 This directory contains prompts and expected behavior contracts for controlled
 agentic replay samples.
 

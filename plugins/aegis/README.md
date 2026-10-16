@@ -22,6 +22,8 @@
 
 # Aegis
 
+English | [中文](README.zh.md)
+
 <p align="center">
     <strong>Aegis Method Pack</strong><br/>
     Make your AI coding agent trustworthy: fewer reworks, safer changes, proof before "done".

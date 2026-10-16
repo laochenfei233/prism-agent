@@ -1,5 +1,7 @@
 # Artifact Bootstrap Fixtures
 
+English | [中文](README.zh.md)
+
 These sample manifests are bootstrap fixtures for `artifact-schema-check.sh`.
 
 They are not authoritative runtime outputs.

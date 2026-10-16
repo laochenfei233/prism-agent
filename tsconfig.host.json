@@ -183,6 +183,10 @@
   "references": [
     { "path": "./packages/experimental/speech-to-text" },
     { "path": "./packages/experimental/speech-to-text-sensevoice" },
+    { "path": "./packages/experimental/speech-to-text-dashscope" },
+    { "path": "./packages/experimental/speech-to-text-openai" },
+    { "path": "./packages/experimental/tool-meeting-minutes" },
+    { "path": "./packages/experimental/meeting-minutes-bundle" },
     { "path": "./packages/experimental/api-speech-to-text" },
     { "path": "./packages/experimental/voice-input-bundle" },
     { "path": "./packages/client/locale/tsconfig.host.json" },

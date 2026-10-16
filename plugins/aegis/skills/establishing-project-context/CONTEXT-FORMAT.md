@@ -42,7 +42,7 @@ ambiguities are never active truth.
    useful; omit an empty `_Avoid_` line.
 4. **Stable bytes**: no timestamps, task/session IDs, automatic review dates,
    unrelated reordering, or cosmetic rewrites.
-5. **Optional provenance**: use `_Authority_` only for formal or
+5. **Optional authority**: use `_Authority_` only for formal or
    drift-sensitive definitions. The linked authority remains the owner.
 6. **Immediate minimal delta**: write a resolved fact inline; leave bytes
    unchanged when meaning did not change.

@@ -141,3 +141,13 @@ const job = await ctx.cron.create({
 - **`runNow` 在有运行在飞时拒绝**——调用方要的是此刻，因此提供方回答 `cron_run_in_progress`，而不是排到正在进行的那次之后。
 - **搜索是有界的**——`nextCronOccurrence` 走 `MAX_SEARCH_DAYS` 天，该窗口大于被跳过的世纪闰年所造成的八年间隔；窗口内没有发生时回答 `undefined`，而不是无限搜索。
 - **发生时刻按需计算**——没有索引也没有缓存，反复解析同一表达式的调用方每次都付这个代价。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

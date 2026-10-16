@@ -127,3 +127,13 @@ These limits define when the scheduled-task tools are a poor fit or need special
 - **`cron_run` is not a firing** — it records one run and leaves the stored schedule and its next occurrence untouched.
 - **Result instants are UTC** — the model reads every occurrence as an RFC 3339 UTC instant and must convert to the task's declared zone itself when reporting local time.
 - **No snapshot pins the rendered text yet** — the schemas and results are pinned by this package's focused tests; a keyless recorded-session scenario for a Cron-fired run belongs to T15.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

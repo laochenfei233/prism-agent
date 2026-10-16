@@ -1,8 +1,11 @@
 /**
  * Standalone build for the out-of-tree Host half the Loader imports.
  *
- * Every harness import in `src/` is `import type`, so the emitted module has no
- * imports at all: no bundle entry and no runtime resolution are needed.
+ * Every harness import in `src/` is `import type` except `createUserMessage`
+ * from `@deepseek-ai/dsh-llm`. The harness packages stay external, resolved
+ * from the profile that loads this bundle, exactly as the sibling
+ * `plugins/prism-memory` does — so the artifact carries one import and a
+ * deployment installs nothing of its own.
  */
 import { defineConfig } from 'tsdown'
 
@@ -16,4 +19,5 @@ export default defineConfig({
   dts: false,
   clean: true,
   fixedExtension: false,
+  deps: { neverBundle: [/^@deepseek-ai\//u] },
 })

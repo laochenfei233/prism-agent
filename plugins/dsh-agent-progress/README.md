@@ -1,5 +1,7 @@
 # dsh-agent-progress
 
+English | [中文](README.zh.md)
+
 A DeepSeek Harness plugin bundle that adds an **Agent work-progress panel**: a
 sidebar entry at the viewport foot and a native overlay page listing every
 session with what each agent is doing.

@@ -5,7 +5,7 @@ import z from '@deepseek-ai/schemastery'
 // entry and `loader/volatile-update` merges.
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
-import type { SpeechPreparationOptions, SpeechProvider, SpeechProviderId, SpeechProviderInfo, SpeechSnapshot, SpeechSelectionPatch, SpeechRequest, SpeechSpec, Transcript } from './types.ts'
+import type { SpeechPreparationOptions, SpeechProvider, SpeechProviderId, SpeechProviderInfo, SpeechSnapshot, SpeechSelectionPatch, SpeechRequest, SpeechSpec, SpeechStream, SpeechStreamRequest, SpeechStreamSpec, Transcript } from './types.ts'
 
 export type * from './types.ts'
 
@@ -22,12 +22,15 @@ export interface Config {
   defaultProvider: Volatile<string>
   /** Provider language hint selected when the caller omits one. */
   language: Volatile<string>
+  /** Model the selection runs; the empty string leaves the selected recognizer's own default. */
+  model: Volatile<string>
 }
 
 interface Registration {
   readonly provider: SpeechProvider
   readonly lifetime: AbortController
   readonly pending: Set<Promise<Transcript>>
+  readonly sessions: Set<SpeechStream>
   readonly unsubscribe: () => void
 }
 
@@ -36,6 +39,7 @@ export default class SpeechToText extends Service {
   static Config = z.object({
     defaultProvider: z.string().min(1).required().volatile(),
     language: z.string().min(1).default('auto').volatile(),
+    model: z.string().default('').volatile(),
   })
 
   private readonly providers = new Map<SpeechProviderId, Registration>()
@@ -63,7 +67,7 @@ export default class SpeechToText extends Service {
   register(provider: SpeechProvider): () => Promise<void> {
     this.lifetime.signal.throwIfAborted()
     if (this.providers.has(provider.info.id)) throw new Error(`Speech provider already registered: ${provider.info.id}`)
-    const registration: Registration = { provider, lifetime: new AbortController(), pending: new Set(),
+    const registration: Registration = { provider, lifetime: new AbortController(), pending: new Set(), sessions: new Set(),
       unsubscribe: provider.preparation?.subscribe(() => { this.changed() }) ?? (() => {}) }
     this.providers.set(provider.info.id, registration)
     this.changed()
@@ -76,6 +80,8 @@ export default class SpeechToText extends Service {
     registration.unsubscribe()
     this.changed()
     registration.lifetime.abort(new Error('Speech provider unloaded'))
+    await Promise.allSettled([...registration.sessions].map(session => session.cancel()))
+    registration.sessions.clear()
     await Promise.allSettled(registration.pending)
   }
 
@@ -121,9 +127,12 @@ export default class SpeechToText extends Service {
    * @returns one detached complete observation.
    */
   snapshot(): SpeechSnapshot {
+    const model = this.config.model.get()
     return { providers: [...this.providers.values()].map(({ provider }) => ({ ...provider.info,
       preparation: provider.preparation?.snapshot() ?? { phase: 'ready' },
-    })), selection: { providerId: this.config.defaultProvider.get() as SpeechProviderId, language: this.config.language.get() } }
+      ...provider.streaming === undefined ? {} : { streaming: provider.streaming.mode },
+    })), selection: { providerId: this.config.defaultProvider.get() as SpeechProviderId,
+      language: this.config.language.get(), ...model === '' ? {} : { model } } }
   }
 
   /**
@@ -135,17 +144,27 @@ export default class SpeechToText extends Service {
     const settings = this.ctx.get('settings')
     const entry = this.entryId
     if (settings === undefined || entry === undefined) throw new Error('Speech selection requires the settings service and a profile entry')
-    const id = patch.providerId ?? this.config.defaultProvider.get() as SpeechProviderId
-    this.selectedProvider(id, patch.language ?? this.config.language.get())
+    const previous = this.config.defaultProvider.get()
+    const id = patch.providerId ?? previous as SpeechProviderId
+    // Naming a different recognizer without a model selects that recognizer's own
+    // default, because the previous model belongs to the recognizer being left.
+    const switching = patch.providerId !== undefined && patch.providerId !== previous
+    const model = patch.model ?? (switching ? '' : this.config.model.get())
+    this.selectedProvider(id, patch.language ?? this.config.language.get(), model)
     await settings.update(entry, { ...patch.providerId === undefined ? {} : { defaultProvider: patch.providerId },
-      ...patch.language === undefined ? {} : { language: patch.language } })
+      ...patch.language === undefined ? {} : { language: patch.language },
+      // A stored model the resulting selection cannot run is replaced, never left behind.
+      ...model === this.config.model.get() ? {} : { model } })
   }
 
-  private selectedProvider(id: SpeechProviderId, language: string): SpeechProvider {
+  private selectedProvider(id: SpeechProviderId, language: string, model: string): SpeechProvider {
     const registration = this.providers.get(id)
     if (!registration) throw new Error(`Speech provider is unavailable: ${id}`)
     if (!registration.provider.info.languages.includes(language)) {
       throw new Error(`Speech provider ${id} does not support language: ${language}`)
+    }
+    if (model !== '' && registration.provider.info.models?.includes(model) !== true) {
+      throw new Error(`Speech provider ${id} does not offer model: ${model}`)
     }
     return registration.provider
   }
@@ -180,7 +199,9 @@ export default class SpeechToText extends Service {
   resolve(request: SpeechRequest): SpeechSpec {
     const id = request.providerId ?? this.config.defaultProvider.get() as SpeechProviderId
     const language = request.language ?? this.config.language.get()
-    return { provider: this.selectedProvider(id, language), audio: request.audio, language }
+    const model = request.model ?? this.config.model.get()
+    return { provider: this.selectedProvider(id, language, model), audio: request.audio, language,
+      ...model === '' ? {} : { model } }
   }
 
   /**
@@ -196,7 +217,8 @@ export default class SpeechToText extends Service {
     const combined = AbortSignal.any([signal, registration.lifetime.signal])
     const pending = Promise.resolve().then(() => {
       combined.throwIfAborted()
-      return spec.provider.transcribe({ audio: spec.audio, language: spec.language }, combined)
+      return spec.provider.transcribe({ audio: spec.audio, language: spec.language,
+        ...spec.model === undefined ? {} : { model: spec.model } }, combined)
     })
     registration.pending.add(pending)
     try {
@@ -205,6 +227,47 @@ export default class SpeechToText extends Service {
       return result
     } finally {
       registration.pending.delete(pending)
+    }
+  }
+
+  /**
+   * Apply composition defaults and capture the selected provider's live capability.
+   * @param request - optional provider and language selection.
+   * @returns provider-pinned input for openStream().
+   * @throws {Error} The selected provider offers no live session.
+   */
+  resolveStream(request: SpeechStreamRequest): SpeechStreamSpec {
+    const id = request.providerId ?? this.config.defaultProvider.get() as SpeechProviderId
+    const language = request.language ?? this.config.language.get()
+    const model = request.model ?? this.config.model.get()
+    const provider = this.selectedProvider(id, language, model)
+    if (provider.streaming === undefined) throw new Error(`Speech provider offers no live session: ${id}`)
+    return { provider, streaming: provider.streaming, language, ...model === '' ? {} : { model } }
+  }
+
+  /**
+   * Open one live session on exactly the resolved provider; withdrawing the registration cancels it.
+   * @param spec - resolved selection; a withdrawn or replaced registration is rejected.
+   * @param signal - caller cancellation.
+   * @returns the open session, tracked until it closes, cancels, or the registration withdraws.
+   */
+  async openStream(spec: SpeechStreamSpec, signal: AbortSignal): Promise<SpeechStream> {
+    signal.throwIfAborted()
+    const registration = this.providers.get(spec.provider.info.id)
+    if (registration?.provider !== spec.provider) throw new Error('Resolved speech provider is no longer registered')
+    const combined = AbortSignal.any([signal, registration.lifetime.signal])
+    const session = await spec.streaming.open({ language: spec.language,
+      ...spec.model === undefined ? {} : { model: spec.model } }, combined)
+    registration.sessions.add(session)
+    const settled = async (end: () => Promise<void>): Promise<void> => {
+      registration.sessions.delete(session)
+      await end()
+    }
+    return {
+      push: chunk => session.push(chunk),
+      close: () => settled(() => session.close()),
+      cancel: () => settled(() => session.cancel()),
+      events: observer => session.events(observer),
     }
   }
 }

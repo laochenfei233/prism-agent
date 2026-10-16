@@ -2717,6 +2717,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'spec', description: 'resolved input; a withdrawn or replaced registration is rejected.' }, { name: 'signal', description: 'caller cancellation.' }],
         returns: 'final transcript after provider settlement.',
       },
+      {
+        signature: 'resolveStream(request: SpeechStreamRequest): SpeechStreamSpec',
+        description: 'Apply composition defaults and capture the selected provider\'s live capability.',
+        parameters: [{ name: 'request', description: 'optional provider and language selection.' }],
+        returns: 'provider-pinned input for openStream().',
+        throws: ['{Error} The selected provider offers no live session.'],
+      },
+      {
+        signature: 'async openStream(spec: SpeechStreamSpec, signal: AbortSignal): Promise<SpeechStream>',
+        description: 'Open one live session on exactly the resolved provider; withdrawing the registration cancels it.',
+        parameters: [{ name: 'spec', description: 'resolved selection; a withdrawn or replaced registration is rejected.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'the open session, tracked until it closes, cancels, or the registration withdraws.',
+      },
     ],
   },
   {
@@ -6887,7 +6900,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpeechInput',
-    declaration: 'export interface SpeechInput {\n    readonly audio: Uint8Array;\n    readonly language: string;\n}',
+    declaration: 'export interface SpeechInput {\n    readonly audio: Uint8Array;\n    readonly language: string;\n    readonly model?: string;\n}',
   },
   {
     name: 'SpeechPreparation',
@@ -6911,7 +6924,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpeechProvider',
-    declaration: 'export interface SpeechProvider {\n    readonly info: SpeechProviderInfo;\n    readonly preparation?: SpeechPreparation;\n    transcribe(input: SpeechInput, signal: AbortSignal): Promise<Transcript>;\n}',
+    declaration: 'export interface SpeechProvider {\n    readonly info: SpeechProviderInfo;\n    readonly preparation?: SpeechPreparation;\n    readonly streaming?: SpeechStreaming;\n    transcribe(input: SpeechInput, signal: AbortSignal): Promise<Transcript>;\n}',
   },
   {
     name: 'SpeechProviderId',
@@ -6919,23 +6932,27 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpeechProviderInfo',
-    declaration: 'export interface SpeechProviderInfo {\n    readonly id: SpeechProviderId;\n    readonly name: string;\n    readonly location: \'host-local\' | \'cloud\';\n    readonly languages: readonly string[];\n    readonly setupEstimate?: SpeechSetupEstimate;\n    readonly downloadSources?: readonly string[];\n}',
+    declaration: 'export interface SpeechProviderInfo {\n    readonly id: SpeechProviderId;\n    readonly name: string;\n    readonly location: \'host-local\' | \'cloud\';\n    readonly languages: readonly string[];\n    readonly model?: string;\n    readonly models?: readonly string[];\n    readonly setupEstimate?: SpeechSetupEstimate;\n    readonly downloadSources?: readonly string[];\n}',
   },
   {
     name: 'SpeechProviderView',
-    declaration: 'export interface SpeechProviderView extends SpeechProviderInfo {\n    readonly preparation: SpeechPreparationState;\n}',
+    declaration: 'export interface SpeechProviderView extends SpeechProviderInfo {\n    readonly preparation: SpeechPreparationState;\n    readonly streaming?: SpeechStreamingMode;\n}',
   },
   {
     name: 'SpeechRequest',
-    declaration: 'export interface SpeechRequest {\n    readonly audio: Uint8Array;\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n}',
+    declaration: 'export interface SpeechRequest {\n    readonly audio: Uint8Array;\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SpeechSegment',
+    declaration: 'export interface SpeechSegment {\n    readonly text: string;\n    readonly speaker?: string;\n    readonly start?: number;\n    readonly end?: number;\n}',
   },
   {
     name: 'SpeechSelection',
-    declaration: 'export interface SpeechSelection {\n    readonly providerId: SpeechProviderId;\n    readonly language: string;\n}',
+    declaration: 'export interface SpeechSelection {\n    readonly providerId: SpeechProviderId;\n    readonly language: string;\n    readonly model?: string;\n}',
   },
   {
     name: 'SpeechSelectionPatch',
-    declaration: 'export interface SpeechSelectionPatch {\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n}',
+    declaration: 'export interface SpeechSelectionPatch {\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n    readonly model?: string;\n}',
   },
   {
     name: 'SpeechSetupEstimate',
@@ -6948,6 +6965,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SpeechSpec',
     declaration: 'export interface SpeechSpec extends SpeechInput {\n    readonly provider: SpeechProvider;\n}',
+  },
+  {
+    name: 'SpeechStream',
+    declaration: 'export interface SpeechStream {\n    push(chunk: Uint8Array): Promise<void>;\n    close(): Promise<void>;\n    cancel(): Promise<void>;\n    events(signal: AbortSignal): AsyncIterable<SpeechStreamUpdate>;\n}',
+  },
+  {
+    name: 'SpeechStreaming',
+    declaration: 'export interface SpeechStreaming {\n    readonly mode: SpeechStreamingMode;\n    open(input: SpeechStreamInput, signal: AbortSignal): Promise<SpeechStream>;\n}',
+  },
+  {
+    name: 'SpeechStreamingMode',
+    declaration: 'export type SpeechStreamingMode = \'duplex\' | \'incremental-output\';',
+  },
+  {
+    name: 'SpeechStreamInput',
+    declaration: 'export interface SpeechStreamInput {\n    readonly language: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SpeechStreamRequest',
+    declaration: 'export interface SpeechStreamRequest {\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SpeechStreamSpec',
+    declaration: 'export interface SpeechStreamSpec extends SpeechStreamInput {\n    readonly provider: SpeechProvider;\n    readonly streaming: SpeechStreaming;\n}',
+  },
+  {
+    name: 'SpeechStreamUpdate',
+    declaration: 'export type SpeechStreamUpdate = {\n    readonly kind: \'partial\';\n    readonly id: string;\n    readonly text: string;\n    readonly speaker?: string;\n} | {\n    readonly kind: \'segment\';\n    readonly id: string;\n    readonly segment: SpeechSegment;\n} | {\n    readonly kind: \'final\';\n    readonly transcript: Transcript;\n};',
   },
   {
     name: 'SpillLocator',
@@ -7455,7 +7500,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'Transcript',
-    declaration: 'export interface Transcript {\n    readonly text: string;\n    readonly audioSeconds: number;\n    readonly inferenceSeconds: number;\n}',
+    declaration: 'export interface Transcript {\n    readonly text: string;\n    readonly audioSeconds: number;\n    readonly inferenceSeconds: number;\n    readonly segments?: readonly SpeechSegment[];\n}',
   },
   {
     name: 'TranscriptionRequest',
