@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-resync.md
 /:
-  en: 60dcdfe1ee36cff6
-  zh: bd3c2a7837c6eb7d
+  en: a6cf0dd1fccc4534
+  zh: aa76efae9213aa9c
 /upstream-resync-dsh-0-2-x:
   en: c2c093d8e73d102e
   zh: bffcb47458648fee
 /upstream-resync-dsh-0-2-x/report:
-  en: 0c2d6bc4c8359c40
-  zh: b2dcc516d7f4193b
-/upstream-resync-dsh-0-2-x/s1-s1-problem:
-  en: a8168b8a2d886c2f
-  zh: d5269cba3eaa32e0
+  en: 77c9236e55896be8
+  zh: 96a30fea8641e7f1
+/upstream-resync-dsh-0-2-x/s1-problem:
+  en: 184240909e866c70
+  zh: 0470cf7dde2cdc73
 /upstream-resync-dsh-0-2-x/s2-design:
   en: 4d74231be212f31f
   zh: da73f79ade7eadb8

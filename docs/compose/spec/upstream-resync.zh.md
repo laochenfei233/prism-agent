@@ -1,9 +1,9 @@
 ---
 feature: upstream-resync
 status: delivered
-updated: 2026-10-16
+updated: 2026-10-21
 branch: none（阶段 A 落在姊妹检出的 master；阶段 B 按本仓库惯例直接提交 master）
-commits: 9e00a5d2（基线）..交付工作树
+commits: 813a8ea6（基线）..交付工作树
 ---
 
 # 上游再同步（dsh 0.2.x）
@@ -12,26 +12,25 @@ commits: 9e00a5d2（基线）..交付工作树
 
 ## Report
 
-**What was built** — 上游 `86a402200d`（`dsh-v0.2.1-alpha.4`）经姊妹检出的合并提交 `6497148adb` 重新导入本仓库：新增约 4500 个上游路径、更新约 4760 个、删除 1200 个上游退役路径与约 3700 个误提交垃圾文件，299 个偏离文件以锚点 `46a7f68b09` 为基做三方合并重放，A1–A10 区域全部重放并保留 `PRISM-DIVERGENCE` 标记（32 文件 39 处，全部位点存活）。行为反转按 D5 消费：不变式机制、schedule 组合包、收窄的安装依赖与 `desktop-sync.yml` 均保持上游的移除状态；A7 从索引中移除（已随 `b4593d01` 落地）。版本字段与全部 fork 包对齐 `0.2.1-alpha.4`。
+**What was built** — 上游 `687f282e86`（`dsh-v0.2.1-rc.2`）经姊妹检出的合并提交 `3d5ad79dc0` 进入本仓库（纯上游合并：姊妹的 easel 与 alpha.14–22 工作仍在未合并的特性分支上）。实测 delta 为 49 个提交、699 个按 rename 压缩的路径、+7711/−1623 行。导入按 raw diff 逐路径分类（新增 165、更新 844、fork 自有 883 个路径不动），并重放分歧索引：A1 桌面线整体保留 Tauri 壳，并新增排除上游随之引入的 Electron 卫星（`apps/desktop-host/**`、它的 `desktop-host.e2e.ts` 测试、`desktop-test-auth-popup` 升级指南，以及 24 篇 Electron 打包/更新/公证 agent 笔记）；A2–A4、A8、A9 重放；104 个偏离文件以姊妹的 `6497148adb` blob 为基做三方合并重建，另有约 80 个无标记的品牌面与安装重命名面恢复或手工合并，现已在索引的更新区域行中点名；`desktop-sync.yml` 保持删除（A10）。`pnpm-lock.yaml` 由 `pnpm install`（372 个 workspace 工程）再生，此前导入先修复了被盲取的提供方文件（time、tool-goal、speech-to-text types、theme settings）。版本字段跟随发布线：10 个 fork 清单从 `0.2.1-alpha.4` 升到 `0.2.1-rc.2`。上游在 rc.2 重新引入了此前退役的 `packages/schedule`，内容与 fork 保留副本一致，故导入保留 fork 包并取上游的清单刷新。
 
-**Verification** — 姊妹检出：typecheck 5/5、build 9/9、hygiene 20/1（唯一失败为合并前已存在的 Windows 符号链接物化）、聚焦单测 371/371、rescope 幂等检查通过，独立评审 APPROVE。本仓库：typecheck 5/5、build 8/8、test:docs 21/21、constraints/rescope/licenses/no-unknown-casts（baseline 净删 59 条）/package-dependencies/official-bundle-catalog/default-product-isolation/product-use 全部通过，translation-pairing 1037 对一致（46 条记录按工具规程重录），launcher-help 从重生成的 `prism` 横幅重录，无密钥快照回放确认 `SESSION_FORMAT_VERSION = 4` 下已提交代际可被合并后的运行时解码（160 个场景全部产出逐事件差异而非解码失败）；差异内容是新运行时的新注入（技能清单 system-reminder 等）相对导入前录制的期望过期，按 D6 需以 `DEEPSEEK_API_KEY` 重录 fork 快照用例（acp 刷新模式另有 `parseToolSchemasSnapshot` 的路径解析 bug），本环境无 key，留作显式收尾项。hygiene 仅剩 `verify-cordis-config` 的 `apps/cli/tests/profiles/acp/cordis.yml` 一项：该路径是 git 符号链接（mode 120000），本机 Windows 检出将其物化为纯文本所致，规则与物化文件都早于本次导入（PRE-EXISTING）。
+**Verification** — 本仓库：typecheck 5/5、build 8/8（含聚合检查）、test:docs 21/21（含 2032 个文件的 markdown 链接检查与 1043 对 translation-pairing，31 条记录按工具规程重录）；聚焦行为测试通过（boot profile、home-paths、speech-to-text model/streaming、tool-goal 共 93 个；ui-primitives、ui-sidebar、ui-theme、ui-brand-official、apps/cli plugin、packages/web 共 793 个——其中两处 ui-theme 半径刻度与 appearance 文案期望已按合并后的副本更新）。无密钥快照回放无解码失败：其 161 处逐事件差异是新运行时的注入与 unknown-tool 接受变化相对导入前录制的期望过期，按 D6 需以 `DEEPSEEK_API_KEY` 重录 fork 快照用例（显式收尾项；本环境无 key；acp 家族仍命中 `parseToolSchemasSnapshot` 的符号链接物化错误）。hygiene 20/1——唯一失败仍是 `verify-cordis-config` 的 `apps/cli/tests/profiles/acp/cordis.yml`：git 符号链接被本机 Windows 检出物化为纯文本，规则与物化文件都早于本次导入（PRE-EXISTING）。
 
 **Journey log**
 
-- 导入不能按路径集合盲目执行：fork 基线内嵌了 fork 自己的工作（如 `apps/desktop/**` 的 Tauri 壳、`design-assets/**`），「基线∩fork-only」会误删现役内容；以**上游锚点 blob**（`46a7f68b09`）为三方合并的 base，而非 fork 基线 blob，才测得出真实偏离。
+- 导入不能按路径集合盲目执行：fork 基线内嵌了 fork 自己的工作（如 `apps/desktop/**` 的 Tauri 壳、`design-assets/**`），「基线∩fork-only」会误删现役内容；上一轮以上游锚点 blob（`46a7f68b09`）测偏离，本轮以姊妹的 alpha.4 blob（`6497148adb`）作为每个偏离文件的 base。
 - 姊妹仓自己的 fork 提交也会随合并进入候选树：`apps/desktop-tauri/**` 与 `patches/esbuild@0.25.12.patch` 是姊妹的偏离，不属于本仓索引，导入时必须按上游树再过滤一次。
 - 大规模 `git rm` 会触碰 junction：pnpm 中断安装遗留的 3251 个 `.ignored_*` junction 被 `rm -rf` 跟进目标，误删 vendor 真实内容；用 `cmd /c rd`（只删链接）清理并用 git 恢复后完成。Windows 上清理 junction 一律走 `rd`。
-- 上游新门禁是本仓适配面的一部分：`verify-product-use`、`gen-official-bundle-catalog`、`gen-tool-catalog`、`verify-package-readme-summaries` 都按 A8/A5 手法做了 fork 重放（CLI 包名、fork 包注册、目录 fragment）。
+- `git diff --raw -z` 默认启用 rename 检测，`R` 条目携带两个 NUL 分隔的路径：只读下一个字段的解析器会静默丢掉所有 rename 目标——首次 install 正因一个新包的 `package.json`（rename 到位）缺席而失败。先声明 rename 处理并消费两个字段，或重新解析并补导入漏掉的目标。
 - 网络受限环境下 npmmirror 镜像可完成 pnpm 的解析与完整性校验；lockfile 不记录 registry 主机名，内容一致性由 integrity 哈希保证。
-
 
 ## [S1] 问题
 
 本仓库无法合并上游：`master` 持有的是 harness 树的孤儿基线导入，也没有 `upstream` 远端，所以对它执行 `git merge` 结构上不可行（该历史由 [fork-upstream-divergence.md](fork-upstream-divergence.zh.md) S1 记录）。唯一能合并上游的是姊妹检出 `../deepseek-harness`（`laochenfei233/deepseek-harness`），它的历史与上游有共同祖先；本仓库随后通过重新导入该树并重放分叉索引来更新。
 
-两棵树已经相距很远。我们的基线对应上游约 `46a7f68b09`（2026-10-01 记录的上游参照）；上游 `master` 现为 `86a402200d`，即 `dsh-v0.2.1-alpha.4` 的发布合并，其间经过 0.1.7-rc.2、v0.2.0-rc.2 与 0.2.1-alpha.1 到 alpha.4。自我们锚点测得的增量是 2670 个提交（1981 个非 merge）、9819 个文件、+481527/−170588 行。姊妹检出的 `master`（`65359876b9`，工作树干净）已经合入上游 `d743267388`（0.2.1-alpha.2），并带有四个本地提交——`862f102f17` 把 fork 的 Tauri 壳移到 `apps/desktop-tauri`、`bafb0f3abf` 换取 WebView cookie 的启动令牌、`84235bd728` 回退客户端 `FishLogo` 的 viewBox、`65359876b9` 内联大体积 esbuild 转换输入——因此它剩余 737 个提交、3622 个文件、+142747/−18213。
+两棵树的漂移在每轮再同步前重新测量。2026-10-21 的实测：上游 `master` 是 `687f282e86`（`dsh-v0.2.1-rc.2` 的发布合并），姊妹检出 `master`（`3d5ad79dc0`，工作树干净）已合入该上游；自上一锚点 `6497148adb` 测得 49 个提交（32 个非 merge）、699 个文件、+7711/−1623 行，且姊妹自该锚点起没有自己的 master 提交（easel 与 alpha.14–22 的工作留在未合并的特性分支上），因此这轮 delta 是纯上游内容。
 
-这次同步携带的行为变化深入到 fork 自己的记录。上游 v0.2.0-rc.2 **整体移除运行时不变式插件**（`@deepseek-ai/dsh-invariants`、每个 `<package>/invariant` 子路径导出，以及 `sdk-minimal` 的五条行），反转了本仓库仍在陈述的一条规则，并删除了其文档计数的不变式文件。`agent-instructions` **移除 `dshHome` 配置字段**，改为通过 `resolveDshHome()` 解析 harness home——正是本 fork A9 改动所编辑的同一个解析点。CLI 与 Python 运行时**收窄安装依赖**（hook 桥与 webhook 包对离开默认安装），`schedule` 组合包退役，另有一个子路径插件展示清单与账号登录改动落地。会话格式**不变**：三棵树里 `SESSION_FORMAT_VERSION` 都是 `4`，已提交的代际仍然可读，本次同步不要求持久化迁移。
+这次同步携带的行为变化深入到 fork 自己的产品线。上游 rc.1/rc.2 **新增藏在设置开关后的 DeepSeek Search 与 Fetch API**（`#6103`，新 `packages/web/web-deepseek-api` 包连同 client 与 bundle 行）、**重构账号通知**（通用字段与多条通知层叠展示），并**新增 provider 感知的模型标签槽**与临时的 `ui-deepseek-model-label-1017` 发布徽章包。上游还**重新引入了此前退役的 `packages/schedule`**，内容与 fork 保留副本一致，故导入保留 fork 包并取清单刷新。会话格式**不变**：三棵树里 `SESSION_FORMAT_VERSION` 都是 `4`，已提交的代际仍然可读，本次同步不要求持久化迁移。
 
 ## [S2] 设计
 

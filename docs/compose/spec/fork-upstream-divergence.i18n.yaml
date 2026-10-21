@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/fork-upstream-divergence.md
 /:
-  en: bcee3edfeab2b2e5
-  zh: 43f718388829ca3d
+  en: 6018980bc4d466c0
+  zh: 91ebbdc08a0351ce
 /fork-upstream-divergence:
   en: 96adc1ca63fcc88e
   zh: a1aa76aee55f2a4a
@@ -24,8 +24,8 @@
   en: 60fc59ad9195767b
   zh: 35ee81038c1e742b
 /fork-upstream-divergence/s2-design/areas:
-  en: 819dfaffcf3c5c1f
-  zh: 43cab8b5b534fd3f
+  en: ee7d153892ee9c85
+  zh: 37d75e01ef0341ee
 /fork-upstream-divergence/s3-scope:
   en: 533b087c40b6c813
   zh: 2aa04040a35991a6
@@ -33,8 +33,8 @@
   en: 3978a5c0d3ef8d14
   zh: 15018cd657182422
 /fork-upstream-divergence/s4-replay-checklist:
-  en: 845e271b2e019667
-  zh: 3aebf751968e8c93
+  en: fba786e3e249a911
+  zh: 557f603630ea23fd
 /fork-upstream-divergence/s5-related-documents:
   en: b486f8e42beae72e
   zh: b736b1c4b8d6a94d

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-util-path-lock",
   "description": "Cross-process exclusive kernel lock on one filesystem path: POSIX flock or a Win32 named semaphore, released by the kernel when the holder's process ends (PathLock, PathLockedError)",
-  "version": "0.2.1-alpha.4",
+  "version": "0.2.1-rc.2",
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-speech-to-text-openai",
   "description": "OpenAI-compatible HTTP transcription provider for the DeepSeek Harness speech capability seam (ctx.speechToText)",
-  "version": "0.2.1-alpha.4",
+  "version": "0.2.1-rc.2",
   "publishConfig": {
     "access": "public"
   },
