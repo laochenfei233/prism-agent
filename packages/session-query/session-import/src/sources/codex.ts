@@ -7,7 +7,7 @@
  * `event_msg` repeats it. Only `response_item` messages of role `user` and
  * `assistant` are retained.
  *
- * @module @deepseek-ai/dsh-session-import/sources/codex
+ * @module @prism/prism-session-import/sources/codex
  */
 
 import { basename, join } from 'node:path'

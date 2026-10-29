@@ -6,7 +6,7 @@
  * records, and injected reminders carry `isMeta`. Only genuine user prompts and
  * assistant text are retained.
  *
- * @module @deepseek-ai/dsh-session-import/sources/claude
+ * @module @prism/prism-session-import/sources/claude
  */
 
 import { basename, join } from 'node:path'

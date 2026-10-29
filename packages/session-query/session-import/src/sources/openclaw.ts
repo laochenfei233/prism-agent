@@ -8,7 +8,7 @@
  * `message` wrappers and reports a session whose events carry no recognizable
  * messages as empty.
  *
- * @module @deepseek-ai/dsh-session-import/sources/openclaw
+ * @module @prism/prism-session-import/sources/openclaw
  */
 
 import { zstdDecompressSync } from 'node:zlib'

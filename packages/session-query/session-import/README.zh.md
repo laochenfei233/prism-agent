@@ -3,7 +3,7 @@ description: "在设置中导入 Claude Code、Codex、Grok、DeepSeek Harness�
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-session-import
+# @prism/prism-session-import
 
 [English](README.md) | 中文
 
@@ -31,7 +31,7 @@ kind: "package-reference"
 
 ```yaml
 - id: session-import
-  name: '@deepseek-ai/dsh-session-import'
+  name: '@prism/prism-session-import'
 ```
 
 浏览器半包通过同一行加载，因为 manifest 声明了 `dsh.client`。

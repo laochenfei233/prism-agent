@@ -132,9 +132,9 @@ ctx.slots.inject('settings.section', () => ctx.slots.register({
 
 ### 2.4 登记清单（真实路径）
 
-1. `packages/session-query/session-import/package.json`（`@deepseek-ai/dsh-session-import`，`dsh.client` 行、`exports`、`files`）。
+1. `packages/session-query/session-import/package.json`（`@prism/prism-session-import`，`dsh.client` 行、`exports`、`files`）。
 2. `packages/session-query/session-import/tsconfig.json`，并在 `tsconfig.client.json` / `tsconfig.host.json` 的 aggregate `references` 各加一条。
-3. `packages/bundle/web-app/cordis.patch.yml` 新增一行（`- id: session-import` / `name: '@deepseek-ai/dsh-session-import'`），位置参考 `:56-57` 的 `session-log-download`。
+3. `packages/bundle/web-app/cordis.patch.yml` 新增一行（`- id: session-import` / `name: '@prism/prism-session-import'`），位置参考 `:56-57` 的 `session-log-download`。
 4. `packages/bundle/web-app/package.json` 的 workspace 依赖。
 5. `tsconfig.base.json` 的 `paths` 手写别名条目（参见 `CAPABILITY-PLAN.md:204` 的踩坑记录）。
 6. 更新 `packages/session-query/README.md`（+ `.zh.md`）的包表，以及根 `AGENTS.md` 布局注释里的 `session-query/  browsing/search/export` → `…/export/import`。

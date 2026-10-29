@@ -3,7 +3,7 @@
  * The section calls the Host import routes directly; it needs no Remote
  * namespace of its own.
  *
- * @module @deepseek-ai/dsh-session-import/client
+ * @module @prism/prism-session-import/client
  */
 
 // Type-only: the ctx.locale Context merge and its namespace map.

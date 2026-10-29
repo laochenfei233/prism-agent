@@ -77,7 +77,7 @@
 
     # Cross-agent conversation import: the settings section and its Host routes.
     - id: session-import
-      name: '@deepseek-ai/dsh-session-import'
+      name: '@prism/prism-session-import'
 
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application

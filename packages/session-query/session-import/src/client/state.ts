@@ -2,7 +2,7 @@
  * Pure helpers for the import settings page: group identity, selection,
  * merge detection, outcome counts, and display formatting.
  *
- * @module @deepseek-ai/dsh-session-import/client/state
+ * @module @prism/prism-session-import/client/state
  */
 
 import type {

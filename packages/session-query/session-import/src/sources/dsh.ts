@@ -5,7 +5,7 @@
  * skipped because they are internal delegation, not conversations the user
  * opened. Logs may be plain JSONL or a concatenated Zstandard container.
  *
- * @module @deepseek-ai/dsh-session-import/sources/dsh
+ * @module @prism/prism-session-import/sources/dsh
  */
 
 import { join } from 'node:path'

@@ -5,7 +5,7 @@
  * session id, cwd, and timestamps. Harness-injected user turns are marked with
  * `synthetic_reason` and skipped.
  *
- * @module @deepseek-ai/dsh-session-import/sources/grok
+ * @module @prism/prism-session-import/sources/grok
  */
 
 import { basename, dirname, join } from 'node:path'

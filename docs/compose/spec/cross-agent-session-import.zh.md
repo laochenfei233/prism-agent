@@ -20,7 +20,7 @@ commits: c64d35c4..HEAD
 
 ### [S2.1] 包与进程落点
 
-新包 `packages/session-query/session-import`（`@deepseek-ai/dsh-session-import`）同时承载两半：注册一条带认证的 Fetch 路由的 Host 函数插件，以及注册 `settings.section` 的浏览器插件。包形态照抄 `session-log-export`：`apply(ctx, config)`、`dsh.client`、Host 与 Client 两套 tsconfig、`clientBundle(..., { hostPhase: true })`。
+新包 `packages/session-query/session-import`（`@prism/prism-session-import`）同时承载两半：注册一条带认证的 Fetch 路由的 Host 函数插件，以及注册 `settings.section` 的浏览器插件。包形态照抄 `session-log-export`：`apply(ctx, config)`、`dsh.client`、Host 与 Client 两套 tsconfig、`clientBundle(..., { hostPhase: true })`。
 
 路由是 `POST /api/session.import`（`plan` 与 `apply`）和 `GET /api/session.import/candidates`（发现）。它走 `ctx.connection.fetch` 而不是 Typert Remote 命名空间，因为载荷就是普通 JSON，客户端不需要生成类型，而同一个包已经拥有自己的设置页。在共享 API 通道的认证策略下，只有 owner peer 能到达这条路由。
 

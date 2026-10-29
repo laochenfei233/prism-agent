@@ -2,7 +2,7 @@
  * The supported foreign conversation stores and their documented default
  * roots. A deployment can override any root through the plugin Config.
  *
- * @module @deepseek-ai/dsh-session-import/catalog
+ * @module @prism/prism-session-import/catalog
  */
 
 import { homedir } from 'node:os'

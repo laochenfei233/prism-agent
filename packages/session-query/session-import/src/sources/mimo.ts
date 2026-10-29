@@ -6,7 +6,7 @@
  * `part.data` rows of type `text`. Tool, reasoning, and synthetic parts are
  * skipped.
  *
- * @module @deepseek-ai/dsh-session-import/sources/chat-db
+ * @module @prism/prism-session-import/sources/chat-db
  */
 
 import { join } from 'node:path'

@@ -2,7 +2,7 @@
  * Source reader registry. Each entry turns one foreign store into scanned
  * sessions and normalized transcripts.
  *
- * @module @deepseek-ai/dsh-session-import/sources
+ * @module @prism/prism-session-import/sources
  */
 
 import type { ImportSourceId, ScannedSource } from '../types.ts'

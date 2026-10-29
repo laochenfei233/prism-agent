@@ -5,7 +5,7 @@
  * path from the newest record back to the root, so abandoned branches are not
  * imported.
  *
- * @module @deepseek-ai/dsh-session-import/sources/pi
+ * @module @prism/prism-session-import/sources/pi
  */
 
 import { basename } from 'node:path'

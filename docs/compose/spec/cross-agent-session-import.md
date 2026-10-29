@@ -20,7 +20,7 @@ Reading the history is not enough: the user must be able to open an imported con
 
 ### [S2.1] Package and process placement
 
-A new package `packages/session-query/session-import` (`@deepseek-ai/dsh-session-import`) holds both halves: a Host function plugin that registers one authenticated Fetch route, and a browser plugin that registers a `settings.section`. The package follows the `session-log-export` shape: `apply(ctx, config)`, `dsh.client`, Host and Client tsconfig faces, `clientBundle(..., { hostPhase: true })`.
+A new package `packages/session-query/session-import` (`@prism/prism-session-import`) holds both halves: a Host function plugin that registers one authenticated Fetch route, and a browser plugin that registers a `settings.section`. The package follows the `session-log-export` shape: `apply(ctx, config)`, `dsh.client`, Host and Client tsconfig faces, `clientBundle(..., { hostPhase: true })`.
 
 The route is `POST /api/session.import` for `plan` and `apply`, and `GET /api/session.import/candidates` for discovery. It uses `ctx.connection.fetch` rather than a Typert Remote namespace because the payloads are plain JSON, the client needs no generated types, and the same package already owns its settings UI. The route is reachable only by the owner peer under the shared API channel's authentication policy.
 

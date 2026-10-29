@@ -2,7 +2,7 @@
  * Runtime identity of the supported store ids, shared by the Host catalog and
  * the browser wire guard.
  *
- * @module @deepseek-ai/dsh-session-import/source-ids
+ * @module @prism/prism-session-import/source-ids
  */
 
 import type { ImportSourceId } from './types.ts'

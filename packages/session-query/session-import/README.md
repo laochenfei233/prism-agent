@@ -3,7 +3,7 @@ description: "Settings import of conversation history from Claude Code, Codex, G
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-session-import
+# @prism/prism-session-import
 
 English | [中文](README.zh.md)
 
@@ -31,7 +31,7 @@ Mount the package in a Web or desktop bundle that already provides Connection, S
 
 ```yaml
 - id: session-import
-  name: '@deepseek-ai/dsh-session-import'
+  name: '@prism/prism-session-import'
 ```
 
 The browser half loads through the same row because the manifest declares `dsh.client`.

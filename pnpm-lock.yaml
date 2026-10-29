@@ -2875,9 +2875,6 @@ importers:
       '@deepseek-ai/dsh-schedule':
         specifier: workspace:*
         version: link:../../schedule/schedule
-      '@deepseek-ai/dsh-session-import':
-        specifier: workspace:*
-        version: link:../../session-query/session-import
       '@deepseek-ai/dsh-session-log-export':
         specifier: workspace:*
         version: link:../../session-query/session-log-export
@@ -2974,6 +2971,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@prism/prism-session-import':
+        specifier: workspace:~
+        version: link:../../session-query/session-import
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -12289,6 +12289,9 @@ importers:
       '@deepseek-ai/dsh-session-persistence':
         specifier: workspace:*
         version: link:../../session/session-persistence
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
       '@deepseek-ai/dsh-session-title':
         specifier: workspace:*
         version: link:../../session/session-title

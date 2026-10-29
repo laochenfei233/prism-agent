@@ -6,7 +6,7 @@
  * sessions to projects that already exist. It calls the Host routes with
  * plain JSON and never reads a foreign store itself.
  *
- * @module @deepseek-ai/dsh-session-import/client/ImportSection
+ * @module @prism/prism-session-import/client/ImportSection
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'

@@ -2895,40 +2895,6 @@ export interface JsonRpcConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-sdk-jsonrpc-server -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-import -->
-<a id="deepseek-aidsh-session-import"></a>
-
-## `@deepseek-ai/dsh-session-import`
-
-- `inject`: `connection` · `sessionPersistence` · `workspaceRegistry`
-- `source`: [`packages/session-query/session-import/src/index.ts:38`](../packages/session-query/session-import/src/index.ts)
-
-```ts config-catalog
-/** Import policy and per-source root overrides. */
-export interface Config {
-  /** Absolute root overrides keyed by source id. */
-  readonly roots?: Partial<Record<ImportSourceId, string>>
-  /** Maximum retained messages per imported conversation. @default 2000 */
-  readonly maxMessages?: number
-  /** UTF-8 byte budget for one imported message. @default 32768 */
-  readonly maxMessageTextBytes?: number
-}
-
-/** Foreign conversation stores this feature can read. */
-export type ImportSourceId =
-  | 'claude'
-  | 'codex'
-  | 'grok'
-  | 'dsh'
-  | 'mimocode'
-  | 'opencode'
-  | 'openclaw'
-  | 'hermes'
-  | 'pi'
-  | 'gemini'
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-import -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
@@ -4765,6 +4731,40 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
+
+<!-- BEGIN GENERATED config-catalog:@prism/prism-session-import -->
+<a id="prismprism-session-import"></a>
+
+## `@prism/prism-session-import`
+
+- `inject`: `connection` · `sessionPersistence` · `workspaceRegistry`
+- `source`: [`packages/session-query/session-import/src/index.ts:38`](../packages/session-query/session-import/src/index.ts)
+
+```ts config-catalog
+/** Import policy and per-source root overrides. */
+export interface Config {
+  /** Absolute root overrides keyed by source id. */
+  readonly roots?: Partial<Record<ImportSourceId, string>>
+  /** Maximum retained messages per imported conversation. @default 2000 */
+  readonly maxMessages?: number
+  /** UTF-8 byte budget for one imported message. @default 32768 */
+  readonly maxMessageTextBytes?: number
+}
+
+/** Foreign conversation stores this feature can read. */
+export type ImportSourceId =
+  | 'claude'
+  | 'codex'
+  | 'grok'
+  | 'dsh'
+  | 'mimocode'
+  | 'opencode'
+  | 'openclaw'
+  | 'hermes'
+  | 'pi'
+  | 'gemini'
+```
+<!-- END GENERATED config-catalog:@prism/prism-session-import -->
 
 ## 无配置的可加载插件
 

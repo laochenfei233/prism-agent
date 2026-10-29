@@ -5,7 +5,7 @@
  * The engine writes through `SessionPersistence` and registers projects through
  * `WorkspaceRegistry`; it never edits persisted files directly.
  *
- * @module @deepseek-ai/dsh-session-import/engine
+ * @module @prism/prism-session-import/engine
  */
 
 import { createHash, randomUUID } from 'node:crypto'
@@ -470,11 +470,13 @@ export class SessionImportEngine {
       lastTime = Math.max(lastTime, message.time)
       if (message.role === 'user') {
         if (open) {
+          push({ type: 'step/end', seq: seqOf(seq), time: lastTime, data: { turn, step: 1 } })
           push({ type: 'turn/end', seq: seqOf(seq), time: lastTime, data: { turn, reason: { kind: 'completed' } } })
         }
         turn += 1
         open = true
         push({ type: 'turn/start', seq: seqOf(seq), time: lastTime, data: { turn } })
+        push({ type: 'step/start', seq: seqOf(seq), time: lastTime, data: { turn, step: 1 } })
         const user: UserMessage = {
           id: brandString<MessageId>(randomUUID()),
           role: 'user',
@@ -501,6 +503,7 @@ export class SessionImportEngine {
       })
     }
     if (open) {
+      push({ type: 'step/end', seq: seqOf(seq), time: lastTime, data: { turn, step: 1 } })
       push({ type: 'turn/end', seq: seqOf(seq), time: lastTime, data: { turn, reason: { kind: 'completed' } } })
     }
     if (imported.title !== undefined && firstUserSeq !== undefined) {

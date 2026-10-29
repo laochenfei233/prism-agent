@@ -3,7 +3,7 @@
  * SQLite schema; older builds wrote one JSON file per record under
  * `storage/session`, `storage/message`, and `storage/part`.
  *
- * @module @deepseek-ai/dsh-session-import/sources/opencode
+ * @module @prism/prism-session-import/sources/opencode
  */
 
 import { basename, join } from 'node:path'

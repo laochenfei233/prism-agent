@@ -5,7 +5,7 @@
  * Every file and database here is untrusted input, so values are validated
  * before use instead of trusted from a static type.
  *
- * @module @deepseek-ai/dsh-session-import/sources/shared
+ * @module @prism/prism-session-import/sources/shared
  */
 
 import { createReadStream } from 'node:fs'

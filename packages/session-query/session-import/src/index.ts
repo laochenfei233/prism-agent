@@ -6,7 +6,7 @@
  * calls those routes. Reading foreign stores is read-only; writes go through
  * `SessionPersistence` and `WorkspaceRegistry`.
  *
- * @module @deepseek-ai/dsh-session-import
+ * @module @prism/prism-session-import
  */
 
 import type { Context } from '@deepseek-ai/cordis'

@@ -60,7 +60,7 @@ async function boot(root: string, seedWorkspace = false): Promise<Harness> {
   }
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
-    "- name: '@deepseek-ai/dsh-session-import'",
+    "- name: '@prism/prism-session-import'",
     `  config: ${JSON.stringify(config)}`,
     '',
   ].join('\n'))
@@ -129,7 +129,7 @@ async function boot(root: string, seedWorkspace = false): Promise<Harness> {
   context.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
-      if (specifier !== '@deepseek-ai/dsh-session-import') throw new Error(`unexpected Loader import: ${specifier}`)
+      if (specifier !== '@prism/prism-session-import') throw new Error(`unexpected Loader import: ${specifier}`)
       return SessionImport
     },
   } as never

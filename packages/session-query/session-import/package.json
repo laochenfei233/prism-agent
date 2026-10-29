@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-session-import",
-  "description": "Settings import of conversation history from other coding agents",
+  "name": "@prism/prism-session-import",
+  "description": "Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI)",
   "version": "0.2.1-rc.2",
   "publishConfig": {
     "access": "public"
@@ -56,7 +56,8 @@
     "@deepseek-ai/dsh-session-persistence": "workspace:*",
     "@deepseek-ai/dsh-session-title": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*"
   },
   "dsh": {
     "client": {
@@ -67,5 +68,6 @@
       ],
       "platform": "web"
     }
-  }
+  },
+  "author": "prism-ai"
 }

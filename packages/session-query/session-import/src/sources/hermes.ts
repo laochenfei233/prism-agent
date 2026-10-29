@@ -6,7 +6,7 @@
  * across builds; the reader accepts the documented `role` and `content` fields
  * and skips rows it cannot classify.
  *
- * @module @deepseek-ai/dsh-session-import/sources/hermes
+ * @module @prism/prism-session-import/sources/hermes
  */
 
 import { join } from 'node:path'

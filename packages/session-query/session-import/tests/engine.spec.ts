@@ -1,8 +1,10 @@
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Session, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
   ImportEngineError,
   SessionImportEngine,
@@ -173,8 +175,8 @@ describe('SessionImportEngine apply', () => {
     expect(first.workspaces).toEqual([{ path: cwd, workspaceId: `ws-${cwd}`, created: true, imported: 1 }])
     const events = [...fakesValue.stored.values()][0] ?? []
     expect(events.map(event => event.type)).toEqual([
-      'turn/start', 'user/message', 'assistant/message', 'turn/end',
-      'turn/start', 'user/message', 'assistant/message', 'turn/end',
+      'turn/start', 'step/start', 'user/message', 'assistant/message', 'step/end', 'turn/end',
+      'turn/start', 'step/start', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       'session/title',
     ])
     expect(events.map(event => event.seq)).toEqual(events.map((_event, index) => index))
@@ -298,6 +300,44 @@ describe('SessionImportEngine apply', () => {
     expect(messages[2]?.content[0]?.type).toBe('tool-result')
     await expect(engine.apply({ source: 'dsh', sessionIds: [id] }))
       .resolves.toMatchObject({ results: [{ outcome: 'duplicate' }] })
+  })
+
+  it('writes a converted log the real JSONL backend can cold-read', async () => {
+    const root = await rootOf('coldread')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    await claudeFixture(root, 'one', cwd, [['first', 'reply one'], ['second', 'reply two']])
+    const store = new Context()
+    const storageRoot = join(root, 'sessions')
+    const fiber = await store.plugin(JsonlSessionPersistence, { root: storageRoot, compression: 'none' }).await()
+    try {
+      const engine = new SessionImportEngine({
+        persistence: store.get('sessionPersistence') as unknown as ImportPersistence,
+        workspaces: fakes().registry,
+        currentHome: join(root, '.prism'),
+        roots: { claude: join(root, 'projects') },
+        maxMessages: 2000,
+        maxMessageTextBytes: 32768,
+      })
+      const result = await engine.apply({ source: 'claude', sessionIds: ['one'] })
+      const id = result.results[0]?.sessionId
+      expect(id).toBeDefined()
+
+      const persistence = store.get('sessionPersistence') as unknown as {
+        open(id: string, access: 'read'): Promise<{ read(): Promise<{ events: SessionEvent[] }>; close(): Promise<void> }>
+      }
+      const handle = await persistence.open(String(id), 'read')
+      const read = await handle.read()
+      await handle.close()
+      const types = read.events.map(event => event.type)
+      expect(types[0]).toBe('turn/start')
+      expect(types[1]).toBe('step/start')
+      expect(types.at(-2)).toBe('step/end')
+      expect(types.at(-1)).toBe('turn/end')
+      expect(read.events.every((event, index) => event.seq === index)).toBe(true)
+    } finally {
+      await fiber.dispose()
+    }
   })
 
   it('reports unknown sources and unknown session ids without writing', async () => {

@@ -2,7 +2,7 @@
  * Wire and engine types of the cross-agent Session import. Every value here is
  * plain JSON so the Host route and the settings page share one declaration.
  *
- * @module @deepseek-ai/dsh-session-import/types
+ * @module @prism/prism-session-import/types
  */
 
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'

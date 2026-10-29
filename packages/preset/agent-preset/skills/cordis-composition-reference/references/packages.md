@@ -391,9 +391,9 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@deepseek-ai/dsh-session-import` | yes | Settings import of conversation history from other coding agents |
 | `@deepseek-ai/dsh-session-log-export` | yes | Web Session-log export command and shared download dialog |
 | `@deepseek-ai/dsh-session-query-sqlite` | yes | Concrete ctx.sessionQuery backend with SQLite FTS5 search |
+| `@prism/prism-session-import` | yes | Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI) |
 
 ## settings
 

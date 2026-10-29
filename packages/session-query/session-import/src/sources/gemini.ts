@@ -6,7 +6,7 @@
  * deduplicated by their `id`. Assistant records use type `gemini`; control
  * records and `info`/`error` entries are skipped.
  *
- * @module @deepseek-ai/dsh-session-import/sources/gemini
+ * @module @prism/prism-session-import/sources/gemini
  */
 
 import { basename } from 'node:path'
