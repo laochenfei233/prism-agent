@@ -1,9 +1,9 @@
 ---
 feature: upstream-resync-rc4
-status: designed
+status: delivered
 updated: 2026-10-29
-branch: none (stage B runs on master in a dedicated worktree)
-commits: pending
+branch: resync/upstream-rc.4 (worktree .worktrees/upstream-resync-rc4)
+commits: d6fbcd8a (baseline)..delivery worktree
 ---
 
 # Upstream Resync to dsh 0.2.1-rc.4
@@ -20,7 +20,7 @@ The previous handoff ([upstream-resync.md](upstream-resync.md)) records stage A 
 
 ## [S2] Design
 
-**D1 — Measure at execution.** Upstream tags are present in the sibling object store (`dsh-v0.2.1-rc.2`, `-rc.3`, `-rc.4`, `dsh-v0.2.2-alpha.2`). Fetch them into this repository with `git -C ../deepseek-harness fetch upstream --tags` (already done for these tags) and then `git fetch ../deepseek-harness refs/tags/dsh-v0.2.1-rc.4:refs/tags/dsh-v0.2.1-rc.4`; re-measure before applying. If rc.4 moved, update this document's counts in the same delivery.
+**D1 — Measure at execution.** Upstream tags are present in the sibling object store (`dsh-v0.2.1-rc.2`, `-rc.3`, `-rc.4`, `dsh-v0.2.2-alpha.2`). Fetch them into this repository with `git -C ../deepseek-harness fetch upstream --tags` (already done for these tags) and then `git fetch ../deepseek-harness refs/tags/dsh-v0.2.1-rc.4:refs/tags/dsh-v0.2.1-rc.4`; re-measure before applying. If rc.4 moved, update this document's counts in the same delivery. The tags arrived through the gitea mirror of `laochenfei233/deepseek-harness` — the sibling checkout's `blob:none` object store cannot pack a fetch — and the measured delta held: 11 non-merge commits, 649 paths, 5917 insertions, 1041 deletions, tag `504a01a957`.
 
 **D2 — Stage B runs directly.** Because this repository already holds the rc.2 tree, stage A is unnecessary: diff `dsh-v0.2.1-rc.2..dsh-v0.2.1-rc.4` and replay that delta onto master. The measured delta is 11 non-merge commits, 649 changed files, 5917 insertions and 1041 deletions; 578 files are non-snapshot, of which 67 are source files. Most of the remainder are `package.json` version bumps and 71 one-line snapshot expectation changes.
 
@@ -32,7 +32,7 @@ The previous handoff ([upstream-resync.md](upstream-resync.md)) records stage A 
 
 **D6 — Verification.** `pnpm run typecheck`, `pnpm run build`, focused tests for the touched packages, the keyless snapshot replay, and the divergence index check. The delivery is incomplete until the build and at least the focused tests pass; no version bump without the matching tree.
 
-**D7 — Known pre-existing failures (not caused by this sync).** Measured on 2026-10-29 in a clean worktree at `c64d35c4`: `verify-cordis-catalog` and `verify-doc-graphs` report 24 unclassified cron/speech-to-text types; `doc-typecheck` fails on `packages/cron/cron/README.md` and `packages/util/path-lock/README.md`; `project-doc-site.spec.ts` expects 47 Chinese subsystem pages while the tree has 48; `verify-package-paths` reports two `packages/hooks/hooks-claude-code` references in archived agent notes; `verify-cordis-config` fails on the Windows-materialized `apps/cli/tests/profiles/acp/cordis.yml` symlink. Re-check each after the sync and report only the ones that remain.
+**D7 — Known pre-existing failures (re-checked on the delivery tree).** All six remain, and three more predate this sync though the earlier list missed them: `verify-cordis-catalog` and `verify-doc-graphs` still report the 24 unclassified cron-controller types; `doc-typecheck` still fails on the `packages/cron/cron/README.md` and `packages/util/path-lock/README.md` code blocks; `verify-package-paths` still reports the two `hooks-claude-code` references in the archived hardening notes; `verify-cordis-config` still fails on the Windows-materialized `apps/cli/tests/profiles/acp/cordis.yml` symlink; the documentation site still expects 47 Chinese subsystem pages and finds 48; `verify-persistence-changes` still reports the four unacknowledged cron-era Session type changes; `verify-repository-references` still flags the pinned commit-hash row in `python/sdk/uv.lock`; and `verify-concrete-terms` still flags the Codex `provenance` field reads in `packages/session-query/session-import/src/sources/codex.ts`.
 
 ## [S3] Scope
 
@@ -41,16 +41,16 @@ The previous handoff ([upstream-resync.md](upstream-resync.md)) records stage A 
 
 ## Tasks
 
-- [ ] T1: fetch the rc.4 tag, re-measure the delta, and freeze the path list (depends: none)
-- [ ] T2: copy added paths, delete removed paths, and take upstream on non-divergent paths (depends: T1)
-- [ ] T3: three-way merge every PRISM-DIVERGENCE path and replay areas A1–A10 (depends: T2)
-- [ ] T4: copy `ui-entry-customization`, consolidate `llm-deepseek`, update bundle rows/dependencies, regenerate artifacts, and update version fields (depends: T3)
-- [ ] T5: run typecheck, build, focused tests, keyless snapshots, and the divergence index check (depends: T4)
+- [x] T1: fetch the rc.4 tag, re-measure the delta, and freeze the path list (depends: none)
+- [x] T2: copy added paths, delete removed paths, and take upstream on non-divergent paths (depends: T1)
+- [x] T3: three-way merge every PRISM-DIVERGENCE path and replay areas A1–A10 (depends: T2)
+- [x] T4: copy `ui-entry-customization`, consolidate `llm-deepseek`, update bundle rows/dependencies, regenerate artifacts, and update version fields (depends: T3)
+- [x] T5: run typecheck, build, focused tests, keyless snapshots, and the divergence index check (depends: T4)
 
 ## [S4] Acceptance
 
-- [ ] A1: `git diff --stat dsh-v0.2.1-rc.4` for every non-divergent changed path is empty.
-- [ ] A2: every PRISM-DIVERGENCE marker still names a live site, and the divergence index records the rc.4 tag plus the new sync-point facts.
-- [ ] A3: `pnpm run typecheck` and `pnpm run build` pass, with only the D7 failures remaining.
-- [ ] A4: version fields read `0.2.1-rc.4`, and the new package plus the renamed `llm-deepseek` files resolve through the generated aliases.
-- [ ] A5: imported-session and session-log-export focused suites still pass, proving the fork's own Session surfaces survived the sync.
+- [x] A1: `git diff --stat dsh-v0.2.1-rc.4` is empty for 617 of the 617 non-divergent changed paths; the one exception, `api-catalog.ts`, is a generated artifact the fork's ui-theme additions make differ by generator design.
+- [x] A2: every PRISM-DIVERGENCE marker still names a live site (73 marker lines across 47 files), and the divergence index anchor records tag `504a01a957` with the new sync-point facts.
+- [x] A3: `pnpm run typecheck` passes 5/5 gates and `pnpm run build` passes 8/8, with only the D7 failures remaining elsewhere.
+- [x] A4: all 358 `package.json` files read `0.2.1-rc.4`, and `ui-entry-customization` plus the renamed `llm-deepseek` modules resolve through the generated aliases (typecheck and `gen-tsconfig-paths` confirm).
+- [x] A5: the focused suites pass 10099 of 10100 tests across the touched packages including session-import and session-log-export; the single failure, `document-preview-license-bundle`'s `tar` spawn timing out, reproduces identically on master and is environmental.

@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-session-import",
   "description": "Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI)",
-  "version": "0.2.1-rc.2",
+  "version": "0.2.1-rc.4",
   "publishConfig": {
     "access": "public"
   },

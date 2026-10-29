@@ -1,7 +1,7 @@
 ---
 feature: fork-upstream-divergence
 status: delivered
-updated: 2026-10-21
+updated: 2026-10-29
 branch: 无，见 desktop-startup-latency.zh.md（S2）的工作区覆盖
 commits: 未提交的工作区改动
 ---
@@ -82,7 +82,7 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 
 ## [S4] Replay checklist
 
-**同步锚点（2026-10-21）：** 上一次再同步把上游 `687f282e86`（`dsh-v0.2.1-rc.2`）以合并提交 `3d5ad79dc0` 并入姊妹检出，并把该树重新导入本仓库，重放了桌面线（A1 连同其 `apps/desktop-host` 卫星排除）、客户端品牌（A2）、启动解析器（A3）、安装身份（A8）与默认 home（A9），并再次剔除 Electron 卫星。下一次再同步从这里测量：`git -C ../deepseek-harness rev-list --count 3d5ad79dc0..upstream/master`。
+**同步锚点（2026-10-29）：** 上一次再同步把上游 `dsh-v0.2.1-rc.2..dsh-v0.2.1-rc.4` 增量（发布提交 `504a01a957`）以测定的 stage-B 重放直接落到 master（[upstream-resync-rc4](upstream-resync-rc4.zh.md)）：11 个非合并提交、649 个路径，逐路径以 rc.2 blob 为合并基分类。它重放了 A1 的 `apps/desktop-host` 卫星排除与 A2 在 `ui-sidebar`、`ui-primitives` 的品牌行，并确认 A3、A4、A9、A10 的文件未被此次增量触及、无需重放。下一次再同步从 rc.4 tag 起测量；tag 从 `laochenfei233/deepseek-harness` 的 gitea 镜像获取，因为姊妹检出的对象库是 `blob:none` 部分克隆，无法打包传输。
 
 1. 先在本仓库盘点：`git status --porcelain` 与 `rg -n PRISM-DIVERGENCE`，并在动其他东西之前决定进行中的导入（A7）怎么办。
 2. 在能合并的地方调和：在 `../deepseek-harness` 中 `git fetch upstream` 并合并 `upstream/master`，在那里重新施加 A1 到 A4——在那里它们都是普通提交。

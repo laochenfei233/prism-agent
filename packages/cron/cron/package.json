@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-cron",
   "description": "Calendar scheduling capability: five-field cron expression parsing, day matching, and occurrence resolution over an explicit IANA zone",
-  "version": "0.2.1-rc.2",
+  "version": "0.2.1-rc.4",
   "publishConfig": {
     "access": "public"
   },

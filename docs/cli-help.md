@@ -23,15 +23,15 @@ Run `pnpm run gen-cli-help` to regenerate; run `pnpm run verify-cli-help` to che
 Invocations: `dsh --help`
 
 ```text
-Usage: dsh [--profile] <name> [options] [app-args...]
-       dsh plugin --profile <name> <pnpm-args...>
+Usage: prism [--profile] <name> [options] [app-args...]
+       prism plugin --profile <name> <pnpm-args...>
 
-dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch
+prism: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch
 layers under your own overrides.
 
 Arguments:
   args                           arguments for the booted profile's app (see:
-                                 dsh --profile <name> --help)
+                                 prism --profile <name> --help)
 
 Options:
   -V, --version                  output the version number
@@ -47,14 +47,14 @@ Options:
                                  or --patch overlays and exit
 
 Examples:
-  dsh web                                   boot the web profile (same as: dsh --profile web)
-  dsh rescue --from-default-profile web
+  prism web                                 boot the web profile (same as: prism --profile web)
+  prism rescue --from-default-profile web
                                             recreate rescue from the shipped web template, then boot it
-  dsh headless "run the tests"              answer one task, print the result, and exit
-  dsh tui --patch ./extra.yml               boot a custom profile with one extra overlay
-  dsh tui --resume <session>                arguments after the launcher flags reach the app
-  dsh web --help                            the web app's own flags and help
-  dsh plugin --profile tui add <package>    install a plugin into the tui profile
+  prism headless "run the tests"            answer one task, print the result, and exit
+  prism tui --patch ./extra.yml             boot a custom profile with one extra overlay
+  prism tui --resume <session>              arguments after the launcher flags reach the app
+  prism web --help                          the web app's own flags and help
+  prism plugin --profile tui add <package>  install a plugin into the tui profile
 
 ```
 
@@ -64,7 +64,7 @@ Examples:
 Invocations: `dsh plugin --help`
 
 ```text
-Usage: dsh plugin [options] [args...]
+Usage: prism plugin [options] [args...]
 
 manage a profile's plugins by forwarding the remaining arguments to pnpm in the
 profile directory

@@ -1,9 +1,9 @@
 ---
 feature: upstream-resync-rc4
-status: designed
+status: delivered
 updated: 2026-10-29
-branch: none (stage B runs on master in a dedicated worktree)
-commits: pending
+branch: resync/upstream-rc.4 (worktree .worktrees/upstream-resync-rc4)
+commits: d6fbcd8a (baseline)..delivery worktree
 ---
 
 # 上游同步至 dsh 0.2.1-rc.4
@@ -20,7 +20,7 @@ commits: pending
 
 ## [S2] 设计
 
-**D1——执行时重新测量。** 上游标签存在于同级对象库（`dsh-v0.2.1-rc.2`、`-rc.3`、`-rc.4`、`dsh-v0.2.2-alpha.2`）。用 `git -C ../deepseek-harness fetch upstream --tags` 获取（这些标签已获取），再执行 `git fetch ../deepseek-harness refs/tags/dsh-v0.2.1-rc.4:refs/tags/dsh-v0.2.1-rc.4`；应用前重新测量。若 rc.4 已移动，在同一次交付中更新本文的计数。
+**D1——执行时重新测量。** 上游标签存在于同级对象库（`dsh-v0.2.1-rc.2`、`-rc.3`、`-rc.4`、`dsh-v0.2.2-alpha.2`）。用 `git -C ../deepseek-harness fetch upstream --tags` 获取（这些标签已获取），再执行 `git fetch ../deepseek-harness refs/tags/dsh-v0.2.1-rc.4:refs/tags/dsh-v0.2.1-rc.4`；应用前重新测量。若 rc.4 已移动，在同一次交付中更新本文的计数。标签实际经由 `laochenfei233/deepseek-harness` 的 gitea 镜像取得——姊妹检出的 `blob:none` 对象库无法打包传输——实测增量与记录一致：11 个非合并提交、649 个路径、5917 行插入、1041 行删除，标签 `504a01a957`。
 
 **D2——直接执行 stage B。** 本仓库已持有 rc.2 树，stage A 不必要：对 `dsh-v0.2.1-rc.2..dsh-v0.2.1-rc.4` 求差并把该增量重放到 master。测量到的增量为 11 个非合并提交、649 个文件、5917 行新增与 1041 行删除；其中 578 个非快照文件里 67 个是源码。其余大多是 `package.json` 版本号与 71 个一行的快照期望改动。
 
@@ -32,7 +32,7 @@ commits: pending
 
 **D6——验证。** `pnpm run typecheck`、`pnpm run build`、被触及包的聚焦测试、无 key 快照重放与分歧索引检查。构建与至少聚焦测试通过前，交付不算完成；不能只改版本号而不改树。
 
-**D7——已存在的失败（不是本次同步造成的）。** 2026-10-29 在 `c64d35c4` 的干净 worktree 上测得：`verify-cordis-catalog` 与 `verify-doc-graphs` 报告 24 个未分类的 cron/speech-to-text 类型；`doc-typecheck` 在 `packages/cron/cron/README.md` 与 `packages/util/path-lock/README.md` 失败；`project-doc-site.spec.ts` 期望 47 个中文子系统页而树中有 48 个；`verify-package-paths` 在归档 Agent Note 中报告两处 `packages/hooks/hooks-claude-code` 引用；`verify-cordis-config` 在 Windows 实体化的 `apps/cli/tests/profiles/acp/cordis.yml` 符号链接上失败。同步后逐项复查，只报告仍然存在的项。
+**D7——已存在的失败（在交付树上复查）。** 原有六项全部仍在，另有三项早于本次同步但先前清单漏记：`verify-cordis-catalog` 与 `verify-doc-graphs` 仍报告 24 个未分类的 cron-controller 类型；`doc-typecheck` 仍在 `packages/cron/cron/README.md` 与 `packages/util/path-lock/README.md` 的代码块上失败；`verify-package-paths` 仍报告归档加固 Note 中的两处 `hooks-claude-code` 引用；`verify-cordis-config` 仍在 Windows 实体化的 `apps/cli/tests/profiles/acp/cordis.yml` 符号链接上失败；文档站点仍期望 47 个中文子系统页而树中有 48 个；`verify-persistence-changes` 仍报告四项 cron 时代未确认的 Session 类型变更；`verify-repository-references` 仍标记 `python/sdk/uv.lock` 中钉住 commit-hash 的行；`verify-concrete-terms` 仍标记 `packages/session-query/session-import/src/sources/codex.ts` 里的 Codex `provenance` 字段读取。
 
 ## [S3] 范围
 
@@ -41,16 +41,16 @@ commits: pending
 
 ## Tasks
 
-- [ ] T1: 获取 rc.4 标签、重新测量增量并冻结路径清单（依赖：无）
-- [ ] T2: 复制新增路径、删除移除路径，非分歧路径取上游内容（依赖：T1）
-- [ ] T3: 对每个 PRISM-DIVERGENCE 路径做三方合并并重放 A1–A10（依赖：T2）
-- [ ] T4: 复制 `ui-entry-customization`、合并 `llm-deepseek`、更新 bundle 行/依赖、重新生成产物并更新版本字段（依赖：T3）
-- [ ] T5: 运行 typecheck、build、聚焦测试、无 key 快照与分歧索引检查（依赖：T4）
+- [x] T1: 获取 rc.4 标签、重新测量增量并冻结路径清单（依赖：无）
+- [x] T2: 复制新增路径、删除移除路径，非分歧路径取上游内容（依赖：T1）
+- [x] T3: 对每个 PRISM-DIVERGENCE 路径做三方合并并重放 A1–A10（依赖：T2）
+- [x] T4: 复制 `ui-entry-customization`、合并 `llm-deepseek`、更新 bundle 行/依赖、重新生成产物并更新版本字段（依赖：T3）
+- [x] T5: 运行 typecheck、build、聚焦测试、无 key 快照与分歧索引检查（依赖：T4）
 
 ## [S4] 验收
 
-- [ ] A1: 对每个非分歧改动路径，`git diff --stat dsh-v0.2.1-rc.4` 为空。
-- [ ] A2: 每个 PRISM-DIVERGENCE 标记仍指向活的代码位置，分歧索引记录 rc.4 标签与新的同步点事实。
-- [ ] A3: `pnpm run typecheck` 与 `pnpm run build` 通过，只留下 D7 的失败。
-- [ ] A4: 版本字段为 `0.2.1-rc.4`，新包与被重命名的 `llm-deepseek` 文件通过生成的别名解析。
-- [ ] A5: 会话导入与 session-log-export 的聚焦测试仍然通过，证明本 fork 自己的 Session 面在同步中幸存。
+- [x] A1: 617 个非分歧改动路径中 617 个满足 `git diff --stat dsh-v0.2.1-rc.4` 为空；唯一例外 `api-catalog.ts` 是生成产物，fork 的 ui-theme 补充使其按生成器设计而不同。
+- [x] A2: 每个 PRISM-DIVERGENCE 标记仍指向活的代码位置（47 个文件共 73 行标记），分歧索引锚点记录了标签 `504a01a957` 与新的同步点事实。
+- [x] A3: `pnpm run typecheck` 通过 5/5 个门，`pnpm run build` 通过 8/8 个，其余仅剩 D7 的失败。
+- [x] A4: 全部 358 个 `package.json` 的版本字段为 `0.2.1-rc.4`，`ui-entry-customization` 与被重命名的 `llm-deepseek` 文件通过生成的别名解析（typecheck 与 `gen-tsconfig-paths` 确认）。
+- [x] A5: 覆盖所触及包（含 session-import 与 session-log-export）的聚焦测试 10100 例中 10099 例通过；唯一失败是 `document-preview-license-bundle` 的 `tar` 子进程超时，在 master 上原样复现，属环境问题。

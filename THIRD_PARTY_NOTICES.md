@@ -85,7 +85,6 @@ External packages installed for runtime use or distributed inside the prebuilt b
 | [`compression`](https://github.com/expressjs/compression) | MIT |
 | [`diff`](https://github.com/kpdecker/jsdiff) | BSD-3-Clause |
 | [`dompurify`](https://github.com/cure53/DOMPurify) | (MPL-2.0 OR Apache-2.0) |
-| [`electron-updater`](https://github.com/electron-userland/electron-builder) | MIT |
 | [`eventsource-parser`](https://github.com/rexxars/eventsource-parser) | MIT |
 | [`exceljs`](https://github.com/exceljs/exceljs) | MIT |
 | [`execa`](https://github.com/sindresorhus/execa) | MIT |
@@ -149,7 +148,6 @@ pnpm applies local patches to the following packages at install time, so shipped
 - `@fortune-sheet/core@1.0.4` — [`patches/@fortune-sheet__core@1.0.4.patch`](patches/@fortune-sheet__core@1.0.4.patch)
 - `@fortune-sheet/react@1.0.4` — [`patches/@fortune-sheet__react@1.0.4.patch`](patches/@fortune-sheet__react@1.0.4.patch)
 - `@yao-pkg/pkg@6.21.0` — [`patches/@yao-pkg__pkg@6.21.0.patch`](patches/@yao-pkg__pkg@6.21.0.patch)
-- `app-builder-lib@26.17.0` — [`patches/app-builder-lib@26.17.0.patch`](patches/app-builder-lib@26.17.0.patch)
 - `esbuild@0.25.12` — [`patches/esbuild@0.25.12.patch`](patches/esbuild@0.25.12.patch)
 - `exceljs@4.4.0` — [`patches/exceljs@4.4.0.patch`](patches/exceljs@4.4.0.patch)
 - `node-pty@1.2.0-beta.15` — [`patches/node-pty@1.2.0-beta.15.patch`](patches/node-pty@1.2.0-beta.15.patch)
@@ -191,8 +189,6 @@ External packages **directly declared** for development, tests, types, or toolin
 | Package | License |
 | --- | --- |
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
-| [`@electron/get`](https://github.com/electron/get) | MIT |
-| [`@electron/notarize`](https://github.com/electron/notarize) | MIT |
 | [`@lexical/headless`](https://github.com/facebook/lexical) | MIT |
 | [`@modelcontextprotocol/node`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
 | [`@modelcontextprotocol/server`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
@@ -228,14 +224,10 @@ External packages **directly declared** for development, tests, types, or toolin
 | [`@vitest/spy`](https://github.com/vitest-dev/vitest) | MIT |
 | [`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) | MIT |
 | [`@yarnpkg/cli-dist`](https://github.com/yarnpkg/berry) | BSD-2-Clause |
-| [`app-builder-lib`](https://github.com/electron-userland/electron-builder) | MIT |
-| [`cos-nodejs-sdk-v5`](https://github.com/tencentyun/cos-nodejs-sdk-v5) | ISC |
 | [`cytoscape`](https://github.com/cytoscape/cytoscape.js) | MIT |
 | [`cytoscape-cose-bilkent`](https://github.com/cytoscape/cytoscape.js-cose-bilkent) | MIT |
 | [`dayjs`](https://github.com/iamkun/dayjs) | MIT |
 | [`debug`](https://github.com/debug-js/debug) | MIT |
-| [`electron`](https://github.com/electron/electron) | MIT |
-| [`electron-builder`](https://github.com/electron-userland/electron-builder) | MIT |
 | [`esbuild`](https://github.com/evanw/esbuild) | MIT |
 | [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS) | LGPL-3.0-only |
 | [`extract-zip`](https://github.com/maxogden/extract-zip) | BSD-2-Clause |

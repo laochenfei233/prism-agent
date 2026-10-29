@@ -1,7 +1,7 @@
 ---
 feature: fork-upstream-divergence
 status: delivered
-updated: 2026-10-21
+updated: 2026-10-29
 branch: none, see the Workspace override in desktop-startup-latency.md (S2)
 commits: uncommitted working tree
 ---
@@ -82,7 +82,7 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 
 ## [S4] Replay checklist
 
-**Sync anchor (2026-10-21):** the last resync merged upstream `687f282e86` (`dsh-v0.2.1-rc.2`) into the sibling checkout as merge `3d5ad79dc0` and re-imported that tree here, replaying the desktop line (A1 with its `apps/desktop-host` satellite exclusions), the client branding (A2), the boot resolver (A3), the install identity (A8), and the home default (A9), and re-deleting the Electron satellites. The next resync measures from `3d5ad79dc0`: `git -C ../deepseek-harness rev-list --count 3d5ad79dc0..upstream/master`.
+**Sync anchor (2026-10-29):** the last resync replayed the upstream `dsh-v0.2.1-rc.2..dsh-v0.2.1-rc.4` delta (release `504a01a957`) directly onto master as a measured stage-B replay ([upstream-resync-rc4.md](upstream-resync-rc4.md)): 11 non-merge commits, 649 paths, each classified with the rc.2 blob as merge base. It re-applied A1's `apps/desktop-host` satellite exclusion and the A2 branding rows in `ui-sidebar` and `ui-primitives`, and confirmed A3, A4, A9, and A10 needed no replay because the delta does not touch their files. The next resync measures from the rc.4 tag; fetch the tags from the gitea mirror of `laochenfei233/deepseek-harness`, because the sibling checkout's object store is a `blob:none` partial clone and cannot pack a fetch.
 
 1. Take stock here: `git status --porcelain` and `rg -n PRISM-DIVERGENCE`, and decide the fate of the import in progress (A7) before touching anything else.
 2. Reconcile where merging works: in `../deepseek-harness`, `git fetch upstream` and merge `upstream/master`, re-applying A1 through A4 there, where they are ordinary commits.
