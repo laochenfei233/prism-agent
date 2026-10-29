@@ -9,7 +9,8 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { isAbsolute, join } from 'node:path'
+import { cp } from 'node:fs/promises'
+import { dirname, isAbsolute, join } from 'node:path'
 import { brandNumber, brandString } from '@deepseek-ai/dsh-brand'
 import {
   SESSION_FORMAT_VERSION,
@@ -112,6 +113,8 @@ export class ImportEngineError extends Error {
 
 /** Pure import planning and writing. */
 export class SessionImportEngine {
+  private attachmentsCopied = false
+
   /**
    * @param options - persistence, workspace registry, roots, and limits.
    */
@@ -289,7 +292,9 @@ export class SessionImportEngine {
       if (!group.merge) continue
       for (const session of group.sessions) {
         if (!requested.has(session.key)) continue
-        const id = this.sessionIdFor(source, session.key)
+        const id = source === 'dsh'
+          ? brandString<SessionId>(session.key)
+          : this.sessionIdFor(source, session.key)
         if ((await this.options.persistence.stat(id)) === undefined) return true
       }
     }
@@ -304,6 +309,9 @@ export class SessionImportEngine {
     workspaceFor: (path: string) => Promise<ImportWorkspace>,
     workspaces: Map<string, ImportWorkspaceOutcome>,
   ): Promise<ImportApplyEntry> {
+    if (session.loadNative !== undefined) {
+      return this.writeNative(session, group, workspaceFor, workspaces)
+    }
     const key = session.meta.key
     const id = this.sessionIdFor(source, key)
     if ((await this.options.persistence.stat(id)) !== undefined) {
@@ -330,23 +338,88 @@ export class SessionImportEngine {
     } finally {
       await handle.close()
     }
-    let reason: string | undefined
-    if (cwd !== undefined) {
-      try {
-        const workspace = await workspaceFor(cwd)
-        await workspace.attachSession(id)
-        const existing = workspaces.get(cwd)
-        workspaces.set(cwd, {
-          path: cwd,
-          workspaceId: workspace.id,
-          created: existing?.created ?? group.existingWorkspace === undefined,
-          imported: (existing?.imported ?? 0) + 1,
-        })
-      } catch (error: unknown) {
-        reason = `session imported, project registration failed: ${errorText(error)}`
-      }
-    }
+    const reason = await this.attachProject(id, group, workspaceFor, workspaces)
     return { key, outcome: 'imported', sessionId: id, ...(reason === undefined ? {} : { reason }) }
+  }
+
+  /** Copy a DSH-compatible log without rewriting its events. */
+  private async writeNative(
+    session: ScannedSession,
+    group: PlanGroup,
+    workspaceFor: (path: string) => Promise<ImportWorkspace>,
+    workspaces: Map<string, ImportWorkspaceOutcome>,
+  ): Promise<ImportApplyEntry> {
+    const key = session.meta.key
+    const native = await session.loadNative?.()
+    if (native === undefined) return { key, outcome: 'failed', reason: 'native reader unavailable' }
+    const id = native.header.id
+    if ((await this.options.persistence.stat(id)) !== undefined) {
+      return { key, outcome: 'duplicate', sessionId: id }
+    }
+    await this.copyAttachments()
+    const cwd = group.path ?? native.header.cwd
+    const header: SessionHeader = {
+      version: SESSION_FORMAT_VERSION,
+      id,
+      createdAt: native.header.createdAt,
+      ...(cwd === undefined ? {} : { cwd }),
+      isSeeded: false,
+      delegationDepth: 0,
+    }
+    const handle = await this.options.persistence.create(header)
+    try {
+      await handle.append(native.events)
+      await handle.flush()
+    } finally {
+      await handle.close()
+    }
+    const reason = await this.attachProject(id, group, workspaceFor, workspaces)
+    return { key, outcome: 'imported', sessionId: id, ...(reason === undefined ? {} : { reason }) }
+  }
+
+  /** Register one written session under its canonical project folder. */
+  private async attachProject(
+    id: SessionId,
+    group: PlanGroup,
+    workspaceFor: (path: string) => Promise<ImportWorkspace>,
+    workspaces: Map<string, ImportWorkspaceOutcome>,
+  ): Promise<string | undefined> {
+    const cwd = group.path
+    if (cwd === undefined) return undefined
+    try {
+      const workspace = await workspaceFor(cwd)
+      await workspace.attachSession(id)
+      const existing = workspaces.get(cwd)
+      workspaces.set(cwd, {
+        path: cwd,
+        workspaceId: workspace.id,
+        created: existing?.created ?? group.existingWorkspace === undefined,
+        imported: (existing?.imported ?? 0) + 1,
+      })
+      return undefined
+    } catch (error: unknown) {
+      return `session imported, project registration failed: ${errorText(error)}`
+    }
+  }
+
+  /** Copy the source home's attachment store once for natively imported sessions. */
+  private async copyAttachments(): Promise<void> {
+    if (this.attachmentsCopied) return
+    const source = join(dirname(this.rootOf('dsh')), 'attachments')
+    if (!(await isDirectory(source))) {
+      this.attachmentsCopied = true
+      return
+    }
+    try {
+      await cp(source, join(this.options.currentHome, 'attachments'), {
+        recursive: true,
+        force: false,
+        errorOnExist: false,
+      })
+      this.attachmentsCopied = true
+    } catch (error: unknown) {
+      throw new ImportEngineError('import-failed', `attachment copy failed: ${errorText(error)}`)
+    }
   }
 
   /** Normalize, bound, and merge raw messages into alternating turns. */

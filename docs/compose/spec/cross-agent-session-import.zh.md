@@ -45,7 +45,7 @@ commits: c64d35c4..HEAD
 
 ### [S2.3] 规范化对话
 
-每个读取器返回：
+对于九个转换来源，读取器返回：
 
 ```ts
 interface ImportedSession {
@@ -66,13 +66,19 @@ interface ImportedMessage {
 }
 ```
 
-只有真实的用户输入和助手文本会保留。系统提示、developer 消息、合成提醒、推理、工具调用、工具结果、附件和子 agent 会话都会被丢弃。丢弃工具活动让下一次请求保持较小，也避免编造 DSH 会尝试重放的调用标识；导入的对话读起来就是用户记得的那段交流。
+只有真实的用户输入和助手文本会保留。系统提示、developer 消息、合成提醒、推理、工具调用、工具结果、附件和子 agent 会话都会被丢弃。丢弃工具活动让下一次请求保持较小，也避免编造 DSH 会尝试重放的调用标识；导入的对话读起来就是用户记得的那段交流。DeepSeek Harness 不走这条路径，而是使用 S2.3a 的原生复制。
 
 上限约束内存与模型请求：`Config.maxMessages` 保留最近的消息，`Config.maxMessageTextBytes` 截断单条消息并留下可见标记。两者的默认值按真实存储的规模设定（2000 条消息、32 KiB）。
 
+### [S2.3a] DeepSeek Harness 原生复制
+
+DeepSeek Harness 读取器改为暴露原日志：头部中的 id、createdAt 与 cwd，以及完整的已提交事件序列。应用时校验事件封套，并用原会话 id 重放事件，绝不合成消息。工具调用、工具结果、request 头、标题事件与中断标记因此都留在会话及其派生历史中。
+
+格式版本不是当前 `SESSION_FORMAT_VERSION`、或事件被持久化校验拒绝的日志，会让该会话带原因失败；绝不会降级到文本路径。第一次原生写入前，来源 home 的 `attachments/` 目录会复制到当前 home，已存在的文件保留，因此历史中的附件引用可以解析。
+
 ### [S2.4] 持久会话合成
 
-引擎通过 `ctx.sessionPersistence` 写入一个普通的顶层会话：
+对于转换来源，引擎通过 `ctx.sessionPersistence` 写入一个普通的顶层会话：
 
 1. 头部 `{ version: 4, id, createdAt: <首条消息时间>, cwd, isSeeded: false, delegationDepth: 0 }`。id 是确定性的：`session-import-<sha256(source + ':' + key)>` 的小写十六进制。重复导入因此得到同一个 id，直接跳过而不是复制。
 2. 每一轮：`turn/start`、`user/message`（`surfaceOp: 'append'`）、`assistant/message`（`surfaceOp: 'append'`、`stream: []`）、`turn/end`（`reason: { kind: 'completed' }`）。连续的助手消息合并为一条；开头没有用户输入、仅有助手消息的轮次跳过。
@@ -127,6 +133,7 @@ interface ImportedMessage {
 
 - [ ] A1: 十个来源都能在其文档根目录被发现，读取器按顺序返回用户与助手文本，并带 cwd、时间戳和稳定 key。
 - [ ] A2: 应用计划后创建的会话日志可解码，其 `deriveMessages()` 等于导入的对话；第二次应用把每个会话报告为 `duplicate` 且不改任何字节。
+- [ ] A2b: DeepSeek Harness 原生导入保留原会话 id 与完整事件序列（包括 `tool/call` 与 `tool/result`），用存储日志构造的 `Session.create` 能把工具结果派生成模型历史；附件已出现在当前 home。
 - [ ] A3: 导入的会话出现在其文件夹对应的项目下；文件夹已有项目时，只有 `confirmMerge` 为 true 才合并，否则以 `merge-confirmation-required` 拒绝。
 - [ ] A4: plan 与 apply 之后来源根目录未变（文件哈希与 SQLite mtime）。
 - [ ] A5: 设置页列出来源、预览项目、在合并确认被勾选前阻止导入，并报告逐会话结果。

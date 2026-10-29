@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import` 在设置中新增「导入」页，读取另外十个编码 Agent 的对话历史，并把每段对话写成本 harness 中普通的持久会话。导入的会话会出现在侧栏中其记录的工作文件夹对应的项目下，下一次提问会带着导入文本继续该对话。来源以只读方式打开。
+`dsh-session-import` 在设置中新增「导入」页，读取另外十个编码 Agent 的对话历史，并把每段对话写成本 harness 中普通的持久会话。导入的会话会出现在侧栏中其记录的工作文件夹对应的项目下，下一次提问会继续该对话。DeepSeek Harness 会话按原生日志复制，保留原会话 id 与完整事件，因此工具调用与结果不会丢失；其余九个来源会归一化成文本。来源以只读方式打开。
 
 ## 目录
 
@@ -58,8 +58,8 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `roots` | 文档根目录 | 按来源 id 覆盖的绝对根目录。 |
-| `maxMessages` | `2000` | 每段对话保留的最近消息数。 |
-| `maxMessageTextBytes` | `32768` | 单条导入消息的 UTF-8 字节预算；超长文本以 `[truncated]` 结尾。 |
+| `maxMessages` | `2000` | 每段转换对话保留的最近消息数；原生复制的 DeepSeek Harness 日志不受影响。 |
+| `maxMessageTextBytes` | `32768` | 单条转换消息的 UTF-8 字节预算；超长文本以 `[truncated]` 结尾。 |
 
 ### 路由约定
 
@@ -73,7 +73,7 @@ kind: "package-reference"
 
 ### 预期行为
 
-页面扫描来源、预览项目，并导入全部会话或用户保留勾选的项目。文件夹已不存在的对话会在不归入项目的情况下导入，并在结果中点名。同一来源与同一会话 id 始终映射到同一个持久会话 id，因此重复导入会报告 `duplicate`，而不会写入第二份。来源记录了标题时，导入会话带上该标题；否则在下一条消息之后沿用现有的回退标题。
+页面扫描来源、预览项目，并导入全部会话或用户保留勾选的项目。文件夹已不存在的对话会在不归入项目的情况下导入，并在结果中点名。同一来源与同一会话 id 始终映射到同一个持久会话 id，因此重复导入会报告 `duplicate`，而不会写入第二份。DeepSeek Harness 会话保留原 id 与事件日志，并复制一次来源 home 的附件存储；其余来源使用由来源与 key 推导出的新会话 id。来源记录了标题时，导入会话带上该标题；否则在下一条消息之后沿用现有的回退标题。
 
 ### 失败
 
@@ -93,7 +93,11 @@ Host 半包（[`src/index.ts`](src/index.ts)）校验配置、注册两条 Fetch
 
 ### 会话合成
 
-引擎写入顶层头（`version: 4`、`isSeeded: false`、`delegationDepth: 0`），创建时间取对话首条消息，然后每个用户输入一轮：`turn/start`、`user/message`、`stream` 为空的 `assistant/message`、`turn/end`。连续助手消息合并为一条；来源提供的标题写成 `session/title` 事件。最终事件通过普通的持久化句柄追加、flush 并关闭，因此 `sessionPersistence.list()` 在下一次侧栏刷新前就会暴露该会话，下一次提问的派生历史也会包含导入的消息。
+DeepSeek Harness 来源按原生方式复制：引擎用原会话 id 重放完整的已提交事件日志，因此工具调用、工具结果、标题事件与 request 头都会留在持久会话及其派生历史中。当前构建无法校验的格式版本或事件结构会让该会话以原因失败，绝不会降级成文本。第一次原生写入前，来源 home 的 `attachments/` 目录会复制到当前 home。
+
+其余九个来源由引擎写入顶层头（`version: 4`、`isSeeded: false`、`delegationDepth: 0`），创建时间取对话首条消息，然后每个用户输入一轮：`turn/start`、`user/message`、`stream` 为空的 `assistant/message`、`turn/end`。连续助手消息合并为一条；来源提供的标题写成 `session/title` 事件。
+
+两种路径最终都通过普通的持久化句柄追加、flush 并关闭，因此 `sessionPersistence.list()` 在下一次侧栏刷新前就会暴露该会话，下一次提问的派生历史也会包含导入的消息。
 
 ### 只读来源
 
@@ -119,11 +123,11 @@ Host 半包（[`src/index.ts`](src/index.ts)）校验配置、注册两条 Fetch
 
 #### 模型看到什么
 
-导入会话中的下一次用户提问之前，会带上前面的导入用户与助手文本，作为普通的派生历史。系统提示、推理、工具调用、工具结果、附件、子 agent 会话与合成提醒都不存在。
+转换会话中的下一次用户提问之前，会带上前面的导入用户与助手文本，作为普通的派生历史；系统提示、推理、工具调用、工具结果、附件、子 agent 会话与合成提醒都不存在。原生复制的 DeepSeek Harness 会话保留这些记录事件（包括工具调用与结果），并从原会话 id 继续。
 
 #### Token 影响
 
-导入文本在下一次请求中消耗输入 token，受 `maxMessages` 与 `maxMessageTextBytes` 限制。被截断的消息以 `[truncated]` 结尾，保留窗口从用户输入开始，并保留最近的消息。
+转换后的文本在下一次请求中消耗输入 token，受 `maxMessages` 与 `maxMessageTextBytes` 限制；被截断的消息以 `[truncated]` 结尾。原生复制重放其记录的事件，token 成本就是原日志本来包含的内容。
 
 #### KV Cache 影响
 
@@ -133,11 +137,11 @@ Host 半包（[`src/index.ts`](src/index.ts)）校验配置、注册两条 Fetch
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **仅文本**——工具调用、工具结果、推理、图片、附件与子 agent 记录都不会重建。
+- **转换来源仅文本**——Claude Code、Codex、Grok、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 与 Gemini CLI 会丢失工具调用、工具结果、推理、图片与子 agent 记录。DeepSeek Harness 是例外：它的日志按原生方式复制，当前构建无法校验的版本或事件结构会让该会话失败，而不是回退成文本。
 - **没有增量同步**——重复导入同一来源会话只报告重复；外部存储中的新消息不会追加到已有的 DSH 会话。
 - **未公开存储尽力而为**——OpenClaw 与 Hermes 的载荷结构随版本变化；无法识别角色与文本的事件会被跳过，没有任何可用文本的会话报告为已跳过。
 - **一个文件夹一个工作区**——工作区注册表按规范化路径键控项目。向已有项目导入必须经过显式合并确认；无法为同一文件夹创建第二个项目。
-- **消息窗口**——超出 `maxMessages` 的旧消息不会导入，因此超长历史会从截断的前缀继续。
+- **转换消息窗口**——超出 `maxMessages` 的旧消息不会导入，因此超长的转换历史会从截断的前缀继续；原生复制的 DeepSeek Harness 会话保留完整日志。
 
 <a id="dev-note"></a>
 ### 开发备注

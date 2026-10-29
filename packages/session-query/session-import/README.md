@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import` adds an Import page under Settings that reads conversation history from ten other coding agents and writes each conversation as a normal durable session in this harness. Imported sessions appear in the sidebar under the project for their recorded working folder, and the next prompt continues the conversation with the imported text in the request history. Sources are opened read-only.
+`dsh-session-import` adds an Import page under Settings that reads conversation history from ten other coding agents and writes each conversation as a normal durable session in this harness. Imported sessions appear in the sidebar under the project for their recorded working folder, and the next prompt continues the conversation. DeepSeek Harness sessions are copied natively with their original session id and full event log, so tool calls and results survive; the other nine stores are normalized to text. Sources are opened read-only.
 
 ## Table of Contents
 
@@ -58,8 +58,8 @@ The package looks for each store at its documented root under the OS home. A sou
 | Field | Default | Meaning |
 |---|---|---|
 | `roots` | documented roots | Absolute root overrides keyed by source id. |
-| `maxMessages` | `2000` | Most recent messages retained per conversation. |
-| `maxMessageTextBytes` | `32768` | UTF-8 byte budget for one imported message; longer text ends with `[truncated]`. |
+| `maxMessages` | `2000` | Most recent messages retained per converted conversation; a native DeepSeek Harness copy is unchanged. |
+| `maxMessageTextBytes` | `32768` | UTF-8 byte budget for one converted message; longer text ends with `[truncated]`. |
 
 ### Route contract
 
@@ -73,7 +73,7 @@ The package looks for each store at its documented root under the OS home. A sou
 
 ### What to expect
 
-The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message.
+The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. A DeepSeek Harness session keeps its original id and event log, and its source home's attachment store is copied once; the other sources become a new session id derived from the source and key. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message.
 
 ### Failures
 
@@ -93,7 +93,11 @@ The Host half ([`src/index.ts`](src/index.ts)) validates configuration, register
 
 ### Session synthesis
 
-The engine writes a top-level header (`version: 4`, `isSeeded: false`, `delegationDepth: 0`) with the conversation's first message time, then one turn per user prompt: `turn/start`, `user/message`, `assistant/message` with an empty stream, and `turn/end`. Consecutive assistant messages merge into one; a title from the store becomes a `session/title` event. The final events are appended, flushed, and closed through a normal persistence handle, so `sessionPersistence.list()` exposes the session before the next sidebar refresh and the next prompt's derived history includes the imported messages.
+A DeepSeek Harness source is copied natively: the engine replays the complete committed event log under the original session id, so tool calls, tool results, title events, and request headers remain part of the durable session and its derived history. A log whose format version or event shape this build cannot validate fails that session with a reason; it is never downgraded to text. The source home's `attachments/` directory is copied into the current home before the first native write.
+
+For the other nine stores the engine writes a top-level header (`version: 4`, `isSeeded: false`, `delegationDepth: 0`) with the conversation's first message time, then one turn per user prompt: `turn/start`, `user/message`, `assistant/message` with an empty stream, and `turn/end`. Consecutive assistant messages merge into one; a title from the store becomes a `session/title` event.
+
+In both cases the events are appended, flushed, and closed through a normal persistence handle, so `sessionPersistence.list()` exposes the session before the next sidebar refresh and the next prompt's derived history includes the imported messages.
 
 ### Read-only sources
 
@@ -119,11 +123,11 @@ File readers stream JSONL and decode concatenated Zstandard frames; SQLite reade
 
 #### What the model sees
 
-The next user prompt in an imported session is preceded by the imported user and assistant text as ordinary derived history. System prompts, reasoning, tool calls, tool results, attachments, subagent sessions, and synthetic reminders are absent.
+The next user prompt in a converted session is preceded by the imported user and assistant text as ordinary derived history; system prompts, reasoning, tool calls, tool results, attachments, subagent sessions, and synthetic reminders are absent. A natively copied DeepSeek Harness session keeps those recorded events, including tool calls and results, and continues from the original session id.
 
 #### Token effect
 
-The imported text consumes input tokens on the next request, bounded by `maxMessages` and `maxMessageTextBytes`. Truncated messages end with `[truncated]`, and the retained window keeps the most recent messages, starting at a user prompt.
+Converted text consumes input tokens on the next request, bounded by `maxMessages` and `maxMessageTextBytes`; truncated messages end with `[truncated]`. A native copy replays its recorded events, whose token cost is whatever the original log already contained.
 
 #### KV Cache effect
 
@@ -133,11 +137,11 @@ None for the import itself; the session is new. Later turns share the normal ses
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Text only** — tool calls, tool results, reasoning, images, attachments, and subagent transcripts are not reconstructed.
+- **Converted sources are text only** — Claude Code, Codex, Grok, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI lose tool calls, tool results, reasoning, images, and subagent transcripts. DeepSeek Harness is the exception: its log is copied natively, and a version or event shape this build cannot validate fails that session instead of falling back to text.
 - **No incremental sync** — a repeated import of the same source session is a duplicate; newer messages in the foreign store are not appended to the existing DSH session.
 - **Best-effort undocumented stores** — OpenClaw and Hermes payload schemas vary across builds; events that carry no recognizable role and text are skipped, and a session with no usable text reports as skipped.
 - **One workspace per folder** — the workspace registry keys projects by canonical path. Importing into an existing project therefore requires the explicit merge confirmation; it cannot create a second project for the same folder.
-- **Message window** — older messages beyond `maxMessages` are not imported, so very long histories continue from a truncated prefix.
+- **Converted message window** — older messages beyond `maxMessages` are not imported, so very long converted histories continue from a truncated prefix; a native DeepSeek Harness copy keeps its complete log.
 
 <a id="dev-note"></a>
 ### Dev Note

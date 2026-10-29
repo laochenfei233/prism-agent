@@ -45,7 +45,7 @@ The current home (`ctx.dshHomePath()`) is excluded from the DeepSeek Harness sou
 
 ### [S2.3] Normalized transcript
 
-One reader returns:
+For the nine converted sources, one reader returns:
 
 ```ts
 interface ImportedSession {
@@ -66,13 +66,19 @@ interface ImportedMessage {
 }
 ```
 
-Only genuine user prompts and assistant text survive. System prompts, developer messages, synthetic reminders, reasoning, tool calls, tool results, attachments, and subagent sessions are dropped. Dropping tool activity keeps the next request small and avoids inventing tool-call identities DSH would try to replay; the imported conversation reads as the dialogue the user remembers.
+Only genuine user prompts and assistant text survive. System prompts, developer messages, synthetic reminders, reasoning, tool calls, tool results, attachments, and subagent sessions are dropped. Dropping tool activity keeps the next request small and avoids inventing tool-call identities DSH would try to replay; the imported conversation reads as the dialogue the user remembers. DeepSeek Harness does not use this path; it takes the native copy in S2.3a.
 
 Limits bound memory and the model request: `Config.maxMessages` keeps the most recent messages, and `Config.maxMessageTextBytes` truncates one message with a visible marker. Both default to values sized for real stores (2000 messages, 32 KiB).
 
+### [S2.3a] Native DeepSeek Harness copy
+
+A DeepSeek Harness reader instead exposes the original log: the header's id, createdAt, and cwd, plus the complete committed event sequence. Apply validates the envelope, replays the events under the original session id, and never synthesizes messages. Tool calls, tool results, request headers, title events, and interruption markers therefore remain part of the session and its derived history.
+
+A log whose format version is not the current `SESSION_FORMAT_VERSION`, or whose events the persistence validator rejects, fails that session with a reason. It is never downgraded to the text path. Before the first native write, the source home's `attachments/` directory is copied into the current home with existing files preserved, so attachment references in the history resolve.
+
 ### [S2.4] Durable session synthesis
 
-The engine writes a normal top-level session through `ctx.sessionPersistence`:
+For converted sources, the engine writes a normal top-level session through `ctx.sessionPersistence`:
 
 1. Header `{ version: 4, id, createdAt: <first message time>, cwd, isSeeded: false, delegationDepth: 0 }`. The id is deterministic: `session-import-<sha256(source + ':' + key)>` in lowercase hex. A repeated import therefore finds the same id and skips instead of duplicating.
 2. For each turn: `turn/start`, `user/message` (`surfaceOp: 'append'`), `assistant/message` (`surfaceOp: 'append'`, `stream: []`), `turn/end` with `reason: { kind: 'completed' }`. Consecutive assistant messages merge into one; a leading assistant message without a user prompt is skipped.
@@ -127,6 +133,7 @@ Readers open files with read access and SQLite databases with `readOnly: true`. 
 
 - [ ] A1: each of the ten sources is discovered at its documented root, and its reader returns user and assistant text in order with cwd, timestamps, and a stable key.
 - [ ] A2: applying a plan creates decodable session logs whose `deriveMessages()` equals the imported dialogue; a second apply reports every session as `duplicate` and changes no bytes.
+- [ ] A2b: a native DeepSeek Harness import keeps the original session id and complete event sequence, including `tool/call` and `tool/result`, and `Session.create` over the stored log derives the tool result into model history; attachments are present in the current home.
 - [ ] A3: imported sessions appear under the project for their folder; a folder whose project already exists is merged only when `confirmMerge` is true, and rejected with `merge-confirmation-required` otherwise.
 - [ ] A4: source roots are unchanged after plan and apply (file hashes and SQLite mtimes).
 - [ ] A5: the settings page lists sources, previews projects, blocks import until the merge confirmation is acknowledged, and reports per-session results.

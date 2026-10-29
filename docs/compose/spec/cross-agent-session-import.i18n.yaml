@@ -21,11 +21,14 @@
   en: 791a4b261146be86
   zh: e31b84d5921622b5
 /cross-agent-session-import/s2-design/s2-3-normalized-transcript:
-  en: fdc7bd031fc37e58
-  zh: deaf1da84bec2f3c
+  en: 8522b90a23916b18
+  zh: 44a8631b97495d7b
+/cross-agent-session-import/s2-design/s2-3a-native-deepseek-harness-copy:
+  en: 9b1ed0758cdee5c3
+  zh: 8a33b3ee148c0884
 /cross-agent-session-import/s2-design/s2-4-durable-session-synthesis:
-  en: e1b3e0aabc2d3cfe
-  zh: 1afb65d2846f849c
+  en: 5844a75e611c7ee8
+  zh: b53ea59db946f378
 /cross-agent-session-import/s2-design/s2-5-projects-and-merge-confirmation:
   en: 2ec55302ac206628
   zh: f6fdb89bcedd72a1
@@ -45,5 +48,5 @@
   en: d16e79d010d7cb84
   zh: 785626eebecc951d
 /cross-agent-session-import/s4-acceptance:
-  en: 69258596d60f07b5
-  zh: 095d7164cb189798
+  en: 33df9b5a04013ff6
+  zh: 1afd4f0f5f41432f

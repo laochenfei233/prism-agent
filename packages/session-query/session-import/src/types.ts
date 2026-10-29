@@ -5,6 +5,8 @@
  * @module @deepseek-ai/dsh-session-import/types
  */
 
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+
 /** Foreign conversation stores this feature can read. */
 export type ImportSourceId =
   | 'claude'
@@ -66,12 +68,26 @@ export interface ImportedSessionMeta {
   readonly bytes?: number
 }
 
-/** One discovered session plus the reader that materializes its transcript. */
+/** One discovered session plus the readers that materialize it. */
 export interface ScannedSession {
   /** Metadata shown by discovery and planning. */
   readonly meta: ImportedSessionMeta
   /** Read the normalized transcript. */
   readonly load: () => Promise<ImportedSession>
+  /**
+   * Read the original DSH log for a native copy, when the store is
+   * DSH-compatible. Native-capable sources never fall back to `load` during
+   * apply.
+   */
+  readonly loadNative?: () => Promise<NativeSessionLog>
+}
+
+/** One DSH-compatible session log preserved for a native copy. */
+export interface NativeSessionLog {
+  /** Durable header fields, excluding fork seed metadata. */
+  readonly header: SessionHeader
+  /** Complete committed event sequence, in order. */
+  readonly events: readonly SessionEvent[]
 }
 
 /** Result of scanning one source root. */

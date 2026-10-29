@@ -16,11 +16,26 @@
     "src/types.ts"
   ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../client/locale/tsconfig.client.json" },
-    { "path": "../../client/ui-primitives" },
-    { "path": "../../client/ui-renderer" },
-    { "path": "../../client/ui-settings/tsconfig.client.json" },
-    { "path": "../../client/ui-slots" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../client/locale/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/ui-primitives"
+    },
+    {
+      "path": "../../client/ui-renderer"
+    },
+    {
+      "path": "../../client/ui-settings/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/ui-slots"
+    },
+    {
+      "path": "../../core/session"
+    }
   ]
 }

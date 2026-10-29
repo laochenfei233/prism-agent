@@ -154,11 +154,16 @@ describe('DeepSeek Harness reader', () => {
         },
       },
     })
+    const tool = JSON.stringify({
+      type: 'tool/call', seq: 2, time: 1300,
+      data: { turn: 1, step: 1, callId: 'c1', name: 'glob', arguments: '{}' },
+    })
     const log = join(root, 'sessions', '--proj--', id, 'session.v4.jsonl.zstd')
     await mkdir(join(log, '..'), { recursive: true })
     await writeFile(log, Buffer.concat([
       zstdCompressSync(`${header}\n${user}\n`),
       zstdCompressSync(`${assistant}\n`),
+      zstdCompressSync(`${tool}\n`),
     ]))
     const child = join(root, 'sessions', '--proj--', 'child', 'session.v4.jsonl')
     await write(child, JSON.stringify({
@@ -171,6 +176,9 @@ describe('DeepSeek Harness reader', () => {
     expect(scan.skipped?.map(entry => entry.key)).toContain('child')
     const loaded = await scan.sessions[0]?.load()
     expect(loaded?.messages.map(message => message.text)).toEqual(['continue', 'done'])
+    const native = await scan.sessions[0]?.loadNative?.()
+    expect(native?.header.id).toBe(id)
+    expect(native?.events.map(event => event.type)).toEqual(['user/message', 'assistant/message', 'tool/call'])
   })
 })
 
