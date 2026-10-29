@@ -353,7 +353,7 @@ export interface Config {
 ```ts config-catalog
 /** Local attachment backend configuration. */
 export interface Config {
-  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.dsh`. */
+  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.prism`. */
   dshHome?: string
   /** Maximum encoded bytes accepted for one submitted image. Default: 20 MiB. */
   maxImageBytes?: number
@@ -678,7 +678,7 @@ export interface Config {
   terminalFontFamily: Volatile<string>
 }
 
-/** Theme preference persisted by the product Appearance row. */
+/** Theme preference persisted by the product Appearance gallery. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
@@ -784,7 +784,7 @@ export interface Config {
 export interface Config {
   /** Credentials document path; defaults to `.credentials.yaml` under the harness home. */
   path?: string
-  /** Harness home used when `path` is omitted; defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** Harness home used when `path` is omitted; defaults to `$DSH_HOME` or `~/.prism`. */
   dshHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
@@ -793,6 +793,41 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-credentials-local -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-cron -->
+<a id="deepseek-aidsh-cron"></a>
+
+## `@deepseek-ai/dsh-cron`
+
+- `inject`: `storageDomain` · `timer` · `agents`
+- `source`: [`packages/cron/cron/src/config.ts:30`](../packages/cron/cron/src/config.ts)
+
+```ts config-catalog
+/**
+ * Plugin config as a deployment states it in `cordis.yml`.
+ *
+ * Every field is a deployment choice, so none of them is decided inside the
+ * plugin; the two optional ones carry a schema default and are still resolved
+ * explicitly by {@link resolveCronConfig}.
+ */
+export interface Config {
+  /**
+   * Path of the leadership lock file.
+   *
+   * Required, and deliberately not defaulted: a default could point somewhere
+   * other than the deployment's configured storage root, and two deployments
+   * would then each believe they lead while sharing one domain.
+   */
+  leaderLockPath: string
+  /** Delay before a follower retries leadership, in milliseconds. */
+  leaderRetryMs?: number
+  /** Finished runs each job keeps; older runs are dropped as new ones land. */
+  maxRunsPerJob?: number
+  /** Ceiling on one run, in milliseconds, when the creating caller states none. */
+  defaultMaxRunMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-cron -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-deepseek-account-platform -->
 <a id="deepseek-aidsh-deepseek-account-platform"></a>
@@ -1196,9 +1231,85 @@ export interface Config {
   defaultProvider: Volatile<string>
   /** Provider language hint selected when the caller omits one. */
   language: Volatile<string>
+  /** Model the selection runs; the empty string leaves the selected recognizer's own default. */
+  model: Volatile<string>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text-dashscope -->
+<a id="deepseek-aidsh-experimental-speech-to-text-dashscope"></a>
+
+## `@deepseek-ai/dsh-experimental-speech-to-text-dashscope`
+
+- `inject`: `speechToText`
+- `source`: [`packages/experimental/speech-to-text-dashscope/src/index.ts:42`](../packages/experimental/speech-to-text-dashscope/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration; every field is resolved before the provider is registered. */
+export interface Config {
+  /** Literal DashScope key; prefer {@link Config.apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference holding the key; defaults to `DASHSCOPE_API_KEY`. */
+  apiKeyEnv: string
+  /** Registration identity this recognizer occupies. */
+  providerId: string
+  /** Language hints this recognizer accepts. */
+  languages: string[]
+  /** Duplex recognition endpoint. */
+  url: string
+  /** Realtime recognition model name; the deployment's default and initial selection. */
+  model: string
+  /** Models this deployment offers for selection, in order; empty offers no choice. */
+  models: string[]
+  /** Whether the model labels speakers in its results. */
+  speakerDiarization: boolean
+  /** Maximum accepted recording duration in seconds. */
+  maxDurationSeconds: number
+  /** Deadline, in milliseconds, covering connect, upload, and result accumulation. */
+  timeoutMs: number
+  /** Deadline, in milliseconds, for the results sent after `task-finish`. */
+  drainTimeoutMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text-dashscope -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text-openai -->
+<a id="deepseek-aidsh-experimental-speech-to-text-openai"></a>
+
+## `@deepseek-ai/dsh-experimental-speech-to-text-openai`
+
+- `inject`: `speechToText`
+- `source`: [`packages/experimental/speech-to-text-openai/src/index.ts:37`](../packages/experimental/speech-to-text-openai/src/index.ts)
+
+```ts config-catalog
+/** Plugin configuration; every field is resolved before the provider is registered. */
+export interface Config {
+  /** Literal bearer token; prefer {@link Config.apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference holding the token; defaults to `OPENAI_API_KEY`. */
+  apiKeyEnv: string
+  /** Registration identity this recognizer occupies. */
+  providerId: string
+  /** Display name shown by speech surfaces. */
+  name: string
+  /** Language hints this recognizer accepts. */
+  languages: string[]
+  /** API root the transcription path is joined to. */
+  baseUrl: string
+  /** Transcription model the endpoint serves; the deployment's default and initial selection. */
+  model: string
+  /** Models this deployment offers for selection, in order; empty offers no choice. */
+  models: string[]
+  /** Maximum accepted recording duration in seconds. */
+  maxDurationSeconds: number
+  /** Maximum accepted upload size in bytes. */
+  maxUploadBytes: number
+  /** Deadline, in milliseconds, covering one request end to end. */
+  timeoutMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text-openai -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-speech-to-text-sensevoice -->
 <a id="deepseek-aidsh-experimental-speech-to-text-sensevoice"></a>
@@ -1281,6 +1392,25 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-tool-agent-team -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-tool-meeting-minutes -->
+<a id="deepseek-aidsh-experimental-tool-meeting-minutes"></a>
+
+## `@deepseek-ai/dsh-experimental-tool-meeting-minutes`
+
+- `inject`: `tools` · `fs` · `speechToText`
+- `source`: [`packages/experimental/tool-meeting-minutes/src/index.ts:33`](../packages/experimental/tool-meeting-minutes/src/index.ts)
+
+```ts config-catalog
+/** Meeting-minutes tool configuration. */
+export interface Config {
+  /** Largest recording this tool reads into memory, in bytes. */
+  maxAudioBytes: number
+  /** Characters of the transcript carried into the model-visible result. */
+  maxPreviewCharacters: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-tool-meeting-minutes -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-translator -->
 <a id="deepseek-aidsh-experimental-translator"></a>
@@ -2763,6 +2893,40 @@ export interface JsonRpcConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-sdk-jsonrpc-server -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-import -->
+<a id="deepseek-aidsh-session-import"></a>
+
+## `@deepseek-ai/dsh-session-import`
+
+- `inject`: `connection` · `sessionPersistence` · `workspaceRegistry`
+- `source`: [`packages/session-query/session-import/src/index.ts:38`](../packages/session-query/session-import/src/index.ts)
+
+```ts config-catalog
+/** Import policy and per-source root overrides. */
+export interface Config {
+  /** Absolute root overrides keyed by source id. */
+  readonly roots?: Partial<Record<ImportSourceId, string>>
+  /** Maximum retained messages per imported conversation. @default 2000 */
+  readonly maxMessages?: number
+  /** UTF-8 byte budget for one imported message. @default 32768 */
+  readonly maxMessageTextBytes?: number
+}
+
+/** Foreign conversation stores this feature can read. */
+export type ImportSourceId =
+  | 'claude'
+  | 'codex'
+  | 'grok'
+  | 'dsh'
+  | 'mimocode'
+  | 'opencode'
+  | 'openclaw'
+  | 'hermes'
+  | 'pi'
+  | 'gemini'
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-import -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
@@ -3054,7 +3218,7 @@ export interface Config extends SessionTitleLlmConfig {
 ```ts config-catalog
 /** Plugin config (all optional — the built-in facts resolve without defaults). */
 export interface Config {
-  /** DeepSeek Harness home directory exposed as `DSH_HOME`; defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** DeepSeek Harness home directory exposed as `DSH_HOME`; defaults to `$DSH_HOME` or `~/.prism`. */
   dshHome?: string
 }
 ```
@@ -3091,7 +3255,7 @@ export interface Config {
   providerName?: string
   /** Whether project and user roots are included around custom roots. */
   includeDefaultRoots?: boolean
-  /** DeepSeek Harness config root. Defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** DeepSeek Harness config root. Defaults to `$DSH_HOME` or `~/.prism`. */
   dshHome?: string
   /** Shared agent config root. Defaults to `$DSH_AGENTS_HOME` or `~/.agents`. */
   agentsHome?: string
@@ -3752,6 +3916,23 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-bash-persistent -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-cron -->
+<a id="deepseek-aidsh-tool-cron"></a>
+
+## `@deepseek-ai/dsh-tool-cron`
+
+- `inject`: `agents` · `cron` · `sessionProjections` · `tools`
+- `source`: [`packages/cron/tool-cron/src/index.ts:44`](../packages/cron/tool-cron/src/index.ts)
+
+```ts config-catalog
+/** Deployment policy for the scheduled-task tools. */
+export interface Config {
+  /** Run ceiling, in milliseconds, for a task whose creation states none. */
+  defaultMaxRunMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-cron -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-fs -->
 <a id="deepseek-aidsh-tool-fs"></a>
 
@@ -3825,7 +4006,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-goal`
 
 - `inject`: `agents` · `goals` · `tools` · `systemPrompt` · `sessionProjections`
-- `source`: [`packages/goal/tool-goal/src/index.ts:32`](../packages/goal/tool-goal/src/index.ts)
+- `source`: [`packages/goal/tool-goal/src/index.ts:34`](../packages/goal/tool-goal/src/index.ts)
 
 ```ts config-catalog
 /** Model policy and hard lower bounds for goal-state updates. */
@@ -4593,6 +4774,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-acp-app` | `cmdlineArgs` | [`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts) |
 | `@deepseek-ai/dsh-agent` | — | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
 | `@deepseek-ai/dsh-api-account-controller` | `deepseekAccount` · `agents` | [`packages/api/account-controller/src/index.ts`](../packages/api/account-controller/src/index.ts) |
+| `@deepseek-ai/dsh-api-cron-controller` | `cron` · `typert` | [`packages/api/cron-controller/src/index.ts`](../packages/api/cron-controller/src/index.ts) |
 | `@deepseek-ai/dsh-api-remote-access` | — | [`packages/api/remote-access/src/index.ts`](../packages/api/remote-access/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
@@ -4609,6 +4791,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-commands` | — | [`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-conversation` | — | [`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-cordis` | — | [`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-cron` | — | [`packages/client/ui-cron/src/index.ts`](../packages/client/ui-cron/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-deepseek-model-label-1017` | — | [`packages/client/ui-deepseek-model-label-1017/src/index.ts`](../packages/client/ui-deepseek-model-label-1017/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-deliverables` | `systemPrompt` · `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` | [`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-directory-picker-browse` | — | [`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts) |
@@ -4752,6 +4935,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-experimental-browser-use-runtime` | — | [`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-cot-translation-bundle` | — | [`packages/experimental/cot-translation-bundle/src/index.ts`](../packages/experimental/cot-translation-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-inspector-profile` | — | [`packages/experimental/inspector-profile/src/index.ts`](../packages/experimental/inspector-profile/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-meeting-minutes-bundle` | — | [`packages/experimental/meeting-minutes-bundle/src/index.ts`](../packages/experimental/meeting-minutes-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-plugin-market-bundle` | — | [`packages/experimental/plugin-market-bundle/src/index.ts`](../packages/experimental/plugin-market-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-ralph-bundle` | — | [`packages/experimental/ralph-bundle/src/index.ts`](../packages/experimental/ralph-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-session-search` | — | [`packages/experimental/session-search/src/index.ts`](../packages/experimental/session-search/src/index.ts) |
@@ -4794,6 +4978,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-typert-registry` | — | [`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts) |
 | `@deepseek-ai/dsh-util-code-language` | — | [`packages/util/code-language/src/index.ts`](../packages/util/code-language/src/index.ts) |
 | `@deepseek-ai/dsh-util-crypto` | — | [`packages/util/crypto/src/index.ts`](../packages/util/crypto/src/index.ts) |
+| `@deepseek-ai/dsh-util-path-lock` | — | [`packages/util/path-lock/src/index.ts`](../packages/util/path-lock/src/index.ts) |
 | `@deepseek-ai/dsh-util-time` | — | [`packages/util/time/src/index.ts`](../packages/util/time/src/index.ts) |
 | `@deepseek-ai/dsh-util-values` | — | [`packages/util/values/src/index.ts`](../packages/util/values/src/index.ts) |
 | `@deepseek-ai/dsh-util-workspace-path` | — | [`packages/util/workspace-path/src/index.ts`](../packages/util/workspace-path/src/index.ts) |

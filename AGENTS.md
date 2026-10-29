@@ -48,7 +48,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   guard/                loop/tool guards
   extensions/           runtime self-modification
   session/              durable sessions
-  session-query/        browsing/search/export
+  session-query/        browsing/search/export/import
   attachment/           binary attachments
   spill/                output spill
   storage/              non-session storage
