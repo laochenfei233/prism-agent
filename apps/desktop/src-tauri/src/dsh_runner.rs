@@ -30,6 +30,10 @@ const ADOPT_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 /// Bound on reaping the hub at exit. The kill itself is immediate; a hub that
 /// somehow outlives it must not hold the shell's exit open.
 const HUB_KILL_TIMEOUT: Duration = Duration::from_secs(3);
+/// Budget for enumerating rival hubs. The sweep sits on the startup path, so a
+/// stuck shell is killed and treated as an empty sweep instead of holding the
+/// splash.
+const ENUMERATION_TIMEOUT: Duration = Duration::from_secs(3);
 
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
 /// The live server a previous shell start left behind, named by the launch URL
@@ -666,23 +670,26 @@ fn rival_pids(samples: &[(u32, String)], keep: Option<u32>) -> Vec<u32> {
         .collect()
 }
 
-/// Enumerate Node processes as (pid, command line) samples.
+/// Enumerate `node.exe` command lines as (pid, command line) samples under the
+/// enumeration budget.
 #[cfg(windows)]
-fn list_process_samples() -> Vec<(u32, String)> {
-    use std::os::windows::process::CommandExt;
+async fn list_process_samples() -> Vec<(u32, String)> {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let output = std::process::Command::new("powershell")
-        .creation_flags(CREATE_NO_WINDOW)
+    let mut cmd = Command::new("powershell");
+    cmd.creation_flags(CREATE_NO_WINDOW)
+        .kill_on_drop(true)
         .args([
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
-        ])
-        .output();
-    let Ok(output) = output else {
-        return Vec::new();
-    };
-    parse_cim_samples(&output.stdout)
+            // PowerShell 5.1 encodes redirected output in the console code page,
+            // so a non-ASCII path would make the JSON invalid UTF-8 and disable
+            // the sweep. The parser reads UTF-8.
+            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
+        ]);
+    match tokio::time::timeout(ENUMERATION_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => parse_cim_samples(&output.stdout),
+        _ => Vec::new(),
+    }
 }
 
 /// Parses the CIM query's `ConvertTo-Json` output: one match is a bare object,
@@ -708,17 +715,20 @@ fn parse_cim_samples(stdout: &[u8]) -> Vec<(u32, String)> {
         .collect()
 }
 
+/// Enumerate process command lines as (pid, command line) samples under the
+/// enumeration budget. `ps` lists every process; the signature decides which
+/// ones are ours.
 #[cfg(not(windows))]
-fn list_process_samples() -> Vec<(u32, String)> {
+async fn list_process_samples() -> Vec<(u32, String)> {
+    let mut cmd = Command::new("ps");
     // -ww disables the terminal-width truncation that would cut off the
-    // ` web --port` tail. A failed `ps` yields an empty sweep.
-    let Ok(output) = std::process::Command::new("ps")
-        .args(["-axo", "pid=,command=", "-ww"])
-        .output()
-    else {
-        return Vec::new();
-    };
-    parse_ps_samples(&String::from_utf8_lossy(&output.stdout))
+    // ` web --port` tail.
+    cmd.kill_on_drop(true)
+        .args(["-axo", "pid=,command=", "-ww"]);
+    match tokio::time::timeout(ENUMERATION_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => parse_ps_samples(&String::from_utf8_lossy(&output.stdout)),
+        _ => Vec::new(),
+    }
 }
 
 /// Parses `ps -axo pid=,command= -ww`: right-aligned pid, one space, command.
@@ -738,25 +748,25 @@ fn parse_ps_samples(stdout: &str) -> Vec<(u32, String)> {
 /// One shell, one hub: end every rival hub of this product except `keep`.
 /// Rivals are what a dead shell leaves behind, what a parallel launch boots
 /// beside the adopted hub, and what a dev shell runs from this checkout; their
-/// session writer locks are the `session/writer-held` the user sees. Runs on
-/// the blocking pool before an adoption is published and before every spawn.
+/// session writer locks are the `session/writer-held` the user sees. Runs
+/// before an adoption is published and before every spawn.
 async fn sweep_rival_servers(keep: Option<u32>) {
     if cfg!(debug_assertions) {
         // Dev shells compare against the installed app; they must not end its hub.
         return;
     }
-    let killed = tauri::async_runtime::spawn_blocking(move || {
-        let targets = rival_pids(&list_process_samples(), keep);
+    let targets = rival_pids(&list_process_samples().await, keep);
+    if targets.is_empty() {
+        return;
+    }
+    let attempted = targets.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || {
         for pid in &targets {
             terminate_pid(*pid);
         }
-        targets
     })
-    .await
-    .unwrap_or_default();
-    if !killed.is_empty() {
-        append_startup_log(&format!("swept rival dsh web servers: {killed:?}"));
-    }
+    .await;
+    append_startup_log(&format!("rival dsh web sweep targets: {attempted:?}"));
 }
 
 /// Choose the port for the next `dsh web` spawn: the default `INTERNAL_PORT`
@@ -1228,6 +1238,17 @@ mod tests {
             vec![(1, "a".to_string()), (3, "b".to_string())]
         );
         assert!(parse_cim_samples(b"").is_empty());
+
+        // PowerShell is told to emit UTF-8; a non-ASCII install path must
+        // survive both the decode and the signature.
+        let non_ascii = "\"C:\\Users\\陈\\AppData\\Local\\Prism Agent\\runtime\\prism\\lib\\bin.js\" web --port 3084 --no-open";
+        let json = format!(
+            r#"{{"ProcessId":7,"CommandLine":{}}}"#,
+            serde_json::to_string(non_ascii).expect("encode command line")
+        );
+        let samples = parse_cim_samples(json.as_bytes());
+        assert_eq!(samples, vec![(7, non_ascii.to_string())]);
+        assert!(is_our_dsh_web_server(&samples[0].1));
     }
 
     #[cfg(not(windows))]

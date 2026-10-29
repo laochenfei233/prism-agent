@@ -38,27 +38,27 @@ The three conditions keep another harness build out of the sweep by construction
 
 ### S2.3 Process enumeration
 
-Windows enumerates through `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` and selects `ProcessId, CommandLine` (`wmic` is deprecated on current Windows). `ConvertTo-Json` renders a single match as a bare object and several as an array, so both forms are accepted. macOS and Linux parse `ps -axo pid=,command= -ww`; `-ww` disables the terminal-width truncation that would cut off the ` web --port` tail, and the pid column is right-aligned, so leading spaces are trimmed. An enumeration that fails yields an empty list: missing rivals cost a conflict the next start sweeps again, while a failed launch costs the window.
+Windows enumerates through `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` and selects `ProcessId, CommandLine` (`wmic` is deprecated on current Windows). `ConvertTo-Json` renders a single match as a bare object and several as an array, so both forms are accepted. PowerShell 5.1 encodes redirected output in the console code page, so the query sets `[Console]::OutputEncoding` to UTF-8 before it runs; a non-ASCII install path would otherwise make the JSON invalid UTF-8 and silently disable the sweep. The enumeration runs under a 3 s budget: an overrun kills the enumerator and yields an empty sweep, so a stuck shell cannot hold the splash. An enumeration that fails yields an empty list: missing rivals cost a conflict the next start sweeps again, while a failed launch costs the window. macOS and Linux parse `ps -axo pid=,command= -ww`; `-ww` disables the terminal-width truncation that would cut off the ` web --port` tail, and the pid column is right-aligned, so leading spaces are trimmed; `ps` lists every process and the signature alone decides, so an unrelated process would have to spell the product path and the CLI form out in its own arguments to match.
 
 ### S2.4 Wiring and timing
 
 - `adopt_running_server` sweeps with `Some(record.pid)` after the record's launch token authenticates and before the adopted port is published.
 - `supervise` sweeps with `None` on the cold path, before `spawn_child`, so `select_port` sees the ports the sweep just released and the new hub takes 3081 instead of a fallback.
-- `sweep_rival_servers` runs the enumeration and kills on the blocking pool and appends `swept rival dsh web servers: [..]` to `desktop-startup.log` when it ended anything.
+- `sweep_rival_servers` enumerates asynchronously and runs the kills on the blocking pool, then appends `rival dsh web sweep targets: [..]` to `desktop-startup.log` when it had targets.
 - Debug builds skip the sweep (`cfg!(debug_assertions)`), so `pnpm run dev:desktop` never ends the installed app's hub while a developer compares the two.
 - There is no resident watcher: the sweep runs at the two moments the shell already decides which hub serves it. A shell that starts while another shell's hub is live but unadoptable ends that hub at its own start; a shell already running is not revisited until its next decision point.
 
 ## [S3] Scope
 
 - In scope: the signature matcher, decision core, process enumeration, sweep, and the adopt/cold-spawn wiring in `apps/desktop/src-tauri/src/dsh_runner.rs`; their unit tests; the desktop README's hub contract in both languages; the divergence records this change adds.
-- Out of scope: a resident monitor that kills servers while the shell runs; the simultaneous-first-launch race (two shells that start together can each boot a hub — the next start sweeps the loser); a shell-side single-instance lock; hubs of other harness builds (they must keep running); manually launched `prism web` / `pnpm dsh web` servers, which the 3080 contract leaves alone; per-home scoping — the sweep is machine-wide per product, so two release instances separated only by `PRISM_HOME` are not supported as concurrent hubs; Windows process-tree semantics beyond the existing `terminate_pid`.
+- Out of scope: a resident monitor that kills servers while the shell runs; the simultaneous-first-launch race (two shells that start together can each boot a hub — the next start sweeps the loser); a shell-side single-instance lock; hubs of other harness builds (they must keep running); manually launched `prism web` / `pnpm dsh web` servers, which the 3080 contract leaves alone; other checkouts of this fork's lineage, such as the sibling `deepseek-harness` tree, because matching a generic `deepseek-harness/apps/cli` path would end stock-dsh users' servers and break install isolation; per-home scoping — the sweep is machine-wide per product, so two release instances separated only by `PRISM_HOME`, or two release installs at different closure paths sharing one home, are not supported as concurrent hubs (each sweeps the other's hub at its next decision point, and one may exhaust its restart budget); POSIX kill escalation — the sweep sends SIGTERM and neither waits nor escalates to SIGKILL, so a hub that ignores SIGTERM survives that spawn; Windows process-tree semantics beyond the existing `terminate_pid`.
 
 ## Tasks
 
 - [ ] T1: signature matcher, decision core, enumeration, sweep, and the two wiring points (covers: S2.1, S2.2, S2.3, S2.4)
 - [ ] T2: unit tests — installed and dev paths matched (quoted and case variants, macOS separators), stock dsh/Easel/manual CLI excluded, `keep` three-state semantics, `ps` sample parser, and the CIM JSON parser's bare-object/array forms (covers: S2.1, S2.2, S2.3)
 - [ ] T3: desktop README port/hub contract and the port-resilience scope note, both languages (covers: S2.4)
-- [ ] T4: divergence records — `PRISM-DIVERGENCE` marker at the sweep site, this document's S5, the A1 row in `fork-upstream-divergence.md`, and the stale test-count claim in `desktop-startup-latency.md` S5 (covers: S2.1, S2.4)
+- [ ] T4: divergence records — `PRISM-DIVERGENCE` marker at the sweep site, this document's S5, the related-documents list in `fork-upstream-divergence.md`, and the stale test-count claim in `desktop-startup-latency.md` S5 (covers: S2.1, S2.4)
 - [ ] T5: verification — record every command and result under [S4] (depends: T1, T2, T3, T4)
 
 ## [S4] Acceptance
@@ -75,5 +75,5 @@ This checkout imports upstream `deepseek-harness/deepseek-harness` as one baseli
 
 | File | Divergent site | What a replay must keep |
 | --- | --- | --- |
-| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`, `rival_pids`, `list_process_samples`, `parse_cim_samples`, `parse_ps_samples`, `sweep_rival_servers`, and the two call sites in `adopt_running_server` and `supervise` | the block and both call sites; the `rival_sweep_*`, `cim_sample_parser_*`, and `ps_sample_parser_*` tests are its decision coverage, and `cargo test` in `apps/desktop/src-tauri` is the replay check |
+| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`, `rival_pids`, `list_process_samples`, `parse_cim_samples`, `parse_ps_samples`, `sweep_rival_servers` (including the 3 s enumeration budget), and the two call sites in `adopt_running_server` and `supervise` | the block and both call sites; the `rival_sweep_*`, `cim_sample_parser_*`, and `ps_sample_parser_*` tests are its decision coverage, and `cargo test` in `apps/desktop/src-tauri` is the replay check |
 | `docs/compose/spec/desktop-single-hub-sweep.*` | this document | nothing, since upstream has no such file |
