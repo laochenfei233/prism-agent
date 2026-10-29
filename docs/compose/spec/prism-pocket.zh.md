@@ -1,0 +1,90 @@
+---
+feature: prism-pocket
+status: in-progress
+updated: 2026-10-29
+branch: feat/prism-pocket
+commits: 8c5ed274ee..pending
+---
+
+# Prism Pocket（口袋 Prism）
+
+[English](prism-pocket.md) | 中文
+
+## Report
+
+## [S1] 问题
+
+手机浏览器访问 Prism Web UI 时，拿到的只是一个仅会退化为 56 px 图标轨的桌面布局（1024 px 以下）：侧栏没有触摸抽屉，软键盘弹起时没有任何 `visualViewport` 处理、直接盖住输入区，触摸键盘上 `Enter` 仍然发送消息，模型/权限行换行溢出，没有任何 safe-area 适配。远程访问还有额外门槛：webserver 只绑一个具体地址，Host/Origin 信任围栏拒绝其余一切，产品内没有任何文字解释如何通过 Tailscale 配对手机。最致命的是，手机放在旁边时什么都不知道——agent 请求批准或提出问题时，页面静静躺在那里，没人看就没人知道。
+
+`dsh-meow-smooth` 为上游 dsh 解决过这个问题，方式是在仓库外给桌面 DOM 打补丁，每个版本都要维护一次选择器。Prism 有同样的需求；本特性交付的是 fork 原生、形态更正确的版本。
+
+## [S2] 设计
+
+### S2.1 形态：客户端补丁插件，不是独立应用，不改本体
+
+`plugins/prism-pocket`（`@prism/prism-pocket`），双面 Cordis 插件，沿用 `plugins/dsh-agent-progress` 的形态：节点半 `lib/index.js`（ESM），浏览器半 `lib/client.js`（经 `window.__ModuleLoader__` 注册的闭包工厂产物），`dsh.bundle.patch` + `dsh.client` 清单，`./client` 导出。不改动 `packages/` 与 `apps/`。所有适配只锚定应用自己声明的表面——`[data-slot="<key>"]` 容器（`packages/client/ui-renderer/src/client/scoped-slots.tsx` 写明的 addressable seam）、`data-testid` 属性、标准 ARIA 角色——每个适配都是一个能力探针，锚点缺失时跳过并在控制台留一行说明。这是相对 meow-smooth 的自觉改进：不猜选择器，不随版本碎裂。
+
+### S2.2 激活条件
+
+视口较窄且指针为触摸（`pointer: coarse` 且 `width <= 768`）时激活；URL 带 `?pocket=1` / `?pocket=0` 可显式覆盖，最后一次显式选择记入 `localStorage`。桌面外观不受影响。
+
+### S2.3 移动适配层（浏览器半）
+
+- 侧栏抽屉：从左边缘内滑打开侧栏；浏览器返回手势先关抽屉（popstate 拦截）而不是离开页面；抽屉是带暗色背景遮罩的 overlay sheet，选中会话即关闭。
+- 软键盘：`visualViewport` 跟踪，键盘弹起时收起顶栏，输入坞保持可见；坞和抽屉尊重 safe-area inset。
+- 触摸输入：触摸指针上 `Enter` 换行（IME 组合与 Shift/Ctrl+Enter 不受影响）；若运行态没有暴露停止入口，插件在输入坞补一个。
+- 行不换行：模型、权限、上下文条在窄屏截断或收成图标；消息内表格横向滚动。
+- 禁止误触缩放与橡皮筋滚动；窄屏下设置页全屏；窄屏切换会话后侧栏回到收起态。
+
+视觉新增（抽屉、卡片）复用应用主题 token；唯一签名元素是呈现为 overlay sheet 的边缘侧滑抽屉。
+
+### S2.4 通知（浏览器半）
+
+agent 请求批准、提出用户问题、运行失败时，在插件自有的 portal（`document.body` 子元素，不碰应用 DOM）上弹页内卡片；同样的触发在页面隐藏时发系统 `Notification`，页面聚焦时绝不打扰。只对最终失败提醒，瞬时重试状态不提醒。触发源订阅自带批准/提问表面已在消费的客户端投影与 Cordis 客户端事件；具体成员名在 T3 落定。
+
+### S2.5 推送投递（节点半）
+
+页面关闭后由节点半投递：Web Push（RFC 8291 `aes128gcm` 载荷加密 + RFC 8292 VAPID ES256 JWT，用 `node:crypto` 实现——本环境 npm registry 不可达，不引入推送库）与可选的 Bark webhook。触发：批准请求、用户提问、回合完成（可配置，默认开）、运行失败。VAPID 密钥对只生成一次，存于 DSH home 的 `pocket/` 目录（`keys.json`，0600）；订阅存于同目录 `subscriptions.json`；应答 404/410 的端点即删除。路由经 `connection.fetch.register` 挂在已认证的 `/api` 通道上：`GET /api/pocket/remote`、`POST /api/pocket/push/subscribe`、`POST /api/pocket/push/test`。推送载荷是结构化的（`kind`、`sessionId`、`sessionTitle`）；service worker 按 `navigator.language` 组织本地化文案。Config 字段（schemastery `Config`）：`pushEnabled`（默认 true）、`notifyTurnComplete`（默认 true）、`barkUrl`（可选）。仅当存在至少一个订阅或已配置 webhook 时，节点半才发送推送与 Bark。
+
+### S2.6 Tailscale 远程访问（节点半 + 设置页）
+
+节点半探测 Tailscale（`tailscale status --json --peers=false`，包含 Windows 路径 `C:\Program Files\Tailscale\tailscale.exe`），报告自身 MagicDNS 域名与 100.x 地址。设置分区渲染服务面（绑定地址、端口、公网 URL、来自 `webStartup` 供给的 connection 行的 trusted hosts），并标注当前 origin 已受信任（这次已认证调用本身就是证明），同时给出可复制的命令：
+
+- 直接 IP：`prism --profile web --host <tailscale-ip>` —— 围栏直接接受监听绑定 IP，无需 `--trusted-host`。
+- MagicDNS：`tailscale serve --bg --https=443 http://127.0.0.1:3080` 加 `--trusted-host <machine>.<tailnet>.ts.net` 与 `--public-url https://<machine>.<tailnet>.ts.net/` —— TLS 由 tailscale 终结，回环传输保持 HTTP，ts.net authority 必须加入 `trustedHosts`。
+
+内核信任策略（`packages/client/connection/src/api-request-trust.ts`）、webserver 的通配符拒绝、全部 CLI 旗标一律不动；插件只读取并解释它们。未过围栏的连接本来就是现有代码的 403，页面会说明漏掉了哪条命令。
+
+### S2.7 PWA 安装
+
+节点半在 webserver 上注册自有静态资产路由：`/pocket.webmanifest`、`/pocket-sw.js`（根路径，默认 scope 即 `/`）与一枚 SVG 图标。浏览器半在启动时注入 manifest 链接、`apple-touch-icon` 与 `theme-color` meta。Service worker 处理 `push`（弹出通知）与 `notificationclick`（聚焦或打开会话）。iOS 不支持 SVG 主屏图标；PNG 图标是已记录的后续项。
+
+### S2.8 文案归属
+
+所有用户可见文案经 `ctx.locale` 走 zh/en 词典；service worker 自持一份极小 zh/en 表（它活在客户端上下文之外）。
+
+## [S3] 范围
+
+- 范围内：插件骨架（双面、patch 行、清单）、移动适配层、页内/系统通知、Web Push + Bark 投递、Tailscale 探测与远程访问设置分区、PWA 资产与 service worker、zh/en 文案、插件 README（en/zh）、节点半与纯客户端逻辑单测、spec 文档配对。
+- 范围外：接管壳或独立移动页、对 `packages/`/`apps/` 的改动、手机附件上传、历史压缩代理（webserver 已有 gzip）、自动执行 `tailscale serve` 或自动改信任列表、二维码、桌面（Tauri）表面改动、PNG 图标生成。
+
+## Tasks
+
+- [ ] T1: 插件骨架 —— `plugins/prism-pocket` 的 package.json（`@prism/prism-pocket`、`dsh.bundle.patch`、`dsh.client`、`./client` 导出）、手写闭包 banner/footer 的 tsdown 双面构建、`cordis.patch.yml` 插入节点行与浏览器 roster 行（covers: S2.1）
+- [ ] T2: 节点半远程服务 —— schemastery `Config`（S2.5 字段）、Tailscale 探测与解析、经 `connection.fetch.register` 的 `GET /api/pocket/remote`（covers: S2.5, S2.6）
+- [ ] T3: 推送引擎 —— VAPID 密钥存储、经 `node:crypto` 的 RFC 8291 加密 + RFC 8292 JWT、带 404/410 清理的订阅存储、Bark 投递、会话触发接线（批准瀑布、用户提问表面、`turn/end`）、`POST /api/pocket/push/subscribe|test`（covers: S2.5）
+- [ ] T4: 浏览器半移动适配 —— 激活探针、带 popstate 拦截的边缘侧滑抽屉、`visualViewport` 键盘处理、带 IME 防护的 `Enter` 换行、行不换行 CSS、safe-area/缩放/橡皮筋规则、页内通知 portal + 系统通知（covers: S2.2, S2.3, S2.4）
+- [ ] T5: 浏览器半设置分区（远程访问 + 推送状态/测试）、PWA 资产路由、manifest 链接注入、service worker（covers: S2.6, S2.7)
+- [ ] T6: zh/en 词典、插件 README en+zh、导出契约 JSDoc（covers: S2.8）
+- [ ] T7: 测试 —— RFC 8291 往返 + VAPID JWT 对存储公钥的验证、Tailscale JSON 解析、命令生成、订阅存储清理、激活/手势/命令复制纯逻辑（covers: S2.5, S2.6）
+- [ ] T8: 验证 —— 双面构建、typecheck、聚焦测试、装入 dev web profile、手机视口浏览器检查与截图（covers: S4）
+
+## [S4] 验收
+
+- 插件双面构建成功，web profile 装载后可启动；细指针或宽视口下桌面外观与行为不变。
+- 手机尺寸触摸视口下：边缘侧滑打开抽屉、返回关闭、`Enter` 换行、输入坞与信息行不溢出、键盘弹起时顶栏收起。
+- 批准请求触发页内卡片、隐藏时的系统通知、以及向已订阅浏览器的 Web Push；`POST /api/pocket/push/test` 可证明送达；配置了 `barkUrl` 时收到 POST。
+- `GET /api/pocket/remote` 报告绑定面、trusted hosts 与 Tailscale 事实，设置分区渲染符合围栏规则的可复制命令。
+- `/pocket.webmanifest` 与 `/pocket-sw.js` 可访问，移动浏览器提供安装入口。
+- 单测覆盖推送加密（往返 + 对存储公钥的 JWT 验证）、Tailscale 解析、命令生成与存储清理；全部通过。
+- 文档：双语 spec 对 + 插件 README 通过 `verify-md-wrap`、`verify-md-links`、`verify-translation-pairing`。
