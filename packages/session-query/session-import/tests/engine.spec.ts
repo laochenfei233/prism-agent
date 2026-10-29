@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import { Session, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   ImportEngineError,
   SessionImportEngine,
@@ -241,6 +241,63 @@ describe('SessionImportEngine apply', () => {
       : [])
     expect(texts[0]).toContain('[truncated]')
     expect(texts.join(' ')).not.toContain('one prompt')
+  })
+
+  it('copies a DSH session natively, preserving tool events and attachments', async () => {
+    const root = await rootOf('native')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    const sourceHome = join(root, 'dsh')
+    const id = 'source-native'
+    const eventLines = [
+      { type: 'user/message', seq: 0, time: 1100, data: {
+        id: 'u1', role: 'user', content: [{ type: 'text', text: 'go' }], source: { kind: 'user' },
+      }, surfaceOp: 'append' },
+      { type: 'assistant/message', seq: 1, time: 1200, data: {
+        turn: 1, step: 1, stream: [],
+        message: { id: 'a1', role: 'assistant', content: [{ type: 'text', text: 'checking' }], source: { kind: 'model', provider: 'p', model: 'm' } },
+      }, surfaceOp: 'append' },
+      { type: 'tool/call', seq: 2, time: 1300, data: { turn: 1, step: 1, callId: 'c1', name: 'glob', arguments: '{}' } },
+      { type: 'tool/result', seq: 3, time: 1400, data: {
+        turn: 1, step: 1,
+        message: {
+          id: 'r1', role: 'tool', toolCallId: 'c1', source: { kind: 'tool', callId: 'c1' },
+          content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'ok' }], isError: false }],
+        },
+      }, surfaceOp: 'append' },
+      { type: 'turn/end', seq: 4, time: 1500, data: { turn: 1, reason: { kind: 'completed' } } },
+    ]
+    const log = join(sourceHome, 'sessions', '--proj--', id, 'session.v4.jsonl')
+    await write(log, JSON.stringify({
+      type: 'session', version: 4, id, createdAt: 1000, cwd, isSeeded: false, delegationDepth: 0,
+    }) + '\n' + eventLines.map(event => JSON.stringify(event)).join('\n'))
+    await write(join(sourceHome, 'attachments', 'v1', 'objects', 'a.png'), 'png')
+
+    const fakesValue = fakes()
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, 'prism'),
+      roots: { dsh: join(sourceHome, 'sessions') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+    })
+    const result = await engine.apply({ source: 'dsh', sessionIds: [id] })
+    expect(result.results[0]).toMatchObject({ key: id, outcome: 'imported', sessionId: id })
+    expect(fakesValue.stored.get(id)?.map(event => event.type)).toEqual([
+      'user/message', 'assistant/message', 'tool/call', 'tool/result', 'turn/end',
+    ])
+    expect([...fakesValue.attached.values()].flat()).toContain(id)
+    await expect(stat(join(root, 'prism', 'attachments', 'v1', 'objects', 'a.png'))).resolves.toBeTruthy()
+
+    const header = fakesValue.headers.get(id)
+    expect(header).toBeDefined()
+    const resumed = Session.create(SessionId(id), [...(fakesValue.stored.get(id) ?? [])], header)
+    const messages = resumed.deriveMessages()
+    expect(messages).toHaveLength(3)
+    expect(messages[2]?.content[0]?.type).toBe('tool-result')
+    await expect(engine.apply({ source: 'dsh', sessionIds: [id] }))
+      .resolves.toMatchObject({ results: [{ outcome: 'duplicate' }] })
   })
 
   it('reports unknown sources and unknown session ids without writing', async () => {

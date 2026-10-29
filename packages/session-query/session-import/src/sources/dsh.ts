@@ -10,11 +10,20 @@
 
 import { join } from 'node:path'
 import { readdir } from 'node:fs/promises'
-import type { ImportedMessage, ImportedSession, ScannedSession, ScannedSource } from '../types.ts'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import { SESSION_FORMAT_VERSION, type SessionEvent, type SessionHeader, type SessionId } from '@deepseek-ai/dsh-session'
+import type {
+  ImportedMessage,
+  ImportedSession,
+  NativeSessionLog,
+  ScannedSession,
+  ScannedSource,
+} from '../types.ts'
 import {
   contentText,
   forEachDecodedJsonLine,
   messageOf,
+  numberOf,
   pushMessage,
   readFirstStoredJsonLine,
   recordOf,
@@ -49,6 +58,7 @@ async function chooseLog(directory: string): Promise<{ path: string; generation:
 /** Session header fields needed by the scan. */
 interface DshHeader {
   readonly id: string
+  readonly version: number
   readonly cwd?: string
   readonly createdAt: number
   readonly topLevel: boolean
@@ -65,6 +75,7 @@ async function readHeader(path: string): Promise<DshHeader | undefined> {
   const cwd = stringOf(first['cwd'])
   return {
     id,
+    version: numberOf(first['version']) ?? 0,
     ...(cwd === undefined ? {} : { cwd }),
     createdAt: timeOf(first['createdAt'], 0),
     topLevel,
@@ -108,12 +119,47 @@ async function scanProject(
           ...(details === undefined ? {} : { bytes: details.size }),
         },
         load: () => loadDsh(log.path, header),
+        loadNative: () => loadNativeDsh(log.path, header),
       })
     } catch (error: unknown) {
       skipped.push({ key: entry.name, reason: messageOf(error) })
     }
   }
   return { sessions, skipped }
+}
+
+/** Read the complete original log for a native copy. */
+async function loadNativeDsh(path: string, header: DshHeader): Promise<NativeSessionLog> {
+  if (header.version !== SESSION_FORMAT_VERSION) {
+    throw new Error(`session format version ${header.version} is not supported for native import`)
+  }
+  const events: SessionEvent[] = []
+  let first = true
+  await forEachDecodedJsonLine(path, (value) => {
+    const record = recordOf(value)
+    if (record === undefined) throw new Error('malformed session record')
+    if (first) {
+      first = false
+      if (record['type'] === 'session') return
+    }
+    if (stringOf(record['type']) === undefined
+      || numberOf(record['seq']) === undefined
+      || numberOf(record['time']) === undefined
+      || record['data'] === undefined) {
+      throw new Error('malformed session event envelope')
+    }
+    events.push(value as SessionEvent)
+  })
+  if (events.length === 0) throw new Error('session log has no events')
+  const nativeHeader: SessionHeader = {
+    version: SESSION_FORMAT_VERSION,
+    id: brandString<SessionId>(header.id),
+    createdAt: header.createdAt,
+    ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
+    isSeeded: false,
+    delegationDepth: 0,
+  }
+  return { header: nativeHeader, events }
 }
 
 /** Read one DSH session log. */
