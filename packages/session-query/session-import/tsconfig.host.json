@@ -1,0 +1,38 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/catalog.ts",
+    "src/engine.ts",
+    "src/index.ts",
+    "src/routes.ts",
+    "src/source-ids.ts",
+    "src/types.ts",
+    "src/sources/claude.ts",
+    "src/sources/codex.ts",
+    "src/sources/dsh.ts",
+    "src/sources/gemini.ts",
+    "src/sources/grok.ts",
+    "src/sources/hermes.ts",
+    "src/sources/index.ts",
+    "src/sources/mimo.ts",
+    "src/sources/openclaw.ts",
+    "src/sources/opencode.ts",
+    "src/sources/pi.ts",
+    "src/sources/shared.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../core/session" },
+    { "path": "../../llm/llm" },
+    { "path": "../../session/session-persistence" },
+    { "path": "../../session/session-title" },
+    { "path": "../../util/brand" },
+    { "path": "../../workspace/workspace" }
+  ]
+}

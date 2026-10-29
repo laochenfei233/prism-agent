@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for cross-agent-session-import.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/cross-agent-session-import.md
+/:
+  en: 0d98b2243e24c8d6
+  zh: 0d98b2243e24c8d6
+/cross-agent-session-import:
+  en: 4544144288cc83b5
+  zh: b7cb04fdf533aae1
+/cross-agent-session-import/s1-problem:
+  en: a3195ba4dca568a6
+  zh: 8177a81ad12749c6
+/cross-agent-session-import/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/cross-agent-session-import/s2-design/s2-1-package-and-process-placement:
+  en: 7d793591a40518c3
+  zh: 34834b7ffddb488e
+/cross-agent-session-import/s2-design/s2-2-source-catalog:
+  en: 791a4b261146be86
+  zh: e31b84d5921622b5
+/cross-agent-session-import/s2-design/s2-3-normalized-transcript:
+  en: fdc7bd031fc37e58
+  zh: deaf1da84bec2f3c
+/cross-agent-session-import/s2-design/s2-4-durable-session-synthesis:
+  en: e1b3e0aabc2d3cfe
+  zh: 1afb65d2846f849c
+/cross-agent-session-import/s2-design/s2-5-projects-and-merge-confirmation:
+  en: 2ec55302ac206628
+  zh: f6fdb89bcedd72a1
+/cross-agent-session-import/s2-design/s2-6-route-contract:
+  en: 501a12760ff44397
+  zh: 4eece2c8975f30f6
+/cross-agent-session-import/s2-design/s2-7-settings-ui:
+  en: 267d611f6540bb34
+  zh: 4b59e1e779107ff3
+/cross-agent-session-import/s2-design/s2-8-read-only-source-guarantee:
+  en: 92f28370924ae865
+  zh: ff0d83cfe65f99b1
+/cross-agent-session-import/s3-scope:
+  en: fca82d468f4e5c3e
+  zh: 721f46d4ac74608a
+/cross-agent-session-import/tasks:
+  en: d16e79d010d7cb84
+  zh: 785626eebecc951d
+/cross-agent-session-import/s4-acceptance:
+  en: 69258596d60f07b5
+  zh: 095d7164cb189798

@@ -75,6 +75,10 @@
     - id: session-log-download
       name: '@deepseek-ai/dsh-session-log-export'
 
+    # Cross-agent conversation import: the settings section and its Host routes.
+    - id: session-import
+      name: '@deepseek-ai/dsh-session-import'
+
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application
     # renders no button). Two halves: the host routes and the browser surface.

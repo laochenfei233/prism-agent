@@ -1,0 +1,73 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/session-query/session-import/README.md
+/:
+  en: 3fa41bc0e29532ab
+  zh: 74202b49be02c892
+/deepseek-ai-dsh-session-import:
+  en: c72a0d554a430170
+  zh: c8ee38af480558af
+/deepseek-ai-dsh-session-import/summary:
+  en: 0067b0dd071354c1
+  zh: f1298c8d9d12d193
+/deepseek-ai-dsh-session-import/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-session-import/use-this-package:
+  en: 6dd9e77820afd20f
+  zh: 9e8c47dfe3abe7f1
+/deepseek-ai-dsh-session-import/use-this-package/composition:
+  en: 660678c683443aa0
+  zh: b486d60cbd74c147
+/deepseek-ai-dsh-session-import/use-this-package/sources:
+  en: c73e02dcb1bff964
+  zh: 49714a0ef96fc710
+/deepseek-ai-dsh-session-import/use-this-package/configuration:
+  en: 1c9165d18e90b03c
+  zh: 93b4d6d00b60d8c2
+/deepseek-ai-dsh-session-import/use-this-package/route-contract:
+  en: e40a2af8c5e4029c
+  zh: e279c3f0a04b3d9e
+/deepseek-ai-dsh-session-import/use-this-package/what-to-expect:
+  en: e4c98e93cc18b314
+  zh: 821d77fc0b2b4e92
+/deepseek-ai-dsh-session-import/use-this-package/failures:
+  en: 15ad4147661977e4
+  zh: 5f980ca2b1148d98
+/deepseek-ai-dsh-session-import/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 4ed0861911abaf5d
+/deepseek-ai-dsh-session-import/understand-the-implementation/design-split:
+  en: e403e1fddb375f9d
+  zh: 44439eed9bc2066d
+/deepseek-ai-dsh-session-import/understand-the-implementation/session-synthesis:
+  en: 2ccb8d506b5d4af3
+  zh: e5d293aee55474bd
+/deepseek-ai-dsh-session-import/understand-the-implementation/read-only-sources:
+  en: 231a63d889fba34d
+  zh: 0431c1cc5d78990b
+/deepseek-ai-dsh-session-import/further-exploration:
+  en: e7178cf68ba707fa
+  zh: da94d4f75313d2df
+/deepseek-ai-dsh-session-import/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-import/model-experience/imported-conversation-history:
+  en: 26d23c7c0867055b
+  zh: 2394cc44e4292a11
+/deepseek-ai-dsh-session-import/model-experience/imported-conversation-history/what-the-model-sees:
+  en: cf44e8c733428ecf
+  zh: 0df898705793bb63
+/deepseek-ai-dsh-session-import/model-experience/imported-conversation-history/token-effect:
+  en: 29f0d2304884d954
+  zh: f476999b641c677f
+/deepseek-ai-dsh-session-import/model-experience/imported-conversation-history/kv-cache-effect:
+  en: 97e4c4791683d905
+  zh: 029ab1b59c2ba3c9
+/deepseek-ai-dsh-session-import/known-limitations-and-deferred-work:
+  en: 512d3e59f57be450
+  zh: fbf9083bc2edf4ea
+/deepseek-ai-dsh-session-import/known-limitations-and-deferred-work/dev-note:
+  en: 0a1253c6f7b5e8b9
+  zh: 9f56528562c7c914
