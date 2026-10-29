@@ -78,8 +78,8 @@ export function installNotify(ctx: Context, t: Translate): () => void {
     announce('card.question', request.questions[0]?.question ?? '')
     return next()
   })
-  const offError = ctx.remote.$on('api-session/error', (sessionId, message) => {
-    announce('card.error', [message, typeof sessionId === 'string' ? sessionId : ''].filter(Boolean).join(' · '))
+  const offError = ctx.remote.$on('api-session/error', (_sessionId, message) => {
+    announce('card.error', message)
   })
 
   return () => {
