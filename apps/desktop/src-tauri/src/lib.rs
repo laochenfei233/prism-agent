@@ -7,6 +7,7 @@
 //! keeps the app resident when the window closes.
 
 mod dsh_runner;
+mod quit;
 mod setup;
 mod tray;
 
@@ -215,6 +216,12 @@ fn hide_child_consoles() {
 fn hide_child_consoles() {}
 
 pub fn run() {
+    // The installer runs this executable with `--quit` to remove the tray icon
+    // through the same path as the tray menu. Never start a second shell.
+    if quit::requested() {
+        quit::request_running_instance_to_exit();
+        return;
+    }
     dsh_runner::start_startup_clock();
     hide_child_consoles();
     tauri::Builder::default()
@@ -224,6 +231,10 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Register the quit signal before the child and tray exist, so an
+            // installer that signals during startup still exits through the
+            // cleanup path.
+            quit::install(app.handle());
             // Spawn the dsh child before the window exists. WebView2 environment
             // creation costs seconds on a cold start and the child's Node boot
             // costs seconds more; running them in sequence spent both. The child

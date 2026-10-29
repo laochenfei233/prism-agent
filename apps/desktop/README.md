@@ -12,6 +12,7 @@ A Tauri 2 desktop shell that embeds the dsh web UI in a native window, with a bu
 src-tauri/            Rust shell
   src/dsh_runner.rs   dsh child-process lifecycle: spawn `dsh web --port 3081 --no-open`, port health probe, crash auto-restart (does not race when dsh-plugin restarts itself)
   src/tray.rs         tray residency: closing the window hides it; only tray Quit ends the process tree
+  src/quit.rs         installer-requested exit: --quit signals the running shell, which removes its tray icon
   src/setup.rs        first-launch profile seeding: preinstall the bundled default plugins into the web profile (patch + bundle layers)
 ui/dist/              shell frontend (pure static, no build): index.html full-window iframe + error banner
 scripts/bundle-runtime.mjs  pack Node runtime + pnpm-deployed dsh closure + local plugins → runtime/
@@ -39,6 +40,8 @@ pnpm tauri dev              # from apps/desktop; dev mode uses PATH node + apps/
 Dev mode needs built CLI artifacts (`pnpm run build`); you can also override runtime resolution with environment variables:
 `DSH_DESKTOP_NODE` (node executable), `DSH_DESKTOP_DSH_BIN` (dsh CLI entry), `DSH_DESKTOP_PLUGINS_DIR` (local plugins directory).
 
+Dev shells that are force-killed — for example from a worktree or target path different from the installed build — can still leave a tray entry, because a killed process never reaches the exit path that deletes it. Hover over the duplicate in the hidden-icons flyout or restart Explorer to clear it; the installed build is unaffected.
+
 ## Building a release
 
 ```sh
@@ -48,6 +51,8 @@ pnpm tauri build            # package installers (runtime/ is bundled as resourc
 ```
 
 The Windows NSIS installer is current-user only: it installs below `%LOCALAPPDATA%\Prism Agent`, needs no elevation, selects English, Simplified Chinese, or Traditional Chinese from the OS language, creates a `Prism Agent` Start Menu shortcut, and uses the branded installer header/sidebar images in `src-tauri/icons/`.
+
+The installer and uninstaller first ask the shell to leave: when a `prism-agent.exe` process is running from the install directory, the hooks start it with `--quit` and poll for up to 15 seconds. The flag signals that shell and it exits through Tauri's normal exit path, which deletes the tray icon; a forced kill by exact executable path then runs as the fallback and finds no process on a clean update. An installation whose shell predates the flag — including the `dsh-desktop.exe` build from before the rename — cannot be asked to exit: quit it from the tray before installing, so the hooks find no process and skip the forced kill, which would leave dead notification-area entries.
 
 CI (`.github/workflows/desktop-release.yml`) runs the same flow on a three-platform matrix and uploads to GitHub Release; trigger with a `v*` tag or manual dispatch.
 
