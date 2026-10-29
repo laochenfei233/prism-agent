@@ -5,16 +5,49 @@
 ; build's dsh-desktop.exe elsewhere on the machine is not touched. The name
 ; list includes the legacy dsh-desktop.exe because installs before the
 ; rename may still be running it.
+;
+; The shell is tray-resident, so TerminateProcess never reaches the exit path
+; that deletes its notification-area icon; Windows keeps a ghost entry. Stop
+; it through `--quit` first: PRISM_STOP_SHELL starts the installed shell with
+; --quit only when a process with that exact path is running, polls for up to
+; 15 s, then force-kills by exact executable path (shell, legacy shell, and
+; the bundled runtime). A shell that predates --quit starts a second shell
+; instead; the poll expires and the forced kill finishes, so the installer
+; cannot hang on an unknown binary.
+
+!macro PRISM_STOP_SHELL
+  InitPluginsDir
+  FileOpen $0 "$PLUGINSDIR\stop-prism-shell.ps1" w
+  FileWrite $0 'param([string]$$root)$\r$\n'
+  FileWrite $0 'if (-not $$root) { exit 1 }$\r$\n'
+  FileWrite $0 '$$shell = Join-Path $$root $\"prism-agent.exe$\"$\r$\n'
+  FileWrite $0 '$$legacy = Join-Path $$root $\"dsh-desktop.exe$\"$\r$\n'
+  FileWrite $0 '$$running = @(Get-CimInstance Win32_Process | Where-Object { $$_.ExecutablePath -and $$_.ExecutablePath -ieq $$shell })$\r$\n'
+  FileWrite $0 'if ($$running.Count -gt 0) {$\r$\n'
+  FileWrite $0 '  Start-Process -FilePath $$shell -ArgumentList $\"--quit$\" -WindowStyle Hidden -ErrorAction SilentlyContinue$\r$\n'
+  FileWrite $0 '  $$deadline = (Get-Date).AddSeconds(15)$\r$\n'
+  FileWrite $0 '  while ((Get-Date) -lt $$deadline) {$\r$\n'
+  FileWrite $0 '    Start-Sleep -Milliseconds 250$\r$\n'
+  FileWrite $0 '    if (@(Get-CimInstance Win32_Process | Where-Object { $$_.ExecutablePath -and $$_.ExecutablePath -ieq $$shell }).Count -eq 0) { break }$\r$\n'
+  FileWrite $0 '  }$\r$\n'
+  FileWrite $0 '}$\r$\n'
+  FileWrite $0 '$$runtime = (Join-Path $$root $\"runtime$\") + [IO.Path]::DirectorySeparatorChar$\r$\n'
+  FileWrite $0 'Get-CimInstance Win32_Process | Where-Object {$\r$\n'
+  FileWrite $0 '  $$path = $$_.ExecutablePath$\r$\n'
+  FileWrite $0 '  $$path -and ($$path -ieq $$shell -or $$path -ieq $$legacy -or $$path.StartsWith($$runtime, [StringComparison]::OrdinalIgnoreCase))$\r$\n'
+  FileWrite $0 '} | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }$\r$\n'
+  FileWrite $0 'Start-Sleep -Milliseconds 400$\r$\n'
+  FileClose $0
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\stop-prism-shell.ps1" "$INSTDIR"'
+  Pop $0
+  Sleep 800
+!macroend
 
 !macro NSIS_HOOK_PREINSTALL
-  ; The tray process owns the bundled Node runtime as a child. Kill the whole
-  ; product-scoped process set (shell, legacy shell, bundled node) before
-  ; copying so node.exe cannot keep koffi.node open.
-  ExecWait '$SYSDIR\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAALQBOAGEAbQBlACAAJwBwAHIAaQBzAG0ALQBhAGcAZQBuAHQAJwAsACcAZABzAGgALQBkAGUAcwBrAHQAbwBwACcALAAnAG4AbwBkAGUAJwAgAC0ARQByAHIAbwByAEEAYwB0AGkAbwBuACAAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAgAHwAIABXAGgAZQByAGUALQBPAGIAagBlAGMAdAAgAHsAIAAkAF8ALgBQAGEAdABoACAALQBsAGkAawBlACAAJwAqAFwAUAByAGkAcwBtACAAQQBnAGUAbgB0AFwAKgAnACAAfQAgAHwAIABTAHQAbwBwAC0AUAByAG8AYwBlAHMAcwAgAC0ARgBvAHIAYwBlAA==' $0
+  !insertmacro PRISM_STOP_SHELL
   ; An install from before the binary rename leaves dsh-desktop.exe behind;
   ; the file copy does not remove it, so delete it explicitly.
   Delete /REBOOTOK "$INSTDIR\dsh-desktop.exe"
-  Sleep 800
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
@@ -25,10 +58,7 @@
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  ; Same product-scoped kill as PREINSTALL: uninstall must not end another
-  ; harness build's processes, and must release our files before deletion.
-  ExecWait '$SYSDIR\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand RwBlAHQALQBQAHIAbwBjAGUAcwBzACAALQBOAGEAbQBlACAAJwBwAHIAaQBzAG0ALQBhAGcAZQBuAHQAJwAsACcAZABzAGgALQBkAGUAcwBrAHQAbwBwACcALAAnAG4AbwBkAGUAJwAgAC0ARQByAHIAbwByAEEAYwB0AGkAbwBuACAAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAgAHwAIABXAGgAZQByAGUALQBPAGIAagBlAGMAdAAgAHsAIAAkAF8ALgBQAGEAdABoACAALQBsAGkAawBlACAAJwAqAFwAUAByAGkAcwBtACAAQQBnAGUAbgB0AFwAKgAnACAAfQAgAHwAIABTAHQAbwBwAC0AUAByAG8AYwBlAHMAcwAgAC0ARgBvAHIAYwBlAA==' $0
-  Sleep 800
+  !insertmacro PRISM_STOP_SHELL
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL

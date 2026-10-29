@@ -32,6 +32,9 @@ serde_yaml = "0.9"
 # the same crate version tauri links against.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"
+# Named event/mutex for the installer's `--quit` path. tauri already links
+# windows-sys; these features make the synchronization calls available here.
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Threading"] }
 
 [features]
 # This feature is used for production builds or when a dev server is not

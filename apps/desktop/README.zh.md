@@ -12,6 +12,7 @@ Tauri 2 桌面壳：在原生窗口里内嵌 dsh web UI，内置 Node 运行时�
 src-tauri/            Rust shell
   src/dsh_runner.rs   dsh child-process lifecycle: spawn `dsh web --port 3081 --no-open`, port health probe, crash auto-restart (does not race when dsh-plugin restarts itself)
   src/tray.rs         tray residency: closing the window hides it; only tray Quit ends the process tree
+  src/quit.rs         installer-requested exit: --quit signals the running shell, which removes its tray icon
   src/setup.rs        first-launch profile seeding: preinstall the bundled default plugins into the web profile (patch + bundle layers)
 ui/dist/              shell frontend (pure static, no build): index.html full-window iframe + error banner
 scripts/bundle-runtime.mjs  pack Node runtime + pnpm-deployed dsh closure + local plugins → runtime/
@@ -39,6 +40,8 @@ pnpm tauri dev              # from apps/desktop; dev mode uses PATH node + apps/
 dev 模式需要已构建的 CLI 产物（`pnpm run build`）；也可用环境变量覆盖运行时解析：
 `DSH_DESKTOP_NODE`（node 可执行）、`DSH_DESKTOP_DSH_BIN`（dsh CLI 入口）、`DSH_DESKTOP_PLUGINS_DIR`（本地插件目录）。
 
+dev 壳被强杀后仍可能留下托盘条目——例如从与装机版不同的 worktree 或 target 路径启动时——因为被强杀的进程走不到删除图标的退出路径。打开任务栏的隐藏图标弹层、把鼠标逐个扫过重复图标，或重启 Explorer，即可清掉；装机版不受影响。
+
 ## 构建发行版
 
 ```sh
@@ -48,6 +51,8 @@ pnpm tauri build            # package installers (runtime/ is bundled as resourc
 ```
 
 Windows NSIS 安装器仅安装到当前用户：目标是 `%LOCALAPPDATA%\Prism Agent`，不需要提权；根据系统语言自动选择英文、简体中文或繁体中文；在开始菜单创建 `Prism Agent` 快捷方式，并使用 `src-tauri/icons/` 中的品牌化安装器头图与侧栏图。
+
+安装器与卸载器会先请壳退出：安装目录下若有 `prism-agent.exe` 正在运行，钩子会以 `--quit` 启动它并最多轮询 15 秒。该参数通知正在运行的壳，让它走 Tauri 的正常退出路径——托盘图标会在进程离开前被删除；随后仍会按精确可执行路径执行强杀兜底，正常升级时它找不到任何进程。不认识该参数的旧壳——包括改名前的 `dsh-desktop.exe` 装机版——无法被这样请退：升级前先从托盘退出它，钩子就找不到进程，也就不会强杀并多留下死托盘条目。
 
 CI（`.github/workflows/desktop-release.yml`）在三平台矩阵上执行同一流程并上传 GitHub Release；打 `v*` tag 或手动触发。
 
