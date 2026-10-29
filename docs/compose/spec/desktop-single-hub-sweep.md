@@ -12,7 +12,7 @@ English | [中文](desktop-single-hub-sweep.zh.md)
 
 ## Report
 
-**What was built** — The shell now clears the field before deciding which hub serves it. `is_our_dsh_web_server` recognizes a hub by the installed closure path (`runtime/prism/lib/bin.js`, the Windows install and the macOS app bundle) or by this checkout's built CLI (`prism-agent/apps/cli/lib/bin.js`, linked worktrees included), after lowercasing and normalizing separators; `rival_pids` is the pure decision core; the enumeration reads `Get-CimInstance` on Windows with UTF-8 output and `ps` on macOS/Linux, under a 3 s budget; and `sweep_rival_servers` ends every match except the adopted pid at adoption and before every cold spawn, skipping debug builds. Stock dsh, Easel, manually launched `prism web`, and sibling checkouts are never matched; the two-release-install and POSIX-signal limits are stated in S3. The desktop README's hub contract, the port-resilience scope note, the startup-latency S5 row, and the divergence index record the change beside this document.
+**What was built** — The shell now ends rival hubs before deciding which hub serves it. `is_our_dsh_web_server` recognizes a hub by the installed closure path (`runtime/prism/lib/bin.js`, the Windows install and the macOS app bundle) or by this checkout's built CLI (`prism-agent/apps/cli/lib/bin.js`, linked worktrees included), after lowercasing and normalizing separators; `rival_pids` is the pure decision core; the enumeration reads `Get-CimInstance` on Windows with UTF-8 output and `ps` on macOS/Linux, under a 3 s budget; and `sweep_rival_servers` ends every match except the adopted pid at adoption and before every cold spawn, skipping debug builds. Stock dsh, Easel, manually launched `prism web`, and the sibling `deepseek-harness` checkout are never matched; the two-release-install and POSIX-signal limits are stated in S3. The desktop README's hub contract, the port-resilience scope note, the startup-latency S5 row, and the divergence index record the change beside this document.
 
 **Verification** — All run in the worktree at 5be9dc96 (base c64d35c4):
 
@@ -31,7 +31,7 @@ English | [中文](desktop-single-hub-sweep.zh.md)
 - The review's byte probe caught what no unit test could: PowerShell 5.1 writes redirected output in the console code page, so a Chinese user name made `ConvertTo-Json`'s bytes invalid UTF-8 and the sweep silently did nothing. The query now sets `[Console]::OutputEncoding` first, and a non-ASCII path is part of the CIM parser test.
 - The sweep sits on the startup path, so the enumeration is a 3 s `kill_on_drop` child. An abandoned enumeration cannot end a hub the shell just booted, because the kill loop consumes only a completed enumeration's targets.
 - Scope is per product, not per install or per home: matching a generic `deepseek-harness/apps/cli` would end stock-dsh users' servers, and two release installs at different closure paths are recorded as an unsupported concurrency instead of a kill-back fight.
-- One sweep cannot durably stop a rival supervised shell from restarting its hub; the decision-point design converges at the next start, which is the reference shell's accepted limit.
+- One sweep cannot durably stop a rival supervised shell from restarting its hub: each start re-establishes one hub, a running dev shell can still recreate its hub, and two installs at different closure paths are the limit S3 records.
 
 ## [S1] Problem
 

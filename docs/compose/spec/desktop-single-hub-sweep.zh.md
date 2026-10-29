@@ -12,7 +12,7 @@ commits: c64d35c4..5be9dc96
 
 ## Report
 
-**What was built** — 壳现在先清场，再决定由哪个 hub 服务自己。`is_our_dsh_web_server` 按装机闭包路径（`runtime/prism/lib/bin.js`，Windows 安装与 macOS app bundle）或本 checkout 构建好的 CLI（`prism-agent/apps/cli/lib/bin.js`，含 linked worktree）识别 hub，匹配前先转小写并归一分隔符；`rival_pids` 是纯决策核；枚举在 Windows 上读 `Get-CimInstance`（输出 UTF-8）、在 macOS/Linux 上读 `ps`，受 3 秒预算约束；`sweep_rival_servers` 在收养时与每次冷启前结束除被收养 pid 外的所有命中，debug 构建跳过。原版 dsh、Easel、手动启动的 `prism web` 与姊妹 checkout 绝不命中；两个 release 安装与 POSIX 信号的限制写在 S3。桌面 README 的 hub 契约、端口弹性规格的范围说明、启动延迟规格的 S5 行与分叉索引，都与本文档一起记录了这一改动。
+**What was built** — 壳现在先结束对手 hub，再决定由哪个 hub 服务自己。`is_our_dsh_web_server` 按装机闭包路径（`runtime/prism/lib/bin.js`，Windows 安装与 macOS app bundle）或本 checkout 构建好的 CLI（`prism-agent/apps/cli/lib/bin.js`，含 linked worktree）识别 hub，匹配前先转小写并归一分隔符；`rival_pids` 是纯决策核；枚举在 Windows 上读 `Get-CimInstance`（输出 UTF-8）、在 macOS/Linux 上读 `ps`，受 3 秒预算约束；`sweep_rival_servers` 在收养时与每次冷启前结束除被收养 pid 外的所有命中，debug 构建跳过。原版 dsh、Easel、手动启动的 `prism web` 与姊妹 `deepseek-harness` checkout 绝不命中；两个 release 安装与 POSIX 信号的限制写在 S3。桌面 README 的 hub 契约、端口弹性规格的范围说明、启动延迟规格的 S5 行与分叉索引，都与本文档一起记录了这一改动。
 
 **Verification** — 以下命令均在 worktree 的 5be9dc96（基线 c64d35c4）上运行：
 
@@ -31,7 +31,7 @@ commits: c64d35c4..5be9dc96
 - 评审的字节探针抓到了单元测试抓不到的问题：PowerShell 5.1 的重定向输出使用控制台代码页，中文用户名会让 `ConvertTo-Json` 的字节不是合法 UTF-8，清场静默失效。查询现在先设置 `[Console]::OutputEncoding`，非 ASCII 路径进入了 CIM 解析测试。
 - 清场位于启动路径上，因此枚举是一个带 3 秒预算的 `kill_on_drop` 子进程。被放弃的枚举不可能结束壳刚启动的 hub，因为击杀循环只消费一次已完成枚举的目标。
 - 范围按产品而不是按安装或按 home 划定：匹配通用的 `deepseek-harness/apps/cli` 会结束原版 dsh 用户的 server，而两个闭包路径不同的 release 安装被记录为不支持的并发，而不是互杀。
-- 一次清场无法持久阻止受监督的对手壳重启它的 hub；决策点设计在下一次启动收敛，这是参考壳接受的限制。
+- 一次清场无法持久阻止受监督的对手壳重启它的 hub：每次启动只能重新确立一个 hub，仍在运行的开发壳会再造一个，而两个闭包路径不同的安装正是 S3 记录的限制。
 
 ## [S1] Problem
 
