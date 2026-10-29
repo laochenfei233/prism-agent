@@ -682,8 +682,15 @@ fn list_process_samples() -> Vec<(u32, String)> {
     let Ok(output) = output else {
         return Vec::new();
     };
-    // One match renders as a bare object, several as an array.
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) else {
+    parse_cim_samples(&output.stdout)
+}
+
+/// Parses the CIM query's `ConvertTo-Json` output: one match is a bare object,
+/// several are an array. Entries whose command line is unreadable are skipped,
+/// and output that is not JSON yields an empty sweep.
+#[cfg(windows)]
+fn parse_cim_samples(stdout: &[u8]) -> Vec<(u32, String)> {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(stdout) else {
         return Vec::new();
     };
     let items: Vec<serde_json::Value> = match value {
@@ -1202,6 +1209,25 @@ mod tests {
         let easel = "/Applications/Easel-dsh.app/Contents/Resources/runtime/dsh/lib/bin.js web --port 3098 --no-open".to_string();
         let samples = vec![(40456, installed), (21944, dev), (111, easel)];
         assert_eq!(rival_pids(&samples, None), vec![40456, 21944]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cim_sample_parser_accepts_a_bare_object_and_an_array() {
+        let one = br#"{"ProcessId":60884,"CommandLine":"\"C:\\x\\runtime\\prism\\lib\\bin.js\" web --port 3999 --no-open"}"#;
+        assert_eq!(
+            parse_cim_samples(one),
+            vec![(
+                60884,
+                "\"C:\\x\\runtime\\prism\\lib\\bin.js\" web --port 3999 --no-open".to_string()
+            )]
+        );
+        let many = br#"[{"ProcessId":1,"CommandLine":"a"},{"ProcessId":2,"CommandLine":null},{"ProcessId":3,"CommandLine":"b"}]"#;
+        assert_eq!(
+            parse_cim_samples(many),
+            vec![(1, "a".to_string()), (3, "b".to_string())]
+        );
+        assert!(parse_cim_samples(b"").is_empty());
     }
 
     #[cfg(not(windows))]

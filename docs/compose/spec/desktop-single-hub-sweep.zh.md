@@ -56,7 +56,7 @@ Windows 通过 `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` 枚举�
 ## Tasks
 
 - [ ] T1: signature matcher, decision core, enumeration, sweep, and the two wiring points (covers: S2.1, S2.2, S2.3, S2.4)
-- [ ] T2: unit tests — installed and dev paths matched (quoted and case variants, macOS separators), stock dsh/Easel/manual CLI excluded, `keep` three-state semantics, `ps` sample parser (covers: S2.1, S2.2, S2.3)
+- [ ] T2: unit tests — installed and dev paths matched (quoted and case variants, macOS separators), stock dsh/Easel/manual CLI excluded, `keep` three-state semantics, `ps` sample parser, and the CIM JSON parser's bare-object/array forms (covers: S2.1, S2.2, S2.3)
 - [ ] T3: desktop README port/hub contract and the port-resilience scope note, both languages (covers: S2.4)
 - [ ] T4: divergence records — `PRISM-DIVERGENCE` marker at the sweep site, this document's S5, the A1 row in `fork-upstream-divergence.md`, and the stale test-count claim in `desktop-startup-latency.md` S5 (covers: S2.1, S2.4)
 - [ ] T5: verification — record every command and result under [S4] (depends: T1, T2, T3, T4)
@@ -75,5 +75,5 @@ Windows 通过 `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` 枚举�
 
 | 文件 | 分叉点 | 重放必须保留 |
 | --- | --- | --- |
-| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`、`rival_pids`、`list_process_samples`、`parse_ps_samples`、`sweep_rival_servers`，以及 `adopt_running_server` 与 `supervise` 里的两处调用点 | 整个代码块与两处调用点；`rival_sweep_*` 与 `ps_sample_parser_*` 测试是它的决策覆盖，`apps/desktop/src-tauri` 下的 `cargo test` 是重放验收 |
+| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`、`rival_pids`、`list_process_samples`、`parse_cim_samples`、`parse_ps_samples`、`sweep_rival_servers`，以及 `adopt_running_server` 与 `supervise` 里的两处调用点 | 整个代码块与两处调用点；`rival_sweep_*`、`cim_sample_parser_*` 与 `ps_sample_parser_*` 测试是它的决策覆盖，`apps/desktop/src-tauri` 下的 `cargo test` 是重放验收 |
 | `docs/compose/spec/desktop-single-hub-sweep.*` | 本文档 | 无需保留，上游没有这个文件 |

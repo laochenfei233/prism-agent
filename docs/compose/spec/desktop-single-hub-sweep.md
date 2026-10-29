@@ -56,7 +56,7 @@ Windows enumerates through `Get-CimInstance Win32_Process -Filter "Name='node.ex
 ## Tasks
 
 - [ ] T1: signature matcher, decision core, enumeration, sweep, and the two wiring points (covers: S2.1, S2.2, S2.3, S2.4)
-- [ ] T2: unit tests — installed and dev paths matched (quoted and case variants, macOS separators), stock dsh/Easel/manual CLI excluded, `keep` three-state semantics, `ps` sample parser (covers: S2.1, S2.2, S2.3)
+- [ ] T2: unit tests — installed and dev paths matched (quoted and case variants, macOS separators), stock dsh/Easel/manual CLI excluded, `keep` three-state semantics, `ps` sample parser, and the CIM JSON parser's bare-object/array forms (covers: S2.1, S2.2, S2.3)
 - [ ] T3: desktop README port/hub contract and the port-resilience scope note, both languages (covers: S2.4)
 - [ ] T4: divergence records — `PRISM-DIVERGENCE` marker at the sweep site, this document's S5, the A1 row in `fork-upstream-divergence.md`, and the stale test-count claim in `desktop-startup-latency.md` S5 (covers: S2.1, S2.4)
 - [ ] T5: verification — record every command and result under [S4] (depends: T1, T2, T3, T4)
@@ -75,5 +75,5 @@ This checkout imports upstream `deepseek-harness/deepseek-harness` as one baseli
 
 | File | Divergent site | What a replay must keep |
 | --- | --- | --- |
-| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`, `rival_pids`, `list_process_samples`, `parse_ps_samples`, `sweep_rival_servers`, and the two call sites in `adopt_running_server` and `supervise` | the block and both call sites; the `rival_sweep_*` and `ps_sample_parser_*` tests are its decision coverage, and `cargo test` in `apps/desktop/src-tauri` is the replay check |
+| `apps/desktop/src-tauri/src/dsh_runner.rs` | `is_our_dsh_web_server`, `rival_pids`, `list_process_samples`, `parse_cim_samples`, `parse_ps_samples`, `sweep_rival_servers`, and the two call sites in `adopt_running_server` and `supervise` | the block and both call sites; the `rival_sweep_*`, `cim_sample_parser_*`, and `ps_sample_parser_*` tests are its decision coverage, and `cargo test` in `apps/desktop/src-tauri` is the replay check |
 | `docs/compose/spec/desktop-single-hub-sweep.*` | this document | nothing, since upstream has no such file |
