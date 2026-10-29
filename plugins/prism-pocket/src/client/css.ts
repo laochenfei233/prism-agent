@@ -17,8 +17,12 @@ html.prism-active {
   -webkit-text-size-adjust: 100%;
 }
 
-/* The drawer: the sidebar leaves the column flow and covers the viewport. */
+/* The drawer: the sidebar leaves the column flow and covers the viewport.
+   The slot anchor renders display:contents, so it is restored to a real box
+   here — otherwise the fixed positioning would have nothing to position. */
 html.prism-active.prism-drawer-open [data-slot="sidebar"] {
+  /* The anchor's inline display:contents only yields to !important. */
+  display: block !important;
   position: fixed;
   top: 0;
   left: 0;
@@ -26,6 +30,7 @@ html.prism-active.prism-drawer-open [data-slot="sidebar"] {
   width: min(82vw, 360px);
   height: 100dvh;
   z-index: 100;
+  overflow-y: auto;
   box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -84,6 +89,72 @@ html.prism-active [data-slot="main"] table {
   gap: 8px;
   pointer-events: none;
 }
+
+/* The Pocket settings section: theme-agnostic translucency, app-like radii. */
+.prism-section {
+  display: grid;
+  gap: 20px;
+  max-width: 560px;
+  font: 400 13px/1.6 system-ui, sans-serif;
+}
+.prism-section section { display: grid; gap: 8px; }
+.prism-section h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  font-weight: 700;
+}
+.prism-section h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; opacity: 0.8; }
+.prism-section p { margin: 0; }
+.prism-section code {
+  font: 500 12px/1.5 ui-monospace, monospace;
+  background: rgb(127 127 127 / 0.14);
+  padding: 2px 6px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.prism-commands { display: grid; gap: 10px; }
+.prism-command {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 480px) {
+  /* The settings content column is narrow next to its nav; stack the row. */
+  .prism-command { grid-template-columns: 1fr auto; }
+  .prism-command-label { grid-column: 1 / -1; }
+}
+.prism-command-label { font-size: 12px; opacity: 0.75; }
+.prism-command button,
+.prism-actions button {
+  border: 1px solid rgb(127 127 127 / 0.35);
+  background: none;
+  color: inherit;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.prism-badge,
+.prism-badge-ok,
+.prism-badge-warn {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(127 127 127 / 0.15);
+}
+.prism-badge-ok { background: rgb(60 160 90 / 0.2); }
+.prism-badge-warn { background: rgb(200 90 60 / 0.22); }
+.prism-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.prism-note { font-size: 12px; opacity: 0.8; }
+.prism-section-loading,
+.prism-section-error { font: 400 13px/1.6 system-ui, sans-serif; opacity: 0.7; }
 .prism-card {
   pointer-events: auto;
   display: flex;

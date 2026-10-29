@@ -36,8 +36,8 @@ export type * from './types.ts'
 /** Cordis plugin name, matching the `cordis.patch.yml` row id. */
 export const name = 'pocket'
 
-/** Host services this plugin needs. */
-export const inject = ['connection', 'webserver', 'webStartup', 'dshHomePath']
+/** Host services this plugin needs (`webServer` is the carrier's service name). */
+export const inject = ['connection', 'webServer', 'webStartup', 'dshHomePath']
 
 /** Pocket delivery policy. */
 export interface Config {
@@ -92,7 +92,7 @@ interface PocketRuntime {
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = Config(config) as Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
   const connection = Reflect.get(ctx, 'connection') as ConnectionRoute
-  const webserver = Reflect.get(ctx, 'webserver') as WebServerLike
+  const webserver = Reflect.get(ctx, 'webServer') as WebServerLike
   const webStartup = Reflect.get(ctx, 'webStartup') as WebStartupLike
   const runtime: PocketRuntime = {
     surface: {
@@ -149,7 +149,7 @@ function deliverer(ctx: Context, runtime: PocketRuntime): PocketDeliverer {
       let delivered = 0
       let pruned = 0
       for (const record of runtime.store.all()) {
-        const result = await deliverWebPush(record.endpoint, encryptPushPayload(record.keys.p256dh, record.keys.auth, body), urgency, material)
+        const result = await deliverToSubscription(record, body, urgency, material)
         if (result.prune) {
           runtime.store.remove(record.endpoint)
           pruned += 1
@@ -165,6 +165,21 @@ function deliverer(ctx: Context, runtime: PocketRuntime): PocketDeliverer {
     })().catch((error: unknown) => {
       ctx.logger.warn(`pocket: notification delivery failed: ${error instanceof Error ? error.message : String(error)}`)
     })
+  }
+}
+
+/** Encrypt and send to one subscription; bad key material fails soft per subscriber. */
+async function deliverToSubscription(
+  record: PocketPushSubscriptionRecord,
+  body: Buffer,
+  urgency: 'high' | 'normal',
+  material: VapidMaterial,
+): Promise<{ ok: boolean; prune: boolean }> {
+  try {
+    const encrypted = encryptPushPayload(record.keys.p256dh, record.keys.auth, body)
+    return await deliverWebPush(record.endpoint, encrypted, urgency, material)
+  } catch {
+    return { ok: false, prune: false }
   }
 }
 
@@ -206,7 +221,7 @@ async function testDelivery(runtime: PocketRuntime): Promise<{ delivered: number
   const body = Buffer.from(JSON.stringify(payload), 'utf8')
   let delivered = 0
   for (const record of runtime.store.all()) {
-    const result = await deliverWebPush(record.endpoint, encryptPushPayload(record.keys.p256dh, record.keys.auth, body), 'normal', material)
+    const result = await deliverToSubscription(record, body, 'normal', material)
     if (result.prune) runtime.store.remove(record.endpoint)
     else if (result.ok) delivered += 1
   }
@@ -225,6 +240,10 @@ function readSubscription(value: unknown): PocketPushSubscriptionRecord | undefi
   if (typeof keys !== 'object' || keys === null) return undefined
   if (typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string') return undefined
   if (!isBase64url(keys.p256dh) || !isBase64url(keys.auth)) return undefined
+  // RFC 8291 client keys: a 65-byte uncompressed P-256 point and a >=16-byte auth secret.
+  const p256dh = Buffer.from(keys.p256dh, 'base64url')
+  if (p256dh.byteLength !== 65 || p256dh[0] !== 0x04) return undefined
+  if (Buffer.from(keys.auth, 'base64url').byteLength < 16) return undefined
   return { endpoint: candidate.endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, addedAt: new Date().toISOString() }
 }
 
