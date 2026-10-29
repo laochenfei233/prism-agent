@@ -1,9 +1,9 @@
 ---
 feature: prism-pocket
-status: in-progress
+status: delivered
 updated: 2026-10-30
 branch: feat/prism-pocket
-commits: 8c5ed274ee..pending
+commits: 8c5ed274ee..2f3a5b8ca1
 ---
 
 # Prism Pocket（口袋 Prism）
@@ -11,6 +11,12 @@ commits: 8c5ed274ee..pending
 [English](prism-pocket.md) | 中文
 
 ## Report
+
+**构建内容** —— `plugins/prism-pocket`（`@prism/prism-pocket`），一个仓库外双面 Cordis 插件，把现有 Web 表面变成手机可用的远程控制台，不改动 `packages/` 与 `apps/`。浏览器半增加按激活条件生效的移动适配（窄屏触摸视口或 `?pocket=`）：左边缘内滑把应用自己的侧栏变成覆盖抽屉、返回手势关闭、`visualViewport` 跟踪软键盘、触摸键盘上普通 `Enter` 换行，样式表只锚定应用自身的 `[data-slot]` 接缝。批准请求、用户提问与运行失败经应用自己的事件桥弹出页内卡片与隐藏页系统通知；页面关闭时节点半投递 Web Push（RFC 8291/8292 以 `node:crypto` 实现，零运行时依赖）加可选的 Bark 通道，订阅与 VAPID 密钥对存于 DSH home 的 `pocket/` 目录。「口袋」设置分区探测本机 Tailscale、按镜像规则校验当前连接与信任围栏的一致性，并给出直连 IP 与 MagicDNS 两条路径的可复制命令；插件还提供 PWA 的 manifest、service worker 与图标。
+
+**验证** —— `tsc -p tsconfig.json --noEmit` 干净；`vitest run` 43/43（RFC 8291 经独立实现的接收方往返、VAPID ES256 JWT 对存储公钥验证、存储持久化/清理、发送端头部契约、触发决策（含合并扩展静默）、Tailscale 解析、贴合围栏的信任判定、激活/手势逻辑）；tsdown 双面构建；实机 web profile 启动后 `/pocket.webmanifest` 与 `/pocket-sw.js` 可访问、`GET /api/pocket/remote` 返回真实 Tailscale 事实、订阅被接受且被严格校验、测试路由软失败、抽屉/popstate 关闭/设置分区在手机视口浏览器中实测并截图。评审第一轮 REQUEST_CHANGES（缺 README.zh、浏览器半失败卡片、背板关闭、信任徽章保真），四项全部修复后复审 APPROVE，另留两条仅显示层的漂移（`--trusted-host` 的默认端口与大小写）作为后续项。
+
+**历程日志** —— 载体服务名是 `webServer` 而非 `webserver`；启动审计日志会精确写出等待者，先读日志再猜注入名。slot 锚点内联渲染 `display: contents`，插件 CSS 必须先用 `!important` 把它还原成真实盒子再定位。可转发宿主事件白名单在 `packages/api/remotes/src/remote-events.ts`，其中已有 `api-session/error`——客户端半应复用既有白名单事件，而不是提议新增。信任围栏在绑定 loopback 时接受任意 loopback origin、无端口 trusted host 匹配任意端口；显示侧徽章必须镜像 `api-request-trust.ts`，而不是凭直觉。
 
 ## [S1] 问题
 
@@ -70,14 +76,14 @@ agent 请求批准、提出用户问题、运行失败时，在插件自有的 p
 
 ## Tasks
 
-- [ ] T1: 插件骨架 —— `plugins/prism-pocket` 的 package.json（`@prism/prism-pocket`、`dsh.bundle.patch`、`dsh.client`、`./client` 导出）、手写闭包 banner/footer 的 tsdown 双面构建、`cordis.patch.yml` 插入节点行与浏览器 roster 行（covers: S2.1）
-- [ ] T2: 节点半远程服务 —— schemastery `Config`（S2.5 字段）、Tailscale 探测与解析、经 `connection.fetch.register` 的 `GET /api/pocket/remote`（covers: S2.5, S2.6）
-- [ ] T3: 推送引擎 —— VAPID 密钥存储、经 `node:crypto` 的 RFC 8291 加密 + RFC 8292 JWT、带 404/410 清理的订阅存储、Bark 投递、会话触发接线（批准瀑布、用户提问表面、`turn/end`）、`POST /api/pocket/push/subscribe|test`（covers: S2.5）
-- [ ] T4: 浏览器半移动适配 —— 激活探针、带 popstate 拦截的边缘侧滑抽屉、`visualViewport` 键盘处理、带 IME 防护的 `Enter` 换行、行不换行 CSS、safe-area/缩放/橡皮筋规则、页内通知 portal + 系统通知（covers: S2.2, S2.3, S2.4）
-- [ ] T5: 浏览器半设置分区（远程访问 + 推送状态/测试）、PWA 资产路由、manifest 链接注入、service worker（covers: S2.6, S2.7)
-- [ ] T6: zh/en 词典、插件 README en+zh、导出契约 JSDoc（covers: S2.8）
-- [ ] T7: 测试 —— RFC 8291 往返 + VAPID JWT 对存储公钥的验证、Tailscale JSON 解析、命令生成、订阅存储清理、激活/手势/命令复制纯逻辑（covers: S2.5, S2.6）
-- [ ] T8: 验证 —— 双面构建、typecheck、聚焦测试、装入 dev web profile、手机视口浏览器检查与截图（covers: S4）
+- [x] T1: 插件骨架 —— `plugins/prism-pocket` 的 package.json（`@prism/prism-pocket`、`dsh.bundle.patch`、`dsh.client`、`./client` 导出）、手写闭包 banner/footer 的 tsdown 双面构建、`cordis.patch.yml` 插入节点行与浏览器 roster 行（covers: S2.1）
+- [x] T2: 节点半远程服务 —— schemastery `Config`（S2.5 字段）、Tailscale 探测与解析、经 `connection.fetch.register` 的 `GET /api/pocket/remote`（covers: S2.5, S2.6）
+- [x] T3: 推送引擎 —— VAPID 密钥存储、经 `node:crypto` 的 RFC 8291 加密 + RFC 8292 JWT、带 404/410 清理的订阅存储、Bark 投递、会话触发接线（批准瀑布、用户提问表面、`turn/end`）、`POST /api/pocket/push/subscribe|test`（covers: S2.5）
+- [x] T4: 浏览器半移动适配 —— 激活探针、带 popstate 拦截的边缘侧滑抽屉、`visualViewport` 键盘处理、带 IME 防护的 `Enter` 换行、行不换行 CSS、safe-area/缩放/橡皮筋规则、页内通知 portal + 系统通知（covers: S2.2, S2.3, S2.4）
+- [x] T5: 浏览器半设置分区（远程访问 + 推送状态/测试）、PWA 资产路由、manifest 链接注入、service worker（covers: S2.6, S2.7)
+- [x] T6: zh/en 词典、插件 README en+zh、导出契约 JSDoc（covers: S2.8）
+- [x] T7: 测试 —— RFC 8291 往返 + VAPID JWT 对存储公钥的验证、Tailscale JSON 解析、命令生成、订阅存储清理、激活/手势/命令复制纯逻辑（covers: S2.5, S2.6）
+- [x] T8: 验证 —— 双面构建、typecheck、聚焦测试、装入 dev web profile、手机视口浏览器检查与截图（covers: S4）
 
 ## [S4] 验收
 

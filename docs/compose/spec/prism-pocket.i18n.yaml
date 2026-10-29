@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-pocket.md
 /:
-  en: 6eaa770755deb2e2
-  zh: 6eaa770755deb2e2
+  en: a5c312b9373f3bcb
+  zh: a5c312b9373f3bcb
 /prism-pocket:
   en: 2a9eb80f4497fe69
   zh: f775c44d7c90a909
 /prism-pocket/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 0ba15196d278da23
+  zh: 9fd55649df7fab84
 /prism-pocket/s1-problem:
   en: aed87ffe7e8a4d1d
   zh: 47d92441a4a0684f
@@ -45,8 +45,8 @@
   en: cdcfb82413dd48ec
   zh: 65ded8b40148e17c
 /prism-pocket/tasks:
-  en: cdd26ea3c9e81cc1
-  zh: 96da496005648624
+  en: d32fd6771400c64c
+  zh: b0a240bdc74b1760
 /prism-pocket/s4-acceptance:
   en: 646b82b115405862
   zh: 0c1af4e0462ea31f

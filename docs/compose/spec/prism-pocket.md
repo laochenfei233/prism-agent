@@ -1,9 +1,9 @@
 ---
 feature: prism-pocket
-status: in-progress
+status: delivered
 updated: 2026-10-30
 branch: feat/prism-pocket
-commits: 8c5ed274ee..pending
+commits: 8c5ed274ee..2f3a5b8ca1
 ---
 
 # Prism Pocket
@@ -11,6 +11,12 @@ commits: 8c5ed274ee..pending
 English | [中文](prism-pocket.zh.md)
 
 ## Report
+
+**What was built** — `plugins/prism-pocket` (`@prism/prism-pocket`), a dual-face out-of-tree Cordis plugin that turns the existing web surface into a phone-usable remote console without touching `packages/` or `apps/`. The browser half adds activation-gated mobile adaptations (narrow coarse-pointer viewports or `?pocket=`): the left-edge swipe opens the app's own sidebar as an overlay drawer closed by the back gesture, `visualViewport` tracks the soft keyboard, plain `Enter` inserts a newline on touch, and the stylesheet anchors exclusively on the app's `[data-slot]` seams. Approval requests, user questions, and run failures raise in-page cards and hidden-page system notifications over the app's own event bridges; when the page is closed the node half delivers Web Push (RFC 8291/8292 implemented on `node:crypto`, zero runtime dependencies) plus an optional Bark relay, with subscriptions and the VAPID keypair under the DSH home's `pocket/` directory. The Pocket settings section probes the local Tailscale, verifies the current connection against the trust fence by mirroring its rules, and renders copyable commands for the direct-IP and MagicDNS paths; the plugin also serves the PWA manifest, service worker, and icon.
+
+**Verification** — `tsc -p tsconfig.json --noEmit` clean; `vitest run` 43/43 (RFC 8291 round-trip through an independently written recipient, VAPID ES256 JWT verified against the stored public key, store persistence/pruning, sender header contract, trigger decisions including merge-extension silence, tailscale parsing, fence-true trust checks, activation/gesture logic); both tsdown faces build; a live web profile boot served `/pocket.webmanifest` and `/pocket-sw.js`, returned real Tailscale facts from `GET /api/pocket/remote`, accepted and strictly validated subscriptions, delivered the test route fail-soft, and the drawer, popstate close, and settings section were exercised in a phone-viewport browser with screenshots. Review round 1 returned REQUEST_CHANGES (missing README.zh, browser-half failure cards, backdrop dismissal, trust-badge fidelity); all four were fixed and the fresh reviewer returned APPROVE with two residual display-only drift notes (default-port and case-sensitivity in `--trusted-host` entries) left as follow-ups.
+
+**Journey log** — the carrier service is named `webServer`, not `webserver`; the boot audit log names the exact waiter, so read it before guessing injection names. The slot anchors render `display: contents` inline, so plugin CSS must restore the box with `!important` before positioning it. The forwardable host-event allowlist lives in `packages/api/remotes/src/remote-events.ts` and already carries `api-session/error` — client halves should ride existing allowlisted events instead of proposing new ones. The trust fence accepts any loopback origin when bound loopback and port-less trusted hosts on any port; a display-side badge must mirror `api-request-trust.ts`, not intuition.
 
 ## [S1] Problem
 
@@ -70,14 +76,14 @@ All user-visible copy routes through `ctx.locale` with zh/en dictionaries; the s
 
 ## Tasks
 
-- [ ] T1: plugin skeleton — `plugins/prism-pocket` package.json (`@prism/prism-pocket`, `dsh.bundle.patch`, `dsh.client`, `./client` export), tsdown two-face build with the hand-written closure banner/footer, `cordis.patch.yml` inserting the node row and browser roster row (covers: S2.1)
-- [ ] T2: node half remote service — schemastery `Config` (S2.5 fields), tailscale detection and parsing, `GET /api/pocket/remote` over `connection.fetch.register` (covers: S2.5, S2.6)
-- [ ] T3: push engine — VAPID key storage, RFC 8291 encryption + RFC 8292 JWT via `node:crypto`, subscription store with 404/410 pruning, Bark delivery, session trigger wiring (approval waterfall, user-question surface, `turn/end`), `POST /api/pocket/push/subscribe|test` (covers: S2.5)
-- [ ] T4: browser-half mobile adapter — activation probe, edge-swipe drawer with popstate guard, `visualViewport` keyboard handling, `Enter`-as-newline with IME guard, no-wrap row CSS, safe-area/zoom/rubber-band rules, in-page notification portal + system notifications (covers: S2.2, S2.3, S2.4)
-- [ ] T5: browser-half settings section (remote access + push status/test), PWA asset routes, manifest link injection, service worker (covers: S2.6, S2.7)
-- [ ] T6: zh/en locale dictionaries, plugin README en+zh, JSDoc on exported contracts (covers: S2.8)
-- [ ] T7: tests — RFC 8291 round-trip + VAPID JWT verification, tailscale JSON parsing, command generation, subscription store pruning, activation/gesture/command-copy pure logic (covers: S2.5, S2.6)
-- [ ] T8: verification — build both faces, typecheck, focused tests, install into a dev web profile, phone-viewport browser check with screenshots (covers: S4)
+- [x] T1: plugin skeleton — `plugins/prism-pocket` package.json (`@prism/prism-pocket`, `dsh.bundle.patch`, `dsh.client`, `./client` export), tsdown two-face build with the hand-written closure banner/footer, `cordis.patch.yml` inserting the node row and browser roster row (covers: S2.1)
+- [x] T2: node half remote service — schemastery `Config` (S2.5 fields), tailscale detection and parsing, `GET /api/pocket/remote` over `connection.fetch.register` (covers: S2.5, S2.6)
+- [x] T3: push engine — VAPID key storage, RFC 8291 encryption + RFC 8292 JWT via `node:crypto`, subscription store with 404/410 pruning, Bark delivery, session trigger wiring (approval waterfall, user-question surface, `turn/end`), `POST /api/pocket/push/subscribe|test` (covers: S2.5)
+- [x] T4: browser-half mobile adapter — activation probe, edge-swipe drawer with popstate guard, `visualViewport` keyboard handling, `Enter`-as-newline with IME guard, no-wrap row CSS, safe-area/zoom/rubber-band rules, in-page notification portal + system notifications (covers: S2.2, S2.3, S2.4)
+- [x] T5: browser-half settings section (remote access + push status/test), PWA asset routes, manifest link injection, service worker (covers: S2.6, S2.7)
+- [x] T6: zh/en locale dictionaries, plugin README en+zh, JSDoc on exported contracts (covers: S2.8)
+- [x] T7: tests — RFC 8291 round-trip + VAPID JWT verification, tailscale JSON parsing, command generation, subscription store pruning, activation/gesture/command-copy pure logic (covers: S2.5, S2.6)
+- [x] T8: verification — build both faces, typecheck, focused tests, install into a dev web profile, phone-viewport browser check with screenshots (covers: S4)
 
 ## [S4] Acceptance
 
