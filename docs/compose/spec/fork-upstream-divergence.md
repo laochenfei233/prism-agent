@@ -97,5 +97,5 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 - [install-isolation.md](install-isolation.md) — the feature document for A8 and A9 (CLI install identity and default home).
 - [upstream-resync.md](upstream-resync.md) — the handoff for the next upstream resync (merge in the sibling checkout, re-import, replay A1–A9).
 - [desktop-startup-latency.md](desktop-startup-latency.md) — the boot gate and the hub adoption, and the per-file list for A3.
-- [desktop-client.md](desktop-client.md), [desktop-port-resilience.md](desktop-port-resilience.md), [cli-pnpm-resolution.md](cli-pnpm-resolution.md) — the desktop features whose code A1 carries.
+- [desktop-client.md](desktop-client.md), [desktop-port-resilience.md](desktop-port-resilience.md), [cli-pnpm-resolution.md](cli-pnpm-resolution.md), [desktop-single-hub-sweep.md](desktop-single-hub-sweep.md) — the desktop features whose code A1 carries.
 - `archive-import-prism-agent-e.md` — how the orphan baseline was produced and pushed.

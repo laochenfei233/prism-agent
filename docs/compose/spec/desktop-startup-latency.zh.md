@@ -143,7 +143,7 @@ commits: 未提交的工作区改动
 | `packages/boot/app-boot/src/profile-resolution/resolver.ts` | `canonicalPath` 返回 `realModuleDirectory(path)`，上游调用的是 `fs.realpathSync` | 那一行载体 realpath |
 | `packages/boot/app-boot/src/profile.ts` | 列表相关代码块（`DirectoryListings`、`DirectoryListing`、`ABSENT_DIRECTORY`、`isMissingDirectory`、`listingOf`、`listedDirectory`、`listingHolds`）与 `packageDirFromAnchor` 内的门禁 | 代码块与门禁；`collectInstallationScopePackages`、`dependencyClosure`、`collectProfileScopePackages`、`createRuntimeResolution`、`resolveBundleDir` 上多出的 `listings` 参数由它们派生，少传参数编译器会直接报错 |
 | `packages/boot/app-boot/tests/profile.spec.ts` | 无 manifest 用例、大小写折叠用例，以及两条搜索路径用例（POSIX 权限、Windows ACL） | 四条都要保留，它们共同构成这道门禁的回归覆盖——列表持有的名字仍会去探测、大小写不同的名字仍能解析、无法列出的目录仍经探测解析 |
-| `apps/desktop/src-tauri/src/dsh_runner.rs` | 第 1 层：`ServerRecord` 以及采纳、停驻、重启、遗忘、停止这些路径 | 整个文件的功能；它的 14 项测试就是重放验收 |
+| `apps/desktop/src-tauri/src/dsh_runner.rs` | 第 1 层：`ServerRecord` 以及采纳、停驻、重启、遗忘、停止这些路径 | 整个文件的功能；它的测试就是重放验收，旁边的对手清场由 [desktop-single-hub-sweep.zh.md](desktop-single-hub-sweep.zh.md) S5 列出 |
 | `docs/compose/spec/desktop-startup-latency.*` | 本文档 | 无需保留，上游没有这个文件 |
 
 `vendor/` 未被改动，因此其本地修改清单不需要新增条目。重放是否成立，以仓库根目录下 `node ./node_modules/typescript/bin/tsc -p packages/boot/app-boot/tsconfig.json --noEmit`、`node ./node_modules/vitest/vitest.mjs run packages/boot/app-boot` 通过，且 `apps/desktop/src-tauri` 下 `cargo test` 通过为准。

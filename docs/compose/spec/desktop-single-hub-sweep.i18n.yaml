@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for desktop-single-hub-sweep.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/desktop-single-hub-sweep.md
+/:
+  en: a1e411eee3cc92fa
+  zh: a1e411eee3cc92fa
+/desktop-single-hub-sweep:
+  en: af50f85dc59bee0e
+  zh: c84deabea0cbb2ec
+/desktop-single-hub-sweep/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/desktop-single-hub-sweep/s1-problem:
+  en: 2f68925975a23cf6
+  zh: 1c95d9d3e1cd3af0
+/desktop-single-hub-sweep/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/desktop-single-hub-sweep/s2-design/s2-1-product-scoped-process-signature:
+  en: d3afd867a7fb74bb
+  zh: d7412de198201484
+/desktop-single-hub-sweep/s2-design/s2-2-decision-core:
+  en: a7c8e6bd971bbc70
+  zh: fbb38f512216ad46
+/desktop-single-hub-sweep/s2-design/s2-3-process-enumeration:
+  en: 4dee709e483a0988
+  zh: cbf05c51130d9b6d
+/desktop-single-hub-sweep/s2-design/s2-4-wiring-and-timing:
+  en: d5236f7ce50ba5dc
+  zh: a7d7e89e846fa358
+/desktop-single-hub-sweep/s3-scope:
+  en: d93cb830cee29713
+  zh: c562bdecfebf90c1
+/desktop-single-hub-sweep/tasks:
+  en: b6b5ff34c7cd24cf
+  zh: b6b5ff34c7cd24cf
+/desktop-single-hub-sweep/s4-acceptance:
+  en: 0b8260fd9337e0a6
+  zh: 0b8260fd9337e0a6
+/desktop-single-hub-sweep/s5-upstream-divergence:
+  en: 7e56da85e8a7392f
+  zh: 5b9d6395859752f7

@@ -98,5 +98,5 @@ git -C ../deepseek-harness rev-parse <upstream-ref>:<path>   # blob, when the pa
 - [upstream-resync.md](upstream-resync.zh.md) — 下一次上游再同步的交接件（在姊妹检出合并、重新导入、重放 A1–A9）。
 
 - [desktop-startup-latency.md](desktop-startup-latency.zh.md)——启动门禁与 hub 采纳，以及 A3 的逐文件清单。
-- [desktop-client.md](desktop-client.zh.md)、[desktop-port-resilience.md](desktop-port-resilience.zh.md)、[cli-pnpm-resolution.md](cli-pnpm-resolution.zh.md)——A1 所承载的桌面功能。
+- [desktop-client.md](desktop-client.zh.md)、[desktop-port-resilience.md](desktop-port-resilience.zh.md)、[cli-pnpm-resolution.md](cli-pnpm-resolution.zh.md)、[desktop-single-hub-sweep.zh.md](desktop-single-hub-sweep.zh.md)——A1 所承载的桌面功能。
 - `archive-import-prism-agent-e.md`——孤儿基线是如何产生并推送的（该文档只有英文版）。

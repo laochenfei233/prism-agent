@@ -131,6 +131,9 @@ impl DshHandle {
                 }
                 continue;
             }
+            // No hub to adopt: every one of our hubs still running is a rival
+            // of the fresh one this shell is about to boot.
+            sweep_rival_servers(None).await;
             let (child, port) = match self.spawn_child(app.clone()).await {
                 Ok(owned) => owned,
                 Err(err) => {
@@ -223,6 +226,10 @@ impl DshHandle {
             .await
             .ok()
             .flatten()?;
+        // The adopted hub is the sole survivor: rivals left by dead shells or
+        // parallel launches hold session writer locks the user sees as
+        // "occupied by another dsh".
+        sweep_rival_servers(Some(record.pid)).await;
         self.port.store(record.port, Ordering::SeqCst);
         *self.auth_url.lock().unwrap() = Some(record.url.clone());
         append_startup_log(&format!(
@@ -630,6 +637,118 @@ fn terminate_pid(pid: u32) {
         let _ = std::process::Command::new("kill")
             .arg(pid.to_string())
             .status();
+    }
+}
+
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-single-hub-sweep.md (S5).
+/// True when `command_line` boots one of this product's `dsh web` hubs: the
+/// installed closure (`<install>/runtime/prism/lib/bin.js`, or the mac app's
+/// `Contents/Resources/runtime/prism/...`) or this checkout's built CLI
+/// (`.../prism-agent/apps/cli/lib/bin.js`, linked worktrees included). Another
+/// harness build boots from a different path and must never match.
+fn is_our_dsh_web_server(command_line: &str) -> bool {
+    // CIM returns the quoted image path, so the two flags are matched as
+    // separate substrings; separator normalization makes one rule match the
+    // Windows and macOS command lines.
+    let line = command_line.to_lowercase().replace('\\', "/");
+    let own_runtime = line.contains("/runtime/prism/")
+        || (line.contains("prism-agent/") && line.contains("/apps/cli/"));
+    own_runtime && line.contains("bin.js") && line.contains(" web --port")
+}
+
+/// The sweep decision: every sampled pid that boots one of this product's
+/// hubs except `keep`, the hub the shell is about to adopt.
+fn rival_pids(samples: &[(u32, String)], keep: Option<u32>) -> Vec<u32> {
+    samples
+        .iter()
+        .filter(|(pid, line)| Some(*pid) != keep && is_our_dsh_web_server(line))
+        .map(|(pid, _)| *pid)
+        .collect()
+}
+
+/// Enumerate Node processes as (pid, command line) samples.
+#[cfg(windows)]
+fn list_process_samples() -> Vec<(u32, String)> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let output = std::process::Command::new("powershell")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
+        ])
+        .output();
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    // One match renders as a bare object, several as an array.
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) else {
+        return Vec::new();
+    };
+    let items: Vec<serde_json::Value> = match value {
+        serde_json::Value::Array(items) => items,
+        item @ serde_json::Value::Object(_) => vec![item],
+        _ => return Vec::new(),
+    };
+    items
+        .iter()
+        .filter_map(|item| {
+            let pid = item.get("ProcessId")?.as_u64()? as u32;
+            let line = item.get("CommandLine")?.as_str()?.to_owned();
+            Some((pid, line))
+        })
+        .collect()
+}
+
+#[cfg(not(windows))]
+fn list_process_samples() -> Vec<(u32, String)> {
+    // -ww disables the terminal-width truncation that would cut off the
+    // ` web --port` tail. A failed `ps` yields an empty sweep.
+    let Ok(output) = std::process::Command::new("ps")
+        .args(["-axo", "pid=,command=", "-ww"])
+        .output()
+    else {
+        return Vec::new();
+    };
+    parse_ps_samples(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Parses `ps -axo pid=,command= -ww`: right-aligned pid, one space, command.
+#[cfg(not(windows))]
+fn parse_ps_samples(stdout: &str) -> Vec<(u32, String)> {
+    stdout
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            let (pid, command) = line.split_once(' ')?;
+            let pid = pid.trim().parse().ok()?;
+            Some((pid, command.trim_start().to_owned()))
+        })
+        .collect()
+}
+
+/// One shell, one hub: end every rival hub of this product except `keep`.
+/// Rivals are what a dead shell leaves behind, what a parallel launch boots
+/// beside the adopted hub, and what a dev shell runs from this checkout; their
+/// session writer locks are the `session/writer-held` the user sees. Runs on
+/// the blocking pool before an adoption is published and before every spawn.
+async fn sweep_rival_servers(keep: Option<u32>) {
+    if cfg!(debug_assertions) {
+        // Dev shells compare against the installed app; they must not end its hub.
+        return;
+    }
+    let killed = tauri::async_runtime::spawn_blocking(move || {
+        let targets = rival_pids(&list_process_samples(), keep);
+        for pid in &targets {
+            terminate_pid(*pid);
+        }
+        targets
+    })
+    .await
+    .unwrap_or_default();
+    if !killed.is_empty() {
+        append_startup_log(&format!("swept rival dsh web servers: {killed:?}"));
     }
 }
 
@@ -1041,6 +1160,66 @@ mod tests {
         assert_eq!(
             launch_token("http://192.168.1.8:3081/?token=abc", 3081),
             None
+        );
+    }
+
+    #[test]
+    fn rival_sweep_kills_orphans_and_dev_hubs_but_spares_the_kept_hub() {
+        let hub = r#""C:\Users\fei\AppData\Local\Prism Agent\runtime\prism\lib\bin.js" web --port 3081 --no-open"#.to_string();
+        // An orphan from a dead shell: same product, differently cased install dir.
+        let orphan = r#""C:\Users\fei\AppData\Local\PRISM AGENT\runtime\prism\lib\bin.js" web --port 3082 --no-open"#.to_string();
+        // This checkout's dev fallback, from a linked worktree.
+        let dev = r#""C:\Users\fei\Documents\GitHub\prism-agent\.worktrees\hub\apps\cli\lib\bin.js" web --port 3083 --no-open"#.to_string();
+        // Another harness build boots from a different path and keeps running.
+        let stock = r#""C:\Users\fei\AppData\Local\deepseek-harness\runtime\dsh\lib\bin.js" web --port 3099 --no-open"#.to_string();
+        let easel = r#""C:\Users\fei\AppData\Local\Easel-dsh\runtime\dsh\lib\bin.js" web --port 3098 --no-open"#.to_string();
+        // A CLI server the user started by hand keeps its own 3080 contract.
+        let manual = "node --import tsx/esm apps/cli/src/bin.ts web".to_string();
+        let unrelated = r#""C:\Tools\server.js" --port 7000"#.to_string();
+        let samples = vec![
+            (34096, hub),
+            (40456, orphan),
+            (21944, dev),
+            (111, stock),
+            (112, easel),
+            (113, manual),
+            (222, unrelated),
+        ];
+        // Adopting 3081: the orphan and the dev hub go, another product stays.
+        assert_eq!(rival_pids(&samples, Some(34096)), vec![40456, 21944]);
+        // Cold spawn: every one of our hubs goes, still sparing another product.
+        assert_eq!(rival_pids(&samples, None), vec![34096, 40456, 21944]);
+        // A keep that names no live process only loses the exemption.
+        assert_eq!(rival_pids(&samples, Some(999)), vec![34096, 40456, 21944]);
+    }
+
+    #[test]
+    fn rival_sweep_matches_mac_app_bundle_and_dev_paths() {
+        let installed = "/Applications/Prism Agent.app/Contents/Resources/runtime/prism/lib/bin.js web --port 3081 --no-open".to_string();
+        let dev =
+            "/Users/fei/Documents/GitHub/prism-agent/apps/cli/lib/bin.js web --port 3083 --no-open"
+                .to_string();
+        let easel = "/Applications/Easel-dsh.app/Contents/Resources/runtime/dsh/lib/bin.js web --port 3098 --no-open".to_string();
+        let samples = vec![(40456, installed), (21944, dev), (111, easel)];
+        assert_eq!(rival_pids(&samples, None), vec![40456, 21944]);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn ps_sample_parser_accepts_ps_output() {
+        let samples = parse_ps_samples(
+            "  40456 /usr/local/bin/node /Users/fei/.prism/runtime/prism/lib/bin.js web --port 3081\n  1 /sbin/launchd\n",
+        );
+        assert_eq!(
+            samples,
+            vec![
+                (
+                    40456u32,
+                    "/usr/local/bin/node /Users/fei/.prism/runtime/prism/lib/bin.js web --port 3081"
+                        .to_string()
+                ),
+                (1u32, "/sbin/launchd".to_string()),
+            ]
         );
     }
 
