@@ -81,9 +81,11 @@ export function parseTailscaleStatus(stdout: string): PocketTailscaleInfo {
   const self = readSelf(parsed)
   const dnsName = typeof self?.DNSName === 'string' ? self.DNSName.replace(/\.$/, '') : undefined
   const ips = Array.isArray(self?.TailscaleIPs) ? self.TailscaleIPs.filter(ip => typeof ip === 'string') : []
-  const offline = self?.Online === false
+  if (self?.Online === false) {
+    return { available: false, detail: 'tailscale reports this node offline' }
+  }
   if (dnsName === undefined && ips.length === 0) {
-    return { available: false, detail: offline ? 'tailscale reports this node offline' : 'tailscale status carried no self facts' }
+    return { available: false, detail: 'tailscale status carried no self facts' }
   }
   const ipv4 = ips.find(ip => ip.includes('.') && !ip.includes(':'))
   return {

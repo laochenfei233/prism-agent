@@ -8,16 +8,20 @@
  *   is only observed, never answered;
  * - the `user-questions/request` answerer waterfall, same contract.
  *
+ * The decision logic takes a structural registrar, so the tests drive it
+ * without a Cordis context; {@link installPocketTriggers} is the thin
+ * wiring onto the real seams.
+ *
  * @module @prism/prism-pocket/push
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 // Type-only: the 'session/event' Events merge and the Session/SessionEvent types.
-import type {} from '@deepseek-ai/dsh-session'
-// Type-only: the 'approval/request' Events merge.
-import type {} from '@deepseek-ai/dsh-user-approval'
-// Type-only: the 'user-questions/request' Events merge.
-import type {} from '@deepseek-ai/dsh-user-questions'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+// Type-only: the 'approval/request' Events merge and its outcome union.
+import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+// Type-only: the 'user-questions/request' Events merge and its answer union.
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { PocketPushPayload } from '../types.ts'
 
 /** Fire-and-forget notification sink; implementations must not throw. */
@@ -29,14 +33,43 @@ export interface TriggerOptions {
   notifyTurnComplete: boolean
 }
 
+/** The three listener seats the triggers need, abstracted for testing. */
+export interface TriggerRegistrar {
+  /** Observe one session's event stream; the listener reads only the id. */
+  onSessionEvent(listener: (session: Pick<Session, 'id'>, event: SessionEvent) => void): void
+  /** Observe one approval ask; the listener delegates through `next()`. */
+  onApprovalRequest(listener: (request: { readonly toolName: string }, next: () => Promise<ApprovalOutcome>) => Promise<ApprovalOutcome>): void
+  /** Observe one user-question ask; the listener delegates through `next()`. */
+  onUserQuestionsRequest(listener: (request: { readonly questions: ReadonlyArray<{ question: string }> }, next: () => Promise<AskUserQuestionAnswer>) => Promise<AskUserQuestionAnswer>): void
+}
+
 /**
- * Install the trigger listeners.
+ * Install the trigger listeners on the real host seams.
  * @param ctx - host context; every registration rides `ctx.effect`.
  * @param deliver - the notification sink.
  * @param options - turn-completion policy.
  */
 export function installPocketTriggers(ctx: Context, deliver: PocketDeliverer, options: TriggerOptions): void {
-  ctx.effect(() => ctx.on('session/event', (session, event) => {
+  const registrar: TriggerRegistrar = {
+    onSessionEvent: listener => { ctx.effect(() => ctx.on('session/event', listener), 'pocket: turn events') },
+    onApprovalRequest: listener => {
+      ctx.effect(() => ctx.on('approval/request', async (request, next) => listener(request, next)), 'pocket: approval requests')
+    },
+    onUserQuestionsRequest: listener => {
+      ctx.effect(() => ctx.on('user-questions/request', async (request, next) => listener(request, next)), 'pocket: user questions')
+    },
+  }
+  installTriggerLogic(registrar, deliver, options)
+}
+
+/**
+ * The trigger decisions, testable without a Cordis context.
+ * @param registrar - the listener seats.
+ * @param deliver - the notification sink.
+ * @param options - turn-completion policy.
+ */
+export function installTriggerLogic(registrar: TriggerRegistrar, deliver: PocketDeliverer, options: TriggerOptions): void {
+  registrar.onSessionEvent((session, event) => {
     if (event.type !== 'turn/end') return
     const kind = event.data.reason.kind
     if (kind === 'error') {
@@ -47,16 +80,16 @@ export function installPocketTriggers(ctx: Context, deliver: PocketDeliverer, op
       deliver({ kind: 'turn-end', sessionId: session.id }, 'normal')
     }
     // Unknown reason kinds are merge extensions owned elsewhere; stay silent.
-  }), 'pocket: turn events')
+  })
 
-  ctx.effect(() => ctx.on('approval/request', async (request, next) => {
+  registrar.onApprovalRequest(async (request, next) => {
     deliver({ kind: 'approval', detail: request.toolName }, 'high')
     return await next()
-  }), 'pocket: approval requests')
+  })
 
-  ctx.effect(() => ctx.on('user-questions/request', async (request, next) => {
+  registrar.onUserQuestionsRequest(async (request, next) => {
     const detail = request.questions[0]?.question
     deliver({ kind: 'question', ...(detail !== undefined ? { detail } : {}) }, 'high')
     return await next()
-  }), 'pocket: user questions')
+  })
 }

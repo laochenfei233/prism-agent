@@ -40,7 +40,7 @@ export function isOriginTrusted(
   origin: string,
   surface: Pick<PocketServerSurface, 'host' | 'port' | 'trustedHosts'>,
 ): boolean {
-  const authority = origin.replace(/^https?:\/\//, '')
+  const authority = origin.replace(/^https?:\/\//, '').replace(/:(443|80)$/, '')
   if (authority === `${surface.host}:${surface.port}`) return true
   return surface.trustedHosts.some(entry => authority === entry || authority === entry.split(':')[0])
 }
