@@ -42,6 +42,7 @@ export type PocketLocaleKey =
   | 'pwa.hint'
   | 'card.approval'
   | 'card.question'
+  | 'card.error'
   | 'card.dismiss'
 
 /** English copy. */
@@ -78,6 +79,7 @@ export const en: Record<PocketLocaleKey, string> = {
   'pwa.hint': 'Use your browser menu: "Add to Home Screen" installs the app.',
   'card.approval': 'Approval needed',
   'card.question': 'Prism asked a question',
+  'card.error': 'Run failed',
   'card.dismiss': 'Dismiss',
 }
 
@@ -115,5 +117,6 @@ export const zh: Record<PocketLocaleKey, string> = {
   'pwa.hint': '在浏览器菜单选择「添加到主屏幕」即可安装。',
   'card.approval': '需要批准',
   'card.question': 'Prism 提问',
+  'card.error': '运行失败',
   'card.dismiss': '知道了',
 }

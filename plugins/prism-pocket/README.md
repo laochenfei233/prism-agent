@@ -1,5 +1,7 @@
 # @prism/prism-pocket
 
+English | [中文](README.zh.md)
+
 Pocket remote access for Prism: the web surface, usable from a phone, with the agent able to call you back.
 
 A client-side patch plugin — zero changes to the web app itself. Every adaptation anchors on the app's own `[data-slot]` seams, degrades per feature when an anchor is missing, and never touches the desktop experience.

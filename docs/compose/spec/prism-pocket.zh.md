@@ -1,7 +1,7 @@
 ---
 feature: prism-pocket
 status: in-progress
-updated: 2026-10-29
+updated: 2026-10-30
 branch: feat/prism-pocket
 commits: 8c5ed274ee..pending
 ---
@@ -34,7 +34,7 @@ commits: 8c5ed274ee..pending
 - 软键盘：`visualViewport` 跟踪，键盘弹起时收起顶栏，输入坞保持可见；坞和抽屉尊重 safe-area inset。
 - 触摸输入：触摸指针上 `Enter` 换行（IME 组合与 Shift/Ctrl+Enter 不受影响）；若运行态没有暴露停止入口，插件在输入坞补一个。
 - 行不换行：模型、权限、上下文条在窄屏截断或收成图标；消息内表格横向滚动。
-- 禁止误触缩放与橡皮筋滚动；窄屏下设置页全屏；窄屏切换会话后侧栏回到收起态。
+- 禁止误触缩放与橡皮筋滚动；窄屏切换会话后侧栏回到收起态。设置页尺寸交给宿主布局处理（范围外，见 S3）。
 
 视觉新增（抽屉、卡片）复用应用主题 token；唯一签名元素是呈现为 overlay sheet 的边缘侧滑抽屉。
 
@@ -57,16 +57,16 @@ agent 请求批准、提出用户问题、运行失败时，在插件自有的 p
 
 ### S2.7 PWA 安装
 
-节点半在 webserver 上注册自有静态资产路由：`/pocket.webmanifest`、`/pocket-sw.js`（根路径，默认 scope 即 `/`）与一枚 SVG 图标。浏览器半在启动时注入 manifest 链接、`apple-touch-icon` 与 `theme-color` meta。Service worker 处理 `push`（弹出通知）与 `notificationclick`（聚焦或打开会话）。iOS 不支持 SVG 主屏图标；PNG 图标是已记录的后续项。
+节点半在 webserver 上注册自有静态资产路由：`/pocket.webmanifest`、`/pocket-sw.js`（根路径，默认 scope 即 `/`）与一枚 SVG 图标。浏览器半在启动时注入 manifest 链接、`apple-touch-icon` 与 `theme-color` meta。Service worker 处理 `push`（弹出通知）与 `notificationclick`（聚焦应用，或从根路径打开）。iOS 不支持 SVG 主屏图标；PNG 图标是已记录的后续项。
 
 ### S2.8 文案归属
 
-所有用户可见文案经 `ctx.locale` 走 zh/en 词典；service worker 自持一份极小 zh/en 表（它活在客户端上下文之外）。
+所有用户可见文案经 `ctx.locale` 走 zh/en 词典；service worker 自持一份极小 zh/en 表（它活在客户端上下文之外）。Bark 通道发送英文标题：节点半没有 locale 上下文，也无法从这里得知 Bark 设备自身的语言。
 
 ## [S3] 范围
 
 - 范围内：插件骨架（双面、patch 行、清单）、移动适配层、页内/系统通知、Web Push + Bark 投递、Tailscale 探测与远程访问设置分区、PWA 资产与 service worker、zh/en 文案、插件 README（en/zh）、节点半与纯客户端逻辑单测、spec 文档配对。
-- 范围外：接管壳或独立移动页、对 `packages/`/`apps/` 的改动、手机附件上传、历史压缩代理（webserver 已有 gzip）、自动执行 `tailscale serve` 或自动改信任列表、二维码、桌面（Tauri）表面改动、PNG 图标生成。
+- 范围外：接管壳或独立移动页、对 `packages/`/`apps/` 的改动、手机附件上传、历史压缩代理（webserver 已有 gzip）、自动执行 `tailscale serve` 或自动改信任列表、二维码、桌面（Tauri）表面改动、PNG 图标生成、设置页全屏样式（宿主布局自身会退化）。
 
 ## Tasks
 

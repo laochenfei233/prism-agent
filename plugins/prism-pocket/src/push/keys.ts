@@ -64,9 +64,14 @@ export async function loadOrCreateVapidKeys(file: string): Promise<VapidMaterial
     if (isVapidKeys(parsed)) {
       keys = parsed
     } else {
+      // A readable file with the wrong shape regenerates rather than trusting it.
       keys = await persist(await generateVapidKeys(), file)
     }
-  } catch {
+  } catch (error: unknown) {
+    // ENOENT on first use, EACCES or broken JSON on a damaged file: the only
+    // safe recovery is a fresh keypair, at the cost of re-subscribing devices.
+    // The error is intentionally swallowed; the run continues with new keys.
+    void error
     keys = await persist(await generateVapidKeys(), file)
   }
   const raw = Buffer.from(keys.privateKey, 'base64url')

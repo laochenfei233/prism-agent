@@ -37,7 +37,7 @@ export function installAdapter(layout: LayoutLike): () => void {
   const disposeTyping = installTyping()
 
   return () => {
-    closeDrawerState(layout, backdrop)
+    closeDrawerState(layout)
     disposeKeyboard()
     disposeDrawer()
     disposeTyping()
@@ -85,7 +85,7 @@ function installDrawer(layout: LayoutLike, backdrop: HTMLElement): () => void {
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
 
-  const onBackdropClick = (): void => { closeDrawer(layout, backdrop) }
+  const onBackdropClick = (): void => { closeDrawer(layout) }
   backdrop.addEventListener('click', onBackdropClick)
 
   const onSidebarClick = (event: MouseEvent): void => {
@@ -94,12 +94,12 @@ function installDrawer(layout: LayoutLike, backdrop: HTMLElement): () => void {
     if (!drawerOpen()) return
     if (!(event.target instanceof Element)) return
     if (event.target.closest('[data-slot="sidebar"]') === null) return
-    window.setTimeout(() => { if (drawerOpen()) closeDrawer(layout, backdrop) }, 120)
+    window.setTimeout(() => { if (drawerOpen()) closeDrawer(layout) }, 120)
   }
   document.addEventListener('click', onSidebarClick, true)
 
   const onPopstate = (): void => {
-    if (drawerOpen()) closeDrawer(layout, backdrop)
+    if (drawerOpen()) closeDrawer(layout)
   }
   window.addEventListener('popstate', onPopstate)
 
@@ -121,28 +121,31 @@ function drawerOpen(): boolean {
 function openDrawer(layout: LayoutLike): void {
   if (drawerOpen()) return
   const sidebar = sidebarElement()
-  if (sidebar === null) return
+  if (sidebar === null) {
+    // The app renamed the sidebar seam; degrade instead of toggling blind.
+    console.info('[prism-pocket] sidebar [data-slot] anchor not found; drawer unavailable')
+    return
+  }
   if (sidebar.getBoundingClientRect().width < 100) layout.toggleSidebar()
   document.documentElement.classList.add('prism-drawer-open')
   window.history.pushState({ 'prism-pocket-drawer': true }, '')
 }
 
 /** Close the drawer and unwind the history sentinel. */
-function closeDrawer(layout: LayoutLike, backdrop: HTMLElement): void {
+function closeDrawer(layout: LayoutLike): void {
   if (!drawerOpen()) return
-  closeDrawerState(layout, backdrop)
+  closeDrawerState(layout)
   if (typeof window.history.state?.['prism-pocket-drawer'] === 'boolean') {
     window.history.back()
   }
 }
 
 /** The shared teardown path: collapse the sidebar and drop the overlay class. */
-function closeDrawerState(layout: LayoutLike, backdrop: HTMLElement): void {
+function closeDrawerState(layout: LayoutLike): void {
   if (!document.documentElement.classList.contains('prism-drawer-open')) return
   document.documentElement.classList.remove('prism-drawer-open')
   const sidebar = sidebarElement()
   if (sidebar !== null && sidebar.getBoundingClientRect().width >= 100) layout.toggleSidebar()
-  backdrop.style.pointerEvents = 'none'
 }
 
 /** The sidebar slot wrapper, when the app has rendered it. */

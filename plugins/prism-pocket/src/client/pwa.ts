@@ -55,9 +55,15 @@ export async function subscribeThisDevice(
   if (typeof Notification === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     return 'unsupported'
   }
+  // serviceWorker.ready never settles when registration failed (insecure
+  // origin); bound the wait so the button reports instead of hanging.
+  const registration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<undefined>(resolve => { window.setTimeout(() => resolve(undefined), 4000) }),
+  ])
+  if (registration === undefined) return 'unsupported'
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return 'denied'
-  const registration = await navigator.serviceWorker.ready
   const existing = await registration.pushManager.getSubscription()
   const subscription = existing ?? await registration.pushManager.subscribe({
     userVisibleOnly: true,

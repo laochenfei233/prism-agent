@@ -1,7 +1,7 @@
 ---
 feature: prism-pocket
 status: in-progress
-updated: 2026-10-29
+updated: 2026-10-30
 branch: feat/prism-pocket
 commits: 8c5ed274ee..pending
 ---
@@ -34,7 +34,7 @@ Adaptations activate when the viewport is narrow and the pointer is coarse (`poi
 - Soft keyboard: `visualViewport` tracking collapses the top bar while the keyboard is open; the composer keeps its dock visible; safe-area insets are respected around dock and drawer.
 - Touch typing: on coarse pointers `Enter` inserts a newline (IME composition and Shift/Ctrl+Enter unaffected); if the running state exposes no stop affordance, the plugin adds one to the composer dock.
 - Rows never wrap: model, permission, and context strips truncate or collapse to icons on narrow screens; tables inside messages scroll horizontally.
-- No accidental zoom or rubber-band scroll; settings render full-screen on narrow viewports; after switching sessions on a narrow screen the sidebar returns to collapsed.
+- No accidental zoom or rubber-band scroll; after switching sessions on a narrow screen the sidebar returns to collapsed. Settings sizing stays with the host layout (out of scope, see S3).
 
 Visual additions (drawer, cards) reuse the app theme tokens; the one signature element is the edge-swipe drawer presented as an overlay sheet.
 
@@ -57,16 +57,16 @@ The kernel trust policy (`packages/client/connection/src/api-request-trust.ts`),
 
 ### S2.7 PWA install
 
-The node half registers webserver routes for static assets it owns: `/pocket.webmanifest`, `/pocket-sw.js` (root path, so the default scope is `/`), and an SVG icon. The browser half injects the manifest link, `apple-touch-icon`, and `theme-color` meta at boot. The service worker handles `push` (show a notification) and `notificationclick` (focus or open the session). iOS lacks SVG home-screen icons; shipping PNG icons is a named follow-up.
+The node half registers webserver routes for static assets it owns: `/pocket.webmanifest`, `/pocket-sw.js` (root path, so the default scope is `/`), and an SVG icon. The browser half injects the manifest link, `apple-touch-icon`, and `theme-color` meta at boot. The service worker handles `push` (show a notification) and `notificationclick` (focus the app, or open it at the root). iOS lacks SVG home-screen icons; shipping PNG icons is a named follow-up.
 
 ### S2.8 Locale ownership
 
-All user-visible copy routes through `ctx.locale` with zh/en dictionaries; the service worker keeps its own minimal zh/en table (it lives outside the client context).
+All user-visible copy routes through `ctx.locale` with zh/en dictionaries; the service worker keeps its own minimal zh/en table (it lives outside the client context). The Bark relay sends English titles: the node half has no locale context, and Bark's own per-device language is unknowable from here.
 
 ## [S3] Scope
 
 - In scope: plugin skeleton (both faces, patch rows, manifest), mobile adaptation layer, in-page/system notifications, Web Push + Bark delivery, tailscale detection and the remote-access settings section, PWA assets and service worker, zh/en locale, plugin README (en/zh), unit tests for the node half and pure client logic, spec document pairing.
-- Out of scope: a takeover shell or standalone mobile page, edits to `packages/`/`apps/`, attachment upload from the phone, a history compression proxy (the webserver already gzips), automatic `tailscale serve` execution or automatic trust-list mutation, QR codes, desktop (Tauri) surface changes, PNG icon generation.
+- Out of scope: a takeover shell or standalone mobile page, edits to `packages/`/`apps/`, attachment upload from the phone, a history compression proxy (the webserver already gzips), automatic `tailscale serve` execution or automatic trust-list mutation, QR codes, desktop (Tauri) surface changes, PNG icon generation, and full-screen settings styling (the host layout degrades on its own).
 
 ## Tasks
 

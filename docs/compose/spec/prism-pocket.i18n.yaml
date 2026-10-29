@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-pocket.md
 /:
-  en: 72b7f247c13e94da
-  zh: 72b7f247c13e94da
+  en: 6eaa770755deb2e2
+  zh: 6eaa770755deb2e2
 /prism-pocket:
   en: 2a9eb80f4497fe69
   zh: f775c44d7c90a909
@@ -24,8 +24,8 @@
   en: e405080b17920a6f
   zh: 31dda2968709f81f
 /prism-pocket/s2-design/s2-3-mobile-adaptation-layer-browser-half:
-  en: 2e2cd586f311fbd9
-  zh: c56b5138290a582a
+  en: e07e49cc8b637f66
+  zh: 549419b1a8784a42
 /prism-pocket/s2-design/s2-4-notifications-browser-half:
   en: 762e80b91c227b5d
   zh: f3027d9849d7f066
@@ -36,14 +36,14 @@
   en: 1a28f3e634e8973f
   zh: bde7c79427190353
 /prism-pocket/s2-design/s2-7-pwa-install:
-  en: a3c7db482011358d
-  zh: 34b25bba8b31e00f
+  en: 46cb5c22336859a4
+  zh: 86378499a6a9d1ad
 /prism-pocket/s2-design/s2-8-locale-ownership:
-  en: 81b354104c277448
-  zh: 6038fb3802780116
+  en: 01fe9a3df064c59c
+  zh: cdd67ab0447335cd
 /prism-pocket/s3-scope:
-  en: ea0fef0877b0934c
-  zh: 7541638a2781ce0b
+  en: cdcfb82413dd48ec
+  zh: 65ded8b40148e17c
 /prism-pocket/tasks:
   en: cdd26ea3c9e81cc1
   zh: 96da496005648624

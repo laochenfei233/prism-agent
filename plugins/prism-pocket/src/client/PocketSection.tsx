@@ -60,14 +60,9 @@ export function PocketSection({ t }: PocketSectionProps) {
 
   const subscribe = (): void => {
     if (status === null) return
-    const publicKey = status.pocket.vapidPublicKey
-    if (publicKey === null) {
-      setPushNote(t('push.unsupported'))
-      return
-    }
     void (async () => {
       const publicKey = status.pocket.vapidPublicKey
-      if (publicKey === null) {
+      if (publicKey === '') {
         setPushNote(t('push.unsupported'))
         return
       }
