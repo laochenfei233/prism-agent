@@ -111,6 +111,12 @@ export interface TreeView {
   expandedGroups: readonly string[]
   /** Browser-local order for Sessions without a backing Workspace account. */
   ungroupedOrder?: readonly string[]
+  /**
+   * Project-section order matching the browser's selected Session order:
+   * `activity` ranks sections by their newest visible Session, `registry`
+   * (the default) keeps the Host's project order and manual drag positions.
+   */
+  groupOrder?: 'registry' | 'activity'
 }
 
 interface Group {
@@ -330,6 +336,13 @@ function orderedUngrouped(
  * members resolved from caller-ordered sessionIds. Sessions outside every
  * Workspace trail in the browser-local Ungrouped order, which falls back to
  * recency before that order is initialized.
+ * @param list - sessions list snapshot.
+ * @param workspaces - real Workspaces in Host group order with caller-projected Session order.
+ * @param archived - archived Session ids.
+ * @param archivedFilter - archived-row visibility.
+ * @param ungroupedOrder - browser-local Ungrouped Session order.
+ * @param groupOrder - project-section order selected by the browser.
+ * @returns group sections in render order.
  */
 function groupByWorkspace(
   list: SessionListState,
@@ -337,6 +350,7 @@ function groupByWorkspace(
   archived: ReadonlySet<SessionId>,
   archivedFilter: ArchivedFilter,
   ungroupedOrder: readonly string[] | undefined,
+  groupOrder: 'registry' | 'activity',
 ): Group[] {
   const current = mainSessionId(list)
   const groups: Group[] = []
@@ -372,7 +386,30 @@ function groupByWorkspace(
       orderedUngrouped(stray, ungroupedOrder, list.byId),
     ))
   }
-  return groups
+  return groupOrder === 'activity' ? orderGroupsByActivity(groups) : groups
+}
+
+/**
+ * Order project groups by their most recent Session activity, newest first.
+ * The registry order is manual (drag order); without it every import lands
+ * wherever creation order put the project. Groups with no visible Session and
+ * groups whose latest times tie keep caller order after the ranked ones, and
+ * the Ungrouped bucket always trails.
+ * @param groups - groups in caller order.
+ * @returns workspace groups newest-activity first, Ungrouped last.
+ */
+function orderGroupsByActivity(groups: readonly Group[]): Group[] {
+  const rank = (group: Group): number =>
+    group.sessions.reduce((latest, session) => Math.max(latest, session.updatedAt), 0)
+  const ungrouped = groups.filter(group => group.key === UNGROUPED_KEY)
+  const known = groups.filter(group => group.key !== UNGROUPED_KEY)
+  const ranked = known.map((group, index) => ({ group, index, rank: rank(group) }))
+    .sort((a, b) => {
+      if (a.rank !== b.rank) return b.rank - a.rank
+      return a.index - b.index
+    })
+    .map(entry => entry.group)
+  return [...ranked, ...ungrouped]
 }
 
 /** Keep navigation presentation independent from domain-owned interaction objects. */
@@ -448,7 +485,14 @@ export function deriveGroups(
     ? undefined
     : owningGroupKey(workspaces, current)
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(
+    list,
+    workspaces,
+    archived,
+    rowState.archivedFilter,
+    view.ungroupedOrder,
+    view.groupOrder ?? 'registry',
+  )) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
