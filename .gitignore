@@ -66,3 +66,4 @@ debug.log
 esc-test.txt
 install.err.log
 install.out.log
+apps/desktop/.npm-cache/

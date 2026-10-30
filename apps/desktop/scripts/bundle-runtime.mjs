@@ -136,15 +136,24 @@ async function download(url, dest) {
   });
 }
 
+function tarBinary() {
+  // A bare `tar` on win32 can resolve to MSYS GNU tar, which reads the
+  // drive-letter colon of `C:\...` as a remote host ("Cannot connect to C:")
+  // and refuses zip archives. System32's bsdtar handles both.
+  if (PLATFORM !== 'win') return 'tar';
+  return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+}
+
 function extract(archive, dest) {
   mkdirSync(dest, { recursive: true });
   step(`extract ${archive}`);
+  const tar = tarBinary();
   if (archive.endsWith('.zip')) {
-    // Windows ships bsdtar which reads zip archives; PowerShell's
-    // Expand-Archive is not available in every environment.
-    execFileSync('tar', ['-xf', archive, '-C', dest], { stdio: 'inherit' });
+    // bsdtar reads zip archives; PowerShell's Expand-Archive is not
+    // available in every environment.
+    execFileSync(tar, ['-xf', archive, '-C', dest], { stdio: 'inherit' });
   } else {
-    execFileSync('tar', ['-xJf', archive, '-C', dest], { stdio: 'inherit' });
+    execFileSync(tar, ['-xJf', archive, '-C', dest], { stdio: 'inherit' });
   }
 }
 
@@ -798,7 +807,7 @@ async function installWinTerminalInspector() {
   const tmp = join(PLUGINS_DIR, '.wti-tmp');
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
-  execFileSync('tar', ['-xzf', archive, '-C', tmp], { stdio: 'inherit' });
+  execFileSync(tarBinary(), ['-xzf', archive, '-C', tmp], { stdio: 'inherit' });
   const top = readdirSync(tmp).find((name) => name.startsWith('dsh-win-terminal-inspector-'));
   if (!top) throw new Error(`unexpected tarball layout in ${tmp}`);
   cpSync(join(tmp, top), dest, { recursive: true });
