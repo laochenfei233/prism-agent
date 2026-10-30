@@ -32,7 +32,7 @@ commits: d6fbcd8a (baseline)..delivery worktree
 
 **D6——验证。** `pnpm run typecheck`、`pnpm run build`、被触及包的聚焦测试、无 key 快照重放与分歧索引检查。构建与至少聚焦测试通过前，交付不算完成；不能只改版本号而不改树。
 
-**D7——已存在的失败（在交付树上复查）。** 原有六项全部仍在，另有三项早于本次同步但先前清单漏记：`verify-cordis-catalog` 与 `verify-doc-graphs` 仍报告 24 个未分类的 cron-controller 类型；`doc-typecheck` 仍在 `packages/cron/cron/README.md` 与 `packages/util/path-lock/README.md` 的代码块上失败；`verify-package-paths` 仍报告归档加固 Note 中的两处 `hooks-claude-code` 引用；`verify-cordis-config` 仍在 Windows 实体化的 `apps/cli/tests/profiles/acp/cordis.yml` 符号链接上失败；文档站点仍期望 47 个中文子系统页而树中有 48 个；`verify-persistence-changes` 仍报告四项 cron 时代未确认的 Session 类型变更；`verify-repository-references` 仍标记 `python/sdk/uv.lock` 中钉住 commit-hash 的行；`verify-concrete-terms` 仍标记 `packages/session-query/session-import/src/sources/codex.ts` 里的 Codex `provenance` 字段读取。
+**D7——已存在的失败（在交付树上复查）。** 原有六项全部仍在，另有三项早于本次同步但先前清单漏记：`verify-cordis-catalog` 与 `verify-doc-graphs` 仍报告 24 个未分类的 cron-controller 类型；`doc-typecheck` 仍在 `packages/cron/cron/README.md` 与 `packages/util/path-lock/README.md` 的代码块上失败；`verify-package-paths` 仍报告归档加固 Note 中的两处 `hooks-claude-code` 引用；`verify-cordis-config` 仍在 Windows 实体化的 `apps/cli/tests/profiles/acp/cordis.yml` 符号链接上失败；文档站点仍期望 47 个中文子系统页而树中有 48 个；`verify-persistence-changes` 仍报告四项 cron 时代未确认的 Session 类型变更；`verify-repository-references` 仍标记 `python/sdk/uv.lock` 中钉住 commit-hash 的行。
 
 ## [S3] 范围
 

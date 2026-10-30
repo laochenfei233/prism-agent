@@ -87,10 +87,9 @@ async function collectThreads(root: string): Promise<Map<string, ThreadFiles>> {
 /** Read `session_meta` from the first segment. */
 async function readThreadMeta(
   thread: ThreadFiles,
-): Promise<{ cwd?: string; createdAt: number; model?: string } | undefined> {
+): Promise<{ cwd?: string; createdAt: number } | undefined> {
   let cwd: string | undefined
   let createdAt: number | undefined
-  let model: string | undefined
   try {
     for (const path of thread.paths) {
       const first = await readFirstDecodedJsonLine(path)
@@ -100,9 +99,6 @@ async function readThreadMeta(
       if (payload === undefined) continue
       cwd = stringOf(payload['cwd']) ?? cwd
       createdAt = timeOf(payload['timestamp'], 0) || undefined
-      const base = recordOf(payload['base_instructions'])
-      const provenance = recordOf(base?.['provenance'])
-      model = stringOf(provenance?.['model']) ?? model
       break
     }
   } catch {
@@ -112,7 +108,6 @@ async function readThreadMeta(
   return {
     ...(cwd === undefined ? {} : { cwd }),
     createdAt,
-    ...(model === undefined ? {} : { model }),
   }
 }
 
