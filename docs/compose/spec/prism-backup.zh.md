@@ -50,7 +50,7 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.3 密钥
 
-密码类值绝不进 Config 或任何 patch 文件。它们是提供者管理的文件层里的普通凭据引用 —— `PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY` —— 由设置页经既有 `remote.credentials.set`/`unset`/`describe` 面写入，与 Models 页管理供应商密钥的方式完全相同，值只落到 `~/.prism/.credentials.yaml`。宿主在每次运行时用 `ctx.credentials.resolve` 解析一次引用，所以改密码无需重启即可生效；页面只渲染 `describe()` 的 `configured` 标志，永不显示值。设置页与插件 README 说明备份压缩包内含 `.env` 与 `.credentials.yaml`，备份目标必须是用户信任的服务器。
+密码类值绝不进 Config 或任何 patch 文件。它们是提供者管理的文件层里的普通凭据引用 —— `PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY` —— 由设置页经既有 `remote.credentials.set`/`unset`/`describe` 面写入，与 Models 页管理供应商密钥的方式完全相同，值只落到 `~/.prism/.credentials.yaml`。宿主在每次运行时用 `ctx.credentials.resolve` 解析一次引用，所以改密码无需重启即可生效；页面只渲染 `describe()` 的 `configured` 标志，永不显示值。目标地址本身带 `user:password@` 时以 `not-configured` 拒绝，而不是静默去掉：去掉后的请求是匿名的，会把一个可用的密码变成 401，而且用户键入的值仍留在 patch 文件里。设置页与插件 README 说明备份压缩包内含 `.env` 与 `.credentials.yaml`，备份目标必须是用户信任的服务器。
 
 ### S2.4 压缩包布局
 

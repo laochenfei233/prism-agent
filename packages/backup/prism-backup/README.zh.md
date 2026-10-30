@@ -26,7 +26,7 @@ kind: "package-reference"
 
 配置是一个实时分区：`targetType` 选择目标，对应类型的字段填写它，`includeSettings`/`includeMemory`/`includeProjects` 与 `projectExcludes`、`maxBackups` 决定归档内容与保留。运行开始时读取一次实时值，且单飞：运行名额在解析策略之前就被占住，因此同一 tick 内到达的两个请求只产生一次运行与一次 `prism-backup/busy` 拒绝。运行或测试连接之前不要求字段完整 —— 这正是用户可以先切换协议再逐项填写的原因；缺字段时运行以 `prism-backup/not-configured` 失败并点名该字段。
 
-密码绝不进 Config：WebDAV 密码、SMB 密码、S3 secret access key 都是凭据引用（`PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY`），由页面经 `remote.credentials` 写入，运行时解析一次。页面只渲染是否已存储。
+密码绝不进 Config：WebDAV 密码、SMB 密码、S3 secret access key 都是凭据引用（`PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY`），由页面经 `remote.credentials` 写入，运行时解析一次。页面只渲染是否已存储。地址里自带 `user:password@` 的端点会以 `prism-backup/not-configured` 被拒绝，而不是被静默去掉 —— 静默去掉会把一个可用的密码变成匿名 401；请把用户名填在独立字段、密码存进凭据存储。
 
 ### 一个归档里有什么
 

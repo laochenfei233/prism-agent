@@ -298,11 +298,40 @@ describe('createBackupSection', () => {
       return new Response(JSON.stringify({ ok: true, value: { running: true, history: [] } }), { status: 200 })
     }))
     createBackupSection(ctx, formDouble())
-    await vi.waitFor(() => { expect(states.count).toBeGreaterThan(0) }, { timeout: 3000 })
+    // The mount read plus at least one interval tick proves the timer ran.
+    await vi.waitFor(() => { expect(states.count).toBeGreaterThan(1) }, { timeout: 4000 })
     await ctx.fiber.dispose()
     const afterDispose = states.count
     await new Promise(resolve => setTimeout(resolve, 1200))
     expect(states.count).toBe(afterDispose)
+  })
+
+  it('stops polling when the settle-time read fails', async () => {
+    const { ctx } = mount()
+    const calls = { run: 0, state: 0 }
+    const actions: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(requestBody(init)) as { action: string }
+      actions.push(body.action)
+      if (body.action === 'run') {
+        calls.run += 1
+        return new Response(JSON.stringify({ ok: true, value: RECORD }), { status: 200 })
+      }
+      calls.state += 1
+      return new Response('unavailable', { status: 503 })
+    }))
+    const face = createBackupSection(ctx, formDouble())
+    await vi.waitFor(() => { expect(calls.state).toBeGreaterThan(0) }, { timeout: 3000 })
+    await vi.waitFor(() => { expect(calls.run).toBe(0) }, { timeout: 1000 })
+    face.run()
+    await vi.waitFor(() => { expect(calls.run).toBeGreaterThan(0) }, { timeout: 3000 })
+    expect(actions.filter(action => action === 'run')).toHaveLength(1)
+    // Let the settle-time follow-up read land before counting.
+    await new Promise(resolve => setTimeout(resolve, 150))
+    const after = calls.state
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    // The run settled, so nothing polls even though every read failed.
+    expect(calls.state).toBe(after)
   })
 
   it('shows a failed run as an error notice', async () => {

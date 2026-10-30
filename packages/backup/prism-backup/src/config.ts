@@ -216,7 +216,7 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
   if (type === 'webdav') {
     return {
       type,
-      baseUrl: withoutUserinfo(requireText(config.webdavUrl.get(), 'the WebDAV URL').replace(/\/+$/u, '')),
+      baseUrl: refuseUserinfo(requireText(config.webdavUrl.get(), 'the WebDAV URL'), 'the WebDAV URL'),
       username: config.username.get().trim(),
       password: await requireSecret(readSecret, 'webdav-password'),
     }
@@ -226,7 +226,7 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
     const endpoint = config.s3Endpoint.get().trim().replace(/\/+$/u, '')
     return {
       type,
-      endpoint: endpoint === '' ? `https://s3.${region}.amazonaws.com` : withoutUserinfo(endpoint),
+      endpoint: endpoint === '' ? `https://s3.${region}.amazonaws.com` : refuseUserinfo(endpoint, 'the S3 endpoint'),
       region,
       bucket: requireText(config.s3Bucket.get(), 'the S3 bucket'),
       pathStyle: config.s3PathStyle.get(),
@@ -243,8 +243,9 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
 }
 
 /**
- * Sanitized label a run record keeps for one target: the endpoint without any
- * credential, user name, or secret.
+ * Label a run record keeps for one target. Targets come from
+ * {@link resolveTarget}, which refuses userinfo, so this label cannot carry a
+ * credential.
  * @param target - resolved target.
  * @returns the label shown in the history list.
  */
@@ -255,18 +256,27 @@ export function targetLabel(target: BackupTarget): string {
 }
 
 /**
- * Drop any `user:password@` from one URL before it becomes a target, so no
- * phase line, failure message, or durable record can carry a credential.
+ * Refuse an endpoint that carries `user:password@`: a resolved target must
+ * never hold a credential, and a silently stripped one turns a working
+ * password into an anonymous 401.
  * @param url - a configured endpoint.
- * @returns the same endpoint without userinfo.
+ * @param field - the field name the failure names.
+ * @returns the endpoint with trailing slashes removed.
+ * @throws {BackupError} with `not-configured` when the URL carries userinfo.
  */
-function withoutUserinfo(url: string): string {
+function refuseUserinfo(url: string, field: string): string {
+  let carriesUserinfo = false
   try {
     const parsed = new URL(url)
-    parsed.username = ''
-    parsed.password = ''
-    return parsed.toString().replace(/\/$/u, '')
+    carriesUserinfo = parsed.username !== '' || parsed.password !== ''
   } catch (_notAUrl) {
-    return url
+    // A bare host or a path is not a URL to parse; the transport reports it.
   }
+  if (carriesUserinfo) {
+    throw new BackupError(
+      'prism-backup/not-configured',
+      `${field} must not carry a user name or password; put the user name in its own field and the password in the credential store.`,
+    )
+  }
+  return url.replace(/\/+$/u, '')
 }

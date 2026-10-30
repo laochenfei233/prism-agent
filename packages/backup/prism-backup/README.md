@@ -26,7 +26,7 @@ The Host half is one Loader row in `dsh-web-app` (`prism-backup`) and needs `con
 
 Configuration is one live section: `targetType` selects the destination, the per-type fields fill it in, and `includeSettings`/`includeMemory`/`includeProjects` plus `projectExcludes` and `maxBackups` decide the archive and its retention. A run reads the live values once at its start and is single-flight: the run slot is claimed before the policy is resolved, so two requests arriving in the same tick produce one run and one `prism-backup/busy` refusal. Nothing is required to be complete until a run or a connection test starts, which is what lets a user switch protocols and fill the new fields in order; a missing field then fails with `prism-backup/not-configured` naming it.
 
-Passwords never enter the Config: the WebDAV password, the SMB password, and the S3 secret access key are credential references (`PRISM_BACKUP_WEBDAV_PASSWORD`, `PRISM_BACKUP_SMB_PASSWORD`, `PRISM_BACKUP_S3_SECRET_KEY`) written from the page through `remote.credentials` and resolved once per run. The page renders only whether one is stored.
+Passwords never enter the Config: the WebDAV password, the SMB password, and the S3 secret access key are credential references (`PRISM_BACKUP_WEBDAV_PASSWORD`, `PRISM_BACKUP_SMB_PASSWORD`, `PRISM_BACKUP_S3_SECRET_KEY`) written from the page through `remote.credentials` and resolved once per run. The page renders only whether one is stored. An endpoint that already carries `user:password@` is refused with `prism-backup/not-configured` rather than silently stripped, because a stripped one would turn a working password into an anonymous 401; put the user name in its own field and the password in the credential store.
 
 ### What one archive holds
 

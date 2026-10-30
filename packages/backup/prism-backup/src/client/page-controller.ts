@@ -392,8 +392,9 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
         })
       })
       .finally(() => {
-        // The run this page started is over: stop here even when the follow-up
-        // read fails, so an unreachable Host cannot leave the page polling.
+        // This page's run attempt is over, accepted or refused: stop here even
+        // when the follow-up read fails, so an unreachable Host cannot leave
+        // the page polling.
         stopPolling()
         runStore.update((draft) => { draft.running = false; draft.phase = undefined })
         void refreshRunState()

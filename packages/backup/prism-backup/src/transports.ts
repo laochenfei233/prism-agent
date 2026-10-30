@@ -374,8 +374,8 @@ class S3Transport implements Transport {
       )
     }
     const text = await response.text()
-    // ListObjectsV2 answers full keys; rotation and the page reason about names
-    // within the listed directory, like every other transport.
+    // ListObjectsV2 answers full keys; rotation reasons about names within the
+    // listed directory, like every other transport.
     const prefixWithSlash = prefix === '' ? '' : `${prefix}/`
     return [...text.matchAll(/<Key>([^<]*)<\/Key>/gu)].flatMap((match) => {
       /* v8 ignore next -- the single capture always participates. */

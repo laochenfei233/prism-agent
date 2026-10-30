@@ -207,14 +207,23 @@ describe('mounted backup plugin', () => {
     await errorCtx.fiber.dispose()
   })
 
-  it('records a sanitized endpoint on a failed run', async () => {
+  it('refuses a credentialed URL and records the plain endpoint of a failed run', async () => {
     const home = await tempHome()
     process.env.DSH_HOME = home
     vi.stubGlobal('fetch', async () => new Response('denied', { status: 403 }))
-    const { route, domain, ctx } = await mount({
+    const refused = await mount({
       home,
       password: 'pw',
       section: { targetType: 'webdav', webdavUrl: 'https://me:pw@dav.example.com/base' },
+    })
+    const refusedRun = await call<BackupRunRecord>(refused.route, 'run')
+    expect(refusedRun.value).toMatchObject({ ok: false, error: { code: 'prism-backup/not-configured' } })
+    await refused.ctx.fiber.dispose()
+
+    const { route, domain, ctx } = await mount({
+      home,
+      password: 'pw',
+      section: { targetType: 'webdav', webdavUrl: 'https://dav.example.com/base' },
     })
     const failed = await call<BackupRunRecord>(route, 'run')
     expect(failed.status).toBe(502)
