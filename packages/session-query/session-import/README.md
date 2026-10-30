@@ -73,7 +73,7 @@ The package looks for each store at its documented root under the OS home. A sou
 
 ### What to expect
 
-The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. A DeepSeek Harness session keeps its original id and event log, and its source home's attachment store is copied once; the other sources become a new session id derived from the source and key. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message.
+The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. A DeepSeek Harness session keeps its original id and event log, and its source home's attachment store is copied once; the other sources become a new session id derived from the source and key. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message. Import also checkpoints every written log into the projection cache the session list reads, so an imported conversation appears under its title, ordered by its last prompt, without being opened first.
 
 ### Failures
 

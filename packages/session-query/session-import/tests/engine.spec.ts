@@ -192,6 +192,57 @@ describe('SessionImportEngine apply', () => {
     expect(fakesValue.stored.size).toBe(1)
   })
 
+  it('checkpoints each written log for the cold list', async () => {
+    const root = await rootOf('checkpoint')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    await claudeFixture(root, 'one', cwd, [['prompt', 'reply']], 'A conversation')
+    const fakesValue = fakes()
+    const checkpoints: { header: SessionHeader; events: readonly SessionEvent[] }[] = []
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, '.prism'),
+      roots: { claude: join(root, 'projects') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+      projections: { checkpoint: async (header, events) => { checkpoints.push({ header, events }) } },
+    })
+
+    const result = await engine.apply({ source: 'claude', sessionIds: ['one'] })
+    const id = String(result.results[0]?.sessionId)
+    expect(checkpoints).toHaveLength(1)
+    expect(checkpoints[0]?.header.id).toBe(id)
+    expect(checkpoints[0]?.events).toEqual(fakesValue.stored.get(id))
+
+    await engine.apply({ source: 'claude', sessionIds: ['one'] })
+    expect(checkpoints).toHaveLength(1)
+  })
+
+  it('keeps a session imported when the checkpoint fold fails', async () => {
+    const root = await rootOf('checkpoint-failure')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    await claudeFixture(root, 'one', cwd, [['prompt', 'reply']])
+    const fakesValue = fakes()
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, '.prism'),
+      roots: { claude: join(root, 'projects') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+      projections: { checkpoint: async () => { throw new Error('cache unavailable') } },
+    })
+
+    const result = await engine.apply({ source: 'claude', sessionIds: ['one'] })
+    const imported = result.results[0]
+    expect(imported?.outcome).toBe('imported')
+    expect(imported?.reason).toContain('list title unavailable: cache unavailable')
+    expect(fakesValue.stored.size).toBe(1)
+    expect(fakesValue.attached.get(cwd)).toHaveLength(1)
+  })
+
   it('refuses to merge into an existing project without confirmation', async () => {
     const root = await rootOf('confirm')
     const cwd = join(root, 'project')
@@ -312,7 +363,7 @@ describe('SessionImportEngine apply', () => {
     const fiber = await store.plugin(JsonlSessionPersistence, { root: storageRoot, compression: 'none' }).await()
     try {
       const engine = new SessionImportEngine({
-        persistence: store.get('sessionPersistence') as unknown as ImportPersistence,
+        persistence: store.sessionPersistence,
         workspaces: fakes().registry,
         currentHome: join(root, '.prism'),
         roots: { claude: join(root, 'projects') },
@@ -321,12 +372,9 @@ describe('SessionImportEngine apply', () => {
       })
       const result = await engine.apply({ source: 'claude', sessionIds: ['one'] })
       const id = result.results[0]?.sessionId
-      expect(id).toBeDefined()
+      if (id === undefined) throw new Error('import did not report a session id')
 
-      const persistence = store.get('sessionPersistence') as unknown as {
-        open(id: string, access: 'read'): Promise<{ read(): Promise<{ events: SessionEvent[] }>; close(): Promise<void> }>
-      }
-      const handle = await persistence.open(String(id), 'read')
+      const handle = await store.sessionPersistence.open(SessionId(id), 'read')
       const read = await handle.read()
       await handle.close()
       const types = read.events.map(event => event.type)

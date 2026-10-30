@@ -11,9 +11,15 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { isAbsolute } from 'node:path'
+import { performance } from 'node:perf_hooks'
+import { scheduler } from 'node:timers/promises'
 import Schema from '@deepseek-ai/schemastery'
-// Type-only: the ctx.sessionPersistence and ctx.workspaceRegistry merges.
+import { brandNumber } from '@deepseek-ai/dsh-brand'
+import type { SessionEvent, SessionHeader, SessionLogOffset } from '@deepseek-ai/dsh-session'
+// Type-only: the ctx.sessionPersistence, ctx.workspaceRegistry, and
+// ctx.sessionProjectionCache merges.
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { SessionImportEngine, ImportEngineError } from './engine.ts'
 import { isSourceId } from './catalog.ts'
@@ -91,6 +97,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     roots: config.roots ?? {},
     maxMessages: config.maxMessages ?? 2000,
     maxMessageTextBytes: config.maxMessageTextBytes ?? 32768,
+    projections: { checkpoint: (header, events) => checkpointInto(ctx, header, events) },
   })
   const connection = Reflect.get(ctx, 'connection') as ConnectionRoute
   ctx.effect(() => connection.fetch.register({
@@ -118,6 +125,40 @@ function dshHomeOf(ctx: Context): string {
     throw new Error('session-import: dshHomePath returned a non-string path')
   }
   return value
+}
+
+/** Bound on waiting for the imported row's fire-and-forget cache write. */
+const CHECKPOINT_DRAIN_TIMEOUT_MS = 2_000
+/** Poll interval while waiting for that cache write to become readable. */
+const CHECKPOINT_DRAIN_POLL_MS = 5
+
+/**
+ * Fold one written log into the mounted projection cache, which is what the
+ * cold Session list reads a stored Session's title from. A composition without
+ * the cache still imports; its rows list without cached projections until the
+ * Session is opened.
+ * @param ctx - Host context carrying the optional projection cache.
+ * @param header - the stored Session header.
+ * @param events - the Session's complete log in seq order.
+ * @returns resolution once the row is readable, or immediately without the cache.
+ */
+async function checkpointInto(
+  ctx: Context,
+  header: SessionHeader,
+  events: readonly SessionEvent[],
+): Promise<void> {
+  // Looked up per write: the cache service may initialize after this plugin.
+  const cache = ctx.get('sessionProjectionCache')
+  if (cache === undefined) return
+  const snapshot = cache.coldSnapshot(header, brandNumber<SessionLogOffset>(0), events)
+  // No served value means no registered unit has a client view, so the row
+  // could never become readable and waiting would only delay the import.
+  if (Object.keys(snapshot.values).length === 0) return
+  const deadline = performance.now() + CHECKPOINT_DRAIN_TIMEOUT_MS
+  while (cache.cachedSnapshot(header) === undefined) {
+    if (performance.now() >= deadline) return
+    await scheduler.wait(CHECKPOINT_DRAIN_POLL_MS)
+  }
 }
 
 async function importResponse(request: Request, engine: SessionImportEngine): Promise<Response> {

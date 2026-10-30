@@ -84,6 +84,7 @@ For converted sources, the engine writes a normal top-level session through `ctx
 2. For each turn: `turn/start`, `user/message` (`surfaceOp: 'append'`), `assistant/message` (`surfaceOp: 'append'`, `stream: []`), `turn/end` with `reason: { kind: 'completed' }`. Consecutive assistant messages merge into one; a leading assistant message without a user prompt is skipped.
 3. After the last event, `session/title` carries the imported title when the store provides one; otherwise the existing fallback title derives from the first user message.
 4. `handle.append(events)`, `handle.flush()`, `handle.close()`. Events carry contiguous `seq` starting at 0 and monotonically non-decreasing `time`.
+5. `ctx.sessionProjectionCache.coldSnapshot(header, 0, events)` folds the written log into the projection cache. The Session list serves a stored Session from that checkpoint alone, so this is what gives an imported conversation its title and last-prompt time without opening it. A missing cache or a failed fold never fails the import: the log stays authoritative and the row lists without cached projections.
 
 Because the log is a normal session log, `sessionPersistence.list()` exposes it before the next UI refresh, `session-query` decodes it, and the next prompt's request header includes the imported surface history through `deriveMessages()`. No DSH restart is required.
 
