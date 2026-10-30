@@ -4722,6 +4722,55 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 
+<!-- BEGIN GENERATED config-catalog:@prism/prism-backup -->
+<a id="prismprism-backup"></a>
+
+## `@prism/prism-backup`
+
+- `inject`: `connection` · `storageDomain` · `credentials`
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/backup/prism-backup/src/config.ts:29`](../packages/backup/prism-backup/src/config.ts)
+
+```ts config-catalog
+/** Backup policy as the plugin receives it: every field is a live reference. */
+export interface Config {
+  /** Active remote protocol. @default 'webdav' */
+  targetType: Volatile<BackupTargetType>
+  /** WebDAV base URL including the server's collection path. */
+  webdavUrl: Volatile<string>
+  /** S3 endpoint origin; empty means the AWS endpoint for {@link s3Region}. */
+  s3Endpoint: Volatile<string>
+  /** S3 signing region. @default 'us-east-1' */
+  s3Region: Volatile<string>
+  /** S3 bucket that receives archives. */
+  s3Bucket: Volatile<string>
+  /** Address the bucket as `endpoint/bucket` instead of `bucket.endpoint`. @default false */
+  s3PathStyle: Volatile<boolean>
+  /** UNC path (`\\server\share\folder`) or mounted directory receiving archives. */
+  smbPath: Volatile<string>
+  /** WebDAV or SMB user name; unused by S3. */
+  username: Volatile<string>
+  /** S3 access key id; the secret key lives in the credential store. */
+  s3AccessKeyId: Volatile<string>
+  /** Directory below the target root that holds archives. @default 'prism-backup' */
+  remoteDir: Volatile<string>
+  /** Archive the configuration files. @default true */
+  includeSettings: Volatile<boolean>
+  /** Archive the long-term memory store. @default true */
+  includeMemory: Volatile<boolean>
+  /** Archive the registered project folders. @default true */
+  includeProjects: Volatile<boolean>
+  /** Newline- or comma-separated path segments never walked. */
+  projectExcludes: Volatile<string>
+  /** Archives kept after a successful run; `0` keeps every archive. @default 10 */
+  maxBackups: Volatile<number>
+}
+
+/** Remote protocol a backup targets. */
+export type BackupTargetType = 'webdav' | 's3' | 'smb'
+```
+<!-- END GENERATED config-catalog:@prism/prism-backup -->
+
 <!-- BEGIN GENERATED config-catalog:@prism/prism-session-import -->
 <a id="prismprism-session-import"></a>
 

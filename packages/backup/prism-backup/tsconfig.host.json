@@ -1,0 +1,29 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/index.ts",
+    "src/types.ts",
+    "src/config.ts",
+    "src/error.ts",
+    "src/history.ts",
+    "src/collect.ts",
+    "src/archive.ts",
+    "src/sigv4.ts",
+    "src/transports.ts",
+    "src/run.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../boot/app-boot" },
+    { "path": "../../credentials/credentials" },
+    { "path": "../../storage/storage-domain" },
+    { "path": "../../util/home-paths" },
+    { "path": "../../client/connection/tsconfig.host.json" }
+  ]
+}

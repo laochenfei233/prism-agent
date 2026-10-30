@@ -1,0 +1,28 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
+  },
+  "files": [
+    "src/client/index.ts",
+    "src/client/BackupSection.tsx",
+    "src/client/page-controller.ts",
+    "src/client/locales.ts",
+    "src/types.ts",
+    "src/css-modules.d.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../api/gateway/tsconfig.client.json" },
+    { "path": "../../client/connection/tsconfig.client.json" },
+    { "path": "../../client/store" },
+    { "path": "../../client/locale/tsconfig.client.json" },
+    { "path": "../../client/ui-primitives" },
+    { "path": "../../client/ui-renderer" },
+    { "path": "../../client/ui-settings/tsconfig.client.json" },
+    { "path": "../../client/ui-slots" },
+    { "path": "../../credentials/credentials" }
+  ]
+}
