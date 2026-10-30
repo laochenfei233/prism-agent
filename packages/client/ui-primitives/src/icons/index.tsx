@@ -1684,3 +1684,20 @@ export const IconAppsAddOutlineRegular = (props: AppsAddIconProps) => (
 export const IconAppsAddOutlineMedium = (props: AppsAddIconProps) => (
   <IconAppsAddOutlineArtwork {...props} strokeWidth={ICON_MEDIUM_STROKE} />
 )
+
+const IconThemeOutlineArtwork = ({ size = 16, className, strokeWidth }: WeightedIconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" strokeWidth={strokeWidth}>
+    <rect x="4.5" y="4.5" width="10" height="10" rx="2" stroke="currentColor" />
+    <path d="M11.5 4.5V3.5C11.5 2.39543 10.6046 1.5 9.5 1.5H3.5C2.39543 1.5 1.5 2.39543 1.5 3.5V9.5C1.5 10.6046 2.39543 11.5 3.5 11.5H4.5" stroke="currentColor" />
+  </svg>
+)
+
+/** Regular one-pixel IconThemeOutline artwork. */
+export const IconThemeOutlineRegular = (props: IconProps) => (
+  <IconThemeOutlineArtwork {...props} strokeWidth={ICON_REGULAR_STROKE} />
+)
+
+/** Medium IconThemeOutline artwork with a 1.3px stroke. */
+export const IconThemeOutlineMedium = (props: IconProps) => (
+  <IconThemeOutlineArtwork {...props} strokeWidth={ICON_MEDIUM_STROKE} />
+)

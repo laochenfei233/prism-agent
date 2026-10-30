@@ -6,10 +6,9 @@
  * list and resets whenever that list changes.
  */
 import { Input } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { normalizeFontFamily, type FontRole } from '../theme-settings.ts'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { createFontRowStore } from './settings-store.ts'
+import type { createAppearanceSectionStore } from './settings-store.ts'
 import rowCss from './FontSizeRow.module.css'
 import css from './FontFamilyRow.module.css'
 
@@ -21,9 +20,9 @@ export interface FontFamilyRowInjected {
   setFontFamily: (value: string) => void
 }
 
-/** Full component props: runtime share + store share + locale seat + injected face. */
+/** Component props: section store share + locale seat + injected face. */
 export type FontFamilyRowComponentProps =
-  PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createFontRowStore>>
+  PropsStore<ReturnType<typeof createAppearanceSectionStore>>
   & PropsLocale<'settings.theme'> & FontFamilyRowInjected
 
 /**

@@ -1,12 +1,13 @@
 /**
  * Browser theme registry over the `--dsw-*` token stylesheets. The service
- * owns the live theme preference (light/dark/system), resolves `system` through
- * `prefers-color-scheme`, and publishes immutable snapshots; it never touches
- * the DOM — ui-layout's presenter consumes the resolved snapshot. The Host
- * settings scope loads and stores the preference in the user-settings
- * document. The plugin also registers the Appearance and font settings rows
- * into the settings General section — the theme feature owns its own settings
- * surface. Desktop shortcuts adjust text, code, and terminal font sizes together.
+ * owns the live theme preference (light/dark/system/custom), resolves `system`
+ * through `prefers-color-scheme`, synthesizes `custom` from the stored inputs,
+ * and publishes immutable snapshots; it never touches the DOM — ui-layout's
+ * presenter consumes the resolved snapshot. The Host settings scope loads and
+ * stores the preference in the user-settings document. The plugin also
+ * registers the standalone Appearance section — the theme feature owns its own
+ * settings surface. Desktop shortcuts adjust text, code, and terminal font
+ * sizes together.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
@@ -19,12 +20,10 @@ import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { AppearanceRowInjected } from './AppearanceRow.tsx'
-import { AppearanceRow } from './AppearanceRow.tsx'
-import type { FontSettingsInjected } from './FontSettingsGroup.tsx'
-import { FontSettingsGroup } from './FontSettingsGroup.tsx'
+import type { AppearanceSectionInjected } from './AppearanceSection.tsx'
+import { AppearanceSection } from './AppearanceSection.tsx'
 import { projectThemeGallery } from './gallery.ts'
-import { createAppearanceRowStore, createFontRowStore } from './settings-store.ts'
+import { createAppearanceSectionStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
@@ -39,9 +38,11 @@ import {
 } from '../theme-settings.ts'
 import { synthesizeCustomTheme } from '../custom-theme.ts'
 
+export type { AppearanceSectionComponentProps, AppearanceSectionInjected } from './AppearanceSection.tsx'
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
+export type { CustomThemeGroupProps, CustomThemeGroupInjected } from './CustomThemeGroup.tsx'
 export type { FontSettingsGroupProps, FontSettingsInjected } from './FontSettingsGroup.tsx'
-export type { AppearanceRowState, FontRowState } from './settings-store.ts'
+export type { AppearanceSectionState } from './settings-store.ts'
 export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
 export type {
@@ -567,65 +568,54 @@ function installFontSizeShortcuts(ctx: ClientContext, adjust: (delta: 1 | -1) =>
 
 /**
  * Required services: settings transport plus slots/locale for the Appearance
- * row. `remote` carries the forwarded settings invalidation that
+ * section. `remote` carries the forwarded settings invalidation that
  * `ctx.configForms.get(entryId)` subscribes to on this context.
  */
 export const inject = ['slots', 'locale', 'remote', 'configForms']
 
 /**
- * Client plugin body: provide the theme service and register the
- * feature-owned Appearance gallery and font settings rows into the General section's item
- * slot (a feature owns its settings surface). Desktop font-size shortcuts share
- * all three font-size settings when the keyboard service is available.
+ * Client plugin body: provide the theme service and register the feature-owned
+ * Appearance section (a feature owns its settings surface). Desktop font-size
+ * shortcuts share all three font-size settings when the keyboard service is
+ * available.
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
   installThemeStyles(ctx)
-  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
+  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings dictionaries')
   const host = ctx.configForms.get<ThemeSettings>(THEME_SETTINGS_NAMESPACE)
   const theme = new ThemeRuntime(ctx, host)
   ctx.provide('theme', theme)
+  const t = ctx.locale.bind(SETTINGS_NS)
 
-  const store = createAppearanceRowStore()
+  const store = createAppearanceSectionStore()
   let bound: BoundActions<typeof store> | undefined
-  const fontStore = createFontRowStore()
-  let fontBound: BoundActions<typeof fontStore> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, projectThemeGallery(snapshot.themes), snapshot.revision)
-    fontBound?.sync(snapshot.fontSizes, snapshot.fontFamilies, snapshot.revision)
+    bound?.sync(
+      snapshot.preference, projectThemeGallery(snapshot.themes),
+      snapshot.fontSizes, snapshot.fontFamilies, snapshot.custom, snapshot.revision,
+    )
   }
   ctx.on('theme/change', sync)
-  const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
+  const injected = (actions: BoundActions<typeof store>): AppearanceSectionInjected => {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and
     // first render (the store's revision guard drops stale duplicates).
     sync(theme.getTheme())
     return {
       setTheme: (id) => { theme.setTheme(id) },
+      setCustom: (patch) => { theme.setCustom(patch) },
+      setFontSize: (role, px) => { theme.setFontSize(role, px) },
+      setFontFamily: (role, value) => { theme.setFontFamily(role, value) },
     }
   }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
     id: 'appearance',
-    order: 10,
+    order: 5,
+    label: () => t('appearance.title'),
     store,
     locale: SETTINGS_NS,
     inject: injected,
-  }, AppearanceRow))
-
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'font-size',
-    order: 11,
-    store: fontStore,
-    locale: SETTINGS_NS,
-    inject: (actions: BoundActions<typeof fontStore>): FontSettingsInjected => {
-      fontBound = actions
-      sync(theme.getTheme())
-      return {
-        setFontFamily: (role, value) => { theme.setFontFamily(role, value) },
-        setFontSize: (role, px) => { theme.setFontSize(role, px) },
-      }
-    },
-  }, FontSettingsGroup))
+  }, AppearanceSection))
 }
