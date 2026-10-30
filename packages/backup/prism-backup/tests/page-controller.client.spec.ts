@@ -273,7 +273,7 @@ describe('createBackupSection', () => {
   it('follows a run that was already active when the page opened', async () => {
     const { ctx } = mount()
     const states = { count: 0, settled: false }
-    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       requestBody(init)
       states.count += 1
       if (states.count > 2) states.settled = true
@@ -281,13 +281,28 @@ describe('createBackupSection', () => {
         ok: true,
         value: { running: !states.settled, phase: { detail: 'Uploading' }, history: states.settled ? [RECORD] : [] },
       }), { status: 200 })
-    }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
     const face = createBackupSection(ctx, formDouble())
     await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().running).toBe(true) }, { timeout: 3000 })
     expect(face.hooks.backupRun.getSnapshot().phase).toBe('Uploading')
     await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().running).toBe(false) }, { timeout: 4000 })
-    const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length
-    expect(calls).toBeGreaterThan(2)
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(2)
+  })
+
+  it('stops polling when the plugin unloads', async () => {
+    const { ctx } = mount()
+    const states = { count: 0 }
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      states.count += 1
+      return new Response(JSON.stringify({ ok: true, value: { running: true, history: [] } }), { status: 200 })
+    }))
+    createBackupSection(ctx, formDouble())
+    await vi.waitFor(() => { expect(states.count).toBeGreaterThan(0) }, { timeout: 3000 })
+    await ctx.fiber.dispose()
+    const afterDispose = states.count
+    await new Promise(resolve => setTimeout(resolve, 1200))
+    expect(states.count).toBe(afterDispose)
   })
 
   it('shows a failed run as an error notice', async () => {

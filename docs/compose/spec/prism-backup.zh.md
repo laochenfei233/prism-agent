@@ -65,7 +65,7 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.6 运行编排
 
-`PrismBackup.run()` 单飞：已有运行在途时，第二次调用以 `prism-backup/busy` 失败，不排队。运行经 collect → zip → upload → rotate 推进，并在设置页轮询的内存状态里发布当前阶段与字节/文件计数。结束向 `prism_backup` 存储域（按记录表）追加一条运行记录，列表裁剪到最近 20 条。记录包含 id、起止时间、`success | failed`、目标类型与脱敏端点（去掉 URL userinfo，无凭据）、归档名、目标对象键、压缩包大小、成员计数，以及失败的 code 与 message。无法打开的历史存储 —— 例如记录文件损坏 —— 会降级为空历史并记录一条警告，而不是让插件失败；一次运行即使写入记录被拒，也照实报告自身结果。失败使用 `prism-backup/*` 表（`not-configured`、`busy`、`connection-failed`、`auth-failed`、`upload-failed`、`collect-failed`、`failed`），各自在检查点抛出，底层错误作为 `cause`：读取或压缩来源抛 `collect-failed`，传输拒绝抛各自的 code，其余未分类的为 `failed`。
+`PrismBackup.run()` 单飞：已有运行在途时，第二次调用以 `prism-backup/busy` 失败，不排队。运行经 collect → zip → upload → rotate 推进，并在设置页轮询的内存状态里发布当前阶段与字节/文件计数。结束向 `prism_backup` 存储域（按记录表）追加一条运行记录，列表裁剪到最近 20 条。记录包含 id、起止时间、`success | failed`、目标类型与脱敏端点（去掉 URL userinfo，无凭据）、归档名、目标对象键、压缩包大小、成员计数，以及失败的 code 与 message。无法打开的历史存储 —— 例如记录文件损坏 —— 会降级为空历史并记录一条警告，而不是让插件失败；一次运行即使写入记录被拒，也照实报告自身结果。失败使用 `prism-backup/*` 表（`not-configured`、`busy`、`connection-failed`、`auth-failed`、`upload-failed`、`collect-failed`、`failed`），各自在检查点抛出，底层错误作为 `cause`：读取来源抛 `collect-failed`，传输拒绝抛各自的 code，压缩、暂存或其他未分类的失败为 `failed`。
 
 ### S2.7 宿主路由
 
@@ -73,7 +73,7 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.8 设置页
 
-由包的客户端半区注册一个 `settings.section`（id `backup`，order `25`，排在 agent presets 之后），照 models 页的方式经 config-forms 服务读取实时配置，并按期望 revision 经 `form.mutate` 写回。页面结构：目标类型选择器、活动类型的连接字段（密码为只写输入框，显示已存储或未存储，已存储时提供“清除”）、内容开关、多行控件里的排除清单与保留数、历史列表（时间、状态、大小、目标、失败详情）。每个字符串都放在包的 `locales.ts` 对里，zh 是键集事实源、en 与之镜像，`verify-client-ui-i18n` 保持干净；按钮命名其结果（`Test connection`、`Back up now`、`Backed up`）。
+由包的客户端半区注册一个 `settings.section`（id `backup`，order `25`，排在 agent presets 之后），照 models 页的方式经 config-forms 服务读取实时配置，并按期望 revision 经 `form.mutate` 写回。页面结构：目标类型选择器、活动类型的连接字段（密码为只写输入框，显示已存储或未存储，已存储时提供“清除”）、内容开关、多行控件里的排除清单与保留数、历史列表（时间、状态、大小、目标、失败详情）。每个字符串都放在包的 `locales.ts` 对里，zh 是键集事实源、en 与之镜像，`verify-client-ui-i18n` 保持干净；按钮命名其结果（`Test connection`、`Back up now`），成功提示为 `Backup finished.`
 
 ## [S3] 范围
 

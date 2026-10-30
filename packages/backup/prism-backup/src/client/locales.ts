@@ -52,14 +52,11 @@ export const zh = {
   maxBackups: '保留份数',
   maxBackupsHint: '每次成功后只保留最新的这么多份；填 0 表示全部保留。',
 
-  actions: '操作',
   test: '测试连接',
   testing: '正在测试…',
-  testOk: '连接正常。',
   run: '立即备份',
   running: '正在备份…',
   runOk: '备份完成。',
-  runFailed: '备份失败。',
   saveFailed: '这项设置没有保存成功，请重试。',
   unreachable: '无法连接本机的备份服务。',
   save: '保存',
@@ -74,8 +71,6 @@ export const zh = {
   historyEmpty: '还没有备份记录。',
   historySuccess: '成功',
   historyFailed: '失败',
-  historyTarget: '目标',
-  historySize: '大小',
 } satisfies Record<string, string>
 
 /** English mirror of {@link zh}. */
@@ -125,14 +120,11 @@ export const en: Record<keyof typeof zh, string> = {
   maxBackups: 'Archives kept',
   maxBackupsHint: 'After each successful run only the newest this many remain; 0 keeps every archive.',
 
-  actions: 'Actions',
   test: 'Test connection',
   testing: 'Testing…',
-  testOk: 'Connection works.',
   run: 'Back up now',
   running: 'Backing up…',
   runOk: 'Backup finished.',
-  runFailed: 'Backup failed.',
   saveFailed: 'That setting did not save. Try again.',
   unreachable: 'The backup service on this machine is unreachable.',
   save: 'Save',
@@ -147,8 +139,6 @@ export const en: Record<keyof typeof zh, string> = {
   historyEmpty: 'No backups yet.',
   historySuccess: 'Succeeded',
   historyFailed: 'Failed',
-  historyTarget: 'Target',
-  historySize: 'Size',
 }
 
 /** Key set of the backup page dictionaries. */

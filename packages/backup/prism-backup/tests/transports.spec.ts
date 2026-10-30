@@ -214,10 +214,15 @@ describe('s3 transport', () => {
     const fake = fakeFetch([new Response(null, { status: 200 })])
     const transport = createTransport(target, { fetch: fake.fetch, now: () => new Date('2026-10-30T12:00:00.000Z') })
     await transport.upload(file, 'prism-backup/a.zip')
-    const headers = new Headers(callAt(fake.calls, 0).init.headers)
-    expect(callAt(fake.calls, 0).url).toBe('https://bucket.s3.us-east-1.amazonaws.com/prism-backup/a.zip')
+    const sent = callAt(fake.calls, 0)
+    const headers = new Headers(sent.init.headers)
+    expect(sent.url).toBe('https://bucket.s3.us-east-1.amazonaws.com/prism-backup/a.zip')
     expect(headers.get('x-amz-content-sha256')).toBe('UNSIGNED-PAYLOAD')
     expect(headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE\/20261030\/us-east-1\/s3\/aws4_request/u)
+    // The signature names exactly the headers the request carries, plus host.
+    const signed = /SignedHeaders=([^,]+),/u.exec(headers.get('authorization') ?? '')?.[1]?.split(';') ?? []
+    const carried = [...headers.keys()].filter(name => name !== 'authorization').sort()
+    expect(signed).toEqual(carried)
   })
 
   it('addresses a path-style bucket and probes through a listing', async () => {
@@ -278,7 +283,7 @@ describe('s3 transport', () => {
       + '<Contents><Key>prism-backup/c.zip</Key></Contents>'
       + '<Contents><Key>elsewhere/d.zip</Key></Contents></ListBucketResult>'
     const transport = createTransport(target, { fetch: fakeFetch([new Response(xml, { status: 200 })]).fetch })
-    await expect(transport.list('prism-backup')).resolves.toEqual(['a&b.zip', 'c.zip', 'elsewhere/d.zip'])
+    await expect(transport.list('prism-backup')).resolves.toEqual(['a&b.zip', 'c.zip'])
     const root = createTransport(target, { fetch: fakeFetch([
       new Response('<ListBucketResult><Key>stray.zip</Key></ListBucketResult>', { status: 200 }),
     ]).fetch })

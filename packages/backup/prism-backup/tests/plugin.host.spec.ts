@@ -207,6 +207,26 @@ describe('mounted backup plugin', () => {
     await errorCtx.fiber.dispose()
   })
 
+  it('records a sanitized endpoint on a failed run', async () => {
+    const home = await tempHome()
+    process.env.DSH_HOME = home
+    vi.stubGlobal('fetch', async () => new Response('denied', { status: 403 }))
+    const { route, domain, ctx } = await mount({
+      home,
+      password: 'pw',
+      section: { targetType: 'webdav', webdavUrl: 'https://me:pw@dav.example.com/base' },
+    })
+    const failed = await call<BackupRunRecord>(route, 'run')
+    expect(failed.status).toBe(502)
+    const stored = [...domain.records.values()] as BackupRunRecord[]
+    expect(stored[0]).toMatchObject({
+      status: 'failed',
+      endpoint: 'https://dav.example.com/base',
+    })
+    expect(JSON.stringify(stored)).not.toContain('me:pw')
+    await ctx.fiber.dispose()
+  })
+
   it('answers the connection probe through the mounted route', async () => {
     const home = await tempHome()
     process.env.DSH_HOME = home

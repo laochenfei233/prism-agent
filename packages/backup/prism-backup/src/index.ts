@@ -55,7 +55,7 @@ export const inject = ['connection', 'storageDomain', 'credentials']
  * History over a storage domain opened on first use, so activation stays
  * synchronous. A store that cannot open — a corrupt record file rejects the
  * domain open — degrades to empty history rather than failing the plugin: the
- * backup itself is unaffected, and `onFailure` reports the degradation once.
+ * backup itself is unaffected, and `onFailure` reports what went wrong.
  */
 export class BackupHistoryStore implements BackupHistory {
   private opening: Promise<DomainBackupHistory | undefined> | undefined
@@ -78,14 +78,13 @@ export class BackupHistoryStore implements BackupHistory {
     return this.opened?.list() ?? []
   }
 
-  /** @param record - the finished run; a broken store drops it rather than failing the run. */
+  /** @param record - the finished run; a refused write is reported rather than failing the run. */
   async append(record: BackupRunRecord): Promise<void> {
     const opened = await this.open()
     if (opened === undefined) return
     try {
       await opened.append(record)
     } catch (error: unknown) {
-      this.failure ??= error
       this.onFailure(error)
     }
   }

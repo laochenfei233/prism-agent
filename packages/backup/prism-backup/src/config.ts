@@ -216,7 +216,7 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
   if (type === 'webdav') {
     return {
       type,
-      baseUrl: requireText(config.webdavUrl.get(), 'the WebDAV URL').replace(/\/+$/u, ''),
+      baseUrl: withoutUserinfo(requireText(config.webdavUrl.get(), 'the WebDAV URL').replace(/\/+$/u, '')),
       username: config.username.get().trim(),
       password: await requireSecret(readSecret, 'webdav-password'),
     }
@@ -226,7 +226,7 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
     const endpoint = config.s3Endpoint.get().trim().replace(/\/+$/u, '')
     return {
       type,
-      endpoint: endpoint === '' ? `https://s3.${region}.amazonaws.com` : endpoint,
+      endpoint: endpoint === '' ? `https://s3.${region}.amazonaws.com` : withoutUserinfo(endpoint),
       region,
       bucket: requireText(config.s3Bucket.get(), 'the S3 bucket'),
       pathStyle: config.s3PathStyle.get(),
@@ -249,13 +249,14 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
  * @returns the label shown in the history list.
  */
 export function targetLabel(target: BackupTarget): string {
-  if (target.type === 'webdav') return withoutUserinfo(target.baseUrl)
+  if (target.type === 'webdav') return target.baseUrl
   if (target.type === 's3') return `${target.endpoint}/${target.bucket}`
   return target.root
 }
 
 /**
- * Drop any `user:password@` from one URL, so a durable record never holds a credential.
+ * Drop any `user:password@` from one URL before it becomes a target, so no
+ * phase line, failure message, or durable record can carry a credential.
  * @param url - a configured endpoint.
  * @returns the same endpoint without userinfo.
  */

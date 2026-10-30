@@ -64,7 +64,7 @@ export interface BackupRunRecord {
   readonly endpoint: string
   /** Archive filename, when one was produced. */
   readonly archiveName?: string | undefined
-  /** Destination key below the target root, when the upload started. */
+  /** Destination key below the target root, once the upload succeeded. */
   readonly objectKey?: string | undefined
   /** Archive size in bytes, when one was produced. */
   readonly sizeBytes?: number | undefined

@@ -65,6 +65,30 @@ describe('DomainBackupHistory', () => {
   })
 })
 
+describe('history persistence', () => {
+  it('survives a restart over the same harness home', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prism-backup-history-restart-'))
+    roots.push(root)
+    const mount = async (): Promise<Context> => {
+      const ctx = new Context()
+      await ctx.plugin(Storage)
+      await ctx.plugin(StorageJson, { root: join(root, 'storage') })
+      await ctx.plugin(StorageDomain, { backend: 'json' })
+      return ctx
+    }
+    const first = await mount()
+    const store = new BackupHistoryStore(first, () => {})
+    await store.append(record('kept', 5))
+    await first.fiber.dispose()
+
+    const second = await mount()
+    const reopened = new BackupHistoryStore(second, () => {})
+    await reopened.ensure()
+    expect(reopened.list().map(entry => entry.id)).toEqual(['kept'])
+    await second.fiber.dispose()
+  })
+})
+
 describe('BackupHistoryStore degradation', () => {
   it('reports one failure, answers empty history, and drops appends instead of throwing', async () => {
     const ctx = new Context()

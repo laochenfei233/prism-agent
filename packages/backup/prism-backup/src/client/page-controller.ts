@@ -344,18 +344,20 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
   })
 
   let poll: ReturnType<typeof setInterval> | undefined
+  let disposed = false
   const stopPolling = (): void => {
     if (poll === undefined) return
     clearInterval(poll)
     poll = undefined
   }
   const startPolling = (): void => {
-    if (poll !== undefined) return
+    if (disposed || poll !== undefined) return
     poll = setInterval(() => { void refreshRunState() }, 1000)
   }
   const refreshRunState = async (): Promise<void> => {
     const answer = await callRoute({ action: 'state' }, decodeState)
-    if (!answer.ok) return
+    // A page that unloaded must not restart a timer from an in-flight answer.
+    if (disposed || !answer.ok) return
     runStore.update((draft) => {
       draft.running = answer.value.running
       draft.phase = answer.value.phase?.detail
@@ -390,9 +392,11 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
         })
       })
       .finally(() => {
-        void refreshRunState().then(() => {
-          runStore.update((draft) => { draft.running = false; draft.phase = undefined })
-        })
+        // The run this page started is over: stop here even when the follow-up
+        // read fails, so an unreachable Host cannot leave the page polling.
+        stopPolling()
+        runStore.update((draft) => { draft.running = false; draft.phase = undefined })
+        void refreshRunState()
       })
   }
 
@@ -409,6 +413,7 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
   void refreshSecrets()
   void refreshRunState()
   ctx.effect(() => () => {
+    disposed = true
     stopPolling()
     form.dispose()
   }, 'prism-backup: page form')

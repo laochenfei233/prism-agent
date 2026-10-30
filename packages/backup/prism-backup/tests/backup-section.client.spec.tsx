@@ -74,6 +74,7 @@ function renderPage(form: Partial<BackupFormState> = {}, run: Partial<BackupRunS
   test: ReturnType<typeof vi.fn>
   run: ReturnType<typeof vi.fn>
   clearSecret: ReturnType<typeof vi.fn>
+  resetField: ReturnType<typeof vi.fn>
 } {
   const formStore = createSnapshotStore(formState(form))
   const runStore = createSnapshotStore(runState(run))
@@ -103,6 +104,7 @@ function renderPage(form: Partial<BackupFormState> = {}, run: Partial<BackupRunS
   render(<BackupSection {...props} />)
   return {
     edit: face.edit as ReturnType<typeof vi.fn>,
+    resetField: face.resetField as ReturnType<typeof vi.fn>,
     save: face.save as ReturnType<typeof vi.fn>,
     test: face.test as ReturnType<typeof vi.fn>,
     run: face.run as ReturnType<typeof vi.fn>,
@@ -196,8 +198,7 @@ describe('BackupSection', () => {
       fields: { ...formState().fields, projectExcludes: draft('.git', { overridden: true }) },
     })
     fireEvent.click(screen.getByRole('button', { name: en.reset }))
-    const edits = actions.edit.mock.calls.length
-    expect(edits).toBe(0)
+    expect(actions.resetField).toHaveBeenCalledWith('projectExcludes')
   })
 
   it('renders the exclusion list in a multi-line control', () => {

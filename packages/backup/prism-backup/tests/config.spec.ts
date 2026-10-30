@@ -92,12 +92,17 @@ describe('backup configuration', () => {
     })
   })
 
-  it('drops userinfo from the label and leaves a non-URL endpoint alone', () => {
-    expect(targetLabel({
-      type: 'webdav', baseUrl: 'https://me:pw@dav.example.com/x', username: 'me', password: 'pw',
-    })).toBe('https://dav.example.com/x')
-    expect(targetLabel({ type: 'webdav', baseUrl: 'dav.example.com/x', username: '', password: '' }))
-      .toBe('dav.example.com/x')
+  it('strips userinfo while resolving, and leaves a non-URL endpoint alone', async () => {
+    const secret = secrets({ 'webdav-password': 'pw' })
+    const withUserinfo = await resolveTarget(configured({ webdavUrl: 'https://me:pw@dav.example.com/x/' }), secret)
+    expect(withUserinfo).toMatchObject({ baseUrl: 'https://dav.example.com/x' })
+    expect(targetLabel(withUserinfo)).toBe('https://dav.example.com/x')
+    const bare = await resolveTarget(configured({ webdavUrl: 'dav.example.com/x' }), secret)
+    expect(targetLabel(bare)).toBe('dav.example.com/x')
+    const s3 = await resolveTarget(configured({
+      targetType: 's3', s3Endpoint: 'https://key:secret@minio.local:9000', s3Bucket: 'b', s3AccessKeyId: 'k',
+    }), secrets({ 's3-secret-key': 's' }))
+    expect(targetLabel(s3)).toBe('https://minio.local:9000/b')
   })
 
   it('ships the default exclusions in the schema default text', () => {

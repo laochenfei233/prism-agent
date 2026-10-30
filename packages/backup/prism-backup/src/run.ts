@@ -12,7 +12,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeArchive, type BackupManifest } from './archive.ts'
 import { bytesOf, planBackup } from './collect.ts'
-import { resolveBackup, targetLabel, type Config, type ResolvedBackup, type SecretReader } from './config.ts'
+import { resolveBackup, type Config, type ResolvedBackup, type SecretReader } from './config.ts'
 import { BackupError, asBackupError } from './error.ts'
 import type { BackupHistory } from './history.ts'
 import { createTransport, type Transport, type TransportDeps } from './transports.ts'
@@ -202,7 +202,7 @@ export class BackupRunner {
         startedAt,
         status: 'success',
         targetType: resolved.target.type,
-        endpoint: targetLabel(resolved.target),
+        endpoint: transport.endpoint,
         archiveName: archiveNameWritten,
         objectKey,
         sizeBytes,

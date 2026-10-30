@@ -380,7 +380,7 @@ class S3Transport implements Transport {
     return [...text.matchAll(/<Key>([^<]*)<\/Key>/gu)].flatMap((match) => {
       /* v8 ignore next -- the single capture always participates. */
       const key = decodeXml(match[1] ?? '')
-      return key.startsWith(prefixWithSlash) ? [key.slice(prefixWithSlash.length)] : [key]
+      return key.startsWith(prefixWithSlash) ? [key.slice(prefixWithSlash.length)] : []
     })
   }
 

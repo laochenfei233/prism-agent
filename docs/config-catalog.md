@@ -4775,7 +4775,7 @@ export type BackupTargetType = 'webdav' | 's3' | 'smb'
 ## `@prism/prism-session-import`
 
 - `inject`: `connection` · `sessionPersistence` · `workspaceRegistry`
-- `source`: [`packages/session-query/session-import/src/index.ts:38`](../packages/session-query/session-import/src/index.ts)
+- `source`: [`packages/session-query/session-import/src/index.ts:44`](../packages/session-query/session-import/src/index.ts)
 
 ```ts config-catalog
 /** Import policy and per-source root overrides. */
