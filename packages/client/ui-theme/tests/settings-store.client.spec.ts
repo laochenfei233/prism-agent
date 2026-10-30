@@ -57,11 +57,24 @@ describe('projectThemeGallery', () => {
     expect(entries[0]!.base).toContain('linear-gradient')
   })
 
-  it('previews a theme another package registers', () => {
+  it('assigns each known preference its own preview motif and carries the theme textures', () => {
+    const entries = projectThemeGallery(BUILTIN_THEMES)
+    expect(entries.map(entry => entry.motif)).toEqual([
+      'split', 'sheet', 'night', 'grid', 'beacon', 'strata', 'grain', 'plan', 'crt', 'ink', 'fern',
+    ])
+    const paper = entries.find(entry => entry.id === 'paper')!
+    expect(paper.canvasImage).toContain('data:image/svg+xml')
+    expect(paper.centerImage).toBeUndefined()
+    const strata = entries.find(entry => entry.id === 'strata-dark')!
+    expect(strata.centerImage).toContain('repeating-linear-gradient')
+    expect(strata.canvasImage).toBeUndefined()
+  })
+
+  it('previews a theme another package registers with the plain motif', () => {
     const entries = projectThemeGallery([
       { id: 'sepia', colorScheme: 'light', tokens: { '--dsw-alias-bg-base': '#f4ecd8' } },
     ])
     expect(entries.map(entry => entry.id)).toEqual(['system', 'sepia'])
-    expect(entries[1]).toMatchObject({ base: '#f4ecd8', surface: '#f5f6f7', accent: '#0f1115' })
+    expect(entries[1]).toMatchObject({ base: '#f4ecd8', surface: '#f5f6f7', accent: '#0f1115', motif: 'plain' })
   })
 })

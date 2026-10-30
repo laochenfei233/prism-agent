@@ -77,6 +77,20 @@ describe('AppearanceRow', () => {
     expect(preview.style.getPropertyValue('--preview-accent')).toBe('#ff6900')
   })
 
+  it('renders each row with its motif composition and its texture variables', () => {
+    mount('system', [
+      ...GALLERY,
+      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a', motif: 'plain' },
+    ])
+    const paper = screen.getByRole('button', { name: /^Paper$/ }).querySelector<HTMLElement>('[style]')!
+    expect(paper.className).toContain('grain')
+    expect(paper.style.getPropertyValue('--preview-image')).toContain('data:image/svg+xml')
+    const sepia = screen.getByRole('button', { name: /^sepia$/ }).querySelector<HTMLElement>('[style]')!
+    // Plain motifs carry no texture variable and no per-motif class.
+    expect(sepia.className).not.toContain('grain')
+    expect(sepia.style.getPropertyValue('--preview-image')).toBe('')
+  })
+
   it('click drives setTheme; selection follows the store mirror, not the click echo', () => {
     const b = mount('dark')
     fireEvent.click(screen.getByRole('button', { name: /^Graph Paper Glass$/ }))

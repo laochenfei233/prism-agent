@@ -42,14 +42,33 @@ function themeLabel(id: string, t: GalleryTranslate): string {
  * spread at the style site: `CSSProperties` has no custom-property index, and
  * a spread is the one position TypeScript does not excess-check.
  * @param entry - the row's gallery entry.
- * @returns the three preview variables.
+ * @returns the three preview colors plus the theme's textures when it carries any.
  */
 function previewVariables(entry: ThemeGalleryEntry): Record<string, string> {
   return {
     '--preview-base': entry.base,
     '--preview-surface': entry.surface,
     '--preview-accent': entry.accent,
+    ...(entry.canvasImage !== undefined ? { '--preview-image': entry.canvasImage } : {}),
+    ...(entry.centerImage !== undefined ? { '--preview-center': entry.centerImage } : {}),
   }
+}
+
+/** Preview class per composition; motifs without their own sheet render the plain miniature. */
+const MOTIF_CLASS: Record<ThemeGalleryEntry['motif'], string | undefined> = {
+  plain: undefined,
+  split: css.split,
+  sheet: css.sheet,
+  night: css.night,
+  grid: css.grid,
+  beacon: css.beacon,
+  strata: css.strata,
+  grain: css.grain,
+  plan: css.plan,
+  crt: css.crt,
+  ink: css.ink,
+  fern: css.fern,
+  bespoke: undefined,
 }
 
 /**
@@ -72,7 +91,7 @@ export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentP
             aria-pressed={preference === entry.id}
             onClick={() => { setTheme(entry.id) }}
           >
-            <span className={css.preview} style={{ ...previewVariables(entry) }}>
+            <span className={clsx(css.preview, MOTIF_CLASS[entry.motif])} style={{ ...previewVariables(entry) }}>
               <span className={css.previewRail} />
               <span className={css.previewBody}>
                 <span className={css.previewCard} />
