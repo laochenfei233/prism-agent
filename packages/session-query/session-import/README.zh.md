@@ -137,7 +137,8 @@ DeepSeek Harness 来源按原生方式复制：引擎用原会话 id 重放完�
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **转换来源仅文本**——Claude Code、Codex、Grok、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 与 Gemini CLI 会丢失工具调用、工具结果、推理、图片与子 agent 记录。DeepSeek Harness 是例外：它的日志按原生方式复制，当前构建无法校验的版本或事件结构会让该会话失败，而不是回退成文本。
+- **转换来源仅文本**——Claude Code、Codex、Grok、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 与 Gemini CLI 会丢失工具调用、工具结果、推理、图片与子 agent 记录。DeepSeek Harness 是例外：它的日志按原生方式复制，当前构建无法读取的版本或事件信封会让该会话失败，而不是回退成文本。
+- **原生副本按字节复制**——导入只校验 DeepSeek Harness 日志的格式版本与事件信封，不校验 turn、step 与 surface 关系。事件关系被本构建读取器拒绝的来源日志会导入成功、随后打开失败；请在来源中修复它，或不要导入该会话。
 - **没有增量同步**——重复导入同一来源会话只报告重复；外部存储中的新消息不会追加到已有的 DSH 会话。
 - **未公开存储尽力而为**——OpenClaw 与 Hermes 的载荷结构随版本变化；无法识别角色与文本的事件会被跳过，没有任何可用文本的会话报告为已跳过。
 - **一个文件夹一个工作区**——工作区注册表按规范化路径键控项目。向已有项目导入必须经过显式合并确认；无法为同一文件夹创建第二个项目。

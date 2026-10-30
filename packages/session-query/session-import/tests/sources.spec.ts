@@ -139,31 +139,46 @@ describe('DeepSeek Harness reader', () => {
     await mkdir(cwd)
     const id = 'session-import-dsh'
     const header = JSON.stringify({ type: 'session', version: 4, id, createdAt: 1000, cwd, isSeeded: false, delegationDepth: 0 })
+    const turnStart = JSON.stringify({ type: 'turn/start', seq: 0, time: 1050, data: { turn: 1 } })
+    const stepStart = JSON.stringify({ type: 'step/start', seq: 1, time: 1050, data: { turn: 1, step: 1 } })
     const user = JSON.stringify({
-      type: 'user/message', seq: 0, time: 1100,
+      type: 'user/message', seq: 2, time: 1100,
       data: { id: 'u', role: 'user', content: [{ type: 'text', text: 'continue' }], source: { kind: 'user' } },
       surfaceOp: 'append',
     })
     const assistant = JSON.stringify({
-      type: 'assistant/message', seq: 1, time: 1200,
+      type: 'assistant/message', seq: 3, time: 1200, surfaceOp: 'append',
       data: {
         turn: 1, step: 1, stream: [],
         message: {
-          id: 'a', role: 'assistant', content: [{ type: 'text', text: 'done' }],
+          id: 'a', role: 'assistant',
+          content: [{ type: 'text', text: 'done' }, { type: 'tool-call', id: 'c1', name: 'glob', arguments: '{}' }],
           source: { kind: 'model', provider: 'p', model: 'm' },
         },
       },
     })
     const tool = JSON.stringify({
-      type: 'tool/call', seq: 2, time: 1300,
+      type: 'tool/call', seq: 4, time: 1300,
       data: { turn: 1, step: 1, callId: 'c1', name: 'glob', arguments: '{}' },
     })
+    const toolResult = JSON.stringify({
+      type: 'tool/result', seq: 5, time: 1320, surfaceOp: 'append',
+      data: {
+        turn: 1, step: 1,
+        message: {
+          id: 'r', role: 'tool', toolCallId: 'c1', source: { kind: 'tool', callId: 'c1' },
+          content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'ok' }], isError: false }],
+        },
+      },
+    })
+    const stepEnd = JSON.stringify({ type: 'step/end', seq: 6, time: 1350, data: { turn: 1, step: 1 } })
+    const turnEnd = JSON.stringify({ type: 'turn/end', seq: 7, time: 1350, data: { turn: 1, reason: { kind: 'completed' } } })
     const log = join(root, 'sessions', '--proj--', id, 'session.v4.jsonl.zstd')
     await mkdir(join(log, '..'), { recursive: true })
     await writeFile(log, Buffer.concat([
-      zstdCompressSync(`${header}\n${user}\n`),
+      zstdCompressSync(`${header}\n${turnStart}\n${stepStart}\n${user}\n`),
       zstdCompressSync(`${assistant}\n`),
-      zstdCompressSync(`${tool}\n`),
+      zstdCompressSync(`${tool}\n${toolResult}\n${stepEnd}\n${turnEnd}\n`),
     ]))
     const child = join(root, 'sessions', '--proj--', 'child', 'session.v4.jsonl')
     await write(child, JSON.stringify({
@@ -178,7 +193,10 @@ describe('DeepSeek Harness reader', () => {
     expect(loaded?.messages.map(message => message.text)).toEqual(['continue', 'done'])
     const native = await scan.sessions[0]?.loadNative?.()
     expect(native?.header.id).toBe(id)
-    expect(native?.events.map(event => event.type)).toEqual(['user/message', 'assistant/message', 'tool/call'])
+    expect(native?.events.map(event => event.type)).toEqual([
+      'turn/start', 'step/start', 'user/message', 'assistant/message',
+      'tool/call', 'tool/result', 'step/end', 'turn/end',
+    ])
   })
 })
 
