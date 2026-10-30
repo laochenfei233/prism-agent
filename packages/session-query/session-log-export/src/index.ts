@@ -29,6 +29,11 @@ export {
   sessionLogZipEntries,
   sessionLogZipFilename,
   streamSessionLogZip,
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
+  pushArtifactChunks,
+  pushBinaryChunks,
+  pushStreamChunks,
+  ResponseCapacityGate,
 } from './archive.ts'
 export type {
   SessionLogCompressionLevel,

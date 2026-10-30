@@ -19,6 +19,7 @@ export type TransferErrorCode =
   | 'crc-mismatch'
   | 'disk-space'
   | 'no-projects'
+  | 'unknown-workspace'
   | 'bad-destination'
   | 'reserved-name'
   | 'session-version'
@@ -39,6 +40,7 @@ const STATUS_BY_CODE: Readonly<Record<TransferErrorCode, number>> = {
   'entry-too-large': 400,
   'crc-mismatch': 400,
   'no-projects': 400,
+  'unknown-workspace': 404,
   'bad-destination': 400,
   'reserved-name': 400,
   'session-version': 400,

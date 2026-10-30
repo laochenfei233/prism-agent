@@ -8,9 +8,20 @@
   "files": [
     "src/crc32.ts",
     "src/errors.ts",
+    "src/export-engine.ts",
+    "src/naming.ts",
+    "src/routes.ts",
+    "src/settings-transfer.ts",
+    "src/types.ts",
     "src/zip-reader.ts"
   ],
   "references": [
-    { "path": "../../../vendor/cordis" }
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../attachment/attachment" },
+    { "path": "../../core/session" },
+    { "path": "../../session-query/session-log-export/tsconfig.host.json" },
+    { "path": "../../session-query/session-query" },
+    { "path": "../../session/session-persistence" },
+    { "path": "../../settings/settings" }
   ]
 }

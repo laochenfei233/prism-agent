@@ -412,8 +412,9 @@ const PUSH_CHUNK_BYTES = 1 << 16
 /** Byte capacity retained by the response stream before ZIP production waits for pull. */
 const RESPONSE_HIGH_WATER_MARK_BYTES = 1 << 16
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** One producer waiter released only when ReadableStream pull restores capacity. */
-class ResponseCapacityGate {
+export class ResponseCapacityGate {
   private releasePending: (() => void) | undefined
 
   /**
@@ -445,6 +446,7 @@ class ResponseCapacityGate {
   }
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /**
  * Push one media object's bytes into a deflate stream in bounded chunks,
  * waiting for consumer capacity between chunks like the artifact path does.
@@ -454,7 +456,7 @@ class ResponseCapacityGate {
  * @param capacity - pull-driven response-capacity gate.
  * @param signal - cancellation; throws when aborted.
  */
-async function pushBinaryChunks(
+export async function pushBinaryChunks(
   deflate: ZipDeflate,
   data: Uint8Array,
   controller: ReadableStreamDefaultController<Uint8Array>,
@@ -472,8 +474,9 @@ async function pushBinaryChunks(
   } while (offset < data.byteLength)
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** Push one streamed file entry without retaining its complete byte sequence. */
-async function pushStreamChunks(
+export async function pushStreamChunks(
   deflate: ZipDeflate,
   chunks: AsyncIterable<Uint8Array>,
   controller: ReadableStreamDefaultController<Uint8Array>,
@@ -491,6 +494,7 @@ async function pushStreamChunks(
   await capacity.wait(controller, signal)
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /**
  * Push one artifact's text into a deflate stream in bounded chunks, never
  * splitting a surrogate pair across a chunk boundary (a lone high surrogate
@@ -501,7 +505,7 @@ async function pushStreamChunks(
  * @param capacity - pull-driven response-capacity gate.
  * @param signal - cancellation; throws when aborted.
  */
-async function pushArtifactChunks(
+export async function pushArtifactChunks(
   deflate: ZipDeflate,
   content: string,
   controller: ReadableStreamDefaultController<Uint8Array>,
