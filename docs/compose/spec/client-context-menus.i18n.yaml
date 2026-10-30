@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/client-context-menus.md
 /:
-  en: 528f971d28261b02
-  zh: 547f91f0cae402f5
+  en: 7e6a06240c504675
+  zh: 2ef5b4e014297ec6
 /client-context-menus:
   en: 40c24661ee8ba6b6
   zh: bf7e3247d1f58d1f
@@ -18,8 +18,8 @@
   en: 33ee73ce482c5992
   zh: 3d262c87b1c8ed04
 /client-context-menus/tasks:
-  en: ba3883971994e005
-  zh: b66ddee111a7a122
+  en: 264cf505c1ccbd15
+  zh: 3eb530eff6b92d7e
 /client-context-menus/s4-acceptance:
-  en: 7e29b07ff579bfb8
-  zh: 625d1bf3e8acc349
+  en: b1571c32e9a7a3df
+  zh: 9c624e1c38f28460

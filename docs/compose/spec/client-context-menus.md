@@ -1,9 +1,9 @@
 ---
 feature: client-context-menus
-status: in-progress
+status: delivered
 updated: 2026-10-30
 branch: feat/client-context-menus (worktree .worktrees/client-context-menus)
-commits: 1a63913bd9..HEAD
+commits: 1a63913bd9..8e2ba69e14
 ---
 
 # Client Context Menus
@@ -39,20 +39,20 @@ Every client surface currently shows the browser's default context menu. The ses
 
 ## Tasks
 
-- [ ] T1: `ContextMenu` primitive + test (covers S2.1)
-- [ ] T2: `ShortcutsService.invoke` + test (covers S2.8)
-- [ ] T3: Session-row context menu and new shipped entries (covers S2.2)
-- [ ] T4: Project-row context menu (covers S2.3)
-- [ ] T5: Conversation text menu (covers S2.4)
-- [ ] T6: Composer menu (covers S2.5)
-- [ ] T7: File-tree menu (covers S2.6)
-- [ ] T8: Locale entries and docs (covers S2.7)
+- [x] T1: `ContextMenu` primitive + test (covers S2.1)
+- [x] T2: `ShortcutsService.invoke` + test (covers S2.8)
+- [x] T3: Session-row context menu and new shipped entries (covers S2.2)
+- [x] T4: Project-row context menu (covers S2.3)
+- [x] T5: Conversation text menu (covers S2.4)
+- [x] T6: Composer menu (covers S2.5)
+- [x] T7: File-tree menu (covers S2.6)
+- [x] T8: Locale entries and docs (covers S2.7)
 
 ## [S4] Acceptance
 
-- [ ] A secondary press on a session row, project row, message, composer, and file row opens the product menu and suppresses the browser menu.
-- [ ] Session and project menus run their actions; unavailable capabilities are absent from the menu.
-- [ ] Copy actions write the clipboard; open/reveal actions reach the Host desktop API.
-- [ ] Composer verbs operate on the Lexical draft, and a refused clipboard read shows a localized notice.
-- [ ] Every visible label resolves through a typed dictionary.
-- [ ] Focused tests, typecheck, and the client build pass.
+- [x] A secondary press on a session row, project row, message, composer, and file row opens the product menu and suppresses the browser menu.
+- [x] Session and project menus run their actions; unavailable capabilities are absent from the menu.
+- [x] Copy actions write the clipboard; open/reveal actions reach the Host desktop API.
+- [x] Composer verbs operate on the Lexical draft, and a refused clipboard read shows a localized notice.
+- [x] Every visible label resolves through a typed dictionary.
+- [x] Focused tests, typecheck, and the client build pass.
