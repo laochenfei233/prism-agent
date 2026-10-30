@@ -29,12 +29,15 @@ import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
+  CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID,
+  DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME,
   DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_FAMILY_FIELDS, FONT_ROLES, FONT_SIZE_SPECS,
-  fontFamilyVariable, isFontSize, isThemePreference, normalizeFontFamily, sectionFontSizes,
-  THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition, type ThemePreference,
-  type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
+  fontFamilyVariable, isFontSize, isHexColor, isThemePreference, normalizeFontFamily, normalizeHexColor,
+  sectionFontSizes, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type CustomThemeInputs, type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition,
+  type ThemePreference, type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
 } from '../theme-settings.ts'
+import { synthesizeCustomTheme } from '../custom-theme.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
 export type { FontSettingsGroupProps, FontSettingsInjected } from './FontSettingsGroup.tsx'
@@ -42,8 +45,8 @@ export type { AppearanceRowState, FontRowState } from './settings-store.ts'
 export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
 export type {
-  BuiltinThemeId, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes, ThemePreference,
-  ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
+  BuiltinThemeId, CustomThemeInputs, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes,
+  ThemePreference, ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
 } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
@@ -64,13 +67,16 @@ export interface ThemeSnapshot {
   fontSizes: FontSizes
   /** Normalized user font lists by role; `''` selects the role's built-in stack. */
   fontFamilies: FontFamilies
+  /** The stored custom theme inputs; the `custom` preference synthesizes its theme from these. */
+  custom: CustomThemeInputs
   /**
-   * The resolved active theme (`system` resolved via prefers-color-scheme)
-   * with override layers folded into its tokens (seq order, later layers win
-   * per-token; each value picked for the active color scheme).
+   * The resolved active theme (`system` resolved via prefers-color-scheme,
+   * `custom` synthesized from the stored inputs) with override layers folded
+   * into its tokens (seq order, later layers win per-token; each value picked
+   * for the active color scheme).
    */
   active: ThemeDefinition
-  /** Registered themes in registration order. */
+  /** Registered themes in registration order, then the synthesized custom theme. */
   themes: readonly ThemeDefinition[]
   /** Monotonic change counter (registry or active changes). */
   revision: number
@@ -147,6 +153,7 @@ export class ThemeRuntime {
   private preference: ThemePreference
   private fontSizes: FontSizes = bootstrapFontSizes()
   private fontFamilies: FontFamilies = bootstrapFontFamilies()
+  private custom: CustomThemeInputs = { scheme: DEFAULT_CUSTOM_SCHEME, canvas: DEFAULT_CUSTOM_CANVAS, accent: DEFAULT_CUSTOM_ACCENT }
   private revision = 0
   /** Own settings writes not yet settled; adoption waits for zero so a Host echo of an earlier write cannot revert a later local change. */
   private pendingWrites = 0
@@ -215,15 +222,46 @@ export class ThemeRuntime {
    * Switch the theme preference — the only user preference write entry.
    * Built-in preferences are written through the settings scope and every
    * accepted value emits `theme/change`.
-   * @param id - a registered theme id or `system`; unknown ids throw.
+   * @param id - a registered theme id, `system`, or `custom`; unknown ids throw.
    */
   setTheme(id: string): void {
-    if (id !== 'system' && !this.themes.some(t => t.id === id)) {
+    if (id !== 'system' && id !== CUSTOM_THEME_ID && !this.themes.some(t => t.id === id)) {
       throw new Error(`theme "${id}" is not registered`)
     }
     if (this.preference === id) return
     this.preference = id as ThemePreference
     if (isThemePreference(id)) this.write(() => this.host.set(THEME_PREFERENCE_FIELD, id))
+    this.publish()
+  }
+
+  /**
+   * Change the custom theme inputs — the only custom-theme write entry. Changed
+   * inputs are written through the settings scope together with the preference
+   * switch to `custom` (editing the controls means using the theme), and the
+   * change emits one `theme/change` with the re-synthesized theme. Colors must
+   * be valid hex values; anything else throws and nothing is written.
+   * @param patch - the inputs to change; omitted inputs keep their values.
+   */
+  setCustom(patch: Partial<CustomThemeInputs>): void {
+    const next: CustomThemeInputs = {
+      scheme: patch.scheme ?? this.custom.scheme,
+      canvas: patch.canvas === undefined ? this.custom.canvas : normalizeHexColor(patch.canvas),
+      accent: patch.accent === undefined ? this.custom.accent : normalizeHexColor(patch.accent),
+    }
+    const changed = next.scheme !== this.custom.scheme
+      || next.canvas !== this.custom.canvas
+      || next.accent !== this.custom.accent
+    const switching = this.preference !== CUSTOM_THEME_ID
+    if (!changed && !switching) return
+    const ops = [
+      ...(next.scheme !== this.custom.scheme ? [{ op: 'set' as const, path: [CUSTOM_SCHEME_FIELD], value: next.scheme }] : []),
+      ...(next.canvas !== this.custom.canvas ? [{ op: 'set' as const, path: [CUSTOM_CANVAS_FIELD], value: next.canvas }] : []),
+      ...(next.accent !== this.custom.accent ? [{ op: 'set' as const, path: [CUSTOM_ACCENT_FIELD], value: next.accent }] : []),
+      ...(switching ? [{ op: 'set' as const, path: [THEME_PREFERENCE_FIELD], value: CUSTOM_THEME_ID }] : []),
+    ]
+    this.custom = next
+    this.preference = CUSTOM_THEME_ID
+    this.write(() => this.host.mutate(ops))
     this.publish()
   }
 
@@ -288,18 +326,21 @@ export class ThemeRuntime {
     })
   }
 
-  /** Adopt the scope's accepted durable preference without writing it back. */
+  /** Adopt the scope's accepted durable preference and custom inputs without writing them back. */
   private adopt(): void {
     if (this.pendingWrites > 0) return
     const section = this.host.getSnapshot().value
     if (section === undefined) return
     const fontFamilies = durableFontFamilies(section)
     const fontSizes = sectionFontSizes(section)
+    const custom = sectionCustomInputs(section)
     if (this.preference === section.preference
+      && this.custom.scheme === custom.scheme && this.custom.canvas === custom.canvas && this.custom.accent === custom.accent
       && FONT_ROLES.every(role => this.fontSizes[role] === fontSizes[role] && this.fontFamilies[role] === fontFamilies[role])) return
     this.preference = section.preference
     this.fontSizes = fontSizes
     this.fontFamilies = fontFamilies
+    this.custom = custom
     this.publish()
   }
 
@@ -360,16 +401,18 @@ export class ThemeRuntime {
       ? (this.media?.matches === true ? 'dark' : 'light')
       : this.preference
     // Both built-ins always exist; a registered preference id resolves or has
-    // been reset by its disposer, so the lookup cannot miss.
-    const active = this.themes.find(t => t.id === resolvedId)
+    // been reset by its disposer, so the lookup cannot miss. `custom` carries
+    // its own synthesis.
+    const active = resolvedId === CUSTOM_THEME_ID ? synthesizeCustomTheme(this.custom) : this.themes.find(t => t.id === resolvedId)
     /* v8 ignore next 2 -- needs a registry without light/dark, which register()/dispose() cannot produce */
     if (active === undefined) throw new Error(`theme registry lost "${resolvedId}"`)
     return Object.freeze({
       preference: this.preference,
       fontSizes: this.fontSizes,
       fontFamilies: this.fontFamilies,
+      custom: this.custom,
       active: this.composeActive(active),
-      themes: Object.freeze([...this.themes]),
+      themes: Object.freeze([...this.themes, synthesizeCustomTheme(this.custom)]),
       revision: this.revision,
     })
   }
@@ -434,6 +477,22 @@ function durableFontFamilies(section: ThemeSettings): FontFamilies {
     code: normalizeFontFamily(section.codeFontFamily),
     terminal: normalizeFontFamily(section.terminalFontFamily),
   })
+}
+
+/**
+ * Custom theme inputs from one accepted settings section. Documents written
+ * before the custom fields existed carry none, and hand-edited documents may
+ * hold raw values; missing or malformed fields fall back to the custom schema
+ * defaults, mirroring what validation would have filled in.
+ * @param section - accepted settings section.
+ * @returns the scheme, canvas, and accent inputs.
+ */
+function sectionCustomInputs(section: ThemeSettings): CustomThemeInputs {
+  return {
+    scheme: section.customScheme === 'dark' ? 'dark' : 'light',
+    canvas: isHexColor(section.customCanvas) ? normalizeHexColor(section.customCanvas) : DEFAULT_CUSTOM_CANVAS,
+    accent: isHexColor(section.customAccent) ? normalizeHexColor(section.customAccent) : DEFAULT_CUSTOM_ACCENT,
+  }
 }
 
 /**

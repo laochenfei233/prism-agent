@@ -30,7 +30,7 @@ describe('ThemeRuntime', () => {
     // jsdom matchMedia is absent; system resolves to light.
     expect(snapshot.active.id).toBe('light')
     expect(snapshot.active.colorScheme).toBe('light')
-    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
+    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
   })
 
   it('switches to a designed built-in theme and persists it through the scope', () => {
@@ -208,13 +208,13 @@ describe('ThemeRuntime', () => {
     const { theme, events, host } = make()
     const dispose = theme.register({ id: 'sepia', colorScheme: 'light', tokens: { '--dsw-alias-bg-base': 'red' } })
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'sepia'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'sepia', 'custom'])
     theme.setTheme('sepia')
     expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('red')
     dispose()
     expect(theme.getTheme().preference).toBe('system')
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
     // Custom ids are in-process extension themes; only the built-in product
     // preferences cross the Host settings schema.
     expect(host.set).not.toHaveBeenCalled()
@@ -379,6 +379,102 @@ describe('ThemeRuntime', () => {
       expect(media.listenerCount()).toBe(1)
       await ctx.fiber.dispose()
       expect(media.listenerCount()).toBe(0)
+    })
+  })
+
+  describe('custom theme', () => {
+    it('activates the synthesized custom theme and appends it to the gallery', () => {
+      const { theme, events, host } = make()
+      theme.setTheme('custom')
+      const snapshot = theme.getTheme()
+      expect(snapshot.preference).toBe('custom')
+      expect(snapshot.active.id).toBe('custom')
+      expect(snapshot.active.colorScheme).toBe('light')
+      expect(snapshot.active.tokens['--dsw-alias-bg-base']).toBe('#ffffff')
+      expect(snapshot.active.tokens['--dsw-alias-brand-primary']).toBe('#ff6900')
+      expect(snapshot.custom).toEqual({ scheme: 'light', canvas: '#ffffff', accent: '#ff6900' })
+      expect(snapshot.themes.map(t => t.id)).toEqual([
+        'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom',
+      ])
+      expect(host.set).toHaveBeenCalledWith('preference', 'custom')
+      expect(events).toHaveLength(1)
+    })
+
+    it('writes changed inputs and the preference switch in one mutation', () => {
+      const { theme, events, host } = make()
+      theme.setCustom({ scheme: 'dark', canvas: '#112233', accent: '#00ff00' })
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('dark')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#112233')
+      expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#00ff00')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#112233', accent: '#00ff00' })
+      expect(host.mutate).toHaveBeenCalledWith([
+        { op: 'set', path: ['customScheme'], value: 'dark' },
+        { op: 'set', path: ['customCanvas'], value: '#112233' },
+        { op: 'set', path: ['customAccent'], value: '#00ff00' },
+        { op: 'set', path: ['preference'], value: 'custom' },
+      ])
+      expect(events).toHaveLength(1)
+    })
+
+    it('switches to custom with unchanged inputs writing only the preference', () => {
+      const { theme, host } = make()
+      theme.setCustom({})
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(host.mutate).toHaveBeenCalledWith([{ op: 'set', path: ['preference'], value: 'custom' }])
+    })
+
+    it('edits one input while custom is active without rewriting the preference', () => {
+      const { theme, host } = make()
+      theme.setTheme('custom')
+      theme.setCustom({ accent: '#00ff00' })
+      expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#00ff00')
+      expect(host.mutate).toHaveBeenLastCalledWith([{ op: 'set', path: ['customAccent'], value: '#00ff00' }])
+    })
+
+    it('no-ops when custom is already active with the same inputs', () => {
+      const { theme, events, host } = make()
+      theme.setTheme('custom')
+      const writes = host.mutate.mock.calls.length
+      theme.setCustom({})
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(host.mutate.mock.calls).toHaveLength(writes)
+      expect(events).toHaveLength(1)
+    })
+
+    it('throws on a malformed color and writes nothing', () => {
+      const { theme, events, host } = make()
+      expect(() => { theme.setCustom({ canvas: 'orange' }) }).toThrow('not a hex color')
+      expect(theme.getTheme().preference).toBe('system')
+      expect(host.mutate).not.toHaveBeenCalled()
+      expect(events).toHaveLength(0)
+    })
+
+    it('adopts a stored custom theme from the Host section', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customScheme: 'dark', customCanvas: '#000000', customAccent: '#ff6900',
+      }, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('dark')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#000000')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#000000', accent: '#ff6900' })
+    })
+
+    it('falls back to the custom defaults for sections without the custom fields', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+      }, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().active.id).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('light')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#ffffff')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'light', canvas: '#ffffff', accent: '#ff6900' })
     })
   })
 })
