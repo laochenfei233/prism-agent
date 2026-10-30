@@ -24,7 +24,7 @@ kind: "package-reference"
 
 宿主半区是 `dsh-web-app` 中的一行 Loader 行（`prism-backup`），需要 `connection`、`storageDomain`、`credentials`。它只注册一条路由 `POST /api/prism.backup`，缓冲的 JSON 体携带 `{ "action": "state" | "test" | "run" }`。应答为 `{ ok: true, value }` 或 `{ ok: false, error: { code, message } }`，HTTP 状态由 code 决定：`prism-backup/bad-request` 为 `400`，`prism-backup/busy` 为 `409`，其余配置或供应商失败为 `502`。这条路由是设置页唯一的宿主调用，其他一切走既有通道。
 
-配置是一个实时分区：`targetType` 选择目标，对应类型的字段填写它，`includeSettings`/`includeMemory`/`includeProjects` 与 `projectExcludes`、`maxBackups` 决定归档内容与保留。运行开始时读取一次实时值，且单飞：已有运行在途时第二次请求应答 `prism-backup/busy`，不排队。运行或测试连接之前不要求字段完整 —— 这正是用户可以先切换协议再逐项填写的原因；缺字段时运行以 `prism-backup/not-configured` 失败并点名该字段。
+配置是一个实时分区：`targetType` 选择目标，对应类型的字段填写它，`includeSettings`/`includeMemory`/`includeProjects` 与 `projectExcludes`、`maxBackups` 决定归档内容与保留。运行开始时读取一次实时值，且单飞：运行名额在解析策略之前就被占住，因此同一 tick 内到达的两个请求只产生一次运行与一次 `prism-backup/busy` 拒绝。运行或测试连接之前不要求字段完整 —— 这正是用户可以先切换协议再逐项填写的原因；缺字段时运行以 `prism-backup/not-configured` 失败并点名该字段。
 
 密码绝不进 Config：WebDAV 密码、SMB 密码、S3 secret access key 都是凭据引用（`PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY`），由页面经 `remote.credentials` 写入，运行时解析一次。页面只渲染是否已存储。
 
@@ -32,7 +32,7 @@ kind: "package-reference"
 
 | 成员 | 来源 |
 | --- | --- |
-| `prism-backup/manifest.json` | 格式版本、创建时刻、应用名与版本、平台、各来源计数、缺失来源、跳过条目 |
+| `prism-backup/manifest.json` | 格式版本、创建时刻、应用名与版本、平台、各来源计数与字节总量、缺失来源、跳过条目 |
 | `prism-backup/settings/profile-cordis.patch.yml` | 活动 profile 的 patch 文件 |
 | `prism-backup/settings/home-cordis.patch.yml` | `$DSH_HOME/cordis.patch.yml` |
 | `prism-backup/settings/env` | `$DSH_HOME/.env` |
@@ -41,7 +41,7 @@ kind: "package-reference"
 | `prism-backup/workspace/registry.json` | 工作区注册表 |
 | `prism-backup/projects/<序号>-<名称>/**` | 每个已注册项目文件夹，去掉被排除的路径段 |
 
-可选成员在源存在时打包，否则在 manifest 中记为缺失；消失的项目文件夹只记一条警告，不使备份失败。归档写在上传期间的 `$DSH_HOME/cache/backups`，之后删除。轮换列出远程目录，保留最新的 `maxBackups` 个归档（含刚写入的这个；`0` 表示全留），删除其余。
+可选成员在源存在时打包，否则在 manifest 中记为缺失；消失的项目文件夹只记一条警告，不使备份失败。归档写在上传期间的 `$DSH_HOME/cache/backups`，之后删除。轮换列出远程目录，保留最新的 `maxBackups` 个归档（含刚写入的这个；`0` 表示全留），删除其余；每个传输都返回所请求目录下的名称，因此返回完整键名的存储也能正确轮换。运行记录保留目标对象键、脱敏端点（去掉 URL userinfo）、归档大小与各来源计数。历史存放在 `prism_backup` 存储域；该存储无法打开时降级为空历史并记录一条警告，而不是让插件失败。
 
 ### 配置
 
@@ -83,6 +83,8 @@ kind: "package-reference"
 - 尚未实现恢复：归档通过 manifest 自描述，但目前没有任何代码把它读回 Harness 主目录。
 - 没有定时。备份只在用户按下按钮时运行，关掉的宿主什么也不备份。
 - 同一时刻只有一个目标。切换协议会保留其他协议的字段在同一分区里，但只运行选中的那个，因此两个目标需要两次手动运行。
+- S3 轮换只读一页 `ListObjectsV2`，因此最多依据 1000 个归档判断；目录更大时保留的是这一页内最新的那些。
+- 写入历史被拒的运行仍报告成功、归档也仍然落盘；损失的只有持久化历史。
 - SMB 走操作系统的文件会话。Windows 路径在存有密码时会执行一次 `net use` 引导，该调用的密码参数在进程表中可见；macOS 与 Linux 需要预先挂载共享。
 - 归档内含 `.env` 与 `.credentials.yaml`，目标必须是用户信任的服务器。
 - 会话数据被有意排除；它有自己位于 [`dsh-session-log-export`](../../session-query/session-log-export/README.zh.md) 的导出功能。

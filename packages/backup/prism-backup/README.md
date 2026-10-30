@@ -24,7 +24,7 @@ English | [中文](README.zh.md)
 
 The Host half is one Loader row in `dsh-web-app` (`prism-backup`) and needs `connection`, `storageDomain`, and `credentials`. It registers exactly one route, `POST /api/prism.backup`, whose buffered JSON body carries `{ "action": "state" | "test" | "run" }`. Answers are `{ ok: true, value }` or `{ ok: false, error: { code, message } }` with the HTTP status implied by the code: `400` for `prism-backup/bad-request`, `409` for `prism-backup/busy`, and `502` for every provider or configuration failure. The route is the settings page's only Host call; everything else rides existing surfaces.
 
-Configuration is one live section: `targetType` selects the destination, the per-type fields fill it in, and `includeSettings`/`includeMemory`/`includeProjects` plus `projectExcludes` and `maxBackups` decide the archive and its retention. A run reads the live values once at its start and is single-flight: a second request while one is active answers `prism-backup/busy` instead of queueing. Nothing is required to be complete until a run or a connection test starts, which is what lets a user switch protocols and fill the new fields in order; a missing field then fails with `prism-backup/not-configured` naming it.
+Configuration is one live section: `targetType` selects the destination, the per-type fields fill it in, and `includeSettings`/`includeMemory`/`includeProjects` plus `projectExcludes` and `maxBackups` decide the archive and its retention. A run reads the live values once at its start and is single-flight: the run slot is claimed before the policy is resolved, so two requests arriving in the same tick produce one run and one `prism-backup/busy` refusal. Nothing is required to be complete until a run or a connection test starts, which is what lets a user switch protocols and fill the new fields in order; a missing field then fails with `prism-backup/not-configured` naming it.
 
 Passwords never enter the Config: the WebDAV password, the SMB password, and the S3 secret access key are credential references (`PRISM_BACKUP_WEBDAV_PASSWORD`, `PRISM_BACKUP_SMB_PASSWORD`, `PRISM_BACKUP_S3_SECRET_KEY`) written from the page through `remote.credentials` and resolved once per run. The page renders only whether one is stored.
 
@@ -32,7 +32,7 @@ Passwords never enter the Config: the WebDAV password, the SMB password, and the
 
 | Member | Source |
 | --- | --- |
-| `prism-backup/manifest.json` | format version, creation instant, app name and version, platform, per-source counts, absent sources, skipped entries |
+| `prism-backup/manifest.json` | format version, creation instant, app name and version, platform, per-source counts and byte totals, absent sources, skipped entries |
 | `prism-backup/settings/profile-cordis.patch.yml` | the active profile's patch file |
 | `prism-backup/settings/home-cordis.patch.yml` | `$DSH_HOME/cordis.patch.yml` |
 | `prism-backup/settings/env` | `$DSH_HOME/.env` |
@@ -41,7 +41,7 @@ Passwords never enter the Config: the WebDAV password, the SMB password, and the
 | `prism-backup/workspace/registry.json` | the workspace registry |
 | `prism-backup/projects/<index>-<name>/**` | each registered project folder, minus excluded segments |
 
-Every optional member ships when its source exists and is listed as absent otherwise; a project folder that disappeared is a warning in the manifest, not a failed backup. The archive is written to `$DSH_HOME/cache/backups` while it uploads and deleted afterwards. Rotation lists the remote directory, keeps the newest `maxBackups` archives (including the one just written; `0` keeps all), and deletes the rest.
+Every optional member ships when its source exists and is listed as absent otherwise; a project folder that disappeared is a warning in the manifest, not a failed backup. The archive is written to `$DSH_HOME/cache/backups` while it uploads and deleted afterwards. Rotation lists the remote directory, keeps the newest `maxBackups` archives (including the one just written; `0` keeps all), and deletes the rest; every transport answers names below the requested directory, so a store that reports full keys rotates correctly too. A run record keeps the destination object key, the sanitized endpoint (URL userinfo stripped), the archive size, and the per-source counts. History lives in the `prism_backup` storage domain and degrades to empty — with one logged warning — when that store cannot open, rather than failing the plugin.
 
 ### Config
 
@@ -83,6 +83,8 @@ No direct effect; a backup never reads or writes a model request context.
 - Restore is not implemented: an archive is self-describing through its manifest, but nothing reads it back into a Harness home yet.
 - There is no schedule. Backups run only when the user presses the button, and a Host that is closed backs up nothing.
 - One target exists at a time. Switching protocols keeps the other protocols' fields in the same section but runs only the selected one, so two destinations need two manual runs.
+- S3 rotation reads one `ListObjectsV2` page, so it reasons about at most 1000 archives; a wider directory keeps the newest page's worth.
+- A run whose history append is refused still reports success and its archive still lands; only durable history is lost.
 - SMB runs through the operating system's file session. A Windows path gets one `net use` bootstrap when a password is stored, and that call's password argument is visible in the process table; macOS and Linux need the share mounted already.
 - The archive contains `.env` and `.credentials.yaml`, so the destination must be a server the user trusts.
 - Session data is deliberately excluded; it has its own export under [`dsh-session-log-export`](../../session-query/session-log-export/README.md).
