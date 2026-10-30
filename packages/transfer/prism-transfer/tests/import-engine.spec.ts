@@ -138,7 +138,7 @@ function buildDeps(options: {
 }): TransferImportDeps {
   const persistence = fakePersistence(options.existing ?? new Set())
   const workspaces = fakeWorkspaces()
-  const attachments = fakeAttachments({ saveImageId: options.saveImageId })
+  const attachments = fakeAttachments(options.saveImageId === undefined ? {} : { saveImageId: options.saveImageId })
   return {
     persistence: persistence.persistence,
     workspaces: workspaces.workspaces,
