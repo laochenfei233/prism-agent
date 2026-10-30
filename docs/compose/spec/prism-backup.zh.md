@@ -1,9 +1,9 @@
 ---
 feature: prism-backup
-status: in-progress
+status: delivered
 updated: 2026-10-30
 branch: feat/prism-backup (worktree .worktrees/prism-backup)
-commits: 1a63913b (base)..delivery worktree
+commits: 1a63913b (base)..66821c5a（另含 master 合并 771926f1）
 ---
 
 # Prism 备份
@@ -11,6 +11,20 @@ commits: 1a63913b (base)..delivery worktree
 [English](prism-backup.md) | 中文
 
 ## 报告
+
+**构建了什么** —— `@prism/prism-backup` 在应用设置页加入一个备份分区并让它真正可用：分区选择 WebDAV、SMB 或 S3 之一，填写该协议的字段，决定三份数据里包含哪些，并提供“测试连接”与“立即备份”。一次运行读取一次实时配置，把 profile 与 home 两层 `cordis.patch.yml`、`.env`、`.credentials.yaml`、长期记忆存储、工作区注册表以及每个已注册项目文件夹收集成单个带自描述 manifest 的 zip，上传到所选目标，按用户选择的保留数清理旧归档，并追加一条页面会列出的运行记录。密码绝不进入配置：它们是凭据引用 `PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY`，由页面写入、每次运行解析一次。
+
+宿主半区是一个插件加一条 POST 路由（`/api/prism.backup`），因为备份是带进度的文件传输而不是 JSON Remote 调用；配置走既有配置表单面，密钥走既有凭据面，历史走 `prism_backup` 下的普通存储域。传输实现手写于进程全局 fetch（WebDAV 动词、S3 的 header 形式 SigV4）与操作系统的文件会话（SMB，存有密码时在 Windows 执行一次 `net use` 引导）。这里没有任何模型可见的东西：不注册提示词、工具或会话事件。
+
+**验证** —— `node node_modules/vitest/vitest.mjs run packages/backup/prism-backup/tests`：133 个测试通过，`--coverage` 在 `packages/backup/prism-backup/src` 下每个文件报告 100% 语句、分支、函数与行。`tsc -b tsconfig.host.json` 与 `tsc -b tsconfig.client.json` 通过；`scripts/build.ts --scope artifacts` 与随后的 `--scope check` 通过；oxlint 对本包源码与测试无告警。本次改动触及的门禁全部通过：`gen-config-catalog --check`、`gen-plugin-packages --check`、`gen-client-catalog --check`、`verify-package-readme-summaries`、`verify-package-readme-model-experience`、`verify-package-readme-limitations`、`verify-client-ui-i18n`、`verify-export-jsdoc`、`verify-no-unknown-casts`、`verify-md-wrap`、`verify-md-links`、`verify-translation-pairing`、`check-workspace-constraints`、`verify-default-product-isolation`、`verify-dsh-package-licenses`、`verify-application-entrypoints`。本机上 PRE-EXISTING、在 master `8d388f0a8c` 上相同的失败：`verify-cordis-config`（一个 `apps/cli` profile 夹具，以及 `@prism/prism-session-import` 缺少裸 `tsconfig.base.json` 别名）、`verify-product-use`（同一别名）、`gen-doc-graphs --check`（A7 未完成导入带来的 24 条 cron 类型链接行）。`jscpd` 在该 worktree 无法启动（其自身模块解析失败），克隆检测留给 CI。合并 master 后 `pnpm install --offline` 也失败，因为本地镜像缺少网站依赖 `@algolia/abtesting` 的元数据；已安装的 `node_modules` 对上述所有检查仍可用。
+
+**历程记录**
+
+- 最初的设计给功能配了独立的 Typert Remote 命名空间。那要求包位于 `packages/`（生成器只注册那里的工程），还要在 `@deepseek-ai/dsh-api-remotes` 挂载生成的 contribution。改用一条 `ctx.connection.fetch.register` POST 路由 —— 与 `dsh-client-file-upload` 出于同样理由使用的通道 —— 去掉了代码生成、装配改动和整套失败词汇，spec 记录了这一转向。
+- AWS 文档的 “GET Object” 示例与实现不符，直到把签名器改成只签调用方实际发送的 header；此后 AWS Signature Version 4 测试套件的 `get-vanilla` 向量无需修改即通过。调用方提供的 `x-amz-date` 还必须决定凭据 scope，第一版搞错了这一点。
+- 评审发现三个被测试掩盖的缺陷：web bundle 从未声明该包（该行无法解析）、S3 列表返回完整键名使轮换静默匹配为空、单飞守卫位于 `await` 之前使同一 tick 的两个请求都执行。三者现在都有在旧代码上会失败的测试。
+- 有两条 spec 说法属于断言过度而非代码缺陷，改为收窄而不是“修代码”：必填配置字段在运行开始时解析（而不是模式 `.check()`，后者会在切换协议后的第一次保存就拒绝）；只有读取来源抛 `collect-failed`（压缩与暂存仍为 `failed`）。
+
 
 ## [S1] 问题
 
@@ -82,24 +96,24 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ## 任务
 
-- [ ] T1：搭建包 —— manifest、face 配置、经 `clientBundle` 的 tsdown（host 阶段）、web-app loader 行、服务与路由；`build:artifacts` 与 web profile 启动保持绿（依赖：无）
-- [ ] T2：带校验的 Config 模式、凭据引用解析、`prism_backup` 存储域（依赖：T1）
-- [ ] T3：WebDAV、S3（SigV4 对照公开向量）、SMB 传输与单元测试（依赖：T1）
-- [ ] T4：编排器 —— 收集、压缩、上传、轮换、阶段、历史 —— 用假传输做集成测试（依赖：T2、T3）
-- [ ] T5：POST 路由、失败 code 表、宿主侧 spec（依赖：T4）
-- [ ] T6：客户端设置页、locale 对、插槽注册、run/test/state 的 fetch 接线（依赖：T5）
-- [ ] T7：README 对、divergence 索引 A11 区、如生成器扫描本包则再生成 config catalog（依赖：T6）
-- [ ] T8：完整验证 —— 构建、测试、覆盖率、typecheck、文档与 i18n 门禁（依赖：T7）
-- [ ] T9：评审发现 —— bundle 依赖、S3 列表名称、单飞占位、分阶段失败 code、manifest 字节与对象键、刷新后跟随运行、多行排除控件、清除密码控件（依赖：T8）
+- [x] T1：搭建包 —— manifest、face 配置、经 `clientBundle` 的 tsdown（host 阶段）、web-app loader 行、服务与路由；`build:artifacts` 与 web profile 启动保持绿（依赖：无）
+- [x] T2：带校验的 Config 模式、凭据引用解析、`prism_backup` 存储域（依赖：T1）
+- [x] T3：WebDAV、S3（SigV4 对照公开向量）、SMB 传输与单元测试（依赖：T1）
+- [x] T4：编排器 —— 收集、压缩、上传、轮换、阶段、历史 —— 用假传输做集成测试（依赖：T2、T3）
+- [x] T5：POST 路由、失败 code 表、宿主侧 spec（依赖：T4）
+- [x] T6：客户端设置页、locale 对、插槽注册、run/test/state 的 fetch 接线（依赖：T5）
+- [x] T7：README 对、divergence 索引 A11 区、如生成器扫描本包则再生成 config catalog（依赖：T6）
+- [x] T8：完整验证 —— 构建、测试、覆盖率、typecheck、文档与 i18n 门禁（依赖：T7）
+- [x] T9：评审发现 —— bundle 依赖、S3 列表名称、单飞占位、分阶段失败 code、manifest 字节与对象键、刷新后跟随运行、多行排除控件、清除密码控件（依赖：T8）
 
 ## [S4] 验收
 
-- [ ] web bundle 声明该包，Loader 以裸包名启动该行，客户端设置页渲染出备份分区。
-- [ ] 保存连接字段会持久化到 profile patch；密码只经凭据面写入，其值落在 `.credentials.yaml`，Config 字段与 patch 行都无法承载密码。
-- [ ] `test` 按活动类型报告可达性，失败时给出可操作的信息。
-- [ ] WebDAV 传输上传的 zip 成员、manifest 计数与 manifest 字节总量都与计划一致。
-- [ ] SigV4 签名匹配 AWS 公开向量，且 S3 传输只签名它实际发送的 header。
-- [ ] 轮换保留 `maxBackups` 个压缩包并删除更老的，包括存储返回完整键名的情况。
-- [ ] 同一 tick 内发起两次运行只产生一次运行与一次 `busy` 拒绝。
-- [ ] 历史保持在 20 条以内，经存储域在服务重启后仍在；存储无法打开时降级而不是失败。
-- [ ] 工作树上 `typecheck`（两个聚合）、`build:artifacts` + `build:check` 与文档/i18n 门禁通过；`packages/backup/prism-backup/src` 下每个文件覆盖率 100%。
+- [x] web bundle 声明该包，Loader 以裸包名启动该行，客户端设置页渲染出备份分区。
+- [x] 保存连接字段会持久化到 profile patch；密码只经凭据面写入，其值落在 `.credentials.yaml`，Config 字段与 patch 行都无法承载密码。
+- [x] `test` 按活动类型报告可达性，失败时给出可操作的信息。
+- [x] WebDAV 传输上传的 zip 成员、manifest 计数与 manifest 字节总量都与计划一致。
+- [x] SigV4 签名匹配 AWS 公开向量，且 S3 传输只签名它实际发送的 header。
+- [x] 轮换保留 `maxBackups` 个压缩包并删除更老的，包括存储返回完整键名的情况。
+- [x] 同一 tick 内发起两次运行只产生一次运行与一次 `busy` 拒绝。
+- [x] 历史保持在 20 条以内，经存储域在服务重启后仍在；存储无法打开时降级而不是失败。
+- [x] 工作树上 `typecheck`（两个聚合）、`build:artifacts` + `build:check` 与文档/i18n 门禁通过；`packages/backup/prism-backup/src` 下每个文件覆盖率 100%。

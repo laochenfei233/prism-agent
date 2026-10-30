@@ -1,9 +1,9 @@
 ---
 feature: prism-backup
-status: in-progress
+status: delivered
 updated: 2026-10-30
 branch: feat/prism-backup (worktree .worktrees/prism-backup)
-commits: 1a63913b (base)..delivery worktree
+commits: 1a63913b (base)..66821c5a (plus the master merge 771926f1)
 ---
 
 # Prism Backup
@@ -11,6 +11,20 @@ commits: 1a63913b (base)..delivery worktree
 English | [中文](prism-backup.zh.md)
 
 ## Report
+
+**What was built** — `@prism/prism-backup` puts a Backup section in the application's settings page and makes it work: the section picks one of WebDAV, SMB, or S3, fills in that protocol's fields, decides which of the three data sets to include, and offers Test connection and Back up now. A run reads the live configuration once, collects the profile and home `cordis.patch.yml` layers, `.env`, `.credentials.yaml`, the long-term memory store, the workspace registry, and every registered project folder into a single zip with a self-describing manifest, uploads it to the selected destination, prunes older archives beyond the retention the user chose, and appends one run record the page lists. Passwords never enter configuration: they are the credential references `PRISM_BACKUP_WEBDAV_PASSWORD`, `PRISM_BACKUP_SMB_PASSWORD`, and `PRISM_BACKUP_S3_SECRET_KEY`, written from the page and resolved once per run.
+
+The Host half is one plugin with one POST route (`/api/prism.backup`), because a backup is a file transfer with progress rather than a JSON Remote call; settings rides the existing configuration-form surface, secrets ride the existing credential surface, and history rides the ordinary storage domain under `prism_backup`. Transports are hand-written over the process-global fetch (WebDAV verbs, header-form SigV4 for S3) and the operating system's file session (SMB, with one Windows `net use` bootstrap when a password is stored). Nothing here is model-visible: no prompt, tool, or session event is registered.
+
+**Verification** — `node node_modules/vitest/vitest.mjs run packages/backup/prism-backup/tests`: 133 tests pass, and `--coverage` reports 100% statements, branches, functions, and lines on every `packages/backup/prism-backup/src` file. `tsc -b tsconfig.host.json` and `tsc -b tsconfig.client.json` pass; `scripts/build.ts --scope artifacts` then `--scope check` pass; oxlint is clean on the package's sources and tests. The gates that this change touches pass: `gen-config-catalog --check`, `gen-plugin-packages --check`, `gen-client-catalog --check`, `verify-package-readme-summaries`, `verify-package-readme-model-experience`, `verify-package-readme-limitations`, `verify-client-ui-i18n`, `verify-export-jsdoc`, `verify-no-unknown-casts`, `verify-md-wrap`, `verify-md-links`, `verify-translation-pairing`, `check-workspace-constraints`, `verify-default-product-isolation`, `verify-dsh-package-licenses`, `verify-application-entrypoints`. PRE-EXISTING failures on this machine, identical at master `8d388f0a8c`: `verify-cordis-config` (an `apps/cli` profile fixture, and `@prism/prism-session-import` missing a bare `tsconfig.base.json` alias), `verify-product-use` (the same alias), and `gen-doc-graphs --check` (24 cron type-link rows from the unfinished A7 import). `jscpd` could not start in this worktree (its own module resolution fails), so clone detection is left to CI. `pnpm install --offline` also fails after the master merge because the local mirror lacks metadata for the website's `@algolia/abtesting`; the installed `node_modules` stayed usable for every check above.
+
+**Journey log**
+
+- The first design gave the feature its own Typert Remote namespace. That needs the package under `packages/` (the generator only registers projects there), and it needed a generated contribution mounted in `@deepseek-ai/dsh-api-remotes`. Replacing it with one `ctx.connection.fetch.register` POST route — the channel `dsh-client-file-upload` uses for the same reason — removed the codegen, the assembly edit, and a whole failure vocabulary, and the spec recorded the pivot.
+- The AWS documentation's "GET Object" example did not match the implementation until the signer was generalized to sign exactly the headers a caller sends; the AWS Signature Version 4 test-suite `get-vanilla` vector then passed unmodified. A caller-supplied `x-amz-date` also has to decide the credential scope, which the first version got wrong.
+- Review found three defects that the tests had hidden: the web bundle never declared the package (the row could not resolve), S3 listings returned full keys so rotation silently matched nothing, and the single-flight guard sat before an `await` so two requests in one tick both ran. Each now has a test that fails on the old code.
+- Two spec claims were over-claims rather than code defects and were narrowed instead of "fixed": required configuration fields are resolved when a run starts (not by a schema `.check()`, which would refuse the first save after a protocol switch), and only reading the sources raises `collect-failed` (compression and staging stay `failed`).
+
 
 ## [S1] Problem
 
@@ -82,24 +96,24 @@ A `settings.section` registration (id `backup`, order `25`, after agent presets)
 
 ## Tasks
 
-- [ ] T1: scaffold the package — manifest, face configs, tsdown via `clientBundle` (host phase), the web-app loader row, service and route; `build:artifacts` and a web-profile boot stay green (depends: none)
-- [ ] T2: Config schema with checks, credential-reference resolution, `prism_backup` storage domain (depends: T1)
-- [ ] T3: WebDAV, S3 (SigV4 against published vectors), and SMB transports with unit tests (depends: T1)
-- [ ] T4: orchestrator — collect, zip, upload, rotate, phases, history — with integration tests over a fake transport (depends: T2, T3)
-- [ ] T5: the POST route, failure-code table, and host-side specs (depends: T4)
-- [ ] T6: client settings page, locale pair, slot registration, run/test/state fetch wiring (depends: T5)
-- [ ] T7: README pair, divergence index area A11, config-catalog regeneration if the generator scans the package (depends: T6)
-- [ ] T8: full verification — build, tests, coverage, typecheck, doc and i18n gates (depends: T7)
-- [ ] T9: review findings — bundle dependency, S3 listing names, single-flight claim, stage-specific failure codes, manifest bytes and object key, reload polling, multiline exclusions, clear-secret control (depends: T8)
+- [x] T1: scaffold the package — manifest, face configs, tsdown via `clientBundle` (host phase), the web-app loader row, service and route; `build:artifacts` and a web-profile boot stay green (depends: none)
+- [x] T2: Config schema with checks, credential-reference resolution, `prism_backup` storage domain (depends: T1)
+- [x] T3: WebDAV, S3 (SigV4 against published vectors), and SMB transports with unit tests (depends: T1)
+- [x] T4: orchestrator — collect, zip, upload, rotate, phases, history — with integration tests over a fake transport (depends: T2, T3)
+- [x] T5: the POST route, failure-code table, and host-side specs (depends: T4)
+- [x] T6: client settings page, locale pair, slot registration, run/test/state fetch wiring (depends: T5)
+- [x] T7: README pair, divergence index area A11, config-catalog regeneration if the generator scans the package (depends: T6)
+- [x] T8: full verification — build, tests, coverage, typecheck, doc and i18n gates (depends: T7)
+- [x] T9: review findings — bundle dependency, S3 listing names, single-flight claim, stage-specific failure codes, manifest bytes and object key, reload polling, multiline exclusions, clear-secret control (depends: T8)
 
 ## [S4] Acceptance
 
-- [ ] The web bundle declares the package, Loader boots the row from its bare name, and the client renders a Backup section in settings.
-- [ ] Saving connection fields persists them to the profile patch; passwords are written only through the credential surface, whose values live in `.credentials.yaml`, and no Config field or patch row can carry one.
-- [ ] `test` reports reachability per active type with an actionable failure message.
-- [ ] The WebDAV transport uploads one zip whose members, manifest counts, and manifest byte totals match the plan.
-- [ ] SigV4 signing matches AWS's published vector, and the S3 transport signs exactly the headers it sends.
-- [ ] Rotation keeps `maxBackups` archives and deletes the oldest beyond it, including when the store lists full keys.
-- [ ] Two runs starting in the same tick produce one run and one `busy` refusal.
-- [ ] History stays bounded at 20 records, survives a service restart through the storage domain, and degrades instead of failing when the store cannot open.
-- [ ] `typecheck` (both aggregates), `build:artifacts` + `build:check`, and the doc/i18n gates pass on the worktree; every `packages/backup/prism-backup/src` file is at 100% coverage.
+- [x] The web bundle declares the package, Loader boots the row from its bare name, and the client renders a Backup section in settings.
+- [x] Saving connection fields persists them to the profile patch; passwords are written only through the credential surface, whose values live in `.credentials.yaml`, and no Config field or patch row can carry one.
+- [x] `test` reports reachability per active type with an actionable failure message.
+- [x] The WebDAV transport uploads one zip whose members, manifest counts, and manifest byte totals match the plan.
+- [x] SigV4 signing matches AWS's published vector, and the S3 transport signs exactly the headers it sends.
+- [x] Rotation keeps `maxBackups` archives and deletes the oldest beyond it, including when the store lists full keys.
+- [x] Two runs starting in the same tick produce one run and one `busy` refusal.
+- [x] History stays bounded at 20 records, survives a service restart through the storage domain, and degrades instead of failing when the store cannot open.
+- [x] `typecheck` (both aggregates), `build:artifacts` + `build:check`, and the doc/i18n gates pass on the worktree; every `packages/backup/prism-backup/src` file is at 100% coverage.
