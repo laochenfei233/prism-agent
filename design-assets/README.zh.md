@@ -12,7 +12,7 @@ Prism 品牌标识矢量源与从 Prism-Agent 旧代码库提取的设计内容�
 
 | 文件 | 说明 |
 | --- | --- |
-| prism-icon-badge.svg / prism-mark.svg | 现行品牌标识矢量源，见 [app-icons/README.zh.md](app-icons/README.zh.md) |
+| prism-icon-badge.svg / prism-icon-badge-windows.svg / prism-mark.svg | 现行品牌标识矢量源，见 [app-icons/README.zh.md](app-icons/README.zh.md) |
 
 ### agent-logos/
 
