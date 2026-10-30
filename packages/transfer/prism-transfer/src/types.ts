@@ -189,6 +189,8 @@ export interface ImportedProjectResult {
   readonly sessions: number
   /** Sessions skipped because their id already existed. */
   readonly duplicates: number
+  /** Present when the files are restored but registration failed. */
+  readonly registerError?: string
 }
 
 /** Per-namespace outcome of one settings application. */
@@ -210,7 +212,8 @@ export type TransferJobPhase =
 /** Pollable import job state. */
 export interface TransferJobSnapshot {
   readonly jobId: string
-  readonly kind: 'project' | 'combined'
+  /** `unknown` between job start and manifest dispatch. */
+  readonly kind: 'project' | 'combined' | 'unknown'
   readonly state: 'running' | 'done' | 'failed'
   readonly phase: TransferJobPhase
   /** Source archive filename. */

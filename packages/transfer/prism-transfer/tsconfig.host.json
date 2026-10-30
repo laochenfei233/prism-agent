@@ -9,6 +9,8 @@
     "src/crc32.ts",
     "src/errors.ts",
     "src/export-engine.ts",
+    "src/import-engine.ts",
+    "src/job.ts",
     "src/naming.ts",
     "src/routes.ts",
     "src/settings-transfer.ts",
