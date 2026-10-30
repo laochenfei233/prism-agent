@@ -335,7 +335,7 @@ describe('ui-theme apply', () => {
     expect(instance.getSnapshot().preference).toBe('dark')
     // Every registered theme reaches the gallery, `system` first.
     expect(instance.getSnapshot().entries.map(entry => entry.id))
-      .toEqual(['system', 'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+      .toEqual(['system', 'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
     // Copy rides the standard locale seat: the entry declares the namespace.
     expect(b.slots.entries(SLOT).find(e => e.component === AppearanceRow)!.locale).toBe(SETTINGS_NS)
 

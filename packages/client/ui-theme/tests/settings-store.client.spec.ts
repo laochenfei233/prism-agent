@@ -35,7 +35,7 @@ describe('projectThemeGallery', () => {
   it('lists system first, then every registered theme with a preview read from its tokens', () => {
     const entries = projectThemeGallery(BUILTIN_THEMES)
     expect(entries.map(entry => entry.id))
-      .toEqual(['system', 'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+      .toEqual(['system', 'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
     // The base palettes override no surface token, so they preview their scheme defaults.
     expect(entries.find(entry => entry.id === 'light')).toMatchObject({ base: '#ffffff', accent: '#0f1115' })
     expect(entries.find(entry => entry.id === 'dark')).toMatchObject({ base: '#151517', accent: '#f9fafb' })

@@ -30,7 +30,7 @@ describe('ThemeRuntime', () => {
     // jsdom matchMedia is absent; system resolves to light.
     expect(snapshot.active.id).toBe('light')
     expect(snapshot.active.colorScheme).toBe('light')
-    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
   })
 
   it('switches to a designed built-in theme and persists it through the scope', () => {
@@ -208,13 +208,13 @@ describe('ThemeRuntime', () => {
     const { theme, events, host } = make()
     const dispose = theme.register({ id: 'sepia', colorScheme: 'light', tokens: { '--dsw-alias-bg-base': 'red' } })
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'sepia'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'sepia'])
     theme.setTheme('sepia')
     expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('red')
     dispose()
     expect(theme.getTheme().preference).toBe('system')
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage'])
     // Custom ids are in-process extension themes; only the built-in product
     // preferences cross the Host settings schema.
     expect(host.set).not.toHaveBeenCalled()
