@@ -79,6 +79,22 @@ export interface ImportWorkspaces {
   create(path: string): Promise<ImportWorkspace>
 }
 
+/**
+ * Projection-cache fold that makes one written log readable as a cold list
+ * row. The list serves a stored Session from its checkpoint alone, so a log
+ * written outside the live Session lifecycle would otherwise list without its
+ * title.
+ */
+export interface ImportProjections {
+  /**
+   * Fold one complete stored log into the durable projection cache.
+   * @param header - the stored Session header (identity witness for the record).
+   * @param events - the Session's complete log in seq order.
+   * @returns resolution after the checkpoint is readable by the cold list.
+   */
+  checkpoint(header: SessionHeader, events: readonly SessionEvent[]): Promise<void>
+}
+
 /** Engine dependencies supplied by the Host plugin. */
 export interface SessionImportEngineOptions {
   /** Durable session writer. */
@@ -93,6 +109,8 @@ export interface SessionImportEngineOptions {
   readonly maxMessages: number
   /** UTF-8 byte budget for one message. */
   readonly maxMessageTextBytes: number
+  /** Cold-list projection fold; absent compositions list rows without cached projections. */
+  readonly projections?: ImportProjections
 }
 
 /** Typed engine refusal mapped onto a route status. */
@@ -331,15 +349,15 @@ export class SessionImportEngine {
       isSeeded: false,
       delegationDepth: 0,
     }
+    const events = this.eventsOf(imported, messages)
     const handle = await this.options.persistence.create(header)
     try {
-      await handle.append(this.eventsOf(imported, messages))
+      await handle.append(events)
       await handle.flush()
     } finally {
       await handle.close()
     }
-    const reason = await this.attachProject(id, group, workspaceFor, workspaces)
-    return { key, outcome: 'imported', sessionId: id, ...(reason === undefined ? {} : { reason }) }
+    return this.finish(key, header, events, group, workspaceFor, workspaces)
   }
 
   /** Copy a DSH-compatible log without rewriting its events. */
@@ -373,8 +391,61 @@ export class SessionImportEngine {
     } finally {
       await handle.close()
     }
-    const reason = await this.attachProject(id, group, workspaceFor, workspaces)
-    return { key, outcome: 'imported', sessionId: id, ...(reason === undefined ? {} : { reason }) }
+    return this.finish(key, header, native.events, group, workspaceFor, workspaces)
+  }
+
+  /**
+   * Finish one written Session: publish the log to the cold list, then
+   * register its project. Both steps report a row-level failure instead of
+   * failing an import whose log is already durable.
+   * @param key - source session key reported to the caller.
+   * @param header - the stored Session header.
+   * @param events - the Session's complete log in seq order.
+   * @param group - the planned project for this Session.
+   * @param workspaceFor - per-path workspace creation memo.
+   * @param workspaces - workspace outcomes accumulated for the response.
+   * @returns the imported row with any contained failure text.
+   */
+  private async finish(
+    key: string,
+    header: SessionHeader,
+    events: readonly SessionEvent[],
+    group: PlanGroup,
+    workspaceFor: (path: string) => Promise<ImportWorkspace>,
+    workspaces: Map<string, ImportWorkspaceOutcome>,
+  ): Promise<ImportApplyEntry> {
+    const reasons = [
+      await this.checkpoint(header, events),
+      await this.attachProject(header.id, group, workspaceFor, workspaces),
+    ].filter((reason): reason is string => reason !== undefined)
+    return {
+      key,
+      outcome: 'imported',
+      sessionId: header.id,
+      ...(reasons.length === 0 ? {} : { reason: reasons.join('; ') }),
+    }
+  }
+
+  /**
+   * Publish one written log to the cold-list projection cache. The log is the
+   * authority and the cache is derived, so a fold failure costs only the row's
+   * title until its next open and never fails the import.
+   * @param header - the stored Session header.
+   * @param events - the Session's complete log in seq order.
+   * @returns the row-level failure text, or `undefined` on success.
+   */
+  private async checkpoint(
+    header: SessionHeader,
+    events: readonly SessionEvent[],
+  ): Promise<string | undefined> {
+    const projections = this.options.projections
+    if (projections === undefined) return undefined
+    try {
+      await projections.checkpoint(header, events)
+      return undefined
+    } catch (error: unknown) {
+      return `session imported, list title unavailable: ${errorText(error)}`
+    }
   }
 
   /** Register one written session under its canonical project folder. */

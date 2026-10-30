@@ -269,6 +269,8 @@ type SessionTreeProps = Pick<
   workspaces: readonly WorkspaceView[]
   /** Browser-projected order for Sessions outside every Workspace. */
   ungroupedSessionIds: readonly SessionId[]
+  /** Project-section order matching the selected Session order. */
+  groupOrder: 'registry' | 'activity'
   /** Whether the current Workspace stream has a complete Host baseline. */
   workspaceReady: boolean
   /** Grouping, ordering, and filter changes replace the view without row motion. */
@@ -315,7 +317,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 
 /** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
-  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds,
+  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, groupOrder,
   rowState, onLeaveArchivedOnly,
   workspaceReady, animationResetKey, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest,
@@ -376,8 +378,9 @@ function SessionTree({
     () => deriveGroups(list, workspaces, rowState, statuses, {
       expandedGroups,
       ungroupedOrder: ungroupedSessionIds,
+      groupOrder,
     }),
-    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds],
+    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds, groupOrder],
   )
   useEffect(() => {
     for (let key = revealGroup; key !== undefined; key = parents.get(key)) {
@@ -1447,6 +1450,7 @@ export function WorkspaceBrowser({
                 renderSlot={renderSlot}
                 workspaces={orderedWorkspaces}
                 ungroupedSessionIds={orderedUngroupedSessionIds}
+                groupOrder={orderBy === 'updated' ? 'activity' : 'registry'}
                 workspaceReady={workspaceReady}
                 nestWorkspaces={groupBy === 'workspace-tree'}
                 animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}

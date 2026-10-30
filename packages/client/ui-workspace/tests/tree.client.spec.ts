@@ -47,6 +47,11 @@ const view = (expandedGroups: readonly string[] = [], ungroupedOrder?: readonly 
   expandedGroups,
   ...(ungroupedOrder === undefined ? {} : { ungroupedOrder }),
 })
+/** The browser's Last updated mode also ranks project sections by activity. */
+const activityView = (expandedGroups: readonly string[] = []) => ({
+  expandedGroups,
+  groupOrder: 'activity' as const,
+})
 const noArchive: readonly SessionId[] = []
 const noAttention: SessionStatusSnapshot = new Map()
 const status = (
@@ -217,6 +222,32 @@ describe('Session ordering', () => {
 })
 
 describe('deriveGroups', () => {
+  it('orders Workspace groups by their latest session activity, Ungrouped last', () => {
+    const sessions = list(
+      summary('quiet', 5, '/projects/quiet'),
+      summary('busiest', 30, '/projects/busy'),
+      summary('loose-old', 8, '/loose'),
+      summary('loose-new', 40, '/loose'),
+    )
+    const workspaces = [workspace('quiet', ['quiet']), workspace('busy', ['busiest'])]
+    const groups = deriveGroups(sessions, workspaces, noRows, noAttention, activityView(['quiet', 'busy', UNGROUPED_KEY]))
+    expect(groups.map(group => group.key)).toEqual(['busy', 'quiet', UNGROUPED_KEY])
+  })
+
+  it('keeps caller order between groups whose members carry the same latest time', () => {
+    const sessions = list(summary('a', 10, '/projects/a'), summary('b', 10, '/projects/b'))
+    const workspaces = [workspace('a', ['a']), workspace('b', ['b'])]
+    const groups = deriveGroups(sessions, workspaces, noRows, noAttention, activityView(['a', 'b']))
+    expect(groups.map(group => group.key)).toEqual(['a', 'b'])
+  })
+
+  it('keeps the Host project order in Manual mode', () => {
+    const sessions = list(summary('quiet', 5, '/projects/quiet'), summary('busiest', 30, '/projects/busy'))
+    const workspaces = [workspace('quiet', ['quiet']), workspace('busy', ['busiest'])]
+    const groups = deriveGroups(sessions, workspaces, noRows, noAttention, view(['quiet', 'busy']))
+    expect(groups.map(group => group.key)).toEqual(['quiet', 'busy'])
+  })
+
   it('keeps caller-supplied Workspace and sessionIds order', () => {
     const sessions = list(summary('newer', 20), summary('older', 10))
     const workspaces = [workspace('first', ['older', 'newer']), workspace('empty', [])]

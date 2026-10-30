@@ -228,12 +228,12 @@ async function deployDsh() {
   cpSync(distSrc, distDest, { recursive: true });
   step('web frontend dist copied into deployed closure');
 
-  // deploy used --ignore-scripts (the repo root postinstall needs lefthook);
-  // run the native installs we actually need inside the closure. node-pty's
-  // prebuild.js downloads its prebuilt binary; koffi/better-sqlite3 ship
-  // per-platform prebuilt npm packages.
-  step('rebuild native modules in closure');
-  runPnpm(['rebuild', 'node-pty'], { cwd: DSH_DIR });
+  // The closure needs no separate native rebuild: the deploy install runs the
+  // scripts that matter (koffi's prebuilt fetch, subprocess-local's spawn
+  // helper), and node-pty loads a per-platform prebuilt binding — on Windows
+  // that is conpty.node, not pty.node. `pnpm rebuild` cannot run here anyway:
+  // pnpm 11 refuses without a lockfile, and a deployed closure has none.
+  step('native modules resolved by the deploy install scripts');
 
   // Ship pnpm so `dsh plugin` and the market can install/update plugins
   // inside the desktop's web profile. Pin the same major as the deploy step

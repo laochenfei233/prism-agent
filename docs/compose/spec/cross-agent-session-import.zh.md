@@ -84,6 +84,7 @@ DeepSeek Harness 读取器改为暴露原日志：头部中的 id、createdAt �
 2. 每一轮：`turn/start`、`user/message`（`surfaceOp: 'append'`）、`assistant/message`（`surfaceOp: 'append'`、`stream: []`）、`turn/end`（`reason: { kind: 'completed' }`）。连续的助手消息合并为一条；开头没有用户输入、仅有助手消息的轮次跳过。
 3. 最后一条事件之后，若存储提供了标题，`session/title` 带上该标题；否则现有的回退标题会从第一条用户消息推导。
 4. `handle.append(events)`、`handle.flush()`、`handle.close()`。事件带从 0 开始连续的 `seq` 和不递减的 `time`。
+5. `ctx.sessionProjectionCache.coldSnapshot(header, 0, events)` 把写好的日志折叠进投影缓存。会话列表只从该检查点提供已存会话，因此导入的对话无需打开就得到标题与最后一次输入时间。缓存缺失或折叠失败都不会让导入失败：日志仍是权威，该行只是不带缓存投影。
 
 由于日志就是普通的会话日志，`sessionPersistence.list()` 在下一次界面刷新前就会暴露它，`session-query` 能解码它，下一次提问的请求头也会通过 `deriveMessages()` 带上导入的 surface 历史。不需要重启 DSH。
 

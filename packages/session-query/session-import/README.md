@@ -73,7 +73,7 @@ The package looks for each store at its documented root under the OS home. A sou
 
 ### What to expect
 
-The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. A DeepSeek Harness session keeps its original id and event log, and its source home's attachment store is copied once; the other sources become a new session id derived from the source and key. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message.
+The page scans a source, previews projects, and imports either all sessions or the projects the user leaves checked. A conversation whose folder no longer exists imports without a project and is named in the result. The same session source and id always map to the same durable session id, so repeating an import reports `duplicate` instead of writing a second copy. A DeepSeek Harness session keeps its original id and event log, and its source home's attachment store is copied once; the other sources become a new session id derived from the source and key. Each imported session carries its source title when the store records one; otherwise the existing fallback title applies after the next message. Import also checkpoints every written log into the projection cache the session list reads, so an imported conversation appears under its title, ordered by its last prompt, without being opened first.
 
 ### Failures
 
@@ -137,7 +137,8 @@ None for the import itself; the session is new. Later turns share the normal ses
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Converted sources are text only** — Claude Code, Codex, Grok, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI lose tool calls, tool results, reasoning, images, and subagent transcripts. DeepSeek Harness is the exception: its log is copied natively, and a version or event shape this build cannot validate fails that session instead of falling back to text.
+- **Converted sources are text only** — Claude Code, Codex, Grok, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI lose tool calls, tool results, reasoning, images, and subagent transcripts. DeepSeek Harness is the exception: its log is copied natively, and a version or event envelope this build cannot read fails that session instead of falling back to text.
+- **Native copies are copied verbatim** — the import checks a DeepSeek Harness log's format version and event envelopes, not its turn, step, and surface relationships. A source log whose relationships this build's reader rejects imports successfully and then fails to open; repair it in the source or omit that session.
 - **No incremental sync** — a repeated import of the same source session is a duplicate; newer messages in the foreign store are not appended to the existing DSH session.
 - **Best-effort undocumented stores** — OpenClaw and Hermes payload schemas vary across builds; events that carry no recognizable role and text are skipped, and a session with no usable text reports as skipped.
 - **One workspace per folder** — the workspace registry keys projects by canonical path. Importing into an existing project therefore requires the explicit merge confirmation; it cannot create a second project for the same folder.
