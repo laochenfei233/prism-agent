@@ -10,6 +10,7 @@
     "src/errors.ts",
     "src/export-engine.ts",
     "src/import-engine.ts",
+    "src/index.ts",
     "src/job.ts",
     "src/naming.ts",
     "src/routes.ts",
@@ -24,6 +25,7 @@
     { "path": "../../session-query/session-log-export/tsconfig.host.json" },
     { "path": "../../session-query/session-query" },
     { "path": "../../session/session-persistence" },
-    { "path": "../../settings/settings" }
+    { "path": "../../settings/settings" },
+    { "path": "../../workspace/workspace" }
   ]
 }
