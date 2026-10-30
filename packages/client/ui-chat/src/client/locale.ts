@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** Chat-owned locale namespace and dictionaries. */
 
 /** Namespace for Chat target, node, statistics, and details copy. */
@@ -157,6 +158,9 @@ export const zh = {
   'message.stopped': '已停止',
   'message.branch': '在新对话中分支',
   'message.branchUnavailable': '仅可从已完成轮次的最后一条消息分支',
+  'context.copy': '复制',
+  'context.addToTask': '添加到当前任务',
+  'context.askSide': '在辅助对话中提问',
   'message.retry.active': '正在重试模型请求',
   'message.retry.cancelled': '模型请求重试已取消',
   'message.retry.started': '已重试模型请求',
@@ -355,6 +359,9 @@ export const en = {
   'message.stopped': 'Stopped',
   'message.branch': 'Branch into a new conversation',
   'message.branchUnavailable': 'Available only on the last message of a completed turn',
+  'context.copy': 'Copy',
+  'context.addToTask': 'Add to current task',
+  'context.askSide': 'Ask in a side conversation',
   'message.retry.active': 'Retrying model request',
   'message.retry.cancelled': 'Model request retry cancelled',
   'message.retry.started': 'Retried model request',

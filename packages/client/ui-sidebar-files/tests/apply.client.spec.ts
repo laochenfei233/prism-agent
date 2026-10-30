@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * The plugin's registrations, and their removal when the plugin goes.
  *
@@ -49,6 +50,7 @@ async function boot() {
     }),
   }
   const workspaceFiles = { list: vi.fn() }
+  const session = { openWorkspacePath: vi.fn(), workspacePathApplications: vi.fn() }
   const sidebar = { commandTarget: vi.fn(), openTabFromTarget: vi.fn() }
   const commands: ShortcutCommand[] = []
   ctx.provide('shortcuts', { register: (command: ShortcutCommand) => {
@@ -59,8 +61,9 @@ async function boot() {
   ctx.provide('sidebarRightTabs', tabs as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
-  ctx.provide('remote', { workspaceFiles } as never)
+  ctx.provide('remote', { workspaceFiles, session } as never)
   ctx.provide('remote.workspaceFiles', workspaceFiles as never)
+  ctx.provide('remote.session', session as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
   return { tabs, registered, dictionaries, fiber, sidebar, commands }

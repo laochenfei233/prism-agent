@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** `conversation` namespace dictionaries. */
 
 /** Dictionary namespace owned by this plugin. */
@@ -29,6 +30,12 @@ export const zh = {
   'input.send': '发送消息',
   'input.send.queue': '排队发送',
   'input.send.steer': '插话发送',
+  'menu.undo': '撤销',
+  'menu.redo': '重做',
+  'menu.cut': '剪切',
+  'menu.paste': '粘贴',
+  'menu.selectAll': '全选',
+  'menu.pasteUnavailable': '无法读取剪贴板，请使用粘贴快捷键',
   'attachment.pending': '待发送附件',
   'attachment.scrollLeft': '向左滚动附件',
   'attachment.scrollRight': '向右滚动附件',
@@ -410,6 +417,12 @@ export const en = {
   'input.send': 'Send message',
   'input.send.queue': 'Queue message',
   'input.send.steer': 'Steer message',
+  'menu.undo': 'Undo',
+  'menu.redo': 'Redo',
+  'menu.cut': 'Cut',
+  'menu.paste': 'Paste',
+  'menu.selectAll': 'Select all',
+  'menu.pasteUnavailable': 'Clipboard access was blocked. Use the paste shortcut instead.',
   'attachment.pending': 'Pending attachments',
   'attachment.scrollLeft': 'Scroll attachments left',
   'attachment.scrollRight': 'Scroll attachments right',

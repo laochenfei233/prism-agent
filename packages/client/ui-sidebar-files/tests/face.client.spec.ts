@@ -1,10 +1,11 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** Directory subscriptions and read settlements through the face's real store actions. */
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceDirectoryListing } from '@deepseek-ai/dsh-api-workspace-files/types'
-import { childPath, createList, filesFace } from '../src/client/face.ts'
-import type { WorkspaceFilesListRemote } from '../src/client/face.ts'
+import { childPath, createList, createPathActions, filesFace } from '../src/client/face.ts'
+import type { FilesPathActions, WorkspaceFilesListRemote } from '../src/client/face.ts'
 import { createFilesStore } from '../src/client/store.ts'
 import type { DirLevel } from '../src/client/store.ts'
 import { DirectoryNode } from '../src/client/directory-node.ts'
@@ -17,10 +18,15 @@ const TAB = 'tab-1' as TabId
 
 const LEVEL: DirLevel = { entries: [{ name: 'src', type: 'directory' }], truncated: false }
 
+/** Path actions this listing spec never exercises. */
+function unreachablePaths(): FilesPathActions {
+  return { openPath: async () => false, applications: async () => null }
+}
+
 function mount() {
   const instance = createFilesStore().create()
   const script = scriptedList()
-  const face = filesFace(script.list, script.watch)(SESSION, instance.actions)
+  const face = filesFace(script.list, script.watch, unreachablePaths())(SESSION, instance.actions)
   const controller = new AbortController()
   onTestFinished(async () => {
     controller.abort()
@@ -311,5 +317,44 @@ describe('childPath', () => {
     expect(childPath('/work/app/', 'src')).toBe('/work/app/src')
     expect(childPath('/', 'etc')).toBe('/etc')
     expect(childPath('C:\\work\\', 'src')).toBe('C:\\work/src')
+  })
+})
+
+describe('createPathActions', () => {
+  it('reports the Host acknowledgement for default and named opens', async () => {
+    const openWorkspacePath = vi.fn(async () => ({ ok: true as const, value: { opened: true } }))
+    const workspacePathApplications = vi.fn(async () => ({ ok: true as const, value: [] }))
+    const actions = createPathActions({
+      session: { openWorkspacePath, workspacePathApplications } as never,
+    })
+    await expect(actions.openPath('/w/a.txt')).resolves.toBe(true)
+    expect(openWorkspacePath).toHaveBeenLastCalledWith({ path: '/w/a.txt' })
+    await actions.openPath('/w/a.txt', 'code')
+    expect(openWorkspacePath).toHaveBeenLastCalledWith({ path: '/w/a.txt', application: 'code' })
+  })
+
+  it('turns a refused or unreachable open into false', async () => {
+    const openWorkspacePath = vi.fn()
+      .mockResolvedValueOnce({ ok: false, error: { code: 'gateway/internal', message: 'no' } })
+      .mockRejectedValueOnce(new Error('offline'))
+    const actions = createPathActions({
+      session: { openWorkspacePath, workspacePathApplications: vi.fn() } as never,
+    })
+    await expect(actions.openPath('/w/a.txt')).resolves.toBe(false)
+    await expect(actions.openPath('/w/a.txt')).resolves.toBe(false)
+  })
+
+  it('returns handlers, and null when the query refuses or throws', async () => {
+    const apps = [{ id: 'code', name: 'VS Code', default: true, icon: null }]
+    const workspacePathApplications = vi.fn()
+      .mockResolvedValueOnce({ ok: true, value: apps })
+      .mockResolvedValueOnce({ ok: false, error: { code: 'gateway/internal', message: 'no' } })
+      .mockRejectedValueOnce(new Error('offline'))
+    const actions = createPathActions({
+      session: { openWorkspacePath: vi.fn(), workspacePathApplications } as never,
+    })
+    await expect(actions.applications('/w/a.txt')).resolves.toEqual(apps)
+    await expect(actions.applications('/w/a.txt')).resolves.toBeNull()
+    await expect(actions.applications('/w/a.txt')).resolves.toBeNull()
   })
 })

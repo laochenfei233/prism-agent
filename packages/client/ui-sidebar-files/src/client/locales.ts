@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * `sidebarFiles` namespace dictionaries, and the namespace's declaration.
  *
@@ -37,6 +38,12 @@ export const zh = {
   'error.outsideWorkspace': '这个目录在工作区之外，侧栏不会读取它。',
   'error.notDirectory': '这不是一个目录。',
   'error.unavailable': '读取失败：{message}',
+  'error.openFailed': '无法打开这个文件，请重试。',
+  'menu.preview': '预览',
+  'menu.open': '打开',
+  'menu.openWith': '打开方式',
+  'menu.copyRelative': '复制相对路径',
+  'menu.copyAbsolute': '复制绝对路径',
 } satisfies Record<string, string>
 
 /** Files dictionary key union. */
@@ -61,4 +68,10 @@ export const en = {
   'error.outsideWorkspace': 'That directory is outside the workspace, so the sidebar will not read it.',
   'error.notDirectory': 'That is not a directory.',
   'error.unavailable': 'Read failed: {message}',
+  'error.openFailed': 'Could not open this file. Try again.',
+  'menu.preview': 'Preview',
+  'menu.open': 'Open',
+  'menu.openWith': 'Open with',
+  'menu.copyRelative': 'Copy relative path',
+  'menu.copyAbsolute': 'Copy absolute path',
 } satisfies Record<SidebarFilesKey, string>

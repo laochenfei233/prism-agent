@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * ui-workspace contracts. Two registrations share this package:
  *
@@ -137,7 +138,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /**
      * The rows of one Session's "..." menu, in ascending `order`. ui-workspace
      * registers the shipped rows here — `pin` (100), `rename` (200), `fork`
-     * (300), `archive` (400), and `session-id` (450) — so a plugin row is placed
+     * (300), `archive` (400), `reveal` (420), `copy-path` (430), `session-id`
+     * (450), and `settings` (800) — so a plugin row is placed
      * by its own `order` among them. Use a package-namespaced `id`; reusing a shipped id at
      * another `priority` shadows that row. Each entry renders one
      * `role="menuitem"` `<button>` (the shipped rows use ui-primitives'
@@ -270,6 +272,8 @@ export type WorkspaceBrowserInjected = {
   insertWorkspaceBefore: (workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId) => Promise<void>
   /** Remove a Session from the registry-global archived set (the search results' restore button). */
   unarchiveSession: (sessionId: SessionId) => Promise<void>
+  /** Show one Workspace directory in the Host file manager. */
+  revealWorkspace: (path: string) => void
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
 }
@@ -295,6 +299,10 @@ export type RowToast =
   | { kind: 'stoppedAndArchived'; sessionId: SessionId }
   | { kind: 'sessionIdCopied' }
   | { kind: 'sessionIdCopyFailed' }
+  | { kind: 'pathCopied' }
+  | { kind: 'pathCopyFailed' }
+  | { kind: 'revealFailed' }
+  | { kind: 'workspaceMoveFailed' }
   | { kind: 'pinFailed' }
   | { kind: 'unpinFailed' }
   | { kind: 'archivedNotOpenable' }
@@ -401,6 +409,20 @@ export interface RenameSessionInjected {
 export interface SessionIdInjected {
   /** Copy the complete id and report acceptance or failure through the global toast. */
   copySessionId: (sessionId: SessionId) => Promise<void>
+}
+
+/** Reveal and path-copy share for a Session row's working directory. */
+export interface SessionPathInjected {
+  /** Show the Session's working directory in the Host file manager. */
+  revealSession: (sessionId: SessionId) => void
+  /** Copy the Session's working directory path. */
+  copySessionPath: (sessionId: SessionId) => void
+}
+
+/** Settings share for the row menu's configuration entry. */
+export interface SessionSettingsInjected {
+  /** Open the product settings surface. */
+  openSettings: () => void
 }
 
 /** A Session rename the rename action asked for; the dialog entry opens on it. */

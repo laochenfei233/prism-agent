@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 // @vitest-environment jsdom
 /** Chat inject factories exercised over independently mounted Conversation and Chat plugins. */
@@ -80,12 +81,14 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
   )
   runtime.remote.provideNamespaces({ session: { openWorkspacePath } })
   const openSession = vi.fn<(id: SessionId) => void>()
+  const startSession = vi.fn()
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: vi.fn(async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
       beforeOpen(ROOT)
       openSession(ROOT)
     }),
     openSession,
+    startSession,
   } as never)
   const session = sessionFakeFor()
   await runtime.sessions.add({
@@ -133,6 +136,7 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     },
     runtime, chat, chatSettings, browserAvailable,
     layout, openWorkspacePath, sidebarRight, sidebarRightTabs, session, chatViewApi, chatFlowApi, rootReference, openSession,
+    startSession,
   }
 }
 
@@ -236,6 +240,15 @@ describe('Chat inject API', () => {
     })
     await b.runtime.dispose()
   })
+
+  it('starts a side conversation with the quoted text through Workspace navigation', async () => {
+    const b = await bench()
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.startSideConversation('> quoted\n\n')
+    expect(b.startSession).toHaveBeenCalledExactlyOnceWith(undefined, { prompt: '> quoted\n\n', whenDraftExists: 'append' })
+    await b.runtime.dispose()
+  })
+
 
   it('addresses file paths under the Session\'s scope and opens them in the right Sidebar', async () => {
     const b = await bench()

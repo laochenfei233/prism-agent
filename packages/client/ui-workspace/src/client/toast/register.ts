@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** Business-owned mappings into the keyed Workspace Toast slot. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -33,6 +34,30 @@ export function registerToasts(
         display: (_notice, t) => ({ text: t('toast.sessionIdCopyFailed'), tone: 'warning' }),
       }),
     }, ToastEntry<PropsRuntime<'workspace.toast', 'sessionIdCopyFailed'>>)
+    yield ctx.slots.register({
+      name: 'workspace.toast', key: 'pathCopied', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'pathCopied'> => ({
+        display: (_notice, t) => ({ text: t('toast.pathCopied'), tone: 'success' }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'pathCopied'>>)
+    yield ctx.slots.register({
+      name: 'workspace.toast', key: 'pathCopyFailed', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'pathCopyFailed'> => ({
+        display: (_notice, t) => ({ text: t('toast.pathCopyFailed'), tone: 'warning' }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'pathCopyFailed'>>)
+    yield ctx.slots.register({
+      name: 'workspace.toast', key: 'revealFailed', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'revealFailed'> => ({
+        display: (_notice, t) => ({ text: t('toast.revealFailed'), tone: 'warning' }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'revealFailed'>>)
+    yield ctx.slots.register({
+      name: 'workspace.toast', key: 'workspaceMoveFailed', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'workspaceMoveFailed'> => ({
+        display: (_notice, t) => ({ text: t('toast.workspaceMoveFailed'), tone: 'warning' }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'workspaceMoveFailed'>>)
     yield ctx.slots.register({
       name: 'workspace.toast', key: 'pinFailed', locale: 'workspace',
       inject: (): ToastDisplayInjected<'pinFailed'> => ({

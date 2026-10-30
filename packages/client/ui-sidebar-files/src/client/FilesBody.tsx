@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * The file tree's body: the session's workspace root, listed one level at a time.
  *
@@ -8,21 +9,23 @@
  * anything else is shown but refuses to open. The header uses the shared
  * PathLabel for the root, followed by reload and workspace directory actions.
  */
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import type { RemoteFailure } from '@deepseek-ai/dsh-api-remotes/client'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, TranslateNS,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  FileTypeIcon, IconFolderCloseRegular, IconFolderOpenRegular, IconRefreshOutlineRegular, Tooltip, classifyFileType,
+  ContextMenu, FileTypeIcon, IconFolderCloseRegular, IconFolderOpenRegular, IconRefreshOutlineRegular, Tooltip,
+  classifyFileType, useContextMenu, writeClipboard,
   IconPauseOutlineRegular, IconPlayOutlineRegular, PathLabel,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceDirectoryEntry } from '@deepseek-ai/dsh-api-workspace-files/types'
 import { childPath } from './face.ts'
-import type { FilesInjected } from './face.ts'
+import type { FilesInjected, WorkspacePathApplication } from './face.ts'
 import type {} from './locales.ts'
 import type { FilesTabState, createFilesStore } from './store.ts'
 import css from './FilesBody.module.css'
@@ -69,12 +72,86 @@ export function failureLine(t: TranslateNS<'sidebarFiles'>, failure: RemoteFailu
   }
 }
 
-/** What every level shares: the tab's tree and the two gestures. */
+/** What every level shares: the tab's tree and the row gestures. */
 interface TreeContext {
   readonly state: FilesTabState
   readonly onToggle: (parent: string, path: string) => void
   readonly onOpen: (path: string) => void
+  readonly paths: FilesInjected['paths']
+  /** Report a failed row action above the tree. */
+  readonly reportFailure: (text: string) => void
+  /** Clear the previous row-action failure before a new action runs. */
+  readonly clearFailure: () => void
   readonly t: TranslateNS<'sidebarFiles'>
+}
+
+/** The relative spelling of an absolute path under the tree root. */
+function relativePath(root: string, path: string): string {
+  const base = root.replace(/[/\\]+$/, '')
+  // The tree only lists children of its root, so the prefix always matches.
+  return path.slice(base.length + 1)
+}
+
+/**
+ * One file row: the tree's single-click preview plus its secondary-press menu
+ * (preview, default open, explicit handlers, and the two path spellings).
+ * @param props.path - absolute file path.
+ * @param props.name - the file's basename.
+ * @param props.tree - the level's shared tree context.
+ * @returns the file row.
+ */
+function FileEntry({ path, name, tree }: { path: string; name: string; tree: TreeContext }): ReactNode {
+  const menu = useContextMenu()
+  const [applications, setApplications] = useState<readonly WorkspacePathApplication[] | null>(null)
+  // The handler list is a Host query; asking on open keeps a large directory
+  // from querying every file it lists.
+  const openMenu = (event: ReactMouseEvent): void => {
+    menu.open(event)
+    void tree.paths.applications(path).then(setApplications)
+  }
+  const copy = (text: string): void => {
+    void writeClipboard(text).then((copied) => { if (!copied) tree.reportFailure(tree.t('copy.failed')) })
+  }
+  const items: readonly MenuEntry[] = [
+    { id: 'preview', label: tree.t('menu.preview') },
+    { id: 'open', label: tree.t('menu.open') },
+    ...(applications !== null && applications.length > 0
+      ? [{
+        id: 'open-with',
+        label: tree.t('menu.openWith'),
+        submenu: applications.map(application => ({ id: `application:${application.id}`, label: application.name })),
+      }]
+      : []),
+    { type: 'separator', id: 'menu-paths' },
+    { id: 'copy-relative', label: tree.t('menu.copyRelative') },
+    { id: 'copy-absolute', label: tree.t('menu.copyAbsolute') },
+  ]
+  const select = (id: string): void => {
+    tree.clearFailure()
+    if (id === 'preview') {
+      tree.onOpen(path)
+      return
+    }
+    if (id === 'copy-relative' || id === 'copy-absolute') {
+      copy(id === 'copy-relative' ? relativePath(tree.state.root, path) : path)
+      return
+    }
+    // Every remaining row opens the file: the default handler, or one named
+    // by the `application:<id>` submenu row.
+    const application = id === 'open' ? undefined : id.slice('application:'.length)
+    void tree.paths.openPath(path, application).then((opened) => {
+      if (!opened) tree.reportFailure(tree.t('error.openFailed'))
+    })
+  }
+  return (
+    <li className={css.item} data-files-entry="file" data-files-path={path}>
+      <button type="button" className={css.row} onClick={() => { tree.onOpen(path) }} onContextMenu={openMenu}>
+        <FileTypeIcon kind={classifyFileType(name)} size={16} className={css.fileIcon} />
+        <span className={css.name}>{name}</span>
+      </button>
+      <ContextMenu state={menu} items={items} onSelect={select} />
+    </li>
+  )
 }
 
 /** One entry's row, and its children when it is an expanded directory. */
@@ -92,16 +169,7 @@ function Entry({ parent, entry, tree }: { parent: string; entry: WorkspaceDirect
       </li>
     )
   }
-  if (entry.type === 'file') {
-    return (
-      <li className={css.item} data-files-entry="file" data-files-path={path}>
-        <button type="button" className={css.row} onClick={() => { tree.onOpen(path) }}>
-          <FileTypeIcon kind={classifyFileType(entry.name)} size={16} className={css.fileIcon} />
-          <span className={css.name}>{entry.name}</span>
-        </button>
-      </li>
-    )
-  }
+  if (entry.type === 'file') return <FileEntry path={path} name={entry.name} tree={tree} />
   return (
     <li className={css.item} data-files-entry="other" data-files-path={path}>
       <span className={clsx(css.row, css.other)} aria-disabled="true" title={tree.t('entry.other')}>
@@ -139,7 +207,7 @@ function Level({ path, tree }: { path: string; tree: TreeContext }): ReactNode {
 /** The file tree's body: the workspace root and whatever the reader has opened under it. */
 export function FilesBody({
   useTabInfo, sessionId, useSessions, useStore, actions,
-  start, refresh, setAutoRefresh, toggle, t, renderSlot,
+  start, refresh, setAutoRefresh, toggle, t, renderSlot, paths,
 }: FilesBodyProps): ReactNode {
   const { tab } = useTabInfo()
   useEffect(() => tab.actions.bindCommands({ refresh: () => { refresh(tab.id) } }), [tab.actions, tab.id, refresh])
@@ -148,6 +216,9 @@ export function FilesBody({
   const state = useStore(store => store.byTab[tab.id])
   const bodyRef = useRef<HTMLDivElement>(null)
   const scrollTopRef = useRef(0)
+  // A failed row action (open or clipboard write) surfaces above the tree
+  // until the next action replaces it.
+  const [actionError, setActionError] = useState<string | null>(null)
   // Come back where the reader was: loaded levels outlive the body in the
   // store, so a remounted tree lays out at its full height before this runs
   // and the stored offset re-lands exactly. A fresh tree stores 0.
@@ -185,6 +256,9 @@ export function FilesBody({
     onToggle: (parent, path) => { toggle(tab.id, parent, path, state.expanded, signal) },
     // Every row is under the tree's root, so its address is session-relative.
     onOpen: (path) => { tabActions.openResource(fileAddressFor(sessionId, state.root, path)) },
+    paths,
+    reportFailure: setActionError,
+    clearFailure: () => { setActionError(null) },
     t,
   }
   const reload = (): void => {
@@ -224,6 +298,9 @@ export function FilesBody({
         data-files-body
         onScroll={(event) => { scrollTopRef.current = event.currentTarget.scrollTop }}
       >
+        {actionError !== null && (
+          <p className={css.statusLine} data-files-action-error role="alert">{actionError}</p>
+        )}
         <ul className={css.level}><Level path={state.root} tree={tree} /></ul>
       </div>
     </div>

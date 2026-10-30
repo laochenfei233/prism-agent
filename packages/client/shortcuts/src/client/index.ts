@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** Browser command service, with one keyboard adapter per plugin lifetime. */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
@@ -78,6 +79,15 @@ export default class ShortcutsService extends Service implements Shortcuts {
     const off = this.registry.register(command)
     this.syncDefinitions()
     return () => { off(); this.syncDefinitions() }
+  }
+
+  /**
+   * Run a registered command as an explicit menu action.
+   * @param id - registered product command.
+   * @param context - live input owner and modal state.
+   */
+  invoke(id: Parameters<Shortcuts['invoke']>[0], context: Parameters<Shortcuts['invoke']>[1]): void {
+    this.registry.invoke(id, context)
   }
 
   registerFixed(command: Parameters<Shortcuts['registerFixed']>[0]): () => void {

@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
@@ -14,6 +15,8 @@ import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
+import { ChatMessageActionsProvider } from './chat-message-actions.tsx'
+import type { ChatMessageActions } from './chat-message-actions.tsx'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -53,13 +56,19 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
 /** How long fold transitions stay enabled after a Turn stops running. */
 const MOTION_TAIL_MS = 800
 
+/** Prefix every line as a Markdown quotation, preserving line breaks. */
+function quoteText(text: string): string {
+  return text.split('\n').map(line => `> ${line}`).join('\n')
+}
+
 /**
  * The chat view slot entry: pure component over the composed props; each
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useConversation, useSessions, renderSlot,
-  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
+  useSession, useChat, useConversation, useSessions, renderSlot, inputActions,
+  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt,
+  startSideConversation, fileMentions,
   usePresentation, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
@@ -193,6 +202,15 @@ export function ChatView({
     transcriptView,
   })
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
+  // Message-body context actions: both stage the quoted text, and neither
+  // sends anything — the reader confirms in the composer.
+  const messageActions = useMemo<ChatMessageActions>(() => ({
+    appendQuote: (text) => {
+      const span = inputActions.captureInsertion()
+      inputActions.insertText(`${quoteText(text)}\n\n`, span)
+    },
+    askInSideConversation: (text) => { startSideConversation(quoteText(text)) },
+  }), [inputActions, startSideConversation])
 
   return (
     <div className={css.frame}>
@@ -224,10 +242,12 @@ export function ChatView({
               </div>
             )}
             <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
-              {renderSlot('conversation.chat.flow', {
-                entries, pendingInputs, lastInputTurn, deferCollapse,
-                cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
-              }, { hookContext: flowContext })}
+              <ChatMessageActionsProvider actions={messageActions}>
+                {renderSlot('conversation.chat.flow', {
+                  entries, pendingInputs, lastInputTurn, deferCollapse,
+                  cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
+                }, { hookContext: flowContext })}
+              </ChatMessageActionsProvider>
             </MarkdownDelegateProvider>
             {/* No pending placeholders: questions (ui-user-questions) and approvals
                 (ApprovalPanel) both take over the composer, so a flow card would

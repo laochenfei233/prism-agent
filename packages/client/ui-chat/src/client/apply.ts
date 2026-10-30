@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /** Register the Chat Conversation target, renderers, stats, and details surface. */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
@@ -292,6 +293,13 @@ export function apply(ctx: Context): void {
               .catch(() => {
                 // Fork or child-title failure leaves the source view unchanged.
               })
+          },
+          // A side conversation is a fresh Session in the current workspace with
+          // the quoted text staged in its composer: the reader still chooses when
+          // to send. Without an explicit workspace the navigation layer inherits
+          // the current Session's own.
+          startSideConversation: (prompt) => {
+            ctx.uiWorkspace.startSession(undefined, { prompt, whenDraftExists: 'append' })
           },
         }
       },

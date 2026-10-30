@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * Cordis-free React primitives styled only through `--dsw-*` tokens.
  */
@@ -24,6 +25,8 @@ export { Checkbox } from './Checkbox.tsx'
 export { Input } from './Input.tsx'
 export { InlineEditor } from './InlineEditor.tsx'
 export { Menu, MenuItemButton } from './Menu.tsx'
+export { ContextMenu, useContextMenu } from './ContextMenu.tsx'
+export type { ContextMenuPoint, ContextMenuState } from './ContextMenu.tsx'
 export { MenuSurface } from './MenuSurface.tsx'
 export type { MenuSurfaceProps } from './MenuSurface.tsx'
 export { MenuGroup, observeStickyMenuGroups } from './MenuGroup.tsx'

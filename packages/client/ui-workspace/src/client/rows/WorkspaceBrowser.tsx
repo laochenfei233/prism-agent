@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * The workspace/session browsing region filling the sidebar shell's
  * `sidebar.workspaces` hole: section header (title + view options + add
@@ -253,7 +254,7 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
   'useSessionStatus' | 'startSession' | 'open'
-  | 'insertWorkspaceBefore' | 't' | 'usePanelInfo'
+  | 'insertWorkspaceBefore' | 'revealWorkspace' | 't' | 'usePanelInfo'
 > & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
@@ -322,7 +323,7 @@ function SessionTree({
   workspaceReady, animationResetKey, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest,
   renderSlot,
-  insertWorkspaceBefore,
+  insertWorkspaceBefore, revealWorkspace,
   nestWorkspaces, groupExpansion, setGroupExpanded,
   setSessionOrder, home, t,
   revealSessionId, onSessionRevealed, shortcuts,
@@ -584,6 +585,18 @@ function SessionTree({
               delete: () => {
               /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                 if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
+              },
+              moveToTop: () => {
+                if (group.workspaceId === undefined) return
+                const first = workspaces.find(candidate => candidate.workspaceId !== group.workspaceId)
+                if (first !== undefined) void insertWorkspaceBefore(group.workspaceId, first.workspaceId)
+              },
+              moveToBottom: () => {
+                if (group.workspaceId === undefined) return
+                void insertWorkspaceBefore(group.workspaceId)
+              },
+              reveal: () => {
+                if (group.cwd !== undefined) revealWorkspace(group.cwd)
               },
             }}
         />
@@ -912,6 +925,7 @@ export function WorkspaceBrowser({
   renameWorkspace,
   deleteWorkspace,
   insertWorkspaceBefore,
+  revealWorkspace,
   unarchiveSession,
   createWorkspace,
   searchSessions,
@@ -1462,6 +1476,7 @@ export function WorkspaceBrowser({
                 startSession={startSession}
                 open={guardedOpen}
                 insertWorkspaceBefore={insertWorkspaceBefore}
+                revealWorkspace={revealWorkspace}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
                 home={home}

@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -63,6 +64,22 @@ it('closes the Desktop window with the latest accepted revision and propagates b
 it('rejects a native window close outside Desktop', async () => {
   const { service } = mount()
   await expect(service.closeWindow()).rejects.toThrow('Desktop keyboard bridge unavailable')
+})
+
+it('runs a registered command as a menu action and honors its modal gate', () => {
+  const { service } = mount()
+  const run = vi.fn()
+  const off = service.register({ ...command, modals: ['settings'], resolve: () => ({ status: 'handled', run }) })
+  const context = { region: 'page' as const, modal: null, target: null }
+  service.invoke(command.id, context)
+  expect(run).toHaveBeenCalledOnce()
+  service.invoke(command.id, { ...context, modal: 'other' })
+  expect(run).toHaveBeenCalledOnce()
+  service.invoke('test.missing' as ShortcutCommandId, context)
+  expect(run).toHaveBeenCalledOnce()
+  off()
+  service.invoke(command.id, context)
+  expect(run).toHaveBeenCalledOnce()
 })
 
 it('describes registered binding conflicts on Linux Desktop', async () => {

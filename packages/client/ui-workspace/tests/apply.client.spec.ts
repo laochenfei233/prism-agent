@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -23,6 +24,10 @@ import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from '../src/client/session-actions/ArchiveSession.tsx'
 import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
+import {
+  CopySessionPathMenuItem, RevealSessionMenuItem, SessionSettingsMenuItem,
+} from '../src/client/session-actions/SessionContextActions.tsx'
+import type { SessionPathInjected, SessionSettingsInjected } from '../src/client/contract/slots.ts'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
 import type { ArchiveToastInjected, ToastDisplayInjected } from '../src/client/contract/toast.ts'
@@ -59,11 +64,13 @@ const ALLOWED: HostObservable<boolean> = createSnapshotStore(true)
 async function bench() {
   const ctx = new Context()
   const commands = new Map<string, ShortcutCommand>()
+  const invoke = vi.fn()
   ctx.provide('shortcuts', {
     register: (command: ShortcutCommand) => {
       commands.set(command.id, command)
       return () => { commands.delete(command.id) }
     },
+    invoke,
     catalog: createSnapshotStore([]),
   })
   ctx.provide('uiConversation', {})
@@ -153,8 +160,13 @@ async function bench() {
   } as never)
   const pickDirectory = vi.fn(() => Promise.resolve({ ok: true as const, value: '/projects/picked' }))
   const directoryPicker = { pick: pickDirectory }
-  Object.assign(new TestRemote(ctx), { directoryPicker })
+  const sessionRemote = {
+    openWorkspacePath: vi.fn(async () => ({ ok: true as const, value: { opened: true } })),
+    workspacePathApplications: vi.fn(async () => ({ ok: true as const, value: [] })),
+  }
+  Object.assign(new TestRemote(ctx), { directoryPicker, session: sessionRemote })
   ctx.provide('remote.directoryPicker', directoryPicker as never)
+  ctx.provide('remote.session', sessionRemote as never)
   const locale = new LocaleRuntime(ctx)
   // These specs assert the shipped Chinese copy. There is no jsdom `window`
   // in this lane, so browser-language detection never runs and the locale
@@ -164,7 +176,7 @@ async function bench() {
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename, commands, accessSource,
     retain, using, selectPanel, search, renameSession, binding, fork, pickDirectory, pinSession, unpinSession,
-    workspacesSubscribe, initializeDefault, history, scope, sessionOf,
+    workspacesSubscribe, initializeDefault, history, scope, sessionOf, invoke, sessionRemote,
     setWorkspaces: (snapshot: WorkspaceSnapshot): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
   }
@@ -219,7 +231,8 @@ describe('ui-workspace apply', () => {
 
   it('declares the services it drives', () => {
     expect(inject).toEqual([
-      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'layout', 'shortcuts', 'remoteAccess',
+      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.session', 'remote.directoryPicker', 'layout',
+      'shortcuts', 'remoteAccess',
     ])
   })
 
@@ -265,7 +278,7 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(5)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(8)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
   })
@@ -288,7 +301,10 @@ describe('ui-workspace apply', () => {
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
+      ['reveal', 420, RevealSessionMenuItem, 'workspace'],
+      ['copy-path', 430, CopySessionPathMenuItem, 'workspace'],
       ['session-id', 450, SessionIdMenuItem, 'workspace'],
+      ['settings', 800, SessionSettingsMenuItem, 'workspace'],
     ])
     expect(rows(ROW_ACTION)).toEqual([
       ['archive', 100, ArchiveSessionRowButton, 'workspace'],
@@ -306,8 +322,9 @@ describe('ui-workspace apply', () => {
     const rowToastEntry = entry(b.slots, 'shell.overlay', 'workspace.row-toast')
     expect(rowToastEntry.store).toBeUndefined()
     expect(b.slots.entries('workspace.toast').map(row => row.options.key)).toEqual([
-      'sessionIdCopied', 'sessionIdCopyFailed', 'pinFailed', 'unpinFailed', 'archivedNotOpenable',
-      'defaultWorkspaceFailed', 'shortcutForkFailed', 'createFailed', 'forkRequiresOpen', 'archived', 'stoppedAndArchived',
+      'sessionIdCopied', 'sessionIdCopyFailed', 'pathCopied', 'pathCopyFailed', 'revealFailed', 'workspaceMoveFailed',
+      'pinFailed', 'unpinFailed', 'archivedNotOpenable', 'defaultWorkspaceFailed', 'shortcutForkFailed', 'createFailed',
+      'forkRequiresOpen', 'archived', 'stoppedAndArchived',
     ])
     for (const registration of b.slots.entries('workspace.toast')) {
       expect(registration.locale).toBe('workspace')
@@ -876,7 +893,7 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'conversation.empty.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(5)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(8)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(b.slots.entries('shell.overlay')).toHaveLength(3)
     await fiber.dispose()
@@ -891,4 +908,41 @@ describe('ui-workspace apply', () => {
     expect(b.slots.entries('workspace.toast')).toHaveLength(0)
     expect(b.slots.snapshot('factory:workspace.toast.content')).toEqual([])
   })
+})
+
+
+it('localizes the new row notices', async () => {
+  const b = await bench()
+  onTestFinished(() => b.ctx.fiber.dispose())
+  declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+  await b.ctx.plugin({ inject: [...inject], apply }).await()
+  const t = b.locale.bind('workspace')
+  for (const key of ['pathCopied', 'pathCopyFailed', 'revealFailed', 'workspaceMoveFailed'] as const) {
+    const display = b.slots.entries('workspace.toast').find(row => row.options.key === key)!
+    const face = faceOf(display) as ToastDisplayInjected<typeof key>
+    expect(face.display({ kind: key, seq: 1 } as never, t, () => {}).text).toBe(t(`toast.${key}`))
+  }
+})
+
+it('reveals and copies a Session working directory, and runs settings from the menu', async () => {
+  const b = await bench()
+  onTestFinished(() => b.ctx.fiber.dispose())
+  declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+  await b.ctx.plugin({ inject: [...inject], apply }).await()
+  b.setSessions(sessionState([{ ...summary('path-session', 1), cwd: '/w/project' }]))
+  const paths = faceOf(entry(b.slots, MENU_ITEM, 'reveal')) as SessionPathInjected
+  const settings = faceOf(entry(b.slots, MENU_ITEM, 'settings')) as SessionSettingsInjected
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal('navigator', { clipboard: { writeText } })
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  paths.revealSession(sid('path-session'))
+  await vi.waitFor(() => {
+    expect(b.sessionRemote.openWorkspacePath).toHaveBeenCalledWith({ path: '/w/project', action: 'reveal' })
+  })
+  paths.copySessionPath(sid('path-session'))
+  await vi.waitFor(() => { expect(writeText).toHaveBeenCalledExactlyOnceWith('/w/project') })
+  paths.revealSession(sid('missing-session'))
+  paths.copySessionPath(sid('missing-session'))
+  settings.openSettings()
+  expect(b.invoke).toHaveBeenCalledWith('settings.open', { region: 'page', modal: null, target: null })
 })

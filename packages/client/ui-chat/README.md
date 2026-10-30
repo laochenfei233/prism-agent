@@ -14,6 +14,8 @@ Use this package to render a browser chat from recorded Session conversations, i
 
 File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
 
+A secondary press on a message body copies the selected text (or the whole message) and offers to add it to the current task or start a side conversation with it prefilled; neither action sends.
+
 ## Table of Contents
 
 - [Reference previews](#reference-previews)
