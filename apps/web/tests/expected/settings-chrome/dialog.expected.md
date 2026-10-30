@@ -2,24 +2,18 @@
   - navigation:
     - text: 设置
     - button "通用设置"
+    - button "外观"
     - button "模型"
     - button "内置插件"
     - button "Agent 预设"
+    - button "导入"
+    - button "备份"
   - button "打开配置文件"
   - button "关闭"
   - text: 权限 选择新会话的默认权限模式
   - button "工作区内修改"
   - text: 语言
   - button "中文"
-  - text: 外观
-  - button "浅色"
-  - button "深色"
-  - button "跟随系统" [pressed]
-  - text: 字号大小 仅影响会话内容的字号 14
-  - button "增大字号"
-  - button "减小字号"
-  - text: px
-  - button "更多字体设置"
   - text: 工作步骤展示 选择希望看到多少工具调用细节
   - button "详细"
   - text: 工作步骤收起时机 选择何时自动收起工作步骤

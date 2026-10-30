@@ -82,7 +82,7 @@ export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentP
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.gallery')}</div>
-      <div className={css.gallery}>
+      <div className={css.gallery} role="group" aria-label={t('appearance.gallery')}>
         {entries.map(entry => (
           <button
             key={entry.id}

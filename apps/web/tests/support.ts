@@ -337,3 +337,15 @@ export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<voi
   await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
   await page.getByRole('menuitem', { name: locale === 'zh' ? '设置' : 'Settings', exact: true }).click()
 }
+
+/**
+ * Open the standalone Appearance section and return its theme gallery group,
+ * the scope that disambiguates the theme cards from the custom-theme controls.
+ * @param dialog - the open settings dialog.
+ * @param locale - the dialog's active locale.
+ * @returns the gallery group locator.
+ */
+export async function openAppearanceGallery(dialog: Locator, locale: 'en' | 'zh'): Promise<Locator> {
+  await dialog.getByRole('button', { name: locale === 'zh' ? '外观' : 'Appearance', exact: true }).click()
+  return dialog.getByRole('group', { name: locale === 'zh' ? '主题' : 'Theme', exact: true })
+}
