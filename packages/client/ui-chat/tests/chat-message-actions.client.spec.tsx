@@ -79,3 +79,22 @@ it('disables the actions that need a provider when none is mounted', () => {
   expect(screen.getByRole('menuitem', { name: zh['context.askSide'] }).hasAttribute('disabled')).toBe(true)
   expect(screen.getByRole('menuitem', { name: zh['context.copy'] }).hasAttribute('disabled')).toBe(false)
 })
+
+it('does nothing when the pressed body holds no text', () => {
+  const writeText = vi.fn(async () => {})
+  const restore = installClipboard(writeText)
+  try {
+    function EmptyBody(): React.JSX.Element {
+      const menu = useMessageContextMenu(t)
+      return (
+        <div ref={menu.ref} data-testid="empty" onContextMenu={menu.onContextMenu}>
+          {menu.menu}
+        </div>
+      )
+    }
+    render(<EmptyBody />)
+    fireEvent.contextMenu(screen.getByTestId('empty'), { clientX: 10, clientY: 10 })
+    fireEvent.click(screen.getByRole('menuitem', { name: zh['context.copy'] }))
+    expect(writeText).not.toHaveBeenCalled()
+  } finally { restore() }
+})

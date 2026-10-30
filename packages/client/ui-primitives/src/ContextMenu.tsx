@@ -75,9 +75,13 @@ export function ContextMenu({ state, items = [], children, footer, onSelect, den
     close()
     onSelect?.(id)
   }, [close, onSelect])
+  // `open` means a press point exists: the guard above narrows for the
+  // component, while this closure keeps the same fact.
+  const pointX = point?.x ?? 0
+  const pointY = point?.y ?? 0
   const anchorRect = useCallback(
-    (): DOMRect | null => (point === null ? null : new DOMRect(point.x, point.y, 0, 0)),
-    [point],
+    (): DOMRect | null => new DOMRect(pointX, pointY, 0, 0),
+    [pointX, pointY],
   )
   if (!open) return null
   return (

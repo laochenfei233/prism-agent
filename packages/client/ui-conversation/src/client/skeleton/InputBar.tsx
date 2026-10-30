@@ -199,6 +199,10 @@ export const InputBar = memo(function InputBar({
     menuInsertion.current = inputActions?.captureInsertion() ?? null
     contextMenu.open(event)
   }, [composerSelectionText, contextMenu, inputActions])
+  // A menu outlives neither the draft becoming read-only nor a Session switch.
+  const closeComposerMenu = contextMenu.close
+  useEffect(() => { if (!editable) closeComposerMenu() }, [editable, closeComposerMenu])
+  useEffect(() => { closeComposerMenu() }, [sessionId, closeComposerMenu])
   const onComposerMenuSelect = useCallback((id: string): void => {
     /* v8 ignore next -- the menu renders only while the editor is editable. */
     if (editor === null || !editable) return
@@ -222,7 +226,9 @@ export const InputBar = memo(function InputBar({
         .then((copied) => {
           // Delete only when the draft is still the one the menu copied: a
           // slow clipboard write must not remove text typed since.
-          if (copied && inputActions?.captureInsertion().draftRev === captured.draftRev) {
+          const current = inputActions?.captureInsertion()
+          if (copied && current !== undefined && current.draftRev === captured.draftRev
+            && current.start === captured.start && current.end === captured.end) {
             editor.dispatchCommand(DELETE_CHARACTER_COMMAND, false)
           }
         })
@@ -235,7 +241,7 @@ export const InputBar = memo(function InputBar({
         return
       }
       void clipboard.readText()
-        .then((text) => { if (text !== '') keyboard?.paste(text) })
+        .then((text) => { if (text !== '' && editable) keyboard?.paste(text) })
         .catch(() => { showToast(t('menu.pasteUnavailable')) })
     }
   }, [editable, editor, inputActions, keyboard, showToast, t])

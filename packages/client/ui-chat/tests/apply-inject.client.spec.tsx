@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 // @vitest-environment jsdom
 /** Chat inject factories exercised over independently mounted Conversation and Chat plugins. */
@@ -239,6 +240,15 @@ describe('Chat inject API', () => {
     })
     await b.runtime.dispose()
   })
+
+  it('starts a side conversation with the quoted text through Workspace navigation', async () => {
+    const b = await bench()
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.startSideConversation('> quoted\n\n')
+    expect(b.startSession).toHaveBeenCalledExactlyOnceWith(undefined, { prompt: '> quoted\n\n', whenDraftExists: 'append' })
+    await b.runtime.dispose()
+  })
+
 
   it('addresses file paths under the Session\'s scope and opens them in the right Sidebar', async () => {
     const b = await bench()

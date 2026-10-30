@@ -88,7 +88,8 @@ interface TreeContext {
 /** The relative spelling of an absolute path under the tree root. */
 function relativePath(root: string, path: string): string {
   const base = root.replace(/[/\\]+$/, '')
-  return path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path
+  // The tree only lists children of its root, so the prefix always matches.
+  return path.slice(base.length + 1)
 }
 
 /**
@@ -131,15 +132,16 @@ function FileEntry({ path, name, tree }: { path: string; name: string; tree: Tre
       tree.onOpen(path)
       return
     }
-    if (id === 'open' || id.startsWith('application:')) {
-      const application = id === 'open' ? undefined : id.slice('application:'.length)
-      void tree.paths.openPath(path, application).then((opened) => {
-        if (!opened) tree.reportFailure(tree.t('error.openFailed'))
-      })
+    if (id === 'copy-relative' || id === 'copy-absolute') {
+      copy(id === 'copy-relative' ? relativePath(tree.state.root, path) : path)
       return
     }
-    if (id === 'copy-relative') copy(relativePath(tree.state.root, path))
-    else if (id === 'copy-absolute') copy(path)
+    // Every remaining row opens the file: the default handler, or one named
+    // by the `application:<id>` submenu row.
+    const application = id === 'open' ? undefined : id.slice('application:'.length)
+    void tree.paths.openPath(path, application).then((opened) => {
+      if (!opened) tree.reportFailure(tree.t('error.openFailed'))
+    })
   }
   return (
     <li className={css.item} data-files-entry="file" data-files-path={path}>

@@ -266,12 +266,18 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   const onProjectMenuSelect = (id: string): void => {
     /* v8 ignore next -- the context menu renders only with `actions` present. */
     if (actions === undefined) return
-    if (id === 'new-session') onCreate()
-    else if (id === 'move-top') actions.moveToTop()
-    else if (id === 'move-bottom') actions.moveToBottom()
-    else if (id === 'reveal') actions.reveal()
-    else if (id === 'rename') actions.rename()
-    else if (id === 'delete') actions.delete()
+    // One row per key: the menu emits only ids from `projectMenuItems`.
+    const handler = new Map<string, () => void>([
+      ['new-session', onCreate],
+      ['move-top', actions.moveToTop],
+      ['move-bottom', actions.moveToBottom],
+      ['reveal', actions.reveal],
+      ['rename', actions.rename],
+      ['delete', actions.delete],
+    ]).get(id)
+    /* v8 ignore next -- the menu emits only ids from `projectMenuItems`. */
+    if (handler === undefined) return
+    handler()
   }
   const ownRow = (
     <div

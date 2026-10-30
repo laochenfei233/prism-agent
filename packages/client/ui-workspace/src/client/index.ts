@@ -272,8 +272,9 @@ export function apply(ctx: Context): void {
   }
   const sessionSettingsInjected = (): SessionSettingsInjected => ({
     openSettings: () => {
-      // A menu row is an explicit command gesture, not keyboard input: the
-      // settings command's own modal gate still applies.
+      // A row menu is not reachable under an open modal in the shipped
+      // composition, so the synthetic page context is safe here; a surface
+      // that can open a menu behind a modal must pass the live owner instead.
       ctx.shortcuts.invoke('settings.open' as ShortcutCommandId, { region: 'page', modal: null, target: null })
     },
   })

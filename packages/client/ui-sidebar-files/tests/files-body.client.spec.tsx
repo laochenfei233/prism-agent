@@ -390,3 +390,25 @@ it('reports a refused open and clears it on the next successful gesture', async 
   await act(async () => { await Promise.resolve() })
   expect(view.queryByRole('alert')).toBeNull()
 })
+
+it('reports a refused clipboard write from a path row', async () => {
+  const { view, script, face } = mountBody()
+  await act(() => script.watches.ready(ROOT))
+  await act(() => script.settle({ ok: true, value: ROOT_LEVEL }))
+  vi.mocked(face.paths.applications).mockResolvedValue([])
+  const writeText = vi.fn(async () => { throw new Error('denied') })
+  const prior = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  try {
+    const row = view.container.querySelector(`[data-files-path="${ROOT}/README.md"] button`)!
+    fireEvent.contextMenu(row, { clientX: 10, clientY: 10 })
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.copyAbsolute'] }))
+    await act(async () => { await Promise.resolve() })
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(view.getByRole('alert').textContent).toBe('copy.failed')
+  } finally {
+    if (prior === undefined) Reflect.deleteProperty(navigator, 'clipboard')
+    else Object.defineProperty(navigator, 'clipboard', prior)
+  }
+})
