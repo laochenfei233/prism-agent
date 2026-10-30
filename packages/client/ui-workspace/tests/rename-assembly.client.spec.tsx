@@ -43,7 +43,11 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   // The rename flow never picks a directory; the namespace only has to be there
   // for ui-workspace's inject to settle.
   const directoryPicker = {}
-  runtime.remote.provideNamespaces({ directoryPicker })
+  const session = {
+    openWorkspacePath: vi.fn(async () => ({ ok: true as const, value: { opened: true } })),
+    workspacePathApplications: vi.fn(async () => ({ ok: true as const, value: [] })),
+  }
+  runtime.remote.provideNamespaces({ directoryPicker, session })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
@@ -123,15 +127,21 @@ describe('session rename through the assembled browser', () => {
     const trigger = within(row as HTMLElement).getByLabelText('会话“Persisted title”的操作')
     fireEvent.click(trigger)
     expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '置顶会话', '重命名', '分叉会话', '归档会话', '复制 Session ID', 'Export action', 'Last action',
+      '置顶会话', '重命名', '分叉会话', '归档会话', '在资源管理器中打开', '复制路径', '复制 Session ID', 'Export action', 'Last action',
+      '前往配置',
     ])
-    expect(view.getAllByRole('separator')).toHaveLength(1)
-    const last = view.getByRole('menuitem', { name: 'Last action' })
+    // The shipped reveal and settings rows each start a group; the fixture
+    // entry's own separatorBefore adds the third.
+    expect(view.getAllByRole('separator')).toHaveLength(3)
+    const last = view.getByRole('menuitem', { name: '前往配置' })
+    const pluginLast = view.getByRole('menuitem', { name: 'Last action' })
     const exportRow = view.getByRole('menuitem', { name: 'Export action' })
     trigger.focus()
     fireEvent.keyDown(trigger, { key: 'End' })
     expect(document.activeElement).toBe(last)
     fireEvent.keyDown(last, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(pluginLast)
+    fireEvent.keyDown(pluginLast, { key: 'ArrowUp' })
     expect(document.activeElement).toBe(exportRow)
     fireEvent.click(exportRow)
     expect(selected).toHaveBeenCalledWith('export', SID, 'Persisted title')

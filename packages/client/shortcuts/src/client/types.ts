@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /** Command contributions and immutable catalog values. */
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { BindingIssue, NormalizedBinding, ShortcutConfigSnapshot, ShortcutEdit, ShortcutRevision, ShortcutSaveResult, ShortcutBinding, ShortcutCommandId, ShortcutPlatform, ShortcutProfile, ShortcutRuntime } from '../protocol.ts'
@@ -135,4 +136,11 @@ export interface Shortcuts {
    * @returns disposer removing the binding and catalog entry.
    */
   register(command: ShortcutCommand): () => void
+  /**
+   * Run a registered command as an explicit menu action, independent of its
+   * key binding. The command's own modal gate applies.
+   * @param id - registered product command.
+   * @param context - live input owner and modal state.
+   */
+  invoke(id: ShortcutCommandId, context: ShortcutContext): void
 }

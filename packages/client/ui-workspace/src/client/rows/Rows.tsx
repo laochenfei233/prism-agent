@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /**
  * Workspace browser tree row components (figma Cell set 14:3080): pure presentational —
  * all data and callbacks arrive via props. Hover swaps (folder->chevron,
@@ -15,10 +16,12 @@ import type { RefObject } from 'react'
 import clsx from 'clsx'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  HoverCard, IconArchiveOutlineRegular, IconEditOutlineRegular,
+  ContextMenu, HoverCard, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular,
+  IconDownloadOutlineRegular, IconEditOutlineRegular,
   IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
   IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
+  useContextMenu,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -223,7 +226,13 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
-  actions?: { rename: () => void; delete: () => void } | undefined
+  actions?: {
+    rename: () => void
+    delete: () => void
+    moveToTop: () => void
+    moveToBottom: () => void
+    reveal: () => void
+  } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
@@ -235,10 +244,35 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
+  const contextMenu = useContextMenu()
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
   ]
+  // The secondary-press menu carries the full project surface; the "..." menu
+  // stays the two-row rename/delete affordance it always was.
+  const projectMenuItems = [
+    { id: 'new-session', label: t('project.newSession'), icon: <IconNewChatOutlineRegular /> },
+    { type: 'separator' as const, id: 'project-order' },
+    { id: 'move-top', label: t('project.moveToTop'), icon: <IconChevronUpOutlineRegular /> },
+    { id: 'move-bottom', label: t('project.moveToBottom'), icon: <IconChevronDownOutlineRegular /> },
+    { type: 'separator' as const, id: 'project-files' },
+    { id: 'reveal', label: t('menu.revealSession'), icon: <IconFolderOpenRegular /> },
+    { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
+    { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
+    { type: 'separator' as const, id: 'project-export' },
+    { id: 'export', label: t('project.export'), icon: <IconDownloadOutlineRegular />, disabled: true },
+  ]
+  const onProjectMenuSelect = (id: string): void => {
+    /* v8 ignore next -- the context menu renders only with `actions` present. */
+    if (actions === undefined) return
+    if (id === 'new-session') onCreate()
+    else if (id === 'move-top') actions.moveToTop()
+    else if (id === 'move-bottom') actions.moveToBottom()
+    else if (id === 'reveal') actions.reveal()
+    else if (id === 'rename') actions.rename()
+    else if (id === 'delete') actions.delete()
+  }
   const ownRow = (
     <div
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
@@ -246,6 +280,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
+      onContextMenu={actions === undefined ? undefined : contextMenu.open}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -306,6 +341,9 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
           </button>
         </Tooltip>
       </span>
+      {actions !== undefined && (
+        <ContextMenu state={contextMenu} items={projectMenuItems} onSelect={onProjectMenuSelect} />
+      )}
     </div>
   )
   // The ungrouped bucket has no backing Workspace: no card to show.
@@ -321,7 +359,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       />}
       openDelayMs={800}
       grouped
-      disabled={menuOpen}
+      disabled={menuOpen || contextMenu.point !== null}
       copyText={row.cwd}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}
@@ -575,6 +613,14 @@ export function SessionNodeItem({
   const [menuOpen, setMenuOpen] = useState(false)
   // The menu's open state, bound into the row entries' `useMenuOpenState` hook.
   const menuOpenState = useMemo((): MenuOpenState => [menuOpen, setMenuOpen], [menuOpen])
+  // The same entries serve the secondary-press surface; its open state is the
+  // press point, exposed through the same hook shape so entries dismiss either
+  // menu without knowing which one they sit in.
+  const contextMenu = useContextMenu()
+  const contextMenuState = useMemo((): MenuOpenState => [
+    contextMenu.point !== null,
+    (open: boolean) => { if (!open) contextMenu.close() },
+  ], [contextMenu.point, contextMenu.close])
   const rowRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   const marquee = useTitleMarquee(titleRef)
@@ -597,6 +643,7 @@ export function SessionNodeItem({
       aria-selected={selected}
       aria-description={row.archived ? t('toast.archivedNotOpenable') : undefined}
       onClick={() => { onOpen(node.id) }}
+      onContextMenu={row.blank ? undefined : contextMenu.open}
       onPointerEnter={marquee.enter}
       onPointerLeave={marquee.leave}
       draggable={draggable}
@@ -688,6 +735,15 @@ export function SessionNodeItem({
           {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
         </span>
       )}
+      {!row.blank && (
+        <ContextMenu state={contextMenu}>
+          {renderSlot(
+            'sidebar.workspaces.session.menu.item',
+            { sessionId: node.id, displayTitle: row.title },
+            { hookContext: contextMenuState },
+          )}
+        </ContextMenu>
+      )}
     </div>
   )
   return (
@@ -696,7 +752,7 @@ export function SessionNodeItem({
       content={<SessionHoverContent node={node} now={now} renderSlot={renderSlot} t={t} />}
       openDelayMs={800}
       grouped
-      disabled={menuOpen || drag?.active === true}
+      disabled={menuOpen || contextMenu.point !== null || drag?.active === true}
       copyText={row.blank || row.title === '' ? undefined : row.title}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}

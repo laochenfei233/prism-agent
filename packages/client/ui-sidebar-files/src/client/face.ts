@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /**
  * The tree's asynchronous half: listing directories into the store.
  *
@@ -87,6 +88,66 @@ export type WorkspaceFilesListRemote = {
 }
 
 /**
+ * The Session Remote slice that hands workspace paths to the serving desktop:
+ * default opening, explicit handlers, and the handler query.
+ */
+export type WorkspacePathRemote = {
+  readonly session: Pick<ClientRemote['session'], 'openWorkspacePath' | 'workspacePathApplications'>
+}
+
+/** One handler the serving desktop reports for a workspace path. */
+export type WorkspacePathApplication = Extract<
+  Awaited<ReturnType<ClientRemote['session']['workspacePathApplications']>>,
+  { ok: true }
+>['value'][number]
+
+/** Native open actions a file row offers. */
+export interface FilesPathActions {
+  /**
+   * Open one workspace path in its default or a named application.
+   * @param path - absolute Host path.
+   * @param application - registered handler id; omission uses the OS default.
+   * @returns true once the Host acknowledged the gesture.
+   */
+  openPath: (path: string, application?: string) => Promise<boolean>
+  /**
+   * Query the path's registered handlers.
+   * @param path - absolute Host path.
+   * @returns handlers, or null when the query failed.
+   */
+  applications: (path: string) => Promise<readonly WorkspacePathApplication[] | null>
+}
+
+/**
+ * Bind the file tree's open actions to the Session Remote face.
+ * @param remote - the Client Remote carrying the Session namespace.
+ * @returns the open and handler-query actions.
+ */
+export function createPathActions(remote: WorkspacePathRemote): FilesPathActions {
+  return {
+    openPath: async (path, application) => {
+      try {
+        const result = await remote.session.openWorkspacePath(application === undefined ? { path } : { path, application })
+        return result.ok
+      } catch {
+        // An unreachable Host failed the gesture like a refusing one; the row
+        // reports the failure without distinguishing transport from refusal.
+        return false
+      }
+    },
+    applications: async (path) => {
+      try {
+        const result = await remote.session.workspacePathApplications({ path })
+        return result.ok ? result.value : null
+      } catch {
+        // The query's failure is not the file's: default opening stays available.
+        return null
+      }
+    },
+  }
+}
+
+/**
  * Bind the listing to one Remote face, keeping only what the tree stores.
  * @param remote - the Client Remote face carrying the `workspaceFiles` namespace.
  * @returns the listing the tree's face performs.
@@ -141,17 +202,21 @@ export interface FilesInjected {
    * @param signal - the tab record's lifetime.
    */
   readonly toggle: (tabId: TabId, parentPath: string, path: string, expanded: readonly string[], signal: AbortSignal) => void
+  /** Native opening and handler discovery for a file row. */
+  readonly paths: FilesPathActions
 }
 
 /**
  * Bind the tree's face to one directory listing.
  * @param list - the bound `workspaceFiles.list` call.
  * @param watch - target-scoped directory observation.
+ * @param paths - native opening and handler discovery for file rows.
  * @returns the Slot `inject` factory: session and bound actions in, face out.
  */
 export function filesFace(
   list: ListWorkspaceDirectory,
   watch: WatchWorkspaceDirectory,
+  paths: FilesPathActions,
 ): (sessionId: SessionId, actions: BoundActions<ReturnType<typeof createFilesStore>>) => FilesInjected {
   return (
     sessionId: SessionId,
@@ -181,6 +246,7 @@ export function filesFace(
       })
     }
     return {
+      paths,
       refresh: (tabId) => { void roots.get(tabId)?.refreshTree() },
       setAutoRefresh: (tabId, enabled) => {
         actions.autoRefresh(tabId, enabled)

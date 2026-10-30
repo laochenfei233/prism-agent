@@ -1,5 +1,6 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /** Stateless text-area presentation over the InputBar's borrowed editor. */
-import type { CSSProperties, KeyboardEventHandler, ReactNode, RefObject } from 'react'
+import type { CSSProperties, KeyboardEventHandler, MouseEventHandler, ReactNode, RefObject } from 'react'
 import type { LexicalEditor } from 'lexical'
 import clsx from 'clsx'
 import type { InputState } from '../../contract/input.ts'
@@ -21,6 +22,8 @@ export interface DraftEditorProps {
   readonly onWorkspaceKeyDown: KeyboardEventHandler<HTMLDivElement>
   readonly hint: string | null
   readonly showPlaceholder: boolean
+  /** Secondary-press handler for the text surface; absent keeps the browser menu. */
+  readonly onContextMenu?: MouseEventHandler<HTMLDivElement> | undefined
 }
 
 /**
@@ -30,10 +33,10 @@ export interface DraftEditorProps {
  */
 export function DraftEditor({
   classNames: css, editor, scrollRef, editable, editorDisabled, phase, placeholderText, ariaLabel,
-  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder,
+  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, onContextMenu,
 }: DraftEditorProps): ReactNode {
   return (
-    <div ref={scrollRef} className={css.scroll} data-input-scroll>
+    <div ref={scrollRef} className={css.scroll} data-input-scroll onContextMenu={onContextMenu}>
       <div className={css.grow}>
         <ComposerContentEditable
           editor={workspaceTrigger ? null : editor}

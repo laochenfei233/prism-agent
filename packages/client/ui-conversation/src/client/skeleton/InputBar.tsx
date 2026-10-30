@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /** The default composer body: the 'conversation.composer.bar' slot entry.
  * Machine state arrives through the standard provide channel
  * (useInput + inputActions); the keyboard/DOM command face and stop arrive
@@ -16,9 +17,11 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
+import { $getRoot, $getSelection, $isRangeSelection, $selectAll, DELETE_CHARACTER_COMMAND, REDO_COMMAND, UNDO_COMMAND } from 'lexical'
 import {
-  IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  ContextMenu, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip, useContextMenu, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
 import type {} from '@deepseek-ai/dsh-plan-mode/client'
@@ -74,6 +77,7 @@ export const InputBar = memo(function InputBar({
   const live = input !== undefined && keyboard !== undefined && inputActions !== undefined
   const draft = input?.draft ?? ''
   const editor = keyboard?.editor ?? null
+  const contextMenu = useContextMenu()
   const attachments = useMemo(
     () => input === undefined || resolveDraftAttachments === undefined ? [] : resolveDraftAttachments(input.attachmentIds),
     [resolveDraftAttachments, input?.attachmentIds],
@@ -95,6 +99,79 @@ export const InputBar = memo(function InputBar({
     setToast({ seq: toastSeq.current, text })
   }, [])
   const dismissToast = useCallback(() => { setToast(null) }, [])
+  // The text surface's secondary-press menu: Lexical's own edit commands, with
+  // clipboard transfer layered on the browser API. A refused clipboard read
+  // (no permission, no API) leaves the draft untouched and names the shortcut.
+  const composerMenuItems = useMemo((): readonly MenuEntry[] => [
+    { id: 'undo', label: t('menu.undo'), disabled: editor === null },
+    { id: 'redo', label: t('menu.redo'), disabled: editor === null },
+    { type: 'separator', id: 'menu-history' },
+    { id: 'cut', label: t('menu.cut'), disabled: editor === null },
+    { id: 'copy', label: t('copy'), disabled: editor === null },
+    { id: 'paste', label: t('menu.paste'), disabled: editor === null },
+    { id: 'delete', label: t('delete'), disabled: editor === null },
+    { type: 'separator', id: 'menu-selection' },
+    { id: 'select-all', label: t('menu.selectAll'), disabled: editor === null },
+  ], [editor, t])
+  // The DOM selection is the reader's exact highlight; Lexical's state answers
+  // when the browser selection is gone (a programmatic select-all whose
+  // element points at the root carry no text of their own).
+  const composerSelectionText = useCallback((): string => {
+    const dom = window.getSelection()?.toString() ?? ''
+    if (dom !== '') return dom
+    return editor?.getEditorState().read(() => {
+      const selection = $getSelection()
+      if (selection === null) return ''
+      if ($isRangeSelection(selection)) {
+        const rootKey = $getRoot().getKey()
+        const rootPoint = (point: { type: string; key: string }): boolean =>
+          point.type === 'element' && point.key === rootKey
+        if (rootPoint(selection.anchor) || rootPoint(selection.focus)) return $getRoot().getTextContent()
+      }
+      return selection.getTextContent()
+    }) ?? ''
+  }, [editor])
+  // A secondary press must remember what it was aimed at: activating a row
+  // moves focus out of the editable surface, and the caret selection is not
+  // guaranteed to survive that.
+  const menuSelection = useRef('')
+  const openComposerMenu = useCallback((event: MouseEvent<HTMLDivElement>): void => {
+    menuSelection.current = composerSelectionText()
+    contextMenu.open(event)
+  }, [composerSelectionText, contextMenu])
+  const onComposerMenuSelect = useCallback((id: string): void => {
+    /* v8 ignore next -- the menu renders only while the editor exists. */
+    if (editor === null) return
+    // Lexical keeps its own selection; returning focus restores the caret the
+    // menu was opened over before any command runs.
+    editor.focus()
+    if (id === 'undo') { editor.dispatchCommand(UNDO_COMMAND, undefined); return }
+    if (id === 'redo') { editor.dispatchCommand(REDO_COMMAND, undefined); return }
+    if (id === 'select-all') { editor.update(() => { $selectAll() }); return }
+    if (id === 'delete') { editor.dispatchCommand(DELETE_CHARACTER_COMMAND, true); return }
+    const text = menuSelection.current
+    if (id === 'copy') {
+      if (text !== '') void writeClipboard(text)
+      return
+    }
+    if (id === 'cut') {
+      if (text === '') return
+      void writeClipboard(text)
+        .catch(() => false)
+        .then((copied) => { if (copied) editor.dispatchCommand(DELETE_CHARACTER_COMMAND, true) })
+      return
+    }
+    if (id === 'paste') {
+      const clipboard = navigator.clipboard
+      if (clipboard?.readText === undefined) {
+        showToast(t('menu.pasteUnavailable'))
+        return
+      }
+      void clipboard.readText()
+        .then((text) => { if (text !== '') keyboard?.paste(text) })
+        .catch(() => { showToast(t('menu.pasteUnavailable')) })
+    }
+  }, [editor, keyboard, showToast, t])
   // The deployment's image-intake limits (absent while no attachment service
   // is composed — the pre-check below then defers entirely to the host).
   const imageLimits = useProjection('imageLimits')
@@ -435,7 +512,11 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
+          onContextMenu={editor === null ? undefined : openComposerMenu}
         />
+        {editor !== null && (
+          <ContextMenu state={contextMenu} items={composerMenuItems} onSelect={onComposerMenuSelect} />
+        )}
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>

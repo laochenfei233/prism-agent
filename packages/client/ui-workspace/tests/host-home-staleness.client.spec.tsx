@@ -34,8 +34,12 @@ async function bench() {
   runtime.ctx.provide('layout', { selectPanel: vi.fn(), beginNavigation: () => new AbortController().signal })
   runtime.releaseWorkspaceSource()
   const directoryPicker = {}
+  const session = {
+    openWorkspacePath: vi.fn(async () => ({ ok: true as const, value: { opened: true } })),
+    workspacePathApplications: vi.fn(async () => ({ ok: true as const, value: [] })),
+  }
   const { remote } = runtime
-  remote.provideNamespaces({ directoryPicker })
+  remote.provideNamespaces({ directoryPicker, session })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)

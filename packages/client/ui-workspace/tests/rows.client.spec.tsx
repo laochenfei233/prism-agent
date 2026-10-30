@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
@@ -8,6 +9,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { HoverCardGroup, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { menuOpenStateFactory } from '../src/client/contract/slots.ts'
 import type { MenuOpenState, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { RowDragProps } from '../src/client/rows/Rows.tsx'
@@ -490,7 +492,8 @@ describe('workspace browser rows', () => {
     }
     render(<ProjectRowItem
       group={group} onToggle={onToggle} onCreate={vi.fn()}
-      actions={{ rename: onRename, delete: onDelete }} t={t}
+      actions={{ rename: onRename, delete: onDelete, moveToTop: vi.fn(), moveToBottom: vi.fn(), reveal: vi.fn() }}
+      t={t}
     />)
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     // Opening the menu neither toggles the group nor renames yet.
@@ -1235,4 +1238,70 @@ it.each([['未命名', t], ['Untitled', tEn]])('labels unnamed search results as
     onUnarchive={vi.fn()} t={translate} />)
   fireEvent.click(screen.getByText(label))
   expect(onOpen).toHaveBeenCalledWith(result.id)
+})
+
+/** A slot entry that dismisses through the hook the row occurrence supplies. */
+function SlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState }): React.JSX.Element {
+  const [, setOpen] = useMenuOpenState()
+  return <button type="button" role="menuitem" onClick={() => { setOpen(false) }}>entry</button>
+}
+
+it('opens the same row entries on a secondary press and dismisses through the hook', () => {
+  const node: SessionNode = { id: sid('ctx'), title: 'Context', blank: false, running: false,
+    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false }
+  const renderSlot = ((
+    name: 'sidebar.workspaces.session.menu.item',
+    _props: SessionRowOwnerProps,
+    opts?: { hookContext?: unknown },
+  ) => (name === 'sidebar.workspaces.session.menu.item'
+    ? <SlotEntry useMenuOpenState={menuOpenStateFactory(undefined as never, opts?.hookContext as MenuOpenState)} />
+    : null)) as RowRenderSlot
+  render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()} renderSlot={renderSlot} t={t} />)
+  fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 12, clientY: 20 })
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['entry'])
+  fireEvent.click(screen.getByRole('menuitem', { name: 'entry' }))
+  expect(screen.queryByRole('menu')).toBeNull()
+})
+
+it('keeps the browser menu on a blank provisional row', () => {
+  const node: SessionNode = { id: sid('blank'), title: '', blank: true, running: false,
+    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false }
+  render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+    renderSlot={() => null} t={t} />)
+  const event = createEvent.contextMenu(screen.getByRole('treeitem'))
+  fireEvent(screen.getByRole('treeitem'), event)
+  expect(event.defaultPrevented).toBe(false)
+  expect(screen.queryByRole('menu')).toBeNull()
+})
+
+it('runs every project context row and keeps export disabled', () => {
+  const onCreate = vi.fn()
+  const moveToTop = vi.fn()
+  const moveToBottom = vi.fn()
+  const reveal = vi.fn()
+  const rename = vi.fn()
+  const onDelete = vi.fn()
+  const group: GroupNode = {
+    key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
+    sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
+  }
+  render(<ProjectRowItem
+    group={group} onToggle={vi.fn()} onCreate={onCreate}
+    actions={{ rename, delete: onDelete, moveToTop, moveToBottom, reveal }} t={t}
+  />)
+  const open = (): void => { fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 5, clientY: 5 }) }
+  open()
+  expect(screen.getByRole('menuitem', { name: '导出（开发中）' })).toHaveProperty('disabled', true)
+  fireEvent.click(screen.getByRole('menuitem', { name: '新建会话' }))
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '置底' }))
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '在资源管理器中打开' }))
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '删除工作区' }))
+  expect(onCreate).toHaveBeenCalledOnce()
+  expect(moveToTop).toHaveBeenCalledOnce()
+  expect(moveToBottom).toHaveBeenCalledOnce()
+  expect(reveal).toHaveBeenCalledOnce()
+  expect(rename).toHaveBeenCalledOnce()
+  expect(onDelete).toHaveBeenCalledOnce()
 })

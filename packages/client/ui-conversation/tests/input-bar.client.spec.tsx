@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 // @vitest-environment jsdom
 // InputBar behavior over the editor + submit-machine wiring: Enter-send
 // semantics (IME guard, Shift newline, busy Enter policy, Ctrl/Meta steering,
@@ -12,7 +13,7 @@ import './control-row-dom.ts'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createPortal } from 'react-dom'
 import { $getRoot, $isTextNode } from 'lexical'
 import {
@@ -1912,4 +1913,51 @@ it('places context usage below the composer and hides it until the activity clos
   fireEvent.click(view.getByRole('button', { name: '上下文已用 25%' }))
   expect(view.getByRole('dialog', { name: '上下文已用' })).toBeTruthy()
   expect(view.getByRole('button', { name: '发送消息' })).toBeTruthy()
+})
+
+
+describe('composer context menu', () => {
+  it('runs the edit commands over the draft and names a refused clipboard read', async () => {
+    const { view, shell } = bench({ draft: 'hello world' })
+    const surface = view.container.querySelector('[data-input-scroll]')!
+    const openMenu = (): void => { fireEvent.contextMenu(surface, { clientX: 10, clientY: 10 }) }
+    openMenu()
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent))
+      .toEqual(['撤销', '重做', '剪切', '复制', '粘贴', '删除', '全选'])
+    fireEvent.click(screen.getByRole('menuitem', { name: '全选' }))
+    await act(async () => { await Promise.resolve() })
+    const writeText = vi.fn(async () => {})
+    const readText = vi.fn(async () => 'pasted')
+    const prior = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText, readText } })
+    try {
+      openMenu()
+      fireEvent.click(screen.getByRole('menuitem', { name: '复制' }))
+      await act(async () => { await Promise.resolve() })
+      expect(writeText).toHaveBeenCalledExactlyOnceWith('hello world')
+      openMenu()
+      fireEvent.click(screen.getByRole('menuitem', { name: '剪切' }))
+      await act(async () => { await Promise.resolve() })
+      expect(shell.editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('')
+      openMenu()
+      fireEvent.click(screen.getByRole('menuitem', { name: '粘贴' }))
+      await act(async () => { await Promise.resolve() })
+      expect(readText).toHaveBeenCalledOnce()
+      expect(shell.editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('pasted')
+      openMenu()
+      fireEvent.click(screen.getByRole('menuitem', { name: '撤销' }))
+      await act(async () => { await Promise.resolve() })
+      expect(shell.editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('')
+      openMenu()
+      fireEvent.click(screen.getByRole('menuitem', { name: '重做' }))
+      await act(async () => { await Promise.resolve() })
+      expect(shell.editor.getEditorState().read(() => $getRoot().getTextContent())).toBe('pasted')
+    } finally {
+      if (prior === undefined) Reflect.deleteProperty(navigator, 'clipboard')
+      else Object.defineProperty(navigator, 'clipboard', prior)
+    }
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: '粘贴' }))
+    expect(view.getByText('无法读取剪贴板，请使用 Ctrl+V 粘贴')).toBeTruthy()
+  })
 })

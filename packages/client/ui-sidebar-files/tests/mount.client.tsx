@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /**
  * Mount the body over a real store instance and a scripted listing.
  *
@@ -15,7 +16,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SidebarRightTabActions } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { filesFace } from '../src/client/face.ts'
-import type { FilesInjected } from '../src/client/face.ts'
+import type { FilesInjected, FilesPathActions } from '../src/client/face.ts'
 import { FilesBody } from '../src/client/FilesBody.tsx'
 import type { FilesBodyProps } from '../src/client/FilesBody.tsx'
 import { zh } from '../src/client/locales.ts'
@@ -37,6 +38,17 @@ function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapsho
 
 /** A live instance of the tree's store, as the framework would mint one per session. */
 type FilesStoreInstance = ReturnType<ReturnType<typeof createFilesStore>['create']>
+
+/** Native path actions the tree never exercises unless a spec asks for them. */
+export function scriptedPaths(): FilesPathActions & {
+  readonly openPath: Mock<FilesPathActions['openPath']>
+  readonly applications: Mock<FilesPathActions['applications']>
+} {
+  return {
+    openPath: vi.fn<FilesPathActions['openPath']>(async () => true),
+    applications: vi.fn<FilesPathActions['applications']>(async () => []),
+  }
+}
 
 /** The owner's tab actions as recording mocks. */
 interface MockedTabActions {
@@ -62,7 +74,7 @@ export interface Mounted {
 function harness(cwd: string | null, refreshShortcut?: ReturnType<FilesBodyProps['useTabInfo']>['tab']['refreshShortcut']) {
   const instance = createFilesStore().create()
   const script = scriptedList()
-  const face = filesFace(script.list, script.watch)(SESSION, instance.actions)
+  const face = filesFace(script.list, script.watch, scriptedPaths())(SESSION, instance.actions)
   const controller = new AbortController()
   onTestFinished(async () => {
     controller.abort()

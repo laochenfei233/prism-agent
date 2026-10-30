@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 // @vitest-environment jsdom
 /** File-tree presentation over controlled directory watches and deferred listings. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -326,4 +327,43 @@ describe('failureLine', () => {
     const failure = { code: 'remote/transport', message: 'socket closed' } as unknown as RemoteFailure
     expect(failureLine(t, failure)).toBe('读取失败：socket closed')
   })
+})
+
+it('offers preview, open, open-with, and both path spellings on a file row', async () => {
+  const { view, script, face } = mountBody()
+  await act(() => script.watches.ready(ROOT))
+  await act(() => script.settle({ ok: true, value: ROOT_LEVEL }))
+  const writeText = vi.fn(async () => {})
+  const prior = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  try {
+    vi.mocked(face.paths.applications).mockResolvedValue([{ id: 'code', name: 'VS Code', default: true, icon: null }])
+    const row = view.container.querySelector(`[data-files-path="${ROOT}/README.md"] button`)!
+    const openMenu = async (): Promise<void> => {
+      fireEvent.contextMenu(row, { clientX: 10, clientY: 10 })
+      await act(async () => { await Promise.resolve() })
+    }
+    await openMenu()
+    expect(view.getAllByRole('menuitem').map(item => item.textContent))
+      .toEqual([zh['menu.preview'], zh['menu.open'], zh['menu.openWith'], zh['menu.copyRelative'], zh['menu.copyAbsolute']])
+    expect(face.paths.applications).toHaveBeenCalledWith(`${ROOT}/README.md`)
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.preview'] }))
+    expect(face.paths.openPath).not.toHaveBeenCalled()
+    await openMenu()
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.open'] }))
+    expect(face.paths.openPath).toHaveBeenLastCalledWith(`${ROOT}/README.md`, undefined)
+    await openMenu()
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.openWith'] }))
+    fireEvent.click(view.getByRole('menuitem', { name: 'VS Code' }))
+    expect(face.paths.openPath).toHaveBeenLastCalledWith(`${ROOT}/README.md`, 'code')
+    await openMenu()
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.copyRelative'] }))
+    expect(writeText).toHaveBeenLastCalledWith('README.md')
+    await openMenu()
+    fireEvent.click(view.getByRole('menuitem', { name: zh['menu.copyAbsolute'] }))
+    expect(writeText).toHaveBeenLastCalledWith(`${ROOT}/README.md`)
+  } finally {
+    if (prior === undefined) Reflect.deleteProperty(navigator, 'clipboard')
+    else Object.defineProperty(navigator, 'clipboard', prior)
+  }
 })

@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -11,6 +12,7 @@ import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { useMessageContextMenu } from './chat-message-actions.tsx'
 import css from './MessageItem.module.css'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
@@ -163,10 +165,12 @@ function TurnMaxTokensItem({ t }: {
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
   content, loadImage, renderFactorySlot, actions, pending = false, echo = false, referenceLabels, skillNames,
-  previewAttachments, facts: inputFacts = EMPTY_TEXT_FACTS, interactive = false,
+  previewAttachments, facts: inputFacts = EMPTY_TEXT_FACTS, interactive = false, t,
 }: {
   content: readonly unknown[]
   renderFactorySlot: PropsRenderFactories['renderFactorySlot']
+  /** Chat locale seat; also labels the bubble's context menu. */
+  t: ChatViewSlotProps['t']
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
   /** Whether this is the Host-authoritative pre-admission steering projection. */
@@ -194,12 +198,16 @@ function UserStyleBubble({
     ...(referenceLabels === undefined ? {} : { sessionLabels: referenceLabels }),
     ...(skillNames === undefined ? {} : { skillNames }),
   }), [inputFacts, referenceLabels, skillNames])
+  const contextMenu = useMessageContextMenu(t)
   return (
     <div
+      ref={contextMenu.ref}
       className={css.userRow}
       data-pending-steering={pending || undefined}
       data-submission-echo={echo || undefined}
+      onContextMenu={contextMenu.onContextMenu}
     >
+      {contextMenu.menu}
       {renderFactorySlot('conversation.chat.user.content', {
         content: prepared,
         loadImage,
@@ -227,6 +235,7 @@ export function PendingSteeringBubble({ content, loadImage, renderFactorySlot, t
       content={content}
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      t={t}
       pending
       actions={text => (
         <MessageIconActions
@@ -279,6 +288,7 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
       previewAttachments={previewAttachments}
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      t={t}
       pending={submission.placement === 'steering'}
       echo
       actions={text => (
@@ -305,6 +315,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       interactive
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
+      t={t}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
       actions={text => (

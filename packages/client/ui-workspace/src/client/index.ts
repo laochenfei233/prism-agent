@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 /**
  * Workspace plugin, browser half. Two registrations: WorkspaceBrowser fills
  * the sidebar shell's `sidebar.workspaces` hole (the whole browsing region),
@@ -7,7 +8,8 @@
  * own `single` directory-flow child hole for the composed picker package's
  * client half. WorkspaceBrowser additionally declares the two Session row
  * action lists, and this apply registers the shipped actions — pin, rename,
- * fork, archive, copy ID — into them the way any client plugin would, each
+ * fork, archive, reveal, copy path, copy ID, settings — into them the way any
+ * client plugin would, each
  * with its own behavior, plus the dialogs and the row-action notice into
  * `shell.overlay` (see the contract module doc). It also declares two
  * Session-row seats: the leading decoration a row renders only while its own
@@ -18,6 +20,7 @@
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
 import type { RemoteHostFacts } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { ISessions, SessionForkError } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {
   IWorkspaces, SessionActivity, WorkspaceArchiveError, WorkspaceId, WorkspaceSnapshot,
@@ -41,7 +44,8 @@ import {
   type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
-  type SessionIdInjected, type WorkspaceBrowserInjected, type WorkspacePickerInjected,
+  type SessionIdInjected, type SessionPathInjected, type SessionSettingsInjected,
+  type WorkspaceBrowserInjected, type WorkspacePickerInjected,
 } from './contract/slots.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
@@ -55,6 +59,9 @@ import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/Re
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
 import { registerToasts } from './toast/register.ts'
 import { SessionIdMenuItem } from './session-actions/SessionId.tsx'
+import {
+  CopySessionPathMenuItem, RevealSessionMenuItem, SessionSettingsMenuItem,
+} from './session-actions/SessionContextActions.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
 
@@ -100,7 +107,8 @@ const NS = 'workspace'
  * declaration through `slots.inject()` instead of assuming order.
  */
 export const inject = [
-  'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'layout', 'shortcuts', 'remoteAccess',
+  'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.session', 'remote.directoryPicker', 'layout',
+  'shortcuts', 'remoteAccess',
 ]
 
 /**
@@ -239,6 +247,36 @@ export function apply(ctx: Context): void {
       notify({ kind: copied ? 'sessionIdCopied' : 'sessionIdCopyFailed' })
     },
   })
+  const sessionPathInjected = (): SessionPathInjected => {
+    const cwdOf = (sessionId: SessionId): string | undefined => sessions.list.getSnapshot().byId[sessionId]?.cwd
+    return {
+      revealSession: (sessionId) => {
+        const cwd = cwdOf(sessionId)
+        if (cwd === undefined) {
+          notify({ kind: 'revealFailed' })
+          return
+        }
+        void ctx.remote.session.openWorkspacePath({ path: cwd, action: 'reveal' })
+          .then((result) => { if (!result.ok) notify({ kind: 'revealFailed' }) })
+          .catch(() => { notify({ kind: 'revealFailed' }) })
+      },
+      copySessionPath: (sessionId) => {
+        const cwd = cwdOf(sessionId)
+        if (cwd === undefined) {
+          notify({ kind: 'pathCopyFailed' })
+          return
+        }
+        void writeClipboard(cwd).then((copied) => { notify({ kind: copied ? 'pathCopied' : 'pathCopyFailed' }) })
+      },
+    }
+  }
+  const sessionSettingsInjected = (): SessionSettingsInjected => ({
+    openSettings: () => {
+      // A menu row is an explicit command gesture, not keyboard input: the
+      // settings command's own modal gate still applies.
+      ctx.shortcuts.invoke('settings.open' as ShortcutCommandId, { region: 'page', modal: null, target: null })
+    },
+  })
   const renameInjected = (): RenameSessionInjected => ({ requestSessionRename })
   const renameDialogInjected = (): SessionRenameDialogInjected => ({
     hooks: { renameRequest },
@@ -276,6 +314,11 @@ export function apply(ctx: Context): void {
       await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
     unarchiveSession: async (sessionId) => { await uiWorkspace.unarchiveSession(sessionId) },
+    revealWorkspace: (path) => {
+      void ctx.remote.session.openWorkspacePath({ path, action: 'reveal' })
+        .then((result) => { if (!result.ok) notify({ kind: 'revealFailed' }) })
+        .catch(() => { notify({ kind: 'revealFailed' }) })
+    },
     createWorkspace: input => workspaces.create(input),
     requestSearch: shortcutControls.search,
     requestAddWorkspace: shortcutControls.add,
@@ -319,6 +362,9 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'session-id', order: 450, locale: NS, inject: sessionIdInjected }, SessionIdMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'reveal', order: 420, locale: NS, inject: sessionPathInjected }, RevealSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'copy-path', order: 430, locale: NS, inject: sessionPathInjected }, CopySessionPathMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'settings', order: 800, locale: NS, inject: sessionSettingsInjected }, SessionSettingsMenuItem)
   })
   ctx.slots.inject('sidebar.workspaces.session.row.action', function* () {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.row.action', id: 'archive', order: 100, locale: NS, inject: archiveInjected }, ArchiveSessionRowButton)
