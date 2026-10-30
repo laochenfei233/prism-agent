@@ -20,7 +20,7 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.1 包与组装
 
-新建 in-tree 工作区包 `packages/backup/prism-backup`，包名 `@prism/prism-backup` —— 继 `@prism/prism-session-import` 之后 fork 的第二个 `@prism` 包。选择 in-tree 位置是因为它决定了功能能否拥有 Remote 命名空间：Typert 生成器只注册 `packages/` 下的工程，out-of-tree 插件无法产出 `./typert` 与 `./remote` 产物。一个包承担功能需要的三个角色：宿主服务 `PrismBackupService`（`ctx.prismBackup`）负责编排，Remote 所有者 `BackupController`（线上命名空间 `prism-backup`）负责面向客户端的接缝，客户端半区注册一个 `settings.section` 页面。Loader 行写进 `packages/bundle/web-app/cordis.patch.yml`，与其他控制器并列：`prism-backup-controller`（子路径入口）和根行 `prism-backup` —— 根行的 `name` 用裸包名，客户端半区才会挂上去。`./remote` contribution 在 `@deepseek-ai/dsh-api-remotes` 客户端装配处挂载，与所有 in-tree 命名空间一致。新路径对上游回放而言是纯新增；被改动的上游所有文件（web-app patch、remotes 装配、`packages/README.md`）带 `PRISM-DIVERGENCE` 标记，并以 A11 区加入 [fork-upstream-divergence](fork-upstream-divergence.zh.md) 索引。
+新建 in-tree 工作区包 `packages/backup/prism-backup`，包名 `@prism/prism-backup` —— 继 `@prism/prism-session-import` 之后 fork 的第二个 `@prism` 包。它同时携带宿主半区（`apply` 背后的备份服务，负责收集、归档、传输、轮换与历史）与客户端半区（一个 `settings.section` 页面），由 `packages/bundle/web-app/cordis.patch.yml` 中的一行 Loader 行挂载 —— 行的 `name` 用裸包名，浏览器半区才会挂到同一行上。配置写入走既有 `remote.settings` 面，密钥走 `remote.credentials`，因此本功能不新增生成的 Typert 命名空间，除该 patch 外不改动任何上游所有的装配文件。patch 行带 `PRISM-DIVERGENCE` 标记，并以 A11 区加入 [fork-upstream-divergence](fork-upstream-divergence.zh.md) 索引。
 
 ### S2.2 配置
 
@@ -36,7 +36,7 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.3 密钥
 
-密码类值绝不进 Config 或任何 patch 文件：WebDAV 密码、SMB 密码、S3 secret access key 以凭据记录存放，scope 为 `prism-backup`（id 分别为 `webdav-password`、`smb-password`、`s3-secret-key`），经 `ctx.credentials.modifyRecord` 写入。控制器负责写入与清除，只报告存在性，永不返回值。设置页与插件 README 说明备份压缩包内含 `.env` 与 `.credentials.yaml`，备份目标必须是用户信任的服务器。
+密码类值绝不进 Config 或任何 patch 文件。它们是提供者管理的文件层里的普通凭据引用 —— `PRISM_BACKUP_WEBDAV_PASSWORD`、`PRISM_BACKUP_SMB_PASSWORD`、`PRISM_BACKUP_S3_SECRET_KEY` —— 由设置页经既有 `remote.credentials.set`/`unset`/`describe` 面写入，与 Models 页管理供应商密钥的方式完全相同，值只落到 `~/.prism/.credentials.yaml`。宿主在每次运行时用 `ctx.credentials.resolve` 解析一次引用，所以改密码无需重启即可生效；页面只渲染 `describe()` 的 `configured` 标志，永不显示值。设置页与插件 README 说明备份压缩包内含 `.env` 与 `.credentials.yaml`，备份目标必须是用户信任的服务器。
 
 ### S2.4 压缩包布局
 
@@ -65,11 +65,11 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ### S2.6 运行编排
 
-`PrismBackupService.run()` 单飞：已有运行在途时，第二次调用以 `prism-backup/busy` 失败，不排队。每次运行在 `ctx.jobs` 注册无主 job（任何会话的 job 列表可见），经 collect → zip → upload → rotate 推进并用 `setProgress` 报告。结束向 `prism_backup` 存储域（单文件布局）追加一条运行记录，列表裁剪到最近 20 条。记录包含 id、起止时间、`success | failed`、目标类型与脱敏端点（无凭据）、压缩包大小、对象键、成员计数，以及失败的 code 与 message。失败使用 `prism-backup/*` 表中的 `RemoteError` code（`not-configured`、`busy`、`connection-failed`、`auth-failed`、`upload-failed`、`collect-failed`），各自在检查点抛出，底层错误作为 `cause`。
+`PrismBackup.run()` 单飞：已有运行在途时，第二次调用以 `prism-backup/busy` 失败，不排队。运行经 collect → zip → upload → rotate 推进，并在设置页轮询的内存状态里发布当前阶段与字节/文件计数。结束向 `prism_backup` 存储域（按记录表）追加一条运行记录，列表裁剪到最近 20 条。记录包含 id、起止时间、`success | failed`、目标类型与脱敏端点（无凭据）、压缩包大小、对象键、成员计数，以及失败的 code 与 message。失败使用 `prism-backup/*` 表（`not-configured`、`busy`、`connection-failed`、`auth-failed`、`upload-failed`、`collect-failed`），各自在检查点抛出，底层错误作为 `cause`。
 
-### S2.7 Remote 命名空间
+### S2.7 宿主路由
 
-`BackupController` 提供 `run`（启动一次运行，返回运行 id）、`status`（运行中标志加最新一条记录）、`history`（裁剪后的记录列表）、`testConnection`（按活动类型测可达性，附可操作信息）、`secretState`（哪些密钥 id 已存储）、`setSecret`、`clearSecret`。全部为普通调用；设置页在运行期间轮询 `status`。客户端代码按 `RemoteResult` 的 code 分支，不用 `instanceof`。
+插件经 `ctx.connection.fetch.register` 注册一条精确 POST 路由 `/api/prism.backup` —— 与 `file-upload` 处理无法走 JSON Remote 调用的工作所用的同一通道，这也是本功能不需要生成 Typert 命名空间或 Remote contribution 的原因。缓冲的 JSON 体携带一个 `action`：`state`（运行阶段加历史记录）、`run`（启动一次运行，返回其记录）、`test`（按类型测可达性并附可操作信息）。应答是 JSON 信封 `{ ok: true, value }` 或 `{ ok: false, error: { code, message } }`，code 取自 `prism-backup/*` 表。运行期间页面每秒轮询 `state`；配置写入与密钥写入仍走各自既有的 Remote 面。
 
 ### S2.8 设置页
 
@@ -82,12 +82,12 @@ Prism 有三类用户数据只存在于一台机器上，没有任何复制到�
 
 ## 任务
 
-- [ ] T1：搭建包 —— manifest、face 配置、经 `clientBundle` 的 tsdown（host 阶段）、loader 行、remotes 装配挂载、服务与控制器桩；`build:artifacts` 与 web profile 启动保持绿（依赖：无）
-- [ ] T2：带校验的 Config 模式、凭据辅助、`prism_backup` 存储域（依赖：T1）
+- [ ] T1：搭建包 —— manifest、face 配置、经 `clientBundle` 的 tsdown（host 阶段）、web-app loader 行、服务与路由；`build:artifacts` 与 web profile 启动保持绿（依赖：无）
+- [ ] T2：带校验的 Config 模式、凭据引用解析、`prism_backup` 存储域（依赖：T1）
 - [ ] T3：WebDAV、S3（SigV4 对照公开向量）、SMB 传输与单元测试（依赖：T1）
-- [ ] T4：编排器 —— 收集、压缩、上传、轮换、job 进度、历史 —— 用假传输做集成测试（依赖：T2、T3）
-- [ ] T5：控制器方法、失败 code 表、Typert 产物、宿主侧与客户端侧 spec（依赖：T4）
-- [ ] T6：客户端设置页、locale 对、插槽注册（依赖：T5）
+- [ ] T4：编排器 —— 收集、压缩、上传、轮换、阶段、历史 —— 用假传输做集成测试（依赖：T2、T3）
+- [ ] T5：POST 路由、失败 code 表、宿主侧 spec（依赖：T4）
+- [ ] T6：客户端设置页、locale 对、插槽注册、run/test/state 的 fetch 接线（依赖：T5）
 - [ ] T7：README 对、divergence 索引 A11 区、如生成器扫描本包则再生成 config catalog（依赖：T6）
 - [ ] T8：完整验证 —— 构建、测试、覆盖率、typecheck、文档与 i18n 门禁（依赖：T7）
 

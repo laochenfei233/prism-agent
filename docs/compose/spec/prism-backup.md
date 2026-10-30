@@ -20,7 +20,7 @@ Prism keeps three kinds of user data on one machine with no way to copy them els
 
 ### S2.1 Package and composition
 
-New in-tree workspace package `packages/backup/prism-backup`, name `@prism/prism-backup` — the fork's second `@prism` package, following `@prism/prism-session-import`. The in-tree position is what makes the feature's Remote namespace possible: the Typert generator registers projects only under `packages/`, so an out-of-tree plugin cannot publish `./typert` and `./remote` artifacts. One package carries the three roles the feature needs: the host service `PrismBackupService` (`ctx.prismBackup`) owning orchestration, the Remote owner `BackupController` (wire namespace `prism-backup`) owning the client-facing seam, and the client half registering a `settings.section` page. Loader rows go into `packages/bundle/web-app/cordis.patch.yml` beside the other controllers: `prism-backup-controller` (subpath entry) and the root `prism-backup` row, whose `name` is the bare package name so the client half attaches to it. The `./remote` contribution mounts in the `@deepseek-ai/dsh-api-remotes` client assembly like every in-tree namespace. New paths are additive for upstream replay; the touched upstream-owned files (web-app patch, remotes assembly, `packages/README.md`) carry `PRISM-DIVERGENCE` markers and join the [fork-upstream-divergence](fork-upstream-divergence.md) index as area A11.
+New in-tree workspace package `packages/backup/prism-backup`, name `@prism/prism-backup` — the fork's second `@prism` package, following `@prism/prism-session-import`. It carries the host half (the backup service behind `apply`, owning collection, archiving, transports, rotation, and history) and the client half (a `settings.section` page), mounted by one Loader row in `packages/bundle/web-app/cordis.patch.yml` whose `name` is the bare package name so the browser half attaches to that same row. Settings writes ride the existing `remote.settings` surface and secrets ride `remote.credentials`, so the feature adds no generated Typert namespace and edits no upstream-owned assembly file except that patch. The patch row carries a `PRISM-DIVERGENCE` marker and joins the [fork-upstream-divergence](fork-upstream-divergence.md) index as area A11.
 
 ### S2.2 Configuration
 
@@ -36,7 +36,7 @@ A `.check()` validates the fields the active `targetType` requires and rejects c
 
 ### S2.3 Secrets
 
-Password-type values never enter the Config or any patch file: the WebDAV password, the SMB password, and the S3 secret access key live as credentials records under scope `prism-backup` (ids `webdav-password`, `smb-password`, `s3-secret-key`) through `ctx.credentials.modifyRecord`. The controller writes and clears them and reports only presence, never values. The settings page and the plugin README disclose that the backup archive contains `.env` and `.credentials.yaml`, so a backup target must be a server the user trusts.
+Password-type values never enter the Config or any patch file. They are ordinary credential references in the provider-managed file layer — `PRISM_BACKUP_WEBDAV_PASSWORD`, `PRISM_BACKUP_SMB_PASSWORD`, `PRISM_BACKUP_S3_SECRET_KEY` — written from the settings page through the existing `remote.credentials.set`/`unset`/`describe` surface, exactly as the Models page manages provider keys, so the values land in `~/.prism/.credentials.yaml` and nowhere else. The host resolves each reference once per run with `ctx.credentials.resolve`, so a changed password reaches the next run without a restart, and the page renders only `describe()`'s `configured` flag, never a value. The settings page and the plugin README disclose that the backup archive contains `.env` and `.credentials.yaml`, so a backup target must be a server the user trusts.
 
 ### S2.4 Archive layout
 
@@ -65,11 +65,11 @@ One internal interface, three implementations over the process-global fetch disp
 
 ### S2.6 Run orchestration
 
-`PrismBackupService.run()` is single-flight: a second call while one is active fails with `prism-backup/busy` instead of queueing. A run registers an unowned job on `ctx.jobs` (visible in any session's job list) and advances through collect → zip → upload → rotate with `setProgress` lines. Completion appends one run record to the `prism_backup` storage domain (single-file layout), and the list is pruned to the 20 most recent. A record carries id, start and finish times, `success | failed`, the target type and sanitized endpoint (no credentials), archive size, object key, member counts, and the failure's code and message. Failures use `RemoteError` codes in the `prism-backup/*` table (`not-configured`, `busy`, `connection-failed`, `auth-failed`, `upload-failed`, `collect-failed`), each thrown next to its check with the underlying error as `cause`.
+`PrismBackup.run()` is single-flight: a second call while one is active fails with `prism-backup/busy` instead of queueing. The run advances through collect → zip → upload → rotate and publishes its current phase and byte/file counts in the in-memory state the settings page polls. Completion appends one run record to the `prism_backup` storage domain (per-record table), and the list is pruned to the 20 most recent. A record carries id, start and finish times, `success | failed`, the target type and sanitized endpoint (no credentials), archive size, object key, member counts, and the failure's code and message. Failures use the `prism-backup/*` table (`not-configured`, `busy`, `connection-failed`, `auth-failed`, `upload-failed`, `collect-failed`), each thrown next to its check with the underlying error as `cause`.
 
-### S2.7 Remote namespace
+### S2.7 Host route
 
-`BackupController` exposes `run` (starts a run, returns the run id), `status` (running flag plus the newest record), `history` (the pruned record list), `testConnection` (per-type reachability with an actionable message), `secretState` (which secret ids are stored), `setSecret`, and `clearSecret`. All are plain calls; the settings page polls `status` while a run is active. Client code branches on `RemoteResult` codes and never on `instanceof`.
+The plugin registers one exact POST route, `/api/prism.backup`, through `ctx.connection.fetch.register` — the same channel `file-upload` uses for work that cannot ride JSON Remote invocation, and the reason this feature needs no generated Typert namespace or Remote contribution. The buffered JSON body carries an `action`: `state` (running phase plus the history records), `run` (starts a run, answers its record), or `test` (per-type reachability with an actionable message). Answers are a JSON envelope `{ ok: true, value }` or `{ ok: false, error: { code, message } }` whose code is the `prism-backup/*` table. The page polls `state` every second while a run is active; settings writes and secret writes keep riding their existing Remote surfaces.
 
 ### S2.8 Settings page
 
@@ -82,12 +82,12 @@ A `settings.section` registration (id `backup`, order `25`, after agent presets)
 
 ## Tasks
 
-- [ ] T1: scaffold the package — manifest, face configs, tsdown via `clientBundle` (host phase), loader rows, remotes-assembly mount, service and controller stubs; `build:artifacts` and a web-profile boot stay green (depends: none)
-- [ ] T2: Config schema with checks, credentials helpers, `prism_backup` storage domain (depends: T1)
+- [ ] T1: scaffold the package — manifest, face configs, tsdown via `clientBundle` (host phase), the web-app loader row, service and route; `build:artifacts` and a web-profile boot stay green (depends: none)
+- [ ] T2: Config schema with checks, credential-reference resolution, `prism_backup` storage domain (depends: T1)
 - [ ] T3: WebDAV, S3 (SigV4 against published vectors), and SMB transports with unit tests (depends: T1)
-- [ ] T4: orchestrator — collect, zip, upload, rotate, job progress, history — with integration tests over a fake transport (depends: T2, T3)
-- [ ] T5: controller methods, failure-code table, Typert artifacts, owner-side and client-side specs (depends: T4)
-- [ ] T6: client settings page, locale pair, slot registration (depends: T5)
+- [ ] T4: orchestrator — collect, zip, upload, rotate, phases, history — with integration tests over a fake transport (depends: T2, T3)
+- [ ] T5: the POST route, failure-code table, and host-side specs (depends: T4)
+- [ ] T6: client settings page, locale pair, slot registration, run/test/state fetch wiring (depends: T5)
 - [ ] T7: README pair, divergence index area A11, config-catalog regeneration if the generator scans the package (depends: T6)
 - [ ] T8: full verification — build, tests, coverage, typecheck, doc and i18n gates (depends: T7)
 
