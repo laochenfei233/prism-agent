@@ -3,7 +3,7 @@ feature: prism-backup
 status: delivered
 updated: 2026-10-30
 branch: feat/prism-backup (worktree .worktrees/prism-backup)
-commits: 1a63913b (base)..66821c5a (plus the master merge 771926f1)
+commits: 1a63913b (base)..5ab3d63 plus the master merge 771926f1
 ---
 
 # Prism Backup
@@ -24,6 +24,7 @@ The Host half is one plugin with one POST route (`/api/prism.backup`), because a
 - The AWS documentation's "GET Object" example did not match the implementation until the signer was generalized to sign exactly the headers a caller sends; the AWS Signature Version 4 test-suite `get-vanilla` vector then passed unmodified. A caller-supplied `x-amz-date` also has to decide the credential scope, which the first version got wrong.
 - Review found three defects that the tests had hidden: the web bundle never declared the package (the row could not resolve), S3 listings returned full keys so rotation silently matched nothing, and the single-flight guard sat before an `await` so two requests in one tick both ran. Each now has a test that fails on the old code.
 - Two spec claims were over-claims rather than code defects and were narrowed instead of "fixed": required configuration fields are resolved when a run starts (not by a schema `.check()`, which would refuse the first save after a protocol switch), and only reading the sources raises `collect-failed` (compression and staging stay `failed`).
+- The last review pass caught a hardening the sanitization had missed: stripping `user:password@` silently turned a working password into an anonymous 401 while the typed value stayed in the patch file. The resolver now refuses such a URL and names the user-name field and the credential store instead.
 
 
 ## [S1] Problem

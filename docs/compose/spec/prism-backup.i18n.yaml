@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-backup.md
 /:
-  en: e73e219bf3b16309
-  zh: dd0d1e60d5d8a691
+  en: c4b09406a214ff57
+  zh: ad5112b27ec5ca75
 /prism-backup:
   en: 746ff6b7941b5661
   zh: 71df2526e969b736
 /prism-backup/report:
-  en: f7d095cd315105aa
-  zh: 370784a79e74dece
+  en: facfd0b6d5b15ff8
+  zh: b83493722057c4dd
 /prism-backup/s1-problem:
   en: e28afbf32ef979f4
   zh: 03179a5faa60aea8

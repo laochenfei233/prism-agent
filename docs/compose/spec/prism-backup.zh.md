@@ -3,7 +3,7 @@ feature: prism-backup
 status: delivered
 updated: 2026-10-30
 branch: feat/prism-backup (worktree .worktrees/prism-backup)
-commits: 1a63913b (base)..66821c5a（另含 master 合并 771926f1）
+commits: 1a63913b (base)..5ab3d63（另含 master 合并 771926f1）
 ---
 
 # Prism 备份
@@ -24,6 +24,7 @@ commits: 1a63913b (base)..66821c5a（另含 master 合并 771926f1）
 - AWS 文档的 “GET Object” 示例与实现不符，直到把签名器改成只签调用方实际发送的 header；此后 AWS Signature Version 4 测试套件的 `get-vanilla` 向量无需修改即通过。调用方提供的 `x-amz-date` 还必须决定凭据 scope，第一版搞错了这一点。
 - 评审发现三个被测试掩盖的缺陷：web bundle 从未声明该包（该行无法解析）、S3 列表返回完整键名使轮换静默匹配为空、单飞守卫位于 `await` 之前使同一 tick 的两个请求都执行。三者现在都有在旧代码上会失败的测试。
 - 有两条 spec 说法属于断言过度而非代码缺陷，改为收窄而不是“修代码”：必填配置字段在运行开始时解析（而不是模式 `.check()`，后者会在切换协议后的第一次保存就拒绝）；只有读取来源抛 `collect-failed`（压缩与暂存仍为 `failed`）。
+- 最后一轮评审发现了清理遗漏的一项加固：静默去掉 `user:password@` 会把一个可用的密码变成匿名 401，而用户键入的值仍留在 patch 文件里。解析器现在拒绝这类地址，并指引用户改用独立用户名字段与凭据存储。
 
 
 ## [S1] 问题
