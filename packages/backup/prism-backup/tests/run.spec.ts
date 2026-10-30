@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Config } from '../src/config.ts'
 import type { BackupHistory } from '../src/history.ts'
 import { BackupRunner, archiveName, archiveStamp } from '../src/run.ts'
+import { createTransport } from '../src/transports.ts'
 import type { BackupRunRecord, BackupSecretId } from '../src/types.ts'
 
 const roots: string[] = []
@@ -175,6 +176,66 @@ describe('BackupRunner', () => {
     expect(record.failure?.message).toMatch(/server said no/u)
     expect(history.records).toHaveLength(1)
     await expect(readdir(staging)).resolves.toEqual([])
+  })
+
+  it('refuses a second run that starts in the same tick', async () => {
+    const home = await tempHome()
+    const { runner, transport } = harness({ home, staging: join(home, 'cache') })
+    const first = runner.run()
+    await expect(runner.run()).rejects.toMatchObject({ code: 'prism-backup/busy' })
+    await expect(first).resolves.toMatchObject({ status: 'success' })
+    expect(transport.uploads).toHaveLength(1)
+  })
+
+  it('rotates archives listed by the real S3 transport', async () => {
+    const home = await tempHome()
+    const keys = ['prism-backup/prism-backup-20200101-000000.zip', 'prism-backup/notes.txt']
+    const calls: { method: string; url: string }[] = []
+    const transport = createTransport({
+      type: 's3',
+      endpoint: 'https://s3.us-east-1.amazonaws.com',
+      region: 'us-east-1',
+      bucket: 'bucket',
+      pathStyle: false,
+      accessKeyId: 'AKIA',
+      secretAccessKey: 'secret',
+    }, {
+      fetch: async (input, init) => {
+        const method = init?.method ?? 'GET'
+        calls.push({ method, url: typeof input === 'string' ? input : input instanceof URL ? input.href : input.url })
+        if (method === 'GET') {
+          return new Response(`<ListBucketResult>${keys.map(key => `<Contents><Key>${key}</Key></Contents>`).join('')}</ListBucketResult>`, { status: 200 })
+        }
+        return new Response(null, { status: 200 })
+      },
+    })
+    const runner = new BackupRunner({
+      home,
+      stagingDir: join(home, 'cache'),
+      version: 'test',
+      platform: 'test',
+      config: Config({ targetType: 'smb', smbPath: 'D:\remote', maxBackups: 1 }),
+      readSecret: async () => undefined,
+      history: new MemoryHistory(),
+      transport: () => transport,
+      now: () => new Date('2026-10-30T12:34:56.000Z'),
+    })
+    await runner.run()
+    // The listing answered full keys; rotation still matched the basename and deleted the old archive.
+    expect(calls.filter(call => call.method === 'DELETE').map(call => call.url)).toEqual([
+      'https://bucket.s3.us-east-1.amazonaws.com/prism-backup/prism-backup-20200101-000000.zip',
+    ])
+  })
+
+  it('records a source that cannot be read as a collect failure', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'prism-backup-run-'))
+    roots.push(home)
+    // `.env` as a directory makes the settings source unreadable.
+    await mkdir(join(home, '.env'), { recursive: true })
+    const { runner } = harness({ home, staging: join(home, 'cache') })
+    const record = await runner.run()
+    expect(record.status).toBe('failed')
+    expect(record.failure?.code).toBe('prism-backup/collect-failed')
   })
 
   it('refuses a second run while one is in flight and reports its phase', async () => {

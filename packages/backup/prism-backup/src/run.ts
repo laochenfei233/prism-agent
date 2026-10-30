@@ -11,12 +11,12 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeArchive, type BackupManifest } from './archive.ts'
-import { planBackup } from './collect.ts'
+import { bytesOf, planBackup } from './collect.ts'
 import { resolveBackup, targetLabel, type Config, type ResolvedBackup, type SecretReader } from './config.ts'
 import { BackupError, asBackupError } from './error.ts'
 import type { BackupHistory } from './history.ts'
 import { createTransport, type Transport, type TransportDeps } from './transports.ts'
-import type { BackupCounts, BackupPhase, BackupRunRecord, BackupState, BackupTargetType } from './types.ts'
+import type { BackupCounts, BackupPhase, BackupRunRecord, BackupState } from './types.ts'
 
 /** Archive names this feature owns below the remote directory. */
 const ARCHIVE_NAME = /^prism-backup-\d{8}-\d{6}\.zip$/u
@@ -121,10 +121,16 @@ export class BackupRunner {
     if (this.active !== undefined) {
       throw new BackupError('prism-backup/busy', 'A backup is already running; wait for it to finish.')
     }
-    const resolved = await this.resolve()
-    this.active = this.execute(resolved)
+    // Claim the slot in the same synchronous step as the guard: resolving the
+    // policy awaits the credential service, and a second caller arriving in
+    // that window would otherwise start a second run.
+    const started = (async (): Promise<BackupRunRecord> => {
+      const resolved = await this.resolve()
+      return await this.execute(resolved)
+    })()
+    this.active = started
     try {
-      return await this.active
+      return await started
     } finally {
       this.active = undefined
       this.phase = undefined
@@ -152,6 +158,7 @@ export class BackupRunner {
     let counts = EMPTY_COUNTS
     let sizeBytes: number | undefined
     let archiveNameWritten: string | undefined
+    let objectKey: string | undefined
     const transport = this.transportFor(resolved.target)
     try {
       await mkdir(this.input.stagingDir, { recursive: true })
@@ -160,6 +167,8 @@ export class BackupRunner {
         home: this.input.home,
         ...this.input.profilePatch === undefined ? {} : { profilePatch: this.input.profilePatch },
         content: resolved.content,
+      }).catch((error: unknown) => {
+        throw asBackupError(error, 'prism-backup/collect-failed', 'Reading the backup sources failed')
       })
       counts = plan.counts
       this.setPhase('collect', `Collected ${String(plan.members.length)} files`, plan.members.length, 0)
@@ -171,6 +180,7 @@ export class BackupRunner {
         version: this.input.version,
         platform: this.input.platform ?? process.platform,
         counts,
+        bytes: bytesOf(plan.members),
         absent: plan.absent,
         warnings: plan.warnings,
       }
@@ -183,6 +193,7 @@ export class BackupRunner {
 
       this.setPhase('upload', `Uploading to ${transport.endpoint}`, 0, archived.sizeBytes)
       await this.upload(transport, staging, key)
+      objectKey = key
 
       this.setPhase('rotate', 'Pruning older archives', 0, 0)
       await this.rotate(transport, resolved.content.remoteDir, name, resolved.content.maxBackups)
@@ -191,23 +202,25 @@ export class BackupRunner {
         startedAt,
         status: 'success',
         targetType: resolved.target.type,
-        endpoint: transport.endpoint,
+        endpoint: targetLabel(resolved.target),
         archiveName: archiveNameWritten,
+        objectKey,
         sizeBytes,
         counts,
-      }, resolved.target.type)
+      })
     } catch (error: unknown) {
-      const classified = asBackupError(error, 'prism-backup/upload-failed', 'The backup failed')
+      const classified = asBackupError(error, 'prism-backup/failed', 'The backup failed')
       return await this.record({
         startedAt,
         status: 'failed',
         targetType: resolved.target.type,
-        endpoint: targetLabel(resolved.target),
+        endpoint: transport.endpoint,
         ...archiveNameWritten === undefined ? {} : { archiveName: archiveNameWritten },
+        ...objectKey === undefined ? {} : { objectKey },
         ...sizeBytes === undefined ? {} : { sizeBytes },
         counts,
         failure: { code: classified.code, message: classified.message },
-      }, resolved.target.type)
+      })
     } finally {
       this.phase = undefined
       await rm(staging, { force: true })
@@ -255,13 +268,9 @@ export class BackupRunner {
   /**
    * Append one finished record and return it.
    * @param fields - everything except the id and finish time.
-   * @param _targetType - recorded discriminant (kept for symmetry with the record union).
    * @returns the stored record.
    */
-  private async record(
-    fields: Omit<BackupRunRecord, 'id' | 'finishedAt'>,
-    _targetType: BackupTargetType,
-  ): Promise<BackupRunRecord> {
+  private async record(fields: Omit<BackupRunRecord, 'id' | 'finishedAt'>): Promise<BackupRunRecord> {
     const record: BackupRunRecord = {
       ...fields,
       id: randomUUID(),

@@ -13,7 +13,6 @@ import {
   type SettingsFieldSpec, type SettingsFormActions, type SettingsSecretSpec,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { httpStatusText } from './locales.ts'
 import { BACKUP_ROUTE, BACKUP_SECRET_REFS, type BackupRunRecord, type BackupSecretId } from '../types.ts'
 
 /** Loader entry id owning the settings namespace this page edits. */
@@ -136,6 +135,21 @@ function settingsBooleanField(field: string): SettingsFieldSpec {
   }
 }
 
+/** One route answer: a decoded value, a Host sentence, or the page's own fallback key. */
+type RouteAnswer<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string }
+  | { readonly ok: false; readonly key: 'unreachable' }
+
+/**
+ * The sentence or dictionary key one refused answer carries.
+ * @param answer - a refused answer.
+ * @returns the Host's sentence, or the dictionary key the page translates.
+ */
+function refusalText(answer: Extract<RouteAnswer<never>, { ok: false }>): string {
+  return 'message' in answer ? answer.message : answer.key
+}
+
 /**
  * Read one JSON envelope from the plugin route.
  * @param body - the action to send.
@@ -145,7 +159,7 @@ function settingsBooleanField(field: string): SettingsFieldSpec {
 async function callRoute<T>(
   body: unknown,
   decode: (value: unknown) => T | undefined,
-): Promise<{ ok: true; value: T } | { ok: false; message: string }> {
+): Promise<RouteAnswer<T>> {
   let response: Response
   try {
     response = await fetch(BACKUP_ROUTE, {
@@ -161,13 +175,11 @@ async function callRoute<T>(
     | undefined
   if (parsed?.ok === true) {
     const decoded = decode(parsed.value)
-    if (decoded === undefined) return { ok: false, message: httpStatusText(response.status) }
+    if (decoded === undefined) return { ok: false, key: 'unreachable' }
     return { ok: true, value: decoded }
   }
-  const message = typeof parsed?.error?.message === 'string'
-    ? parsed.error.message
-    : httpStatusText(response.status)
-  return { ok: false, message }
+  const message = typeof parsed?.error?.message === 'string' ? parsed.error.message : undefined
+  return { ok: false, ...message === undefined ? { key: 'unreachable' as const } : { message } }
 }
 
 /**
@@ -331,6 +343,16 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
     return { ...form.shell(), fields, secretText }
   })
 
+  let poll: ReturnType<typeof setInterval> | undefined
+  const stopPolling = (): void => {
+    if (poll === undefined) return
+    clearInterval(poll)
+    poll = undefined
+  }
+  const startPolling = (): void => {
+    if (poll !== undefined) return
+    poll = setInterval(() => { void refreshRunState() }, 1000)
+  }
   const refreshRunState = async (): Promise<void> => {
     const answer = await callRoute({ action: 'state' }, decodeState)
     if (!answer.ok) return
@@ -339,6 +361,9 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
       draft.phase = answer.value.phase?.detail
       draft.history = answer.value.history
     })
+    // A page opened while a run is already active has to follow it too.
+    if (answer.value.running) startPolling()
+    else stopPolling()
   }
 
   const test = (): void => {
@@ -348,24 +373,26 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
         draft.testing = false
         draft.notice = answer.ok
           ? { tone: 'ok', text: answer.value.message }
-          : { tone: 'error', text: answer.message }
+          : { tone: 'error', text: refusalText(answer) }
       })
     })
   }
 
   const run = (): void => {
     runStore.update((draft) => { draft.running = true; draft.phase = undefined; draft.notice = undefined })
-    const poll = setInterval(() => { void refreshRunState() }, 1000)
+    startPolling()
     void callRoute({ action: 'run' }, decodeRun)
       .then((answer) => {
         runStore.update((draft) => {
-          draft.notice = answer.ok ? { tone: 'ok', text: 'runOk' } : { tone: 'error', text: answer.message }
+          draft.notice = answer.ok
+            ? { tone: 'ok', text: 'runOk' }
+            : { tone: 'error', text: refusalText(answer) }
         })
       })
       .finally(() => {
-        clearInterval(poll)
-        runStore.update((draft) => { draft.running = false; draft.phase = undefined })
-        void refreshRunState()
+        void refreshRunState().then(() => {
+          runStore.update((draft) => { draft.running = false; draft.phase = undefined })
+        })
       })
   }
 
@@ -381,7 +408,10 @@ export function createBackupSection(ctx: Context, scope: ConfigForm<BackupSettin
 
   void refreshSecrets()
   void refreshRunState()
-  ctx.effect(() => () => { form.dispose() }, 'prism-backup: page form')
+  ctx.effect(() => () => {
+    stopPolling()
+    form.dispose()
+  }, 'prism-backup: page form')
 
   return {
     ...form.actions(),

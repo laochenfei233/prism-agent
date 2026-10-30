@@ -249,7 +249,23 @@ export async function resolveTarget(config: Config, readSecret: SecretReader): P
  * @returns the label shown in the history list.
  */
 export function targetLabel(target: BackupTarget): string {
-  if (target.type === 'webdav') return target.baseUrl
+  if (target.type === 'webdav') return withoutUserinfo(target.baseUrl)
   if (target.type === 's3') return `${target.endpoint}/${target.bucket}`
   return target.root
+}
+
+/**
+ * Drop any `user:password@` from one URL, so a durable record never holds a credential.
+ * @param url - a configured endpoint.
+ * @returns the same endpoint without userinfo.
+ */
+function withoutUserinfo(url: string): string {
+  try {
+    const parsed = new URL(url)
+    parsed.username = ''
+    parsed.password = ''
+    return parsed.toString().replace(/\/$/u, '')
+  } catch (_notAUrl) {
+    return url
+  }
 }

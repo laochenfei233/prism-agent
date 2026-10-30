@@ -32,6 +32,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-attachment-local` | yes | Private content-addressed DSH_HOME attachment storage |
 
+## backup
+
+| Package | Config | Description |
+|---|---|---|
+| `@prism/prism-backup` | yes | Back up configuration, memory, and project folders to WebDAV, SMB, or S3 from the settings page |
+
 ## boot
 
 | Package | Config | Description |

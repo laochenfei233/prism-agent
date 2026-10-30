@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ARCHIVE_ROOT, planBackup, projectPathsOf } from '../src/collect.ts'
+import { ARCHIVE_ROOT, bytesOf, planBackup, projectPathsOf } from '../src/collect.ts'
 import type { BackupContent } from '../src/config.ts'
 
 const roots: string[] = []
@@ -91,6 +91,11 @@ describe('planBackup', () => {
       `${ARCHIVE_ROOT}/workspace/registry.json`,
     ])
     expect(plan.counts).toEqual({ settings: 2, memoryFiles: 1, projects: 1, projectFiles: 1 })
+    const bytes = bytesOf(plan.members)
+    // The profile patch (11 bytes) plus .env (6 bytes).
+    expect(bytes.settings).toBe(17)
+    expect(bytes.memory).toBe(2)
+    expect(bytes.projects).toBeGreaterThan(0)
     expect(plan.absent).toEqual([join(home, '.credentials.yaml')])
   })
 

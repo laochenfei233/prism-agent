@@ -40,6 +40,7 @@ describe('sigv4', () => {
     expect(canonicalUri('/')).toBe('/')
     expect(canonicalQuery('')).toBe('')
     expect(canonicalQuery('b=2&a=1&a=0&c=x%20y')).toBe('a=0&a=1&b=2&c=x%20y')
+    expect(canonicalQuery('a=1&a=1')).toBe('a=1&a=1')
   })
 
   it('keeps a caller-supplied x-amz-date instead of the clock', () => {

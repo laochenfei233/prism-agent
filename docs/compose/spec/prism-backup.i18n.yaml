@@ -21,32 +21,32 @@
   en: 399fe324d219001a
   zh: 596bd81b269275aa
 /prism-backup/s2-design/s2-2-configuration:
-  en: ead9427a2d49f19a
-  zh: 2772bdc0c3855e8c
+  en: c6f5ba6f5bf45508
+  zh: 9e28247bff54d187
 /prism-backup/s2-design/s2-3-secrets:
   en: 36b110f676ca6ccd
   zh: 19eb504047220143
 /prism-backup/s2-design/s2-4-archive-layout:
-  en: 89e69748ed6e6836
-  zh: 129fb224756163f7
+  en: 6f7704eeca659652
+  zh: f71de523a3df0be9
 /prism-backup/s2-design/s2-5-transports:
-  en: 6b771a3f56da1a1d
-  zh: 77f8c948d38cb22b
+  en: 73371cdb27c4b13d
+  zh: 6627392ab2411b55
 /prism-backup/s2-design/s2-6-run-orchestration:
-  en: faf3ef05d716c9a5
-  zh: 05282e7005e1ede7
+  en: 3967d5fbf9762d1e
+  zh: a46244e9abe25d3f
 /prism-backup/s2-design/s2-7-host-route:
-  en: f4a323d327e4c6f9
-  zh: 1478b7315083ed9d
+  en: 45a687e557603577
+  zh: 9388a095aba6d959
 /prism-backup/s2-design/s2-8-settings-page:
-  en: ab9a2e00be06022e
-  zh: 87660688bfceb98d
+  en: 055913b249d9ab40
+  zh: a473e56d854a5c4b
 /prism-backup/s3-scope:
   en: 0df170407c058087
   zh: 829e9cf990f32847
 /prism-backup/tasks:
-  en: b6a8b8e8e8d05862
-  zh: a21b95a051068283
+  en: f0f1714a4a25ea87
+  zh: e964c52a4c566516
 /prism-backup/s4-acceptance:
-  en: 642b67b09b1c9818
-  zh: fd085e692cc36fdb
+  en: 9d03e34c78a388d3
+  zh: 4849041b30169553

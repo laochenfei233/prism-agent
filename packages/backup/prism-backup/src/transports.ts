@@ -232,7 +232,7 @@ class WebdavTransport implements Transport {
       const raw = match[1] ?? ''
       const tail = raw.replace(/\/+$/u, '').split('/').pop()
       /* v8 ignore next -- a matched href always has a last segment. */
-      const name = decodeURIComponent(tail ?? '')
+      const name = safeDecode(tail ?? '')
       if (name !== '' && name !== '..') names.push(name)
     }
     return names
@@ -256,6 +256,20 @@ class WebdavTransport implements Transport {
 /** Body every PROPFIND sends; Depth decides whether the listing includes children. */
 const PROPFIND_BODY = '<?xml version="1.0" encoding="utf-8"?>'
   + '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'
+
+/**
+ * Percent-decode one href segment, leaving a malformed escape as it arrived
+ * rather than failing the whole listing.
+ * @param text - the encoded segment.
+ * @returns the decoded segment, or the original text when it is not decodable.
+ */
+function safeDecode(text: string): string {
+  try {
+    return decodeURIComponent(text)
+  } catch (_malformedEscape) {
+    return text
+  }
+}
 
 /**
  * Decode the XML entities S3 object names may contain.
@@ -360,8 +374,14 @@ class S3Transport implements Transport {
       )
     }
     const text = await response.text()
-    /* v8 ignore next -- the single capture always participates. */
-    return [...text.matchAll(/<Key>([^<]*)<\/Key>/gu)].map(match => decodeXml(match[1] ?? ''))
+    // ListObjectsV2 answers full keys; rotation and the page reason about names
+    // within the listed directory, like every other transport.
+    const prefixWithSlash = prefix === '' ? '' : `${prefix}/`
+    return [...text.matchAll(/<Key>([^<]*)<\/Key>/gu)].flatMap((match) => {
+      /* v8 ignore next -- the single capture always participates. */
+      const key = decodeXml(match[1] ?? '')
+      return key.startsWith(prefixWithSlash) ? [key.slice(prefixWithSlash.length)] : [key]
+    })
   }
 
   /** @inheritdoc */
@@ -474,7 +494,8 @@ class SmbTransport implements Transport {
       const info = await stat(this.target.root)
       if (!info.isDirectory()) throw new Error(`${this.target.root} is not a directory`)
       await access(this.target.root, fsConstants.W_OK)
-    }, 'prism-backup/connection-failed', `SMB ${this.target.root} is not writable`)
+    }, 'prism-backup/connection-failed',
+    `SMB ${this.target.root} is not writable; on macOS and Linux mount the share first`)
     return `SMB directory ${this.target.root} is writable.`
   }
 

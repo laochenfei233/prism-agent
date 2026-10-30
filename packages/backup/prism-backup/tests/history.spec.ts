@@ -65,10 +65,46 @@ describe('DomainBackupHistory', () => {
   })
 })
 
+describe('BackupHistoryStore degradation', () => {
+  it('reports one failure, answers empty history, and drops appends instead of throwing', async () => {
+    const ctx = new Context()
+    const failures: unknown[] = []
+    ctx.provide('storageDomain', { open: async () => { throw new Error('corrupt history') } })
+    const store = new BackupHistoryStore(ctx, (error) => { failures.push(error) })
+    await store.ensure()
+    await store.append(record('a', 1))
+    await store.append(record('b', 2))
+    expect(store.list()).toEqual([])
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toBeInstanceOf(Error)
+    await ctx.fiber.dispose()
+  })
+
+  it('reports a refused append without failing the caller', async () => {
+    const ctx = new Context()
+    const failures: unknown[] = []
+    ctx.provide('storageDomain', {
+      open: async () => ({
+        table: () => ({
+          entries: () => [][Symbol.iterator](),
+          put: async () => { throw new Error('disk full') },
+          delete: async () => false,
+        }),
+      }),
+    })
+    const store = new BackupHistoryStore(ctx, (error) => { failures.push(error) })
+    await store.append(record('a', 1))
+    expect(failures).toHaveLength(1)
+    expect(store.list()).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+})
+
 describe('BackupHistoryStore', () => {
   it('answers an empty list before the store opens and forwards afterwards', async () => {
     const ctx = await storageContext()
-    const store: BackupHistory = new BackupHistoryStore(ctx)
+    const store: BackupHistory = new BackupHistoryStore(ctx, () => {})
     expect(store.list()).toEqual([])
     await store.ensure()
     expect(store.list()).toEqual([])

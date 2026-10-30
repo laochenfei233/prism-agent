@@ -30,6 +30,7 @@ function manifest(): BackupManifest {
     version: '0.0.0-test',
     platform: 'test',
     counts: { settings: 1, memoryFiles: 0, projects: 0, projectFiles: 0 },
+    bytes: { settings: 5, memory: 0, projects: 0 },
     absent: ['/home/.env'],
     warnings: ['skipped link /x'],
   }

@@ -168,6 +168,48 @@ describe('BackupSection', () => {
     expect(screen.getByText(en.secretMissing)).toBeTruthy()
   })
 
+  it('clears a stored password from its own control', () => {
+    const actions = renderPage({}, { secrets: { 'webdav-password': true, 'smb-password': false, 's3-secret-key': false } })
+    fireEvent.click(screen.getByRole('button', { name: en.secretClear }))
+    expect(actions.clearSecret).toHaveBeenCalledWith('webdav-password')
+  })
+
+  it('clears the password of whichever protocol is selected', () => {
+    const actions = renderPage(
+      { fields: { ...formState().fields, targetType: draft('s3') } },
+      { secrets: { 'webdav-password': false, 'smb-password': false, 's3-secret-key': true } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: en.secretClear }))
+    expect(actions.clearSecret).toHaveBeenCalledWith('s3-secret-key')
+
+    cleanup()
+    const smb = renderPage(
+      { fields: { ...formState().fields, targetType: draft('smb') } },
+      { secrets: { 'webdav-password': false, 'smb-password': true, 's3-secret-key': false } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: en.secretClear }))
+    expect(smb.clearSecret).toHaveBeenCalledWith('smb-password')
+  })
+
+  it('resets the exclusion list to the composition value', () => {
+    const actions = renderPage({
+      fields: { ...formState().fields, projectExcludes: draft('.git', { overridden: true }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.reset }))
+    const edits = actions.edit.mock.calls.length
+    expect(edits).toBe(0)
+  })
+
+  it('renders the exclusion list in a multi-line control', () => {
+    const twoLines = '.git' + String.fromCharCode(10) + 'node_modules'
+    const actions = renderPage({ fields: { ...formState().fields, projectExcludes: draft(twoLines) } })
+    const area = screen.getByLabelText(en.excludes)
+    expect(area.tagName).toBe('TEXTAREA')
+    expect((area as HTMLTextAreaElement).value).toBe(twoLines)
+    fireEvent.change(area, { target: { value: '.git' + String.fromCharCode(10) + 'tmp' } })
+    expect(actions.edit).toHaveBeenCalledWith('projectExcludes', '.git' + String.fromCharCode(10) + 'tmp')
+  })
+
   it('saves the staged edits and disables the controls on a read-only document', () => {
     const actions = renderPage({ dirty: true })
     fireEvent.click(screen.getByRole('button', { name: en.save }))
@@ -206,6 +248,10 @@ describe('BackupSection', () => {
     cleanup()
     renderPage({}, { notice: { tone: 'error', text: 'server said no' } })
     expect(screen.getByText('server said no')).toBeTruthy()
+
+    cleanup()
+    renderPage({}, { notice: { tone: 'error', text: 'unreachable' } })
+    expect(screen.getByText(en.unreachable)).toBeTruthy()
   })
 
   it('renders finished runs with their status, endpoint, and size', () => {

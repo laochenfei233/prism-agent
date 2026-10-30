@@ -168,13 +168,43 @@ describe('mounted backup plugin', () => {
     const { route, ctx } = await mount({ home })
     const failed = await call<BackupRunRecord>(route, 'run')
     expect(failed.status).toBe(502)
-    expect(failed.value).toMatchObject({ ok: false, error: { code: 'prism-backup/upload-failed' } })
+    expect(failed.value).toMatchObject({ ok: false, error: { code: 'prism-backup/failed' } })
     const state = await call<BackupState>(route, 'state')
     expect((state.value as { value: BackupState }).value.history[0]).toMatchObject({
       status: 'failed',
       counts: { settings: 0, memoryFiles: 0, projects: 0, projectFiles: 0 },
     })
     await ctx.fiber.dispose()
+  })
+
+  it('mounts even when the history store cannot open', async () => {
+    const home = await tempHome()
+    process.env.DSH_HOME = home
+    const ctx = new Context()
+    let route: ConnectionFetchRoute | undefined
+    ctx.provide('connection', {
+      fetch: {
+        register: (registered: ConnectionFetchRoute) => {
+          route = registered
+          return async () => {}
+        },
+      },
+    })
+    ctx.provide('storageDomain', { open: async () => { throw 'corrupt history' } })
+    ctx.provide('credentials', { resolve: async () => undefined })
+    apply(ctx, Config({ targetType: 'smb', smbPath: home }))
+    expect(route).toBeDefined()
+    const state = await call<BackupState>(route as ConnectionFetchRoute, 'state')
+    expect(state.value).toMatchObject({ ok: true, value: { running: false, history: [] } })
+    await ctx.fiber.dispose()
+
+    const errorCtx = new Context()
+    errorCtx.provide('connection', { fetch: { register: () => async () => {} } })
+    errorCtx.provide('storageDomain', { open: async () => { throw new Error('corrupt history') } })
+    errorCtx.provide('credentials', { resolve: async () => undefined })
+    apply(errorCtx, Config({ targetType: 'smb', smbPath: home }))
+    await Promise.resolve()
+    await errorCtx.fiber.dispose()
   })
 
   it('answers the connection probe through the mounted route', async () => {

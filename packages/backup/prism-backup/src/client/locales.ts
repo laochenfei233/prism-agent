@@ -62,7 +62,6 @@ export const zh = {
   runFailed: '备份失败。',
   saveFailed: '这项设置没有保存成功，请重试。',
   unreachable: '无法连接本机的备份服务。',
-  httpStatus: 'HTTP {status}',
   save: '保存',
   saving: '正在保存…',
   unavailable: '当前部署没有提供备份设置。',
@@ -136,7 +135,6 @@ export const en: Record<keyof typeof zh, string> = {
   runFailed: 'Backup failed.',
   saveFailed: 'That setting did not save. Try again.',
   unreachable: 'The backup service on this machine is unreachable.',
-  httpStatus: 'HTTP {status}',
   save: 'Save',
   saving: 'Saving…',
   unavailable: 'This deployment serves no backup settings.',
@@ -151,16 +149,6 @@ export const en: Record<keyof typeof zh, string> = {
   historyFailed: 'Failed',
   historyTarget: 'Target',
   historySize: 'Size',
-}
-
-/**
- * Render the HTTP status fallback the page shows when the service answers
- * without a JSON envelope.
- * @param status - the numeric status.
- * @returns the localized sentence.
- */
-export function httpStatusText(status: number): string {
-  return zh.httpStatus.replace('{status}', String(status))
 }
 
 /** Key set of the backup page dictionaries. */

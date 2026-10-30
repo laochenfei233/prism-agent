@@ -92,6 +92,14 @@ describe('backup configuration', () => {
     })
   })
 
+  it('drops userinfo from the label and leaves a non-URL endpoint alone', () => {
+    expect(targetLabel({
+      type: 'webdav', baseUrl: 'https://me:pw@dav.example.com/x', username: 'me', password: 'pw',
+    })).toBe('https://dav.example.com/x')
+    expect(targetLabel({ type: 'webdav', baseUrl: 'dav.example.com/x', username: '', password: '' }))
+      .toBe('dav.example.com/x')
+  })
+
   it('ships the default exclusions in the schema default text', () => {
     const resolved = configured()
     expect(parseExcludes(resolved.projectExcludes.get())).toEqual([...DEFAULT_PROJECT_EXCLUDES])

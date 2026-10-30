@@ -9,7 +9,7 @@
 import type { ReactNode } from 'react'
 import {
   Button, Checkbox, SegmentedControl, SettingsForm, SettingsSecretField, SettingsValueField,
-  fileSizeText,
+  Tag, fileSizeText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -114,6 +114,7 @@ function PasswordField(props: {
   readonly disabled: boolean
   readonly t: (key: BackupLocaleKey) => string
   readonly edit: (field: string, text: string) => void
+  readonly onClear: () => void
 }): ReactNode {
   return (
     <div className={css.password}>
@@ -127,6 +128,13 @@ function PasswordField(props: {
         disabled={props.disabled}
         onEdit={(text) => { props.edit(props.field, text) }}
       />
+      {props.configured
+        ? (
+          <button type="button" className={css.reset} disabled={props.disabled} onClick={props.onClear}>
+            {props.t('secretClear')}
+          </button>
+        )
+        : null}
     </div>
   )
 }
@@ -213,21 +221,21 @@ export function BackupSection(props: BackupSectionProps): ReactNode {
             ? (
               <PasswordField id="prism-backup-webdav-password" field="webdavPassword" text={form.secretText.webdavPassword}
                 configured={run.secrets['webdav-password']} label={t('webdavPassword')} hint={t('passwordHint')}
-                disabled={disabled} t={t} edit={props.edit} />
+                disabled={disabled} t={t} edit={props.edit} onClear={() => { props.clearSecret('webdav-password') }} />
             )
             : null}
           {target === 's3'
             ? (
               <PasswordField id="prism-backup-s3-secret" field="s3SecretKey" text={form.secretText.s3SecretKey}
                 configured={run.secrets['s3-secret-key']} label={t('s3SecretKey')} hint={t('passwordHint')}
-                disabled={disabled} t={t} edit={props.edit} />
+                disabled={disabled} t={t} edit={props.edit} onClear={() => { props.clearSecret('s3-secret-key') }} />
             )
             : null}
           {target === 'smb'
             ? (
               <PasswordField id="prism-backup-smb-password" field="smbPassword" text={form.secretText.smbPassword}
                 configured={run.secrets['smb-password']} label={t('smbPassword')} hint={t('passwordHint')}
-                disabled={disabled} t={t} edit={props.edit} />
+                disabled={disabled} t={t} edit={props.edit} onClear={() => { props.clearSecret('smb-password') }} />
             )
             : null}
           <TextField id="prism-backup-remote-dir" field="remoteDir" draft={form.fields.remoteDir}
@@ -242,7 +250,7 @@ export function BackupSection(props: BackupSectionProps): ReactNode {
             hint={t('includeMemoryHint')} disabled={disabled} edit={props.edit} />
           <ToggleField field="includeProjects" draft={form.fields.includeProjects} label={t('includeProjects')}
             hint={t('includeProjectsHint')} disabled={disabled} edit={props.edit} />
-          <TextField id="prism-backup-excludes" field="projectExcludes" draft={form.fields.projectExcludes}
+          <TextAreaField id="prism-backup-excludes" field="projectExcludes" draft={form.fields.projectExcludes}
             label={t('excludes')} hint={t('excludesHint')} disabled={disabled} t={t} edit={props.edit} reset={props.resetField} />
           <TextField id="prism-backup-keep" field="maxBackups" draft={form.fields.maxBackups}
             label={t('maxBackups')} hint={t('maxBackupsHint')} numeric disabled={disabled} t={t} edit={props.edit} reset={props.resetField} />
@@ -286,6 +294,9 @@ export function BackupSection(props: BackupSectionProps): ReactNode {
   )
 }
 
+/** Notice texts this page owns as dictionary keys; everything else is a Host sentence. */
+const NOTICE_KEYS = new Set<BackupLocaleKey>(['runOk', 'unreachable'])
+
 /**
  * Render a notice: dictionary keys become sentences, Host messages pass through.
  * @param t - bound translator.
@@ -293,5 +304,50 @@ export function BackupSection(props: BackupSectionProps): ReactNode {
  * @returns the sentence to show.
  */
 function noticeText(t: (key: BackupLocaleKey) => string, text: string): string {
-  return text === 'runOk' ? t('runOk') : text
+  return NOTICE_KEYS.has(text as BackupLocaleKey) ? t(text as BackupLocaleKey) : text
+}
+
+/**
+ * Render a multi-line staged field, the shape a list of exclusions needs.
+ * @param props - staged draft, copy, and the staging action.
+ * @returns the labelled textarea.
+ */
+function TextAreaField(props: {
+  readonly id: string
+  readonly field: string
+  readonly draft: { readonly text: string; readonly overridden: boolean }
+  readonly label: string
+  readonly hint: string
+  readonly disabled: boolean
+  readonly t: (key: BackupLocaleKey) => string
+  readonly edit: (field: string, text: string) => void
+  readonly reset: (field: string) => void
+}): ReactNode {
+  return (
+    <div className={css.field}>
+      <div className={css.fieldHead}>
+        <label className={css.fieldLabel} htmlFor={props.id}>{props.label}</label>
+        {props.draft.overridden
+          ? (
+            <span className={css.fieldBadges}>
+              <Tag tone="neutral">{props.t('overridden')}</Tag>
+              <button type="button" className={css.reset} disabled={props.disabled}
+                onClick={() => { props.reset(props.field) }}>
+                {props.t('reset')}
+              </button>
+            </span>
+          )
+          : null}
+      </div>
+      <textarea
+        id={props.id}
+        className={css.textarea}
+        rows={6}
+        value={props.draft.text}
+        disabled={props.disabled}
+        onChange={(event) => { props.edit(props.field, event.target.value) }}
+      />
+      <p className={css.hint}>{props.hint}</p>
+    </div>
+  )
 }

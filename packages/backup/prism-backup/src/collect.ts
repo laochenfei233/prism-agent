@@ -25,6 +25,31 @@ export interface PlannedMember {
   readonly size: number
 }
 
+/** Source bytes per archive area. */
+export interface BackupBytes {
+  /** Bytes copied from the configuration files. */
+  readonly settings: number
+  /** Bytes copied from the memory store. */
+  readonly memory: number
+  /** Bytes copied from the project folders and the registry. */
+  readonly projects: number
+}
+
+/**
+ * Total the planned members per archive area.
+ * @param members - the planned members.
+ * @returns the byte total each area contributes.
+ */
+export function bytesOf(members: readonly PlannedMember[]): BackupBytes {
+  const bytes = { settings: 0, memory: 0, projects: 0 }
+  for (const member of members) {
+    if (member.archivePath.startsWith(`${ARCHIVE_ROOT}/settings/`)) bytes.settings += member.size
+    else if (member.archivePath.startsWith(`${ARCHIVE_ROOT}/memory/`)) bytes.memory += member.size
+    else bytes.projects += member.size
+  }
+  return bytes
+}
+
 /** Everything one run archives, plus the facts the manifest records. */
 export interface BackupPlan {
   readonly members: readonly PlannedMember[]
@@ -212,9 +237,8 @@ export async function planBackup(input: CollectInput): Promise<BackupPlan> {
     if (member !== undefined) members.push(member)
     const seen = new Set<string>()
     for (const path of paths) {
-      const key = path.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
+      if (seen.has(path)) continue
+      seen.add(path)
       const info = await stat(path).catch(() => undefined)
       if (info === undefined || !info.isDirectory()) {
         warnings.push(`project folder missing: ${path}`)

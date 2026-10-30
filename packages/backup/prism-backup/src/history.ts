@@ -28,6 +28,7 @@ const recordSchema = z.object({
   targetType: z.enum(['webdav', 's3', 'smb']),
   endpoint: z.string(),
   archiveName: z.string().min(1).optional(),
+  objectKey: z.string().min(1).optional(),
   sizeBytes: z.number().int().min(0).optional(),
   counts: countsSchema,
   failure: z.object({

@@ -51,15 +51,24 @@ export const name = 'prism-backup'
 /** Services this plugin requires: the API route carrier and durable history. */
 export const inject = ['connection', 'storageDomain', 'credentials']
 
-/** History over a storage domain opened on first use, so activation stays synchronous. */
+/**
+ * History over a storage domain opened on first use, so activation stays
+ * synchronous. A store that cannot open — a corrupt record file rejects the
+ * domain open — degrades to empty history rather than failing the plugin: the
+ * backup itself is unaffected, and `onFailure` reports the degradation once.
+ */
 export class BackupHistoryStore implements BackupHistory {
-  private opening: Promise<DomainBackupHistory> | undefined
+  private opening: Promise<DomainBackupHistory | undefined> | undefined
   private opened: DomainBackupHistory | undefined
+  private failure: unknown
 
-  /** @param ctx - the plugin's context, whose storage domain owns the records. */
-  constructor(private readonly ctx: Context) {}
+  /**
+   * @param ctx - the plugin's context, whose storage domain owns the records.
+   * @param onFailure - receives the first failure; the store never throws for it.
+   */
+  constructor(private readonly ctx: Context, private readonly onFailure: (error: unknown) => void) {}
 
-  /** @returns settlement once history can be read and written. */
+  /** @returns settlement once history is readable, or once it is known unusable. */
   async ensure(): Promise<void> {
     await this.open()
   }
@@ -69,16 +78,32 @@ export class BackupHistoryStore implements BackupHistory {
     return this.opened?.list() ?? []
   }
 
-  /** @param record - the finished run. */
+  /** @param record - the finished run; a broken store drops it rather than failing the run. */
   async append(record: BackupRunRecord): Promise<void> {
-    await (await this.open()).append(record)
+    const opened = await this.open()
+    if (opened === undefined) return
+    try {
+      await opened.append(record)
+    } catch (error: unknown) {
+      this.failure ??= error
+      this.onFailure(error)
+    }
   }
 
-  private async open(): Promise<DomainBackupHistory> {
-    this.opening ??= this.ctx.storageDomain.open(backupDomain).then((domain) => {
-      this.opened = new DomainBackupHistory(domain)
-      return this.opened
-    })
+  private async open(): Promise<DomainBackupHistory | undefined> {
+    if (this.opened !== undefined) return this.opened
+    if (this.failure !== undefined) return undefined
+    this.opening ??= this.ctx.storageDomain.open(backupDomain).then(
+      (domain) => {
+        this.opened = new DomainBackupHistory(domain)
+        return this.opened
+      },
+      (error: unknown) => {
+        this.failure = error
+        this.onFailure(error)
+        return undefined
+      },
+    )
     return await this.opening
   }
 }
@@ -192,7 +217,9 @@ export function createBackupRoute(deps: BackupRouteDeps): ConnectionFetchRoute['
 export function apply(ctx: Context, config: Config): void {
   const profile = ctx.get('profileContext')
   const home = profile?.home ?? resolveDshHome()
-  const history = new BackupHistoryStore(ctx)
+  const history = new BackupHistoryStore(ctx, (error: unknown) => {
+    ctx.logger.warn('prism-backup: run history unavailable: %s', error instanceof Error ? error.message : String(error))
+  })
   void history.ensure()
   const runner = new BackupRunner({
     home,

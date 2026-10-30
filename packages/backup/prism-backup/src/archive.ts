@@ -11,7 +11,7 @@ import { once } from 'node:events'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { Zip, ZipDeflate } from 'fflate'
-import type { PlannedMember } from './collect.ts'
+import type { BackupBytes, PlannedMember } from './collect.ts'
 import { ARCHIVE_ROOT } from './collect.ts'
 import type { BackupCounts } from './types.ts'
 
@@ -35,6 +35,8 @@ export interface BackupManifest {
   readonly platform: string
   /** Per-source counts. */
   readonly counts: BackupCounts
+  /** Per-source source-byte totals. */
+  readonly bytes: BackupBytes
   /** Sources the policy asked for but this machine does not have. */
   readonly absent: readonly string[]
   /** Entries skipped while walking. */

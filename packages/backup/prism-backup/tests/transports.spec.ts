@@ -3,7 +3,9 @@
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { unzipSync } from 'fflate'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { writeArchive } from '../src/archive.ts'
 import { createTransport, uncShareOf } from '../src/transports.ts'
 
 const roots: string[] = []
@@ -112,7 +114,8 @@ describe('webdav transport', () => {
   it('lists href basenames and deletes objects, tolerating a missing one', async () => {
     const listing = '<?xml version="1.0"?><d:multistatus><d:response><d:href>/x/..</d:href></d:response><d:response><d:href>/x/prism-backup/</d:href></d:response>'
       + '<d:response><d:href>/x/prism-backup/prism-backup-20260101-000000.zip</d:href></d:response>'
-      + '<d:response><href>/x/prism-backup/other.zip</href></d:response></d:multistatus>'
+      + '<d:response><href>/x/prism-backup/other.zip</href></d:response>'
+      + '<d:response><href>/x/prism-backup/bad%zz.zip</href></d:response></d:multistatus>'
     const fake = fakeFetch([
       new Response(listing, { status: 207 }),
       new Response(null, { status: 404 }),
@@ -120,7 +123,7 @@ describe('webdav transport', () => {
     ])
     const transport = createTransport(target, { fetch: fake.fetch })
     await expect(transport.list('prism-backup')).resolves.toEqual([
-      'prism-backup', 'prism-backup-20260101-000000.zip', 'other.zip',
+      'prism-backup', 'prism-backup-20260101-000000.zip', 'other.zip', 'bad%zz.zip',
     ])
     await expect(transport.remove('gone.zip')).resolves.toBeUndefined()
     await expect(transport.remove('there.zip')).resolves.toBeUndefined()
@@ -145,6 +148,53 @@ describe('webdav transport', () => {
     await expect(transport.list('prism-backup')).rejects.toMatchObject({ code: 'prism-backup/connection-failed' })
     const deleting = createTransport(target, { fetch: fakeFetch([new Response('', { status: 500 })]).fetch })
     await expect(deleting.remove('a.zip')).rejects.toThrow(/could not delete a\.zip/u)
+  })
+})
+
+describe('webdav upload body', () => {
+  it('sends one zip whose members and manifest match the plan', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'prism-backup-upload-'))
+    roots.push(root)
+    const file = join(root, 'archive.zip')
+    const members = [
+      { path: join(root, 'a.txt'), archivePath: 'prism-backup/settings/a.txt', size: 5 },
+      { path: join(root, 'b.json'), archivePath: 'prism-backup/memory/b.json', size: 2 },
+    ]
+    const [firstMember, secondMember] = members as [typeof members[0], typeof members[0]]
+    await writeFile(firstMember.path, 'hello')
+    await writeFile(secondMember.path, '{}')
+    await writeArchive(members, {
+      format: 1,
+      createdAt: '2026-10-30T12:00:00.000Z',
+      app: 'Prism Agent',
+      version: 'test',
+      platform: 'test',
+      counts: { settings: 1, memoryFiles: 1, projects: 0, projectFiles: 0 },
+      bytes: { settings: 5, memory: 2, projects: 0 },
+      absent: [],
+      warnings: [],
+    }, file)
+
+    const fake = fakeFetch([new Response(null, { status: 201 })])
+    const transport = createTransport(
+      { type: 'webdav', baseUrl: 'https://dav.example.com/x', username: 'me', password: 'pw' },
+      { fetch: fake.fetch },
+    )
+    await transport.upload(file, 'prism-backup/archive.zip')
+    const body = callAt(fake.calls, 0).init.body
+    expect(body).toBeInstanceOf(Blob)
+    const archive = unzipSync(new Uint8Array(await (body as Blob).arrayBuffer()))
+    expect(Object.keys(archive).sort()).toEqual([
+      'prism-backup/manifest.json',
+      'prism-backup/memory/b.json',
+      'prism-backup/settings/a.txt',
+    ])
+    const manifest = JSON.parse(new TextDecoder().decode(archive['prism-backup/manifest.json'])) as {
+      counts: unknown
+      bytes: unknown
+    }
+    expect(manifest.counts).toEqual({ settings: 1, memoryFiles: 1, projects: 0, projectFiles: 0 })
+    expect(manifest.bytes).toEqual({ settings: 5, memory: 2, projects: 0 })
   })
 })
 
@@ -225,9 +275,14 @@ describe('s3 transport', () => {
 
   it('lists decoded keys and treats an unreachable endpoint as a connection failure', async () => {
     const xml = '<ListBucketResult><Contents><Key>prism-backup/a&amp;b.zip</Key></Contents>'
-      + '<Contents><Key>prism-backup/c.zip</Key></Contents></ListBucketResult>'
+      + '<Contents><Key>prism-backup/c.zip</Key></Contents>'
+      + '<Contents><Key>elsewhere/d.zip</Key></Contents></ListBucketResult>'
     const transport = createTransport(target, { fetch: fakeFetch([new Response(xml, { status: 200 })]).fetch })
-    await expect(transport.list('prism-backup')).resolves.toEqual(['prism-backup/a&b.zip', 'prism-backup/c.zip'])
+    await expect(transport.list('prism-backup')).resolves.toEqual(['a&b.zip', 'c.zip', 'elsewhere/d.zip'])
+    const root = createTransport(target, { fetch: fakeFetch([
+      new Response('<ListBucketResult><Key>stray.zip</Key></ListBucketResult>', { status: 200 }),
+    ]).fetch })
+    await expect(root.list('')).resolves.toEqual(['stray.zip'])
     const down = createTransport(target, { fetch: fakeFetch([new TypeError('no route')]).fetch })
     await expect(down.test()).rejects.toMatchObject({ code: 'prism-backup/connection-failed' })
   })

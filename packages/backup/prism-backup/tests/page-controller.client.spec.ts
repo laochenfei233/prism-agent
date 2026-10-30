@@ -270,6 +270,26 @@ describe('createBackupSection', () => {
     await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().running).toBe(false) }, { timeout: 3000 })
   })
 
+  it('follows a run that was already active when the page opened', async () => {
+    const { ctx } = mount()
+    const states = { count: 0, settled: false }
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      requestBody(init)
+      states.count += 1
+      if (states.count > 2) states.settled = true
+      return new Response(JSON.stringify({
+        ok: true,
+        value: { running: !states.settled, phase: { detail: 'Uploading' }, history: states.settled ? [RECORD] : [] },
+      }), { status: 200 })
+    }))
+    const face = createBackupSection(ctx, formDouble())
+    await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().running).toBe(true) }, { timeout: 3000 })
+    expect(face.hooks.backupRun.getSnapshot().phase).toBe('Uploading')
+    await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().running).toBe(false) }, { timeout: 4000 })
+    const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length
+    expect(calls).toBeGreaterThan(2)
+  })
+
   it('shows a failed run as an error notice', async () => {
     const { ctx } = mount()
     vi.stubGlobal('fetch', routeFetch({
@@ -294,6 +314,75 @@ describe('createBackupSection', () => {
     failed.clearSecret('smb-password')
     await vi.waitFor(() => {
       expect(failed.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'unset nope' })
+    })
+  })
+
+  it('refuses a state answer whose shape it does not trust', async () => {
+    const { ctx } = mount()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, value: {} }), { status: 200 })))
+    const face = createBackupSection(ctx, formDouble())
+    await vi.waitFor(() => {
+      expect(face.hooks.backupRun.getSnapshot().running).toBe(false)
+      expect(face.hooks.backupRun.getSnapshot().history).toEqual([])
+    })
+  })
+
+  it('keeps only history records whose fields it can trust', async () => {
+    const { ctx } = mount()
+    const good = {
+      ...RECORD,
+      archiveName: 'prism-backup-20260101-000000.zip',
+      sizeBytes: 12,
+      counts: { settings: 1, memoryFiles: 2, projects: 3, projectFiles: 4 },
+      failure: { code: 'prism-backup/auth-failed', message: 'refused' },
+    }
+    const badCode = { ...RECORD, id: 'bad-code', failure: { code: 'other/code', message: 'x' } }
+    const badShape = { ...RECORD, id: 7 }
+    const badStatus = { ...RECORD, id: 'bad-status', status: 'partial' }
+    const sparseCounts = { ...RECORD, id: 'sparse', counts: {} }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      value: { running: false, history: [good, badCode, badShape, badStatus, 'text', sparseCounts] },
+    }), { status: 200 })))
+    const face = createBackupSection(ctx, formDouble())
+    await vi.waitFor(() => { expect(face.hooks.backupRun.getSnapshot().history.length).toBe(3) })
+    const history = face.hooks.backupRun.getSnapshot().history
+    expect(history[0]).toMatchObject({ failure: { code: 'prism-backup/auth-failed' }, sizeBytes: 12 })
+    expect(history[1]?.failure).toBeUndefined()
+    expect(history[2]).toMatchObject({ counts: { settings: 0, memoryFiles: 0, projects: 0, projectFiles: 0 } })
+  })
+
+  it('refuses a run answer that is not an object', async () => {
+    const { ctx } = mount()
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(requestBody(init)) as { action: string }
+      if (body.action === 'run') return new Response(JSON.stringify({ ok: true, value: null }), { status: 200 })
+      return new Response(JSON.stringify({ ok: true, value: { running: false, history: [] } }), { status: 200 })
+    }))
+    const face = createBackupSection(ctx, formDouble())
+    face.run()
+    await vi.waitFor(() => {
+      expect(face.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'unreachable' })
+    })
+  })
+
+  it('refuses a test answer whose message is not text', async () => {
+    const { ctx } = mount()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, value: { message: 7 } }), { status: 200 })))
+    const face = createBackupSection(ctx, formDouble())
+    face.test()
+    await vi.waitFor(() => {
+      expect(face.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'unreachable' })
+    })
+  })
+
+  it('refuses a test answer without a sentence', async () => {
+    const { ctx } = mount()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, value: null }), { status: 200 })))
+    const face = createBackupSection(ctx, formDouble())
+    face.test()
+    await vi.waitFor(() => {
+      expect(face.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'unreachable' })
     })
   })
 
@@ -322,7 +411,7 @@ describe('createBackupSection', () => {
     const face = createBackupSection(ctx, formDouble())
     face.test()
     await vi.waitFor(() => {
-      expect(face.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'HTTP 503' })
+      expect(face.hooks.backupRun.getSnapshot().notice).toEqual({ tone: 'error', text: 'unreachable' })
     })
   })
 })

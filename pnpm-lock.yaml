@@ -3041,6 +3041,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@prism/prism-backup':
+        specifier: workspace:~
+        version: link:../../backup/prism-backup
       '@prism/prism-session-import':
         specifier: workspace:~
         version: link:../../session-query/session-import

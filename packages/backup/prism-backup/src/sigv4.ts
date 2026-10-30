@@ -77,10 +77,21 @@ export function canonicalQuery(search: string): string {
   if (search === '') return ''
   const pairs = [...new URLSearchParams(search)].map(([key, value]) =>
     [encodeRfc3986(key), encodeRfc3986(value)] as const)
+  // AWS sorts canonical query pairs by code unit, not by locale collation.
   pairs.sort((left, right) => (left[0] === right[0]
-    ? left[1].localeCompare(right[1])
-    : left[0].localeCompare(right[0])))
+    ? compareCodeUnits(left[1], right[1])
+    : compareCodeUnits(left[0], right[0])))
   return pairs.map(([key, value]) => `${key}=${value}`).join('&')
+}
+
+/**
+ * Compare two strings by UTF-16 code unit, the order AWS canonicalization uses.
+ * @param left - first value.
+ * @param right - second value.
+ * @returns a negative, zero, or positive number.
+ */
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
 }
 
 /**
@@ -122,7 +133,7 @@ export function signHeaders(input: SignInput): Record<string, string> {
     host,
     'x-amz-date': stamp,
   }
-  const entries = Object.entries(headers).sort(([left], [right]) => left.localeCompare(right))
+  const entries = Object.entries(headers).sort(([left], [right]) => compareCodeUnits(left, right))
   const canonicalHeaders = entries
     .map(([name, value]) => `${name}:${value.trim().replace(/\s+/gu, ' ')}\n`)
     .join('')
