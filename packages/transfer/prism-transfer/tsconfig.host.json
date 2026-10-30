@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/crc32.ts",
+    "src/errors.ts",
+    "src/zip-reader.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" }
+  ]
+}
