@@ -69,11 +69,15 @@ export function useMessageContextMenu(t: PropsLocale<'chat'>['t']): MessageConte
     { id: 'add-to-task', label: t('context.addToTask'), disabled: actions === undefined },
     { id: 'ask-side', label: t('context.askSide'), disabled: actions === undefined },
   ], [actions, t])
+  // The press is the moment the reader aimed at: focus moves to the menu row
+  // on activation, and a selection is not guaranteed to survive that.
+  const menuText = useRef('')
+  const onContextMenu = useCallback((event: ReactMouseEvent) => {
+    menuText.current = ref.current === null ? '' : actedText(ref.current)
+    state.open(event)
+  }, [state])
   const onSelect = useCallback((id: string) => {
-    const root = ref.current
-    /* v8 ignore next -- the ref is attached before any row can be activated. */
-    if (root === null) return
-    const text = actedText(root)
+    const text = menuText.current
     if (text === '') return
     if (id === 'copy') void writeClipboard(text)
     else if (id === 'add-to-task') actions?.appendQuote(text)
@@ -81,7 +85,7 @@ export function useMessageContextMenu(t: PropsLocale<'chat'>['t']): MessageConte
   }, [actions])
   return {
     ref,
-    onContextMenu: state.open,
+    onContextMenu,
     menu: <ContextMenu state={state} items={items} onSelect={onSelect} />,
   }
 }

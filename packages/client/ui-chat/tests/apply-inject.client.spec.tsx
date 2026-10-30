@@ -80,12 +80,14 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
   )
   runtime.remote.provideNamespaces({ session: { openWorkspacePath } })
   const openSession = vi.fn<(id: SessionId) => void>()
+  const startSession = vi.fn()
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: vi.fn(async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
       beforeOpen(ROOT)
       openSession(ROOT)
     }),
     openSession,
+    startSession,
   } as never)
   const session = sessionFakeFor()
   await runtime.sessions.add({
@@ -133,6 +135,7 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     },
     runtime, chat, chatSettings, browserAvailable,
     layout, openWorkspacePath, sidebarRight, sidebarRightTabs, session, chatViewApi, chatFlowApi, rootReference, openSession,
+    startSession,
   }
 }
 

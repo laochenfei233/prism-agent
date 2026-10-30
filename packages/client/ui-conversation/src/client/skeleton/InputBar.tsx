@@ -32,6 +32,7 @@ import type {} from '@deepseek-ai/dsh-goal/client'
 // api-remotes import already places it in every client program.
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps } from '../contract/slots.ts'
+import type { TokenSpan } from '../contract/draft-editor.ts'
 import { DraftEditor } from '../input/editor/DraftEditor.tsx'
 import {
   focusDraftEditor, installDraftFilePicker, installDraftKeymap, installDraftWheel,
@@ -99,79 +100,6 @@ export const InputBar = memo(function InputBar({
     setToast({ seq: toastSeq.current, text })
   }, [])
   const dismissToast = useCallback(() => { setToast(null) }, [])
-  // The text surface's secondary-press menu: Lexical's own edit commands, with
-  // clipboard transfer layered on the browser API. A refused clipboard read
-  // (no permission, no API) leaves the draft untouched and names the shortcut.
-  const composerMenuItems = useMemo((): readonly MenuEntry[] => [
-    { id: 'undo', label: t('menu.undo'), disabled: editor === null },
-    { id: 'redo', label: t('menu.redo'), disabled: editor === null },
-    { type: 'separator', id: 'menu-history' },
-    { id: 'cut', label: t('menu.cut'), disabled: editor === null },
-    { id: 'copy', label: t('copy'), disabled: editor === null },
-    { id: 'paste', label: t('menu.paste'), disabled: editor === null },
-    { id: 'delete', label: t('delete'), disabled: editor === null },
-    { type: 'separator', id: 'menu-selection' },
-    { id: 'select-all', label: t('menu.selectAll'), disabled: editor === null },
-  ], [editor, t])
-  // The DOM selection is the reader's exact highlight; Lexical's state answers
-  // when the browser selection is gone (a programmatic select-all whose
-  // element points at the root carry no text of their own).
-  const composerSelectionText = useCallback((): string => {
-    const dom = window.getSelection()?.toString() ?? ''
-    if (dom !== '') return dom
-    return editor?.getEditorState().read(() => {
-      const selection = $getSelection()
-      if (selection === null) return ''
-      if ($isRangeSelection(selection)) {
-        const rootKey = $getRoot().getKey()
-        const rootPoint = (point: { type: string; key: string }): boolean =>
-          point.type === 'element' && point.key === rootKey
-        if (rootPoint(selection.anchor) || rootPoint(selection.focus)) return $getRoot().getTextContent()
-      }
-      return selection.getTextContent()
-    }) ?? ''
-  }, [editor])
-  // A secondary press must remember what it was aimed at: activating a row
-  // moves focus out of the editable surface, and the caret selection is not
-  // guaranteed to survive that.
-  const menuSelection = useRef('')
-  const openComposerMenu = useCallback((event: MouseEvent<HTMLDivElement>): void => {
-    menuSelection.current = composerSelectionText()
-    contextMenu.open(event)
-  }, [composerSelectionText, contextMenu])
-  const onComposerMenuSelect = useCallback((id: string): void => {
-    /* v8 ignore next -- the menu renders only while the editor exists. */
-    if (editor === null) return
-    // Lexical keeps its own selection; returning focus restores the caret the
-    // menu was opened over before any command runs.
-    editor.focus()
-    if (id === 'undo') { editor.dispatchCommand(UNDO_COMMAND, undefined); return }
-    if (id === 'redo') { editor.dispatchCommand(REDO_COMMAND, undefined); return }
-    if (id === 'select-all') { editor.update(() => { $selectAll() }); return }
-    if (id === 'delete') { editor.dispatchCommand(DELETE_CHARACTER_COMMAND, true); return }
-    const text = menuSelection.current
-    if (id === 'copy') {
-      if (text !== '') void writeClipboard(text)
-      return
-    }
-    if (id === 'cut') {
-      if (text === '') return
-      void writeClipboard(text)
-        .catch(() => false)
-        .then((copied) => { if (copied) editor.dispatchCommand(DELETE_CHARACTER_COMMAND, true) })
-      return
-    }
-    if (id === 'paste') {
-      const clipboard = navigator.clipboard
-      if (clipboard?.readText === undefined) {
-        showToast(t('menu.pasteUnavailable'))
-        return
-      }
-      void clipboard.readText()
-        .then((text) => { if (text !== '') keyboard?.paste(text) })
-        .catch(() => { showToast(t('menu.pasteUnavailable')) })
-    }
-  }, [editor, keyboard, showToast, t])
   // The deployment's image-intake limits (absent while no attachment service
   // is composed — the pre-check below then defers entirely to the host).
   const imageLimits = useProjection('imageLimits')
@@ -229,6 +157,88 @@ export const InputBar = memo(function InputBar({
   const workspaceTrigger = inert && !removed && onRequestWorkspace !== undefined
   const editorDisabled = removed || (locked && !workspaceTrigger)
   const editable = live && !locked && !machineBusy
+  // The text surface's secondary-press menu: Lexical's own edit commands, with
+  // clipboard transfer layered on the browser API. A refused clipboard read
+  // (no permission, no API) leaves the draft untouched and names the shortcut.
+  const composerMenuItems = useMemo((): readonly MenuEntry[] => [
+    { id: 'undo', label: t('menu.undo'), disabled: editor === null },
+    { id: 'redo', label: t('menu.redo'), disabled: editor === null },
+    { type: 'separator', id: 'menu-history' },
+    { id: 'cut', label: t('menu.cut'), disabled: editor === null },
+    { id: 'copy', label: t('copy'), disabled: editor === null },
+    { id: 'paste', label: t('menu.paste'), disabled: editor === null },
+    { id: 'delete', label: t('delete'), disabled: editor === null },
+    { type: 'separator', id: 'menu-selection' },
+    { id: 'select-all', label: t('menu.selectAll'), disabled: editor === null },
+  ], [editor, t])
+  // The DOM selection is the reader's exact highlight; Lexical's state answers
+  // when the browser selection is gone (a programmatic select-all whose
+  // element points at the root carry no text of their own).
+  const composerSelectionText = useCallback((): string => {
+    const dom = window.getSelection()?.toString() ?? ''
+    if (dom !== '') return dom
+    return editor?.getEditorState().read(() => {
+      const selection = $getSelection()
+      if (selection === null) return ''
+      if ($isRangeSelection(selection)) {
+        const rootKey = $getRoot().getKey()
+        const rootPoint = (point: { type: string; key: string }): boolean =>
+          point.type === 'element' && point.key === rootKey
+        if (rootPoint(selection.anchor) || rootPoint(selection.focus)) return $getRoot().getTextContent()
+      }
+      return selection.getTextContent()
+    }) ?? ''
+  }, [editor])
+  // A secondary press must remember what it was aimed at: activating a row
+  // moves focus out of the editable surface, and the caret selection is not
+  // guaranteed to survive that.
+  const menuSelection = useRef('')
+  const menuInsertion = useRef<TokenSpan | null>(null)
+  const openComposerMenu = useCallback((event: MouseEvent<HTMLDivElement>): void => {
+    menuSelection.current = composerSelectionText()
+    menuInsertion.current = inputActions?.captureInsertion() ?? null
+    contextMenu.open(event)
+  }, [composerSelectionText, contextMenu, inputActions])
+  const onComposerMenuSelect = useCallback((id: string): void => {
+    /* v8 ignore next -- the menu renders only while the editor is editable. */
+    if (editor === null || !editable) return
+    // Lexical keeps its own selection; returning focus restores the caret the
+    // menu was opened over before any command runs.
+    editor.focus()
+    if (id === 'undo') { editor.dispatchCommand(UNDO_COMMAND, undefined); return }
+    if (id === 'redo') { editor.dispatchCommand(REDO_COMMAND, undefined); return }
+    if (id === 'select-all') { editor.update(() => { $selectAll() }); return }
+    if (id === 'delete') { editor.dispatchCommand(DELETE_CHARACTER_COMMAND, false); return }
+    const text = menuSelection.current
+    if (id === 'copy') {
+      if (text !== '') void writeClipboard(text)
+      return
+    }
+    if (id === 'cut') {
+      const captured = menuInsertion.current
+      if (text === '' || captured === null) return
+      void writeClipboard(text)
+        .catch(() => false)
+        .then((copied) => {
+          // Delete only when the draft is still the one the menu copied: a
+          // slow clipboard write must not remove text typed since.
+          if (copied && inputActions?.captureInsertion().draftRev === captured.draftRev) {
+            editor.dispatchCommand(DELETE_CHARACTER_COMMAND, false)
+          }
+        })
+      return
+    }
+    if (id === 'paste') {
+      const clipboard = navigator.clipboard
+      if (clipboard?.readText === undefined) {
+        showToast(t('menu.pasteUnavailable'))
+        return
+      }
+      void clipboard.readText()
+        .then((text) => { if (text !== '') keyboard?.paste(text) })
+        .catch(() => { showToast(t('menu.pasteUnavailable')) })
+    }
+  }, [editable, editor, inputActions, keyboard, showToast, t])
   const steeringAvailable = subagent === null || subagent.address.mode === 'continuable'
   const canSteerQueue = !locked && !machineBusy && !commandMenuOpen && empty && running && steeringAvailable
     && input.queue.length > 0
@@ -512,9 +522,9 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
-          onContextMenu={editor === null ? undefined : openComposerMenu}
+          onContextMenu={editable ? openComposerMenu : undefined}
         />
-        {editor !== null && (
+        {editable && (
           <ContextMenu state={contextMenu} items={composerMenuItems} onSelect={onComposerMenuSelect} />
         )}
         <div ref={rowRef} className={css.row}>

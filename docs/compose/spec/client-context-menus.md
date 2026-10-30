@@ -22,7 +22,7 @@ Every client surface currently shows the browser's default context menu. The ses
 
 **S2.3 — Project rows get their own menu.** New task, move to top, move to bottom, reveal directory, rename, delete, and a disabled export placeholder. "Copy" is omitted: a directory has exactly one Workspace registration, so there is no entity to duplicate. "View files" is not a separate row because the file tree is session-scoped; reveal covers browsing the directory.
 
-**S2.4 — Conversation text is selection-aware.** A secondary press on a message copies the selected text when there is one and the whole message otherwise. "Add to current task" appends the text as a quotation paragraph to the current composer through the public `inputActions` face. "Ask in a side conversation" starts a new Session in the same workspace with the quotation prefilled; it does not send, so nothing reaches a model without a second confirmation.
+**S2.4 — Conversation text is selection-aware.** A secondary press on a message copies the selected text when there is one and the whole message otherwise. "Add to current task" inserts the text as a quotation (each line prefixed with `>`) into the current composer through the public `inputActions` face. "Ask in a side conversation" starts a new Session in the same workspace with the quotation prefilled; it does not send, so nothing reaches a model without a second confirmation.
 
 **S2.5 — The composer menu edits in place.** Undo, redo, cut, copy, paste, delete, and select all dispatch the composer's own Lexical commands. Paste reads the clipboard through `navigator.clipboard.readText()`; a refused read surfaces a notice asking for the keyboard shortcut instead of failing silently.
 

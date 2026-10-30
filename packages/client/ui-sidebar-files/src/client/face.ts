@@ -119,7 +119,8 @@ export interface FilesPathActions {
 }
 
 /**
- * Bind the file tree's open actions to the Session Remote face.
+ * Bind the file tree's open actions to the Session Remote face. The
+ * ui-open-in-app controller is not reused because it depends on this package.
  * @param remote - the Client Remote carrying the Session namespace.
  * @returns the open and handler-query actions.
  */

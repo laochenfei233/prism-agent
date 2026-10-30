@@ -35,7 +35,7 @@ export const zh = {
   'menu.cut': '剪切',
   'menu.paste': '粘贴',
   'menu.selectAll': '全选',
-  'menu.pasteUnavailable': '无法读取剪贴板，请使用 Ctrl+V 粘贴',
+  'menu.pasteUnavailable': '无法读取剪贴板，请使用粘贴快捷键',
   'attachment.pending': '待发送附件',
   'attachment.scrollLeft': '向左滚动附件',
   'attachment.scrollRight': '向右滚动附件',

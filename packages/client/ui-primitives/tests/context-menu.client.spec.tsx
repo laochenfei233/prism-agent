@@ -57,3 +57,23 @@ it('dismisses on an outside press', () => {
   fireEvent.pointerDown(document.body)
   expect(screen.queryByRole('menu')).toBeNull()
 })
+
+it('renders pinned footer rows without requiring a selection owner', () => {
+  function FooterHarness(): React.JSX.Element {
+    const state = useContextMenu()
+    return (
+      <div data-testid="row" onContextMenu={state.open}>
+        <ContextMenu
+          state={state}
+          items={[{ id: 'copy', label: 'Copy' }]}
+          footer={[{ id: 'settings', label: 'Settings' }]}
+          compact
+        />
+      </div>
+    )
+  }
+  render(<FooterHarness />)
+  fireEvent.contextMenu(screen.getByTestId('row'), { clientX: 10, clientY: 10 })
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }))
+  expect(screen.queryByRole('menu')).toBeNull()
+})

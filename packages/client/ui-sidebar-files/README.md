@@ -43,6 +43,8 @@ The root is the session's working directory, read from `useSessions().byId[sessi
 | `file` | Opens `dsh-resource://file/session/<sessionId>/<encoded path relative to the root>`, built by `fileAddressFor` from `@deepseek-ai/dsh-util-workspace-path` from the entry's absolute path and the tree's root, through `useTabInfo().tab.actions.openResource`, landing in the tab's own pane. |
 | `other` | Shown greyed and not clickable, so the directory is reported whole. |
 
+A file row's secondary press opens Preview, Open, Open with (the Host's registered handlers), Copy relative path, and Copy absolute path. A refused open or clipboard write appears above the tree and clears on the next action.
+
 A level cut by the endpoint's entry cap ends with a marker; an empty level says so; a level that failed shows one line per code — `workspace-file/not-found`, `outside-workspace`, `not-directory` — and the transport's own message otherwise. Reload refreshes the root and expanded levels in place, retaining displayed entries during reads instead of resetting the whole tree; collapsed levels are fetched again when they next open. A session without a working directory shows a single line instead of a tree.
 
 State lives in the type's own store, bucketed by tab id: `root`, `levels` (loading / ready / failed per absolute path), `expanded`, `autoRefresh`, and `scrollTop`, which the body tracks locally while scrolling and commits once when it unmounts. Because the store outlives the body, switching to another sidebar tab and back remounts the tree with its levels intact and its scroll offset restored. The owner's `signal` ends a bucket: on abort the tab is forgotten, and neither a listing that settles afterwards nor the unmount's offset commit writes anything.
@@ -61,7 +63,7 @@ None; directory listings travel over the Remote and assemble no model request.
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-- **Listing only.** No search, artifact filter, drag-and-drop, rename, context menu, or current-file highlight.
+- **Listing only.** No search, artifact filter, drag-and-drop, rename, or current-file highlight.
 - **One root.** The tree is rooted at the session's working directory; there is no way to browse above it, and the Host refuses paths outside the workspace root anyway.
 
 <a id="dev-note"></a>

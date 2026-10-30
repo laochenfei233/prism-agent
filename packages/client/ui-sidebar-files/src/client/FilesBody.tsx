@@ -80,6 +80,8 @@ interface TreeContext {
   readonly paths: FilesInjected['paths']
   /** Report a failed row action above the tree. */
   readonly reportFailure: (text: string) => void
+  /** Clear the previous row-action failure before a new action runs. */
+  readonly clearFailure: () => void
   readonly t: TranslateNS<'sidebarFiles'>
 }
 
@@ -124,6 +126,7 @@ function FileEntry({ path, name, tree }: { path: string; name: string; tree: Tre
     { id: 'copy-absolute', label: tree.t('menu.copyAbsolute') },
   ]
   const select = (id: string): void => {
+    tree.clearFailure()
     if (id === 'preview') {
       tree.onOpen(path)
       return
@@ -253,6 +256,7 @@ export function FilesBody({
     onOpen: (path) => { tabActions.openResource(fileAddressFor(sessionId, state.root, path)) },
     paths,
     reportFailure: setActionError,
+    clearFailure: () => { setActionError(null) },
     t,
   }
   const reload = (): void => {

@@ -1240,6 +1240,12 @@ it.each([['未命名', t], ['Untitled', tEn]])('labels unnamed search results as
   expect(onOpen).toHaveBeenCalledWith(result.id)
 })
 
+/** A slot entry that keeps the menu open through the hook's true branch. */
+function KeepingSlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState }): React.JSX.Element {
+  const [, setOpen] = useMenuOpenState()
+  return <button type="button" role="menuitem" onClick={() => { setOpen(true) }}>keep</button>
+}
+
 /** A slot entry that dismisses through the hook the row occurrence supplies. */
 function SlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState }): React.JSX.Element {
   const [, setOpen] = useMenuOpenState()
@@ -1304,4 +1310,21 @@ it('runs every project context row and keeps export disabled', () => {
   expect(reveal).toHaveBeenCalledOnce()
   expect(rename).toHaveBeenCalledOnce()
   expect(onDelete).toHaveBeenCalledOnce()
+})
+
+
+it('leaves the menu open when an entry asks the hook to stay open', () => {
+  const node: SessionNode = { id: sid('ctx-keep'), title: 'Context', blank: false, running: false,
+    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false }
+  const renderSlot = ((
+    name: 'sidebar.workspaces.session.menu.item',
+    _props: SessionRowOwnerProps,
+    opts?: { hookContext?: unknown },
+  ) => (name === 'sidebar.workspaces.session.menu.item'
+    ? <KeepingSlotEntry useMenuOpenState={menuOpenStateFactory(undefined as never, opts?.hookContext as MenuOpenState)} />
+    : null)) as RowRenderSlot
+  render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()} renderSlot={renderSlot} t={t} />)
+  fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 12, clientY: 20 })
+  fireEvent.click(screen.getByRole('menuitem', { name: 'keep' }))
+  expect(screen.getByRole('menu')).toBeTruthy()
 })

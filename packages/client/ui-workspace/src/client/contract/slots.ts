@@ -302,6 +302,7 @@ export type RowToast =
   | { kind: 'pathCopied' }
   | { kind: 'pathCopyFailed' }
   | { kind: 'revealFailed' }
+  | { kind: 'workspaceMoveFailed' }
   | { kind: 'pinFailed' }
   | { kind: 'unpinFailed' }
   | { kind: 'archivedNotOpenable' }

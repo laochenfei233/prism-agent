@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { Menu } from './Menu.tsx'
 import type { MenuEntry } from './Menu.tsx'
+import css from './ContextMenu.module.css'
 
 /** Viewport coordinates of the secondary press that opened a context menu. */
 export interface ContextMenuPoint {
@@ -65,6 +66,9 @@ export function ContextMenu({ state, items = [], children, footer, onSelect, den
   listClassName?: string | undefined
 }): ReactNode {
   const { point, close } = state
+  // A closed context menu has nothing to render: mounting Menu's wrapper while
+  // closed would leave an empty box in the caller's layout.
+  const open = point !== null
   // A context menu is one gesture: selecting a row dismisses it, so callers
   // supply behavior only.
   const select = useCallback((id: string) => {
@@ -75,10 +79,12 @@ export function ContextMenu({ state, items = [], children, footer, onSelect, den
     (): DOMRect | null => (point === null ? null : new DOMRect(point.x, point.y, 0, 0)),
     [point],
   )
+  if (!open) return null
   return (
     <Menu
-      open={point !== null}
+      open
       anchor={null}
+      className={css.root}
       items={items}
       {...footer === undefined ? {} : { footer }}
       onSelect={select}

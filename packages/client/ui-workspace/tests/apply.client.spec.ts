@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -321,9 +322,9 @@ describe('ui-workspace apply', () => {
     const rowToastEntry = entry(b.slots, 'shell.overlay', 'workspace.row-toast')
     expect(rowToastEntry.store).toBeUndefined()
     expect(b.slots.entries('workspace.toast').map(row => row.options.key)).toEqual([
-      'sessionIdCopied', 'sessionIdCopyFailed', 'pathCopied', 'pathCopyFailed', 'revealFailed', 'pinFailed', 'unpinFailed',
-      'archivedNotOpenable', 'defaultWorkspaceFailed', 'shortcutForkFailed', 'createFailed', 'forkRequiresOpen', 'archived',
-      'stoppedAndArchived',
+      'sessionIdCopied', 'sessionIdCopyFailed', 'pathCopied', 'pathCopyFailed', 'revealFailed', 'workspaceMoveFailed',
+      'pinFailed', 'unpinFailed', 'archivedNotOpenable', 'defaultWorkspaceFailed', 'shortcutForkFailed', 'createFailed',
+      'forkRequiresOpen', 'archived', 'stoppedAndArchived',
     ])
     for (const registration of b.slots.entries('workspace.toast')) {
       expect(registration.locale).toBe('workspace')
@@ -909,6 +910,19 @@ describe('ui-workspace apply', () => {
   })
 })
 
+
+it('localizes the new row notices', async () => {
+  const b = await bench()
+  onTestFinished(() => b.ctx.fiber.dispose())
+  declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+  await b.ctx.plugin({ inject: [...inject], apply }).await()
+  const t = b.locale.bind('workspace')
+  for (const key of ['pathCopied', 'pathCopyFailed', 'revealFailed', 'workspaceMoveFailed'] as const) {
+    const display = b.slots.entries('workspace.toast').find(row => row.options.key === key)!
+    const face = faceOf(display) as ToastDisplayInjected<typeof key>
+    expect(face.display({ kind: key, seq: 1 } as never, t, () => {}).text).toBe(t(`toast.${key}`))
+  }
+})
 
 it('reveals and copies a Session working directory, and runs settings from the menu', async () => {
   const b = await bench()

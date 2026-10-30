@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A11.
 // @vitest-environment jsdom
 
 import type { ProcessGroupData } from '../src/client/contract/process-groups.ts'

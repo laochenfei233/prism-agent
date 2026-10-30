@@ -367,3 +367,26 @@ it('offers preview, open, open-with, and both path spellings on a file row', asy
     else Object.defineProperty(navigator, 'clipboard', prior)
   }
 })
+
+
+it('reports a refused open and clears it on the next successful gesture', async () => {
+  const { view, script, face } = mountBody()
+  await act(() => script.watches.ready(ROOT))
+  await act(() => script.settle({ ok: true, value: ROOT_LEVEL }))
+  vi.mocked(face.paths.applications).mockResolvedValue([])
+  vi.mocked(face.paths.openPath).mockResolvedValueOnce(false)
+  const row = view.container.querySelector(`[data-files-path="${ROOT}/README.md"] button`)!
+  const openMenu = async (): Promise<void> => {
+    fireEvent.contextMenu(row, { clientX: 10, clientY: 10 })
+    await act(async () => { await Promise.resolve() })
+  }
+  await openMenu()
+  fireEvent.click(view.getByRole('menuitem', { name: zh['menu.open'] }))
+  await act(async () => { await Promise.resolve() })
+  expect(view.getByRole('alert').textContent).toBe(zh['error.openFailed'])
+  vi.mocked(face.paths.openPath).mockResolvedValueOnce(true)
+  await openMenu()
+  fireEvent.click(view.getByRole('menuitem', { name: zh['menu.open'] }))
+  await act(async () => { await Promise.resolve() })
+  expect(view.queryByRole('alert')).toBeNull()
+})

@@ -1958,6 +1958,6 @@ describe('composer context menu', () => {
     }
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: '粘贴' }))
-    expect(view.getByText('无法读取剪贴板，请使用 Ctrl+V 粘贴')).toBeTruthy()
+    expect(view.getByText('无法读取剪贴板，请使用粘贴快捷键')).toBeTruthy()
   })
 })
