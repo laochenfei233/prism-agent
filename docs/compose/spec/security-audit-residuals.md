@@ -3,7 +3,7 @@ feature: security-audit-residuals
 status: delivered
 updated: 2026-10-31
 branch: fix/security-audit-residuals
-commits: 609ccc3887..fa45014585
+commits: 609ccc3887..34750305c4
 ---
 
 # Security Audit Residuals
@@ -14,7 +14,7 @@ English | [中文](security-audit-residuals.zh.md)
 
 **What was built** — Shell confinement now excludes the harness home from every writable profile that would otherwise reach it: Seatbelt appends a denying subpath rule, bwrap rebinds the home read-only after the workspace bind, Landlock refuses the policy with `SANDBOX_UNAVAILABLE`, and the Windows ACL grant adds a standing Deny ACE for the workspace capability SID. Imported attachment members are republished `0400` after the copy, and the release workflow leaves `latest.json` to `tauri-action` while still uploading `.sig` and `.app.tar.gz`.
 
-**Verification** — `packages/sandbox/sandbox-windows-acl/tests/acl.spec.ts`: 13 passed, including the new deny test. `engine.spec.ts`: 13 passed, including the copied-mode assertion. A direct behavior check of the three profile builders (a workspace containing `$DSH_HOME`, and a home outside every writable root) passed; the package's own specs are excluded on Windows by `vitest.config.ts` and run on the POSIX lanes. `pnpm run typecheck`: 5/5 gates. Translation pairs, `verify-md-links`, and `verify-concrete-terms`: pass. The coverage lane could not run in this checkout (`ast-v8-to-istanbul` TypeError while remapping), though the tests themselves ran. `pnpm run doc-sync` still fails on baseline artifacts unrelated to this change (custom-theme-presets wrap, stale generated catalogs, ui-chat/ui-conversation summaries, removed hooks package paths), and `verify-package-dependencies` fails only on `prism-transfer` imports; this change adds no new failure.
+**Verification** — `packages/sandbox/sandbox-windows-acl/tests/acl.spec.ts`: 14 passed, including the deny ACE, `AclWriteGrant.deny`, and `AclSandbox` deny-dirs tests. `engine.spec.ts`: 13 passed, including a copied-mode assertion that fails on any surviving write bit. A direct behavior check of the three profile builders (a workspace containing `$DSH_HOME`, and a home outside every writable root) passed, and the agentless Windows path passes `--deny` to the runner; the package's own specs are excluded on Windows by `vitest.config.ts` and run on the POSIX lanes. `pnpm run typecheck`: 5/5 gates. Translation pairs, `verify-md-links`, and `verify-concrete-terms`: pass. The coverage lane could not run in this checkout (`ast-v8-to-istanbul` TypeError while remapping), though the tests themselves ran. `pnpm run doc-sync` still fails on baseline artifacts unrelated to this change (custom-theme-presets wrap, stale generated catalogs, ui-chat/ui-conversation summaries, removed hooks package paths), and `verify-package-dependencies` fails only on `prism-transfer` imports; this change adds no new failure.
 
 **Journey log** — Landlock's allow-list forced a fail-closed branch rather than a deny rule, which is the one behavior difference between the POSIX profiles. The sandbox-local spec lane is Windows-excluded, so local verification used the profile builders directly and left the spec run to the POSIX lanes. The home exclusion is gated on the home lying inside a granted root, which keeps every existing profile byte-identical outside that overlap. The ACL deny reuses the existing standing grant instead of adding a second grant lifecycle.
 
@@ -28,12 +28,12 @@ English | [中文](security-audit-residuals.zh.md)
 
 The exclusion applies only when the harness home lies inside a root the `workspace-write` policy would otherwise grant; outside that overlap the ordinary read-only bind or deny already covers it. The home comes from `resolveDshHome()` (`$DSH_HOME`, then `~/.prism`), the same source the shipped composition resolves.
 
-- Seatbelt appends an inheritable `(deny file-write* (subpath "<home>"))` after the allows; Seatbelt evaluates deny rules before allow rules.
+- Seatbelt appends an inheritable `(deny file-write* (subpath "<home>"))` after the allows; its last-matching-rule-wins evaluation makes the deny override them.
 - bwrap appends `--ro-bind <home> <home>` after the workspace bind; a later mount wins over the earlier writable bind.
 - Landlock is an allow-list and cannot exclude a subpath, so the launcher profile refuses the policy with `SandboxUnavailableError` and the command never runs unconfined.
-- The Windows ACL rung adds a standing Deny ACE for the workspace capability SID on the home directory; Windows evaluates deny ACEs before inherited allows, so the home stays unreachable inside the granted workspace.
+- The Windows ACL rung adds a standing Deny ACE for the workspace capability SID on the home directory, for both the seam-managed grant and the standalone runner; Windows evaluates deny ACEs before inherited allows, so the home stays unreachable inside the granted workspace.
 
-No core sandbox protocol, policy type, or updater runtime changes: each provider resolves the same home with its own dialect.
+No core sandbox protocol, policy type, or updater runtime changes: each provider resolves the same home with its own dialect. The ACL denial is standing like the workspace grant it narrows, so moving the home out of a workspace leaves a stale denial for that workspace SID until the workspace ACL is reset.
 
 ### [S2.2] Read-only publication of imported attachments
 
@@ -64,7 +64,7 @@ The event vocabulary has no marker distinguishing imported history, and adding o
 
 - [x] A workspace-write policy whose workspace contains `$DSH_HOME` yields a Seatbelt deny line and a bwrap read-only rebind after the writable bind; a home outside the workspace leaves both profiles unchanged.
 - [x] Landlock refuses that policy with `SandboxUnavailableError` instead of granting the home.
-- [x] The Windows ACL workspace grant denies the capability SID on a nested harness home and does not deny an outside one.
+- [x] The Windows ACL workspace grant denies the capability SID on a nested harness home and does not deny an outside one; the standalone runner receives the same denial.
 - [x] Imported attachment members are mode `0400` after the copy.
 - [x] The release workflow uploads `.sig` and `.app.tar.gz` and no longer uploads `latest.json` itself.
 - [x] The affected package tests, typecheck, coverage, and documentation gates pass, or each failure is a recorded baseline failure with evidence.

@@ -3,7 +3,7 @@ feature: security-audit-residuals
 status: delivered
 updated: 2026-10-31
 branch: fix/security-audit-residuals
-commits: 609ccc3887..fa45014585
+commits: 609ccc3887..34750305c4
 ---
 
 # 安全审计残余
@@ -14,7 +14,7 @@ commits: 609ccc3887..fa45014585
 
 **本次构建** — shell 隔离现在在所有本来会触达 harness home 的可写 profile 中排除它：Seatbelt 追加拒绝子路径规则，bwrap 在工作区绑定之后把 home 重新绑定为只读，Landlock 以 `SANDBOX_UNAVAILABLE` 拒绝该策略，Windows ACL 授权为工作区能力 SID 添加常驻 Deny ACE。导入的附件成员在复制后重新发布为 `0400`，发布工作流把 `latest.json` 留给 `tauri-action`，同时仍上传 `.sig` 与 `.app.tar.gz`。
 
-**验证** — `packages/sandbox/sandbox-windows-acl/tests/acl.spec.ts`：13 通过，包括新的 deny 测试。`engine.spec.ts`：13 通过，包括复制模式断言。对三个 profile 构造器的直接行为检查（工作区包含 `$DSH_HOME`，以及 home 位于所有可写根之外）通过；该包自身的测试在 Windows 上被 `vitest.config.ts` 排除，由 POSIX 通道运行。`pnpm run typecheck`：5/5 门禁。翻译配对、`verify-md-links` 与 `verify-concrete-terms`：通过。覆盖率通道在本检出中无法运行（重映射时 `ast-v8-to-istanbul` TypeError），但测试本身已运行。`pnpm run doc-sync` 仍因与本改动无关的基线产物失败（custom-theme-presets 折行、过期的生成目录、ui-chat/ui-conversation 摘要、已移除的 hooks 包路径），`verify-package-dependencies` 仅因 `prism-transfer` 的导入失败；本改动没有新增失败。
+**验证** — `packages/sandbox/sandbox-windows-acl/tests/acl.spec.ts`：14 通过，包括 deny ACE、`AclWriteGrant.deny` 与 `AclSandbox` deny-dirs 测试。`engine.spec.ts`：13 通过，包括任一写位残留即失败的复制模式断言。对三个 profile 构造器的直接行为检查（工作区包含 `$DSH_HOME`，以及 home 位于所有可写根之外）通过，agentless Windows 路径会把 `--deny` 传给 runner；该包自身的测试在 Windows 上被 `vitest.config.ts` 排除，由 POSIX 通道运行。`pnpm run typecheck`：5/5 门禁。翻译配对、`verify-md-links` 与 `verify-concrete-terms`：通过。覆盖率通道在本检出中无法运行（重映射时 `ast-v8-to-istanbul` TypeError），但测试本身已运行。`pnpm run doc-sync` 仍因与本改动无关的基线产物失败（custom-theme-presets 折行、过期的生成目录、ui-chat/ui-conversation 摘要、已移除的 hooks 包路径），`verify-package-dependencies` 仅因 `prism-transfer` 的导入失败；本改动没有新增失败。
 
 **历程记录** — Landlock 的允许列表迫使采用 fail-closed 分支而不是拒绝规则，这是 POSIX profile 之间唯一的行为差异。sandbox-local 测试通道在 Windows 上被排除，因此本地验证直接使用 profile 构造器，测试运行留给 POSIX 通道。home 排除以“home 位于已授予根之内”为前提，因此在重叠之外每个现有 profile 保持逐字节不变。ACL deny 复用现有的常驻授权，而不是引入第二条授权生命周期。
 
@@ -28,12 +28,12 @@ commits: 609ccc3887..fa45014585
 
 只有当 harness home 位于 `workspace-write` 策略本来会授予的某个根之内时才应用排除；在这个重叠之外，普通的只读绑定或拒绝已经覆盖它。home 来自 `resolveDshHome()`（先 `$DSH_HOME`，再 `~/.prism`），即随附组合解析的同一来源。
 
-- Seatbelt 在允许规则之后追加可继承的 `(deny file-write* (subpath "<home>"))`；Seatbelt 在允许规则之前求值拒绝规则。
+- Seatbelt 在允许规则之后追加可继承的 `(deny file-write* (subpath "<home>"))`；其最后匹配规则优先的求值方式使拒绝覆盖允许。
 - bwrap 在工作区绑定之后追加 `--ro-bind <home> <home>`；后出现的挂载会覆盖先前的可写绑定。
 - Landlock 是允许列表，无法排除子路径，因此启动器 profile 以 `SandboxUnavailableError` 拒绝该策略，命令绝不会在无约束下运行。
-- Windows ACL 这一档在工作区能力 SID 上为 home 目录添加常驻 Deny ACE；Windows 在继承的允许之前求值拒绝，因此 home 在已授予的工作区内仍不可达。
+- Windows ACL 这一档在工作区能力 SID 上为 home 目录添加常驻 Deny ACE，同时覆盖 seam 管理的授权与独立 runner；Windows 在继承的允许之前求值拒绝，因此 home 在已授予的工作区内仍不可达。
 
-不涉及核心沙箱协议、策略类型或更新运行时的改动：每个提供方用自己的方言解析同一个 home。
+不涉及核心沙箱协议、策略类型或更新运行时的改动：每个提供方用自己的方言解析同一个 home。ACL 拒绝与所收窄的工作区授权一样是常驻的，因此把 home 移出工作区后，该工作区 SID 的陈旧拒绝会保留到工作区 ACL 被重置。
 
 ### [S2.2] 导入附件的只读发布
 
@@ -64,7 +64,7 @@ commits: 609ccc3887..fa45014585
 
 - [x] 当工作区包含 `$DSH_HOME` 时，`workspace-write` 策略的 Seatbelt 输出包含拒绝行，bwrap 在可写绑定之后追加只读重绑定；home 在工作区之外时两个 profile 都不变。
 - [x] Landlock 以 `SandboxUnavailableError` 拒绝该策略，而不是授予 home。
-- [x] Windows ACL 工作区授权对嵌套的 harness home 拒绝能力 SID，对工作区之外的 home 不拒绝。
+- [x] Windows ACL 工作区授权对嵌套的 harness home 拒绝能力 SID，对工作区之外的 home 不拒绝；独立 runner 收到同样的拒绝。
 - [x] 复制后导入的附件成员模式为 `0400`。
 - [x] 发布工作流上传 `.sig` 与 `.app.tar.gz`，不再自行上传 `latest.json`。
 - [x] 受影响包的测试、类型检查、覆盖率与文档门禁通过；每个失败都是带证据的已记录基线失败。
