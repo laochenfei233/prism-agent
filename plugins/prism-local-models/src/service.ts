@@ -18,10 +18,16 @@ import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog
 import { downloadFile } from './download.ts'
 import { LocalModelsError } from './errors.ts'
 import { BgeEngine } from './engines/bge.ts'
+import { RapidOcrEngine } from './engines/rapidocr.ts'
 import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
 import { provisionRuntime } from './runtimes.ts'
 import type { ResolvedConfig } from './config.ts'
 import type { CatalogView, ModelFamilyView, ModelProgress, ModelStatus, ModelVariant, ProbeOutcome, StatusView } from './types.ts'
+
+/** Anything an open engine must expose for teardown. */
+interface EngineLike {
+  dispose(): void
+}
 
 /** One running install with its cancellation and live progress. */
 interface ActiveInstall {
@@ -42,7 +48,7 @@ export class PrismLocalModelsService {
   private readonly registry: ModelRegistry
   private readonly init: Promise<void>
   private readonly active = new Map<string, ActiveInstall>()
-  private readonly engines = new Map<string, { readonly variantId: string; readonly engine: BgeEngine }>()
+  private readonly engines = new Map<string, { readonly variantId: string; readonly engine: EngineLike }>()
   private catalogImpl: Catalog = []
   private document: RegistryDocument = { version: 1, families: {} }
 
@@ -136,6 +142,13 @@ export class PrismLocalModelsService {
     await this.init
     this.requireFamily(modelId)
     if (modelId === 'bge') return this.probeEmbedding()
+    if (modelId === 'rapidocr') {
+      const engine = await this.rapidOcrEngine()
+      const text = await engine.probe()
+      return text.trim().length > 0
+        ? { ok: true, detail: text.slice(0, 120) }
+        : { ok: false, error: 'the probe image produced no text' }
+    }
     throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with its inference task`)
   }
 
@@ -146,10 +159,17 @@ export class PrismLocalModelsService {
     return engine.embed(texts)
   }
 
-  /** Capability entry point for image text extraction. */
-  async ocr(_image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
+  /**
+   * Extract text from one image through the ready OCR engine: RapidOCR by
+   * default, the PaddleOCR sidecar when RapidOCR is not installed.
+   */
+  async ocr(image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
     await this.init
-    throw new LocalModelsError('not-implemented', 'OCR arrives with the engine tasks')
+    const record = this.document.families['rapidocr']
+    if (record?.status === 'ready') return (await this.rapidOcrEngine()).detectText(image)
+    const paddle = this.document.families['paddleocr']
+    if (paddle?.status === 'ready') return this.paddleOcr(image)
+    throw new LocalModelsError('not-installed', 'no OCR engine is ready; install RapidOCR (default) or PaddleOCR from the Models page card')
   }
 
   /** Capability entry point for translation through HY-MT1.5. */
@@ -172,7 +192,7 @@ export class PrismLocalModelsService {
       throw new LocalModelsError('not-installed', 'install the BGE model from the Models page card first')
     }
     const cached = this.engines.get(modelId)
-    if (cached?.variantId === record.variantId) return cached.engine
+    if (cached?.variantId === record.variantId && cached.engine instanceof BgeEngine) return cached.engine
     const variant = this.requireVariant(modelId, record.variantId)
     const quantized = variant.files.some(file => file.path.includes('quantized'))
     const engine = await BgeEngine.open(ModelRegistry.variantDir(this.modelsRoot, modelId, record.variantId), { quantized, device: variant.device })
@@ -184,6 +204,24 @@ export class PrismLocalModelsService {
   private async probeEmbedding(): Promise<ProbeOutcome> {
     const vectors = await this.embed(['本地模型探针 local models probe'])
     return { ok: true, detail: `${vectors[0]?.length ?? 0} dims` }
+  }
+
+  /** The RapidOCR engine over the installed family, opening and caching on demand. */
+  private async rapidOcrEngine(): Promise<RapidOcrEngine> {
+    const record = this.document.families['rapidocr']
+    if (record?.status !== 'ready' || record.variantId === undefined) {
+      throw new LocalModelsError('not-installed', 'install the RapidOCR model from the Models page card first')
+    }
+    const cached = this.engines.get('rapidocr')
+    if (cached?.variantId === record.variantId && cached.engine instanceof RapidOcrEngine) return cached.engine
+    const engine = await RapidOcrEngine.open(this.modelsRoot)
+    this.engines.set('rapidocr', { variantId: record.variantId, engine })
+    return engine
+  }
+
+  /** The PaddleOCR sidecar call; arrives with the Python task. */
+  private async paddleOcr(_image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
+    throw new LocalModelsError('not-implemented', 'the PaddleOCR sidecar arrives with the Python task')
   }
 
   /** Resolve the catalog and take the first scan of the models root. */
