@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type Dispatch, ty
 import type { ModelFamilyView, ModelKind, ModelStatus } from '../types.ts'
 import { fetchCatalog, postCancel, postInstall, postProbe, postRemove, type RouteError } from './api.ts'
 import type { LocalModelsLocaleKey } from './locales.ts'
+import { formatBytes, progressText } from './pure.ts'
 
 /** Props bound by the slot renderer. */
 export interface LocalModelsCardProps {
@@ -45,6 +46,7 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
   const [modelsRoot, setModelsRoot] = useState('')
   const [loadError, setLoadError] = useState('')
   const [probes, setProbes] = useState<Record<string, { running: boolean } | undefined>>({})
+  const [selections, setSelections] = useState<Record<string, string | undefined>>({})
 
   const refresh = useCallback((): void => {
     void fetchCatalog().then(catalog => {
@@ -67,9 +69,8 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
     return () => window.clearInterval(timer)
   }, [busy, refresh])
 
-  const act = useCallback((modelId: string, run: () => Promise<unknown>): void => {
+  const act = useCallback((_modelId: string, run: () => Promise<unknown>): void => {
     void run().then(refresh).catch((_error: RouteError) => {
-      setProbes(previous => ({ ...previous, [modelId]: { running: false } }))
       refresh()
     })
   }, [refresh])
@@ -86,6 +87,8 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
           key={family.id}
           family={family}
           t={t}
+          selectedVariantId={selections[family.id] ?? family.selectedVariantId}
+          onSelect={variantId => setSelections(previous => ({ ...previous, [family.id]: variantId }))}
           probeRunning={probes[family.id]?.running === true}
           onInstall={variantId => act(family.id, () => postInstall(family.id, variantId))}
           onCancel={() => act(family.id, () => postCancel(family.id))}
@@ -126,20 +129,20 @@ function applyProbe(
 function FamilyRow(props: {
   family: ModelFamilyView
   t: LocalModelsCardProps['t']
+  selectedVariantId: string
+  onSelect: (variantId: string) => void
   probeRunning: boolean
   onInstall: (variantId: string) => void
   onCancel: () => void
   onRemove: () => void
   onProbe: () => void
 }): ReactElement {
-  const { family, t, probeRunning, onInstall, onCancel, onRemove, onProbe } = props
-  const selected = family.variants.find(variant => variant.id === family.selectedVariantId) ?? family.variants[0]
+  const { family, t, selectedVariantId, onSelect, probeRunning, onInstall, onCancel, onRemove, onProbe } = props
   return (
     <div style={styles.row}>
       <div style={styles.rowHead}>
         <strong>{family.displayName}</strong>
         <span style={styles.chip}>{t(KIND_KEYS[family.kind])}</span>
-        {selected?.device === 'cuda' && <span style={styles.chip}>{t('device.cuda')}</span>}
         <span style={isBusy(family) ? styles.busy : family.status === 'error' ? styles.errorLine : styles.muted}>
           {t(STATUS_KEYS[family.status])}
           {isBusy(family) && family.progress !== undefined && progressText(family.progress)}
@@ -148,20 +151,22 @@ function FamilyRow(props: {
       {family.status === 'error' && family.error !== undefined && <div style={styles.errorLine}>{family.error}</div>}
       <div style={styles.rowActions}>
         <select
-          value={family.selectedVariantId}
+          value={selectedVariantId}
           disabled={isBusy(family)}
-          onChange={event => onInstall(event.target.value)}
+          onChange={event => onSelect(event.target.value)}
           style={styles.select}
         >
           {family.variants.map(variant => (
-            <option key={variant.id} value={variant.id}>{variant.displayName} · {formatBytes(variant.sizeBytes)}</option>
+            <option key={variant.id} value={variant.id}>
+              {variant.installed ? '✓ ' : ''}{variant.displayName} · {variant.device === 'cuda' ? `${t('device.cuda')} · ` : ''}{formatBytes(variant.sizeBytes)}
+            </option>
           ))}
         </select>
         {isBusy(family)
           ? <button type="button" style={styles.button} onClick={onCancel}>{t('action.cancel')}</button>
           : <>
-            {family.status !== 'ready' && selected !== undefined
-              && <button type="button" style={styles.button} onClick={() => onInstall(selected.id)}>{t('action.install')}</button>}
+            {family.status !== 'ready' && selectedVariantId !== undefined
+              && <button type="button" style={styles.button} onClick={() => onInstall(selectedVariantId)}>{t('action.install')}</button>}
             {family.status === 'ready'
               && <>
                 <button type="button" style={styles.button} onClick={onProbe} disabled={probeRunning}>{t('action.probe')}</button>
@@ -181,21 +186,6 @@ function FamilyRow(props: {
   )
 }
 
-/** Progress suffix: percent when the total is known, the item label otherwise. */
-function progressText(progress: NonNullable<ModelFamilyView['progress']>): string {
-  if (progress.phase === 'download' && progress.total !== undefined && progress.total > 0) {
-    return ` ${Math.min(100, Math.round(progress.done / progress.total * 100))}%`
-  }
-  return ` ${progress.label}`
-}
-
-/** Human byte size. */
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
-  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024))} MB`
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
 /** Card styles; neutral inline rules that inherit the app theme. */
 const styles: Record<string, CSSProperties> = {
   card: { display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 0' },
@@ -208,7 +198,7 @@ const styles: Record<string, CSSProperties> = {
   muted: { fontSize: 12, opacity: 0.7 },
   busy: { fontSize: 12, opacity: 0.9 },
   errorLine: { fontSize: 12, color: 'crimson', overflowWrap: 'anywhere' },
-  select: { maxWidth: 260 },
+  select: { maxWidth: 300 },
   button: { cursor: 'pointer' },
   note: { fontSize: 12, opacity: 0.6 },
 }
