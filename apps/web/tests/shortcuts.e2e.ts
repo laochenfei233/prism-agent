@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** Real Web composition: keyboard routing, inline editing, and localized system feedback. */
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'

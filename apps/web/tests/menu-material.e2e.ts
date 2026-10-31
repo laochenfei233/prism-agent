@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** Account and Session menus share material and keep macOS backings aligned and scoped. */
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'

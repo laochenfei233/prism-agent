@@ -1,4 +1,4 @@
-// /** General settings feedback row opening the configured GitHub issues address. */
+/** General settings feedback row opening the configured GitHub issues address. */
 import { IconRightUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './FeedbackRow.module.css'
@@ -22,7 +22,7 @@ export function FeedbackRow({ issuesUrl, t }: FeedbackRowProps) {
   return (
     <div className={css.row}>
       <a className={css.link} href={issuesUrl} target="_blank" rel="noopener noreferrer">
-        {t('contactUs')}<IconRightUpOutlineRegular size={12} />
+        {t('feedback')}<IconRightUpOutlineRegular size={12} />
       </a>
     </div>
   )

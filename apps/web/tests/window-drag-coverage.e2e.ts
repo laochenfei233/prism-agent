@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Browser coverage for the macOS window drag surface: which chrome rows drag,
 // which pixels stay content, and that no control is swallowed by the band.
 //

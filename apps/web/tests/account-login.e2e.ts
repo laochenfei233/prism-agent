@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Real-composition acceptance for DeepSeek account sign-in from a plain browser. The
 // scaffold boots the shipped Web Loader tree, so the real account provider drives
 // auth_init, the loopback OAuth callback, and auth_exchange against a loopback Platform

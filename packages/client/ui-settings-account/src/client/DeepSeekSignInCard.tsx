@@ -1,4 +1,4 @@
-// /** DeepSeek model card sign-in action, shown while the account is signed out. */
+/** DeepSeek model card sign-in action, shown while the account is signed out. */
 import { IconUserOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls ui-settings-models' SlotMap merge (the provider-card slot).

@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Keyless assembled-browser coverage for the opt-in Agent Teams bundle
 // over the real Host projection frame flow.
 import { fileURLToPath } from 'node:url'

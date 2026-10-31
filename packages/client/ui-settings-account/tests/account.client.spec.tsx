@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, act, within } from '@testing-library/react'
 import { useMemo, useSyncExternalStore } from 'react'
@@ -223,7 +224,7 @@ it('renders the General feedback row with the configured issues address', async 
   const { FeedbackRow } = await import('../src/client/FeedbackRow.tsx')
   render(<FeedbackRow {...({} as GlobalStandardProps)} issuesUrl="https://github.com/example/test/issues"
     t={key => en[key as AccountKey]} />)
-  const link = screen.getByRole('link', { name: en.contactUs })
+  const link = screen.getByRole('link', { name: en.feedback })
   expect(link.getAttribute('href')).toBe('https://github.com/example/test/issues')
   expect(link.getAttribute('target')).toBe('_blank')
 })

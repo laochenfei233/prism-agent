@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // The Host's native-onboarding setting must reach the assembled browser before its dialogs register.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'

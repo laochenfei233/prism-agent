@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // @vitest-environment jsdom
 /** Account operations in the shipped client composition, in Desktop and in a plain browser. */
 import { afterEach, beforeEach, expect, vi } from 'vitest'

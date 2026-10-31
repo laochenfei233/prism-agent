@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // @vitest-environment jsdom
 /** The credential onboarding step owns login until dismissal or completion. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
