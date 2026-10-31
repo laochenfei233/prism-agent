@@ -563,6 +563,7 @@ describe('ThemeRuntime', () => {
           null,
           { name: 42, scheme: 'light', canvas: '#112233', accent: '#00ff00' },
           { name: ' ', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          { name: 'Half', scheme: 'light' },
           { name: 'Bad', scheme: 'sepia', canvas: '#112233', accent: '#00ff00' },
           { name: 'Over', scheme: 'light', canvas: 'orange', accent: '#00ff00' },
           { name: 'Navy', scheme: 'dark', canvas: '#000000', accent: '#ff6900' },
