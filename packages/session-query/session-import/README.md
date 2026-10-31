@@ -93,7 +93,7 @@ The Host half ([`src/index.ts`](src/index.ts)) validates configuration, register
 
 ### Session synthesis
 
-A DeepSeek Harness source is copied natively: the engine replays the complete committed event log under the original session id, so tool calls, tool results, title events, and request headers remain part of the durable session and its derived history. Before anything is written, the log is validated with the stored reader's own event grammar — format version, event vocabulary, retired shapes, and message envelopes — so a log it cannot read fails that session with a reason; it is never downgraded to text. The source home's `attachments/` directory is copied into the current home before the first native write.
+A DeepSeek Harness source is copied natively: the engine replays the complete committed event log under the original session id, so tool calls, tool results, title events, and request headers remain part of the durable session and its derived history. Before anything is written, the log is validated with the stored reader's own event grammar — format version, event vocabulary, retired shapes, and message envelopes — so a log it cannot read fails that session with a reason; it is never downgraded to text. The source home's `attachments/` directory is copied into the current home before the first native write, and every copied member is republished read-only.
 
 For the other nine stores the engine writes a top-level header (`version: 4`, `isSeeded: false`, `delegationDepth: 0`) with the conversation's first message time, then one turn per user prompt: `turn/start`, `user/message`, `assistant/message` with an empty stream, and `turn/end`. Consecutive assistant messages merge into one; a title from the store becomes a `session/title` event.
 

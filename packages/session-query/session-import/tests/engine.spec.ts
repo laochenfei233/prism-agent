@@ -349,7 +349,8 @@ describe('SessionImportEngine apply', () => {
       'tool/call', 'tool/result', 'step/end', 'turn/end',
     ])
     expect([...fakesValue.attached.values()].flat()).toContain(id)
-    await expect(stat(join(root, 'prism', 'attachments', 'v1', 'objects', 'a.png'))).resolves.toBeTruthy()
+    const copied = await stat(join(root, 'prism', 'attachments', 'v1', 'objects', 'a.png'))
+    expect(copied.mode & 0o400).toBe(0o400)
 
     const header = fakesValue.headers.get(id)
     expect(header).toBeDefined()
