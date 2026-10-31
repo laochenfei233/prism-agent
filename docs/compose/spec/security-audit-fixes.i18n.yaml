@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/security-audit-fixes.md
 /:
-  en: b4433c6f3b369fdb
-  zh: b4433c6f3b369fdb
+  en: bcedd957a0bfe1f6
+  zh: bcedd957a0bfe1f6
 /security-audit-fixes:
   en: 7884aba49464dd92
   zh: 67e6fe86cb5c9fe0
 /security-audit-fixes/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 58ac554d7e87ddbf
+  zh: 431adbb24cb3f765
 /security-audit-fixes/s1-problem:
   en: e7da19ef61da84b6
   zh: 10a8769c7fee7858
@@ -21,11 +21,11 @@
   en: b7887b900d543a08
   zh: 54ed1ef48408ebb3
 /security-audit-fixes/s2-design/s2-2-foreign-record-validation-before-a-native-import-is-written:
-  en: a2521ca9c6f52ead
-  zh: 5f983e0717af072c
+  en: 0aa2e1da235a3269
+  zh: d8694a49098fa895
 /security-audit-fixes/s2-design/s2-3-admission-limits-enforced-when-a-stored-image-is-read:
-  en: 8b42ce3fa033fbeb
-  zh: d48913c7668f09cb
+  en: 1d51858ace7d2262
+  zh: 15ccb19e358018e0
 /security-audit-fixes/s2-design/s2-4-updater-signing-in-the-release-workflow:
   en: c65f3938ac239b19
   zh: 2a1cc1f61b7076ab
@@ -39,8 +39,8 @@
   en: fa9d9910bf21e906
   zh: f4f2c27560500d79
 /security-audit-fixes/tasks:
-  en: be4b71a4105b41e2
-  zh: 46b1bfd2fa07d635
+  en: 292bd02b00199830
+  zh: 80c71737b81ebf26
 /security-audit-fixes/s4-acceptance:
-  en: 6455dcd428cf5de2
-  zh: 5dc54adc20c79b46
+  en: de0f9de0b422ce66
+  zh: 48d06f41225b27ff

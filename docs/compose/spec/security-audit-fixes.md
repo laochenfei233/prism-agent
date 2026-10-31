@@ -1,9 +1,9 @@
 ---
 feature: security-audit-fixes
-status: in-progress
+status: delivered
 updated: 2026-10-31
 branch: fix/security-audit-run1
-commits: 724259145a..HEAD
+commits: 724259145a..814654e53d
 ---
 
 # Security Audit Fixes
@@ -11,6 +11,16 @@ commits: 724259145a..HEAD
 English | [中文](security-audit-fixes.zh.md)
 
 ## Report
+
+**What was built** — Model filesystem writes and edits now refuse any target under the harness home in `workspace-write`, while reads and an approved `danger-full-access` retry keep working, so a prompt-injected write can no longer reach the `!!js` patch layer or the installed bundle sources. Native session import validates a foreign log with the stored reader's own event grammar before writing anything, so an unknown required type or a retired shape fails the row instead of creating an unopenable session. Stored image reads re-check the configured byte, pixel, and dimension limits, so an attachment object copied in by import cannot reach a decode above admission.
+
+Release builds now receive the documented updater signing key and upload `.sig`, `latest.json`, and `.app.tar.gz`; the static server authenticates every HTML entry, including the worker preview; and the desktop popup fallback refuses cmd metacharacters before `cmd /C start`.
+
+Residuals recorded in [S2] and [S3]: shell sandbox backends still derive writable roots from the workspace alone; attachment copies still skip the staged publication mode (digest and read limits govern); imported events carry no provenance marker; and the `latest.json` upload location still needs one real release run to confirm.
+
+**Verification** — `pnpm exec vitest run` over the four affected specs: 54 passed. The full `attachment-local` suite plus host `session-import` specs: 123 passed, 1 skipped. `pnpm run typecheck`: 5/5 gates passed. `cargo test --lib`: 30 passed before the review round; targeted `cargo test --lib cmd_start`: 3 passed, including a direct `open_with_os` refusal. Named translation pairs are consistent; the corpus-wide check belongs to `doc-sync`. `verify-md-wrap` and `verify-md-links`: pass. `verify-package-dependencies`: the pre-fix run reported exactly the two unclassified imports, and the policy now classifies the reader validator; the full rerun hangs in this worktree's tsx/esbuild environment, so no green rerun is claimed. Repo-wide `pnpm run lint` is red on untouched baseline files (verified on two untouched files in the main checkout); linting only the changed TypeScript paths reports 0 errors. The client `ImportSection` spec fails only under this worktree's local hoisted install and passes on the unmodified checkout; no client code changed.
+
+**Journey log** — The audit's reader has two independent refusals; the first fix mirrored only the vocabulary one, and review caught the retired `request/header` shape, so the import now delegates to `validateStoredEvents` instead of restating the grammar. A fresh worktree's pnpm junctions break Node ESM resolution, so verification used a local hoisted install (not committed), and that install's jsdom/React gaps explain the client-only failures. Read-time attachment limits change the documented "tightening limits keeps history readable" promise; the README now states the new behavior. The shell backends remain outside this fence because closing them needs a deny rule in every dialect.
 
 ## [S1] Problem
 
@@ -64,20 +74,20 @@ The copy still skips the staged `0400` publication; that mode is not what protec
 
 ## Tasks
 
-- [ ] T1: deny tool writes under the harness home in `fs-sandbox` with coverage (depends: none, covers: S2.1)
-- [ ] T2: validate foreign events before a native import writes (depends: none, covers: S2.2)
-- [ ] T3: enforce admission limits when a stored image is read (depends: none, covers: S2.3)
-- [ ] T4: map the updater signing key and upload updater artifacts (depends: none, covers: S2.4)
-- [ ] T5: authenticate every HTML entry in `frontend-static` (depends: none, covers: S2.5)
-- [ ] T6: refuse cmd metacharacters in the popup fallback (depends: none, covers: S2.6)
-- [ ] T7: run the affected tests, typecheck, and lint (depends: T1, T2, T3, T4, T5, T6)
-- [ ] T8: record delivery evidence in this document (depends: T7)
+- [x] T1: deny tool writes under the harness home in `fs-sandbox` with coverage (depends: none, covers: S2.1)
+- [x] T2: validate foreign events before a native import writes (depends: none, covers: S2.2)
+- [x] T3: enforce admission limits when a stored image is read (depends: none, covers: S2.3)
+- [x] T4: map the updater signing key and upload updater artifacts (depends: none, covers: S2.4)
+- [x] T5: authenticate every HTML entry in `frontend-static` (depends: none, covers: S2.5)
+- [x] T6: refuse cmd metacharacters in the popup fallback (depends: none, covers: S2.6)
+- [x] T7: run the affected tests, typecheck, and lint (depends: T1, T2, T3, T4, T5, T6)
+- [x] T8: record delivery evidence in this document (depends: T7)
 
 ## [S4] Acceptance
 
-- [ ] `workspace-write` writes and edits under `$DSH_HOME` are refused with `FS_SANDBOX_DENIED`, no file is created, and a `danger-full-access` call still writes.
-- [ ] A native import whose log carries an unknown required event type returns a `failed` row and creates no session; a known log still imports natively.
-- [ ] `readImage` refuses a stored image above a configured byte, pixel, or dimension cap with an admission error code, and still returns an admitted image.
-- [ ] The release workflow passes the signing key to both build steps and uploads `.sig`, `latest.json`, and `.app.tar.gz`.
-- [ ] An unauthenticated `/preview.html` request receives the index 401 response, while an authenticated one serves the page.
-- [ ] `open_with_os` refuses a URL with shell metacharacters on Windows and accepts a plain `https` URL.
+- [x] `workspace-write` writes and edits under `$DSH_HOME` are refused with `FS_SANDBOX_DENIED`, no file is created, and a `danger-full-access` call still writes.
+- [x] A native import whose log carries an unknown required event type returns a `failed` row and creates no session; a known log still imports natively.
+- [x] `readImage` refuses a stored image above a configured byte, pixel, or dimension cap with an admission error code, and still returns an admitted image.
+- [x] The release workflow passes the signing key to both build steps and uploads `.sig`, `latest.json`, and `.app.tar.gz`.
+- [x] An unauthenticated `/preview.html` request receives the index 401 response, while an authenticated one serves the page.
+- [x] `open_with_os` refuses a URL with shell metacharacters on Windows and accepts a plain `https` URL.
