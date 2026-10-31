@@ -117,3 +117,4 @@ None; an imported session's next request carries the same derived history any st
 - **No cancel, pause, or resume** — a running import runs to completion or fails; closing the app loses the job, and its staging is swept later.
 - **4 GiB per file** — the zip writer's per-entry ceiling is a hard export guard, not a compression choice; larger material must be compressed or split first.
 - **No encryption or foreign zips** — archives this app did not produce (no manifest) are refused, and there is no password protection.
+- **Empty directories and very large logs** — empty folders inside a project are not archived, a session log larger than 256 MiB is refused at import (export has no such cap), and a mid-import failure keeps already-restored sessions; re-importing the same archive then reports those sessions as duplicates under the newly published folder.

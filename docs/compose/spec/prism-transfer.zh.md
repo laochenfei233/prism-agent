@@ -29,9 +29,9 @@ Prism Agent 把每个项目保存为登记的工作区文件夹加挂接的会�
 
 ### S2.1 包与组装
 
-新的 fork 包 `@prism/prism-transfer` 位于 `packages/transfer/prism-transfer`（新建分组 `transfer/` 并带 README 三件套），插件名 `prism-transfer`，沿用 `prism-backup` / `prism-session-import` 的先例：宿主插件在 `src/index.ts`，客户端插件在 `src/client/index.ts` 导出 `inject` + `apply`，`package.json` 含 `./client` 导出与 `dsh.client` 清单（`platform: "web"`），组装行写入 `packages/bundle/web-app/cordis.patch.yml`，分类行写入 `scripts/product-package-policy.ts`。不建 Typert Remote 命名空间，不新增 npm 依赖：zip 读写用 `fflate`（已是 `session-log-export` 的工作区依赖），会话序列化复用 `@deepseek-ai/dsh-session-log-export` 的公开 API，客户端依赖 `slots`、`locale`、`remote`、`workspaces`、`remote.directoryPicker`。没有 `Config` schema：本分区没有随部署变化的调节项（导入目的地默认值是产品常量，可在每次导入时经系统目录选择器覆盖；条目与大小上限是固定的安全不变量）。
+新的 fork 包 `@prism/prism-transfer` 位于 `packages/transfer/prism-transfer`（新建分组 `transfer/` 并带 README 三件套），插件名 `prism-transfer`，沿用 `prism-backup` / `prism-session-import` 的先例：宿主插件在 `src/index.ts`，客户端插件在 `src/client/index.ts` 导出 `inject` + `apply`，`package.json` 含 `./client` 导出与 `dsh.client` 清单（`platform: "web"`），组装行写入 `packages/bundle/web-app/cordis.patch.yml`，免模型审计行写入 `scripts/verify-package-readme-model-experience.ts`（产品使用来自 web-app 组装，与兄弟包一致）。不建 Typert Remote 命名空间，不新增 npm 依赖：zip 读写用 `fflate`（已是 `session-log-export` 的工作区依赖），会话序列化复用 `@deepseek-ai/dsh-session-log-export` 的公开 API，客户端依赖 `slots`、`locale`、`remote`、`workspaces`、`remote.directoryPicker`。没有 `Config` schema：本分区没有随部署变化的调节项（导入目的地默认值是产品常量，可在每次导入时经系统目录选择器覆盖；条目与大小上限是固定的安全不变量）。
 
-分区在既有 `settings.section` 列表槽上注册，`id: 'transfer'`、`order: 30`（排在 backup 与 import 之后），label 为 `() => t('nav')`，命名空间 `settings.transfer`。唯一的核心改动是 `navIcon()`（`packages/client/ui-settings-general/src/client/SettingsRoot.tsx`）增加 `'transfer'` 分支，带 `PRISM-DIVERGENCE` 标记，并在 `docs/compose/spec/fork-upstream-divergence.md` 增加分区行（A13）。`packages/client/*` 其余不动；没有新槽类型，因此无需重新生成槽目录。
+分区在既有 `settings.section` 列表槽上注册，`id: 'transfer'`、`order: 30`（排在 backup 与 import 之后），label 为 `() => t('nav')`，命名空间 `settings.transfer`。唯一的核心改动是 `navIcon()`（`packages/client/ui-settings-general/src/client/SettingsRoot.tsx`）增加 `'transfer'` 分支，带 `PRISM-DIVERGENCE` 标记，并在 `docs/compose/spec/fork-upstream-divergence.md` 增加分区行（A13）。`packages/client/*` 其余不动。
 
 ### S2.2 归档与文件格式
 
@@ -81,7 +81,7 @@ settings.json                    ← prism-settings body, present only when sett
 
 根清单决定形状：`.prism-project.json` → 单项目；`.prism-transfer.json` → 遍历 `projects/*`，每个子目录按完整 prism-project 布局校验；其余（含无清单 zip）以 `bad-manifest` 失败。解压进入与发布同卷的暂存目录 `<dest>/.prism-import-<hex>/`，每个项目用一次原子 `rename` 发布到 `<dest>/<最终名>`；失败清理暂存，`<dest>` 不会留下半个项目。最终名来自清单标题，用与别处项目标题相同的规则清洗（去 Windows 非法字符、限长、非空回退），与既有目录同名时追加 ` (2)`、`(3)`……至多 100 次——导入永不覆盖。默认目的地与选择的目的地都拒绝解析为 DSH home 目录本身或其保留顶层条目的发布目标。
 
-每个项目的会话按 session-import 配方恢复：已存在的 id（`sessionPersistence.stat`）跳过并计为重复，否则从归档首行 JSONL 取 `sessionPersistence.create(header)`，把余下行作为一个连续批次 `append`，`flush`、`close`，再经 `sessionProjectionCache` 写投影检查点（让标题出现在冷侧边栏列表的那一步），然后登记并挂接。头部接受规则与 session-import 原生复制路径一致：可读且格式版本不大于运行时 `SESSION_FORMAT_VERSION` 的头部按原文恢复；其余使该项目以 `session-version` 失败。日志逐字复制——不改写 cwd（头部的 `cwd` 指向导出机器的路径；分组与续跑跟随工作区记录，此限制在 README 中说明）。主会话先于其子代理恢复。媒体与文件经公开附件接口恢复：每个 `media/*` 条目走 `attachments.saveImage`，每个 `files/*` 条目走 `attachments.saveFileStream`，内容寻址复现原引用；每次保存后把返回的附件 id 与归档布局点名的 id 比对，不一致即以 `attachment-mismatch` 失败整个导入，而不是留下图片指向错误字节的会话。工作区以 `workspaceRegistry.create(path)` 登记（同路径已登记视为成功并计数），每个恢复的会话用 `attachSession` 挂接；登记失败保留已恢复的文件，在结果中报告为 `workspace-register-failed`，不回滚。归档携带 `settings.json` 时，其值作为任务的最后阶段应用，与下方设置应用器共享；按命名空间的失败只报告，不致命。
+每个项目的会话按 session-import 配方恢复：已存在的 id（`sessionPersistence.stat`）跳过并计为重复，否则从归档首行 JSONL 取 `sessionPersistence.create(header)`，把余下行作为一个连续批次 `append`，`flush`、`close`，再经 `sessionProjectionCache` 写投影检查点（让标题出现在冷侧边栏列表的那一步），然后登记并挂接。头部接受规则与 session-import 原生复制路径一致：可读且格式版本等于运行时 `SESSION_FORMAT_VERSION` 的头部按原文恢复（session-import 原生规则）；其余使该项目以 `session-version` 失败。日志逐字复制——不改写 cwd（头部的 `cwd` 指向导出机器的路径；分组与续跑跟随工作区记录，此限制在 README 中说明）。主会话先于其子代理恢复。媒体与文件经公开附件接口恢复：每个 `media/*` 条目走 `attachments.saveImage`，每个 `files/*` 条目走 `attachments.saveFileStream`，内容寻址复现原引用；每次保存后把返回的附件 id 与归档布局点名的 id 比对，不一致即以 `attachment-mismatch` 失败整个导入，而不是留下图片指向错误字节的会话。工作区以 `workspaceRegistry.create(path)` 登记（同路径已登记视为成功并计数），每个恢复的会话用 `attachSession` 挂接；登记失败保留已恢复的文件，在结果中报告为 `workspace-register-failed`，不回滚。归档携带 `settings.json` 时，其值作为任务的最后阶段应用，与下方设置应用器共享；按命名空间的失败只报告，不致命。
 
 单飞守卫（在路由的 await 之后取守卫，同一 tick 的两个请求不可能同时通过）允许同时只有一个导入任务；并发导入以 409 `busy` 拒绝。进度为轮询快照：阶段 `validating → extracting → restoring → applying-settings → registering → done`，附字节、文件、会话、项目计数。完成的快照保留到下一次任务开始或十分钟后失效。插件 apply 时与每次导入前清扫超过 24 小时的 `.prism-import-*` 暂存残留；只删这个前缀。
 
@@ -116,7 +116,7 @@ settings.json                    ← prism-settings body, present only when sett
 
 ### S2.9 复用清单
 
-原样复用：`settings.section` 槽合约与注册模式、`@deepseek-ai/dsh-session-log-export` 的 `sessionLogZipEntries` + `sessionLogExportDeps` + `flushLiveSessionLog` + `SESSION_LOG_FILENAME`、`prism-session-import` 的 `sessionPersistence` create/append/flush/close 句柄配方与 `sessionProjectionCache` 检查点、`workspaceRegistry` create/resolveByPath/attachSession、`ctx.settings.describe/update` + 易变/密钥 schema 遍历、客户端 `ctx.workspaces` 列表、`remote.directoryPicker.pick`、`connection.fetch.register` 流式与缓冲路由、`fflate` Zip 写入、设置卡片 CSS 别名、locale 字典模式。新代码：zip 读取器（中央目录 + CRC + 守卫）、导出扫描与组装、导入任务状态机、设置应用器、分区界面。
+复用（含一处扩宽）：传输写入器需要 `session-log-export` 的流式助手（`ResponseCapacityGate`、`pushArtifactChunks`、`pushBinaryChunks`、`pushStreamChunks`）导出，这是带标记的 fork 改动并记入分歧索引；会话条目生产者（`sessionLogZipEntries` + `sessionLogExportDeps` + `flushLiveSessionLog` + `SESSION_LOG_FILENAME`）本就是公开的、`prism-session-import` 的 `sessionPersistence` create/append/flush/close 句柄配方与 `sessionProjectionCache` 检查点、`workspaceRegistry` create/resolveByPath/attachSession、`ctx.settings.describe/update` + 易变/密钥 schema 遍历、客户端 `ctx.workspaces` 列表、`remote.directoryPicker.pick`、`connection.fetch.register` 流式与缓冲路由、`fflate` Zip 写入、设置卡片 CSS 别名、locale 字典模式。新代码：zip 读取器（中央目录 + CRC + 守卫）、导出扫描与组装、导入任务状态机、设置应用器、分区界面。
 
 ### S2.10 被否决的方案
 
@@ -164,6 +164,6 @@ settings.json                    ← prism-settings body, present only when sett
 - [ ] 敌意归档（T1 每种守卫用例，外加无清单 zip、`prism-project` version 2 清单、CRC 被篡改的 stored 媒体条目）都以映射的错误码失败、不留暂存目录、目的地之下毫无变化。
 - [ ] 含 ≥ 4 GiB 文件的项目在下载开始前导出失败并点名文件；符号链接与不可读文件被跳过并计数，结果在客户端可见。
 - [ ] 不勾「包含密钥」的设置导出不含任何 secret 角色值并报告跳过数量；勾选后在第二个 profile 导入可复现导出值（经 `describe()` 验证），新安装缺失的命名空间报告 skipped。
-- [ ] 同一 tick 提交的两个导入只产生一个任务（另一个 409）；轮询未知/过期任务返回 idle；中途杀掉只留一个 `.prism-import-*` 目录，下次导入或重启即清扫。
+- [ ] 同一 tick 提交的两个导入只产生一个任务（另一个 409）；轮询未知/过期任务返回 idle；中途杀掉只留一个 `.prism-import-*` 目录，超过 24 小时后由下次导入或重启清扫。
 - [ ] 分区文案全部字典持有（zh/en），导航图标渲染，每个新控件焦点描边可见，运行/失败态用 `role="status"`/`role="alert"`，reduced-motion 下无进度动画；`verify-client-ui-i18n` 通过。
 - [ ] `pnpm vitest run packages/transfer/prism-transfer` 对每个 `src` 文件 100% 覆盖；`tsc` 宿主与客户端面通过；`build:artifacts` + `build:check` 通过；受影响文档门（readme summaries/model-experience/limitations、translation pairing、md wrap/links、workspace constraints、product isolation、application entrypoints、plugin/client catalogs）通过；与 master 相同的 PRE-EXISTING 失败如实记录。
