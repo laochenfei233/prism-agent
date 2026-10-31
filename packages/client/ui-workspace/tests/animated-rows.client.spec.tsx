@@ -185,6 +185,16 @@ describe('AnimatedRows', () => {
     expect(opened).toHaveBeenCalledOnce()
   })
 
+  it('ignores navigation on a tree without rows', () => {
+    render(<div style={{ position: 'relative' }}>
+      <AnimatedRows className="rows" label="Sessions" rowKeys={[]} ready resetKey="manual">{null}</AnimatedRows>
+    </div>)
+    const tree = screen.getByRole('tree')
+    tree.focus()
+    expect(fireEvent.keyDown(tree, { key: 'ArrowDown' })).toBe(true)
+    expect(document.activeElement).toBe(tree)
+  })
+
   it('leaves keys pressed on a row control to that control', () => {
     render(<div style={{ position: 'relative' }}>
       <AnimatedRows className="rows" label="Sessions" rowKeys={['a', 'b']} ready resetKey="manual">
