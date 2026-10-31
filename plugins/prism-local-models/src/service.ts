@@ -17,7 +17,9 @@ import { dirname, join } from 'node:path'
 import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog, type CatalogFamily, type CatalogVariant } from './catalog.ts'
 import { downloadFile } from './download.ts'
 import { LocalModelsError } from './errors.ts'
+import { BgeEngine } from './engines/bge.ts'
 import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
+import { provisionRuntime } from './runtimes.ts'
 import type { ResolvedConfig } from './config.ts'
 import type { CatalogView, ModelFamilyView, ModelProgress, ModelStatus, ModelVariant, ProbeOutcome, StatusView } from './types.ts'
 
@@ -40,6 +42,7 @@ export class PrismLocalModelsService {
   private readonly registry: ModelRegistry
   private readonly init: Promise<void>
   private readonly active = new Map<string, ActiveInstall>()
+  private readonly engines = new Map<string, { readonly variantId: string; readonly engine: BgeEngine }>()
   private catalogImpl: Catalog = []
   private document: RegistryDocument = { version: 1, families: {} }
 
@@ -120,6 +123,11 @@ export class PrismLocalModelsService {
     if (record?.variantId !== undefined && record.variantId.includes('/') === false && record.variantId.includes('\\') === false) {
       await rm(join(this.modelsRoot, modelId, record.variantId), { recursive: true, force: true })
     }
+    const staleEngine = this.engines.get(modelId)
+    if (staleEngine !== undefined) {
+      this.engines.delete(modelId)
+      void staleEngine.engine.dispose()
+    }
     await this.writeFamilyRecord(modelId, { status: 'idle' })
   }
 
@@ -127,13 +135,15 @@ export class PrismLocalModelsService {
   async probe(modelId: string): Promise<ProbeOutcome> {
     await this.init
     this.requireFamily(modelId)
-    throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with the inference tasks`)
+    if (modelId === 'bge') return this.probeEmbedding()
+    throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with its inference task`)
   }
 
   /** Capability entry point for RAG and memory consumers. */
-  async embed(_texts: readonly string[]): Promise<number[][]> {
+  async embed(texts: readonly string[]): Promise<number[][]> {
     await this.init
-    throw new LocalModelsError('not-implemented', 'embedding arrives with the BGE task')
+    const engine = await this.engineFor('bge')
+    return engine.embed(texts)
   }
 
   /** Capability entry point for image text extraction. */
@@ -148,9 +158,32 @@ export class PrismLocalModelsService {
     throw new LocalModelsError('not-implemented', 'translation arrives with the HY-MT task')
   }
 
-  /** Cancel every in-flight download; engines and sidecars arrive with the inference tasks. */
+  /** Cancel every in-flight download and release engines; sidecars arrive with their tasks. */
   dispose(): void {
     for (const install of this.active.values()) install.abort()
+    for (const entry of this.engines.values()) void entry.engine.dispose()
+    this.engines.clear()
+  }
+
+  /** The BGE engine over the installed variant, opening and caching on demand. */
+  private async engineFor(modelId: 'bge'): Promise<BgeEngine> {
+    const record = this.document.families[modelId]
+    if (record?.status !== 'ready' || record.variantId === undefined) {
+      throw new LocalModelsError('not-installed', 'install the BGE model from the Models page card first')
+    }
+    const cached = this.engines.get(modelId)
+    if (cached?.variantId === record.variantId) return cached.engine
+    const variant = this.requireVariant(modelId, record.variantId)
+    const quantized = variant.files.some(file => file.path.includes('quantized'))
+    const engine = await BgeEngine.open(ModelRegistry.variantDir(this.modelsRoot, modelId, record.variantId), { quantized, device: variant.device })
+    this.engines.set(modelId, { variantId: record.variantId, engine })
+    return engine
+  }
+
+  /** Probe the BGE family with a fixed string and report the vector width. */
+  private async probeEmbedding(): Promise<ProbeOutcome> {
+    const vectors = await this.embed(['本地模型探针 local models probe'])
+    return { ok: true, detail: `${vectors[0]?.length ?? 0} dims` }
   }
 
   /** Resolve the catalog and take the first scan of the models root. */
@@ -168,6 +201,11 @@ export class PrismLocalModelsService {
   private async runInstall(modelId: string, variant: CatalogVariant, signal: AbortSignal, activeInstall: ActiveInstall): Promise<void> {
     const dir = ModelRegistry.variantDir(this.modelsRoot, modelId, variant.id)
     const files: Record<string, FileRecord> = {}
+    const staleEngine = this.engines.get(modelId)
+    if (staleEngine !== undefined) {
+      this.engines.delete(modelId)
+      void staleEngine.engine.dispose()
+    }
     try {
       await mkdir(dir, { recursive: true })
       for (const file of variant.files) {
@@ -186,6 +224,11 @@ export class PrismLocalModelsService {
         })
         const stats = await stat(destPath)
         files[file.path] = { sizeBytes: file.sizeBytes, mtimeMs: stats.mtimeMs, verified: true }
+      }
+      if (variant.runtime !== undefined) {
+        activeInstall.progress = { phase: 'provision', done: 0, total: 1, label: `${variant.runtime.kind} provisioning` }
+        await provisionRuntime(this.modelsRoot, modelId, variant.runtime, this.config.pythonCommand, signal)
+        activeInstall.progress = { phase: 'provision', done: 1, total: 1, label: `${variant.runtime.kind} provisioned` }
       }
       if (signal.aborted) throw new LocalModelsError('download-failed', 'cancelled')
       await this.writeFamilyRecord(modelId, { variantId: variant.id, status: 'ready', error: undefined, files })

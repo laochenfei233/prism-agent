@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { createReadStream, createWriteStream } from 'node:fs'
+import { createWriteStream } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -64,13 +64,4 @@ export async function downloadFile(options: DownloadOptions): Promise<void> {
     })
     throw error
   }
-}
-
-/** Stream-read one file's sha256; used to re-verify manually placed files. */
-export async function hashFile(absolutePath: string): Promise<string> {
-  const hash = createHash('sha256')
-  await pipeline(createReadStream(absolutePath), async function* (source) {
-    for await (const chunk of source) hash.update(chunk as Buffer)
-  })
-  return hash.digest('hex')
 }

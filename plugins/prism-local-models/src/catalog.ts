@@ -74,8 +74,7 @@ const BGE_M3 = `${HF_MIRROR}/Xenova/bge-m3/resolve/main`
 const HY_MT = `${HF_MIRROR}/tencent/HY-MT1.5-1.8B-GGUF/resolve/main`
 
 /** The tokenizer side files shared by both BGE small variants. */
-const BGE_SMALL_TEXT_FILES: readonly CatalogFile[] = [
-  { path: 'tokenizer.json', url: `${BGE_SMALL}/tokenizer.json`, sizeBytes: 439125, sha256: '48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26' },
+const BGE_SMALL_TEXT_FILES: readonly CatalogFile[] = [  { path: 'tokenizer.json', url: `${BGE_SMALL}/tokenizer.json`, sizeBytes: 439125, sha256: '48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26' },
   { path: 'config.json', url: `${BGE_SMALL}/config.json`, sizeBytes: 716, sha256: 'd4193ead3a810fd694fa8a31d7fc72fbaebc0668b603e398734bf2f6538ff42f' },
   { path: 'tokenizer_config.json', url: `${BGE_SMALL}/tokenizer_config.json`, sizeBytes: 367, sha256: 'e6f3b96db926a37d4039995fbf5ad17de158dfb8f6343d607e4dbaad18d75f5a' },
   { path: 'special_tokens_map.json', url: `${BGE_SMALL}/special_tokens_map.json`, sizeBytes: 125, sha256: 'b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3' },
@@ -89,6 +88,9 @@ const BGE_M3_TEXT_FILES: readonly CatalogFile[] = [
   { path: 'special_tokens_map.json', url: `${BGE_M3}/special_tokens_map.json`, sizeBytes: 964, sha256: '8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835' },
   { path: 'sentencepiece.bpe.model', url: `${BGE_M3}/sentencepiece.bpe.model`, sizeBytes: 5069051, sha256: 'cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865' },
 ]
+
+/** The npm runtime BGE variants provision for transformers.js inference. */
+const BGE_RUNTIME: CatalogRuntime = { kind: 'npm', packages: ['@huggingface/transformers@^3', 'onnxruntime-node'] }
 
 /** The built-in families. */
 export const BUILTIN_CATALOG: Catalog = [
@@ -163,6 +165,7 @@ export const BUILTIN_CATALOG: Catalog = [
           { path: 'model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
           ...BGE_SMALL_TEXT_FILES,
         ],
+        runtime: BGE_RUNTIME,
       },
       {
         id: 'bge-small-zh-v1.5-int8',
@@ -172,6 +175,7 @@ export const BUILTIN_CATALOG: Catalog = [
           { path: 'model_quantized.onnx', url: `${BGE_SMALL}/onnx/model_quantized.onnx`, sizeBytes: 24010842, sha256: '15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc' },
           ...BGE_SMALL_TEXT_FILES,
         ],
+        runtime: BGE_RUNTIME,
       },
       {
         id: 'bge-m3-int8',
@@ -181,6 +185,7 @@ export const BUILTIN_CATALOG: Catalog = [
           { path: 'model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
           ...BGE_M3_TEXT_FILES,
         ],
+        runtime: BGE_RUNTIME,
       },
       {
         id: 'bge-small-zh-v1.5-cuda',
@@ -190,6 +195,7 @@ export const BUILTIN_CATALOG: Catalog = [
           { path: 'model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
           ...BGE_SMALL_TEXT_FILES,
         ],
+        runtime: BGE_RUNTIME,
       },
       {
         id: 'bge-m3-int8-cuda',
@@ -199,6 +205,7 @@ export const BUILTIN_CATALOG: Catalog = [
           { path: 'model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
           ...BGE_M3_TEXT_FILES,
         ],
+        runtime: BGE_RUNTIME,
       },
     ],
   },
