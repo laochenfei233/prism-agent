@@ -16,7 +16,7 @@ commits: 724259145a..814654e53d
 
 发布构建现在会收到文档中记载的更新签名密钥，并上传 `.sig`、`latest.json` 与 `.app.tar.gz`；静态服务器认证每个 HTML 入口，包括 worker 预览；桌面弹窗兜底在 `cmd /C start` 之前拒绝 cmd 元字符。
 
-[S2] 与 [S3] 记录的限制：shell 沙箱后端仍只从工作区推导可写根；附件复制仍跳过分阶段发布模式（由摘要与读取限制约束）；导入事件没有来源标记；`latest.json` 的上传位置仍需一次真实发布运行确认。
+[S2] 与 [S3] 记录的限制：导入事件没有导入内容标记（产品决策）；shell 后端、附件发布模式与 `latest.json` 归属已在 [security-audit-residuals](security-audit-residuals.zh.md) 中关闭。
 
 **验证** — 对四个受影响测试文件运行 `pnpm exec vitest run`：54 通过。完整 `attachment-local` 套件加 host `session-import` 测试：123 通过、1 跳过。`pnpm run typecheck`：5/5 门禁通过。`cargo test --lib`：评审轮之前 30 通过；定向 `cargo test --lib cmd_start`：3 通过，其中包括直接调用 `open_with_os` 的拒绝测试。命名翻译配对一致；全仓检查属于 `doc-sync`。`verify-md-wrap` 与 `verify-md-links`：通过。`verify-package-dependencies`：修复前运行恰好报告两个未分类导入，策略现已分类读取器校验函数；完整复跑在本工作区的 tsx/esbuild 环境中挂起，因此不声称已绿色复跑。全仓 `pnpm run lint` 在未触碰的基线文件上为红（已在主检出中的两个未修改文件上验证）；只对改动过的 TypeScript 路径运行 lint 报告 0 错误。客户端 `ImportSection` 测试仅在本工作区的本地 hoisted 安装下失败，在未修改的检出中通过；没有客户端代码改动。
 
@@ -47,7 +47,7 @@ shell 后端保留各自的授权拼写，仍仅从工作区推导可写根，�
 
 `SessionImportEngine.writeNative` 在创建会话之前，用存储读取器自身的 `validateStoredEvents` 校验外来日志：未知的必需类型、已退役的 `request/header` 兜底结构或无效信封都会使该行失败，并且不写入任何内容。被拒绝的日志成为带读取器原因的 `failed` 导入行，因此不会产生损坏的会话、不会存入错误的拒绝原因，重复检查也无法阻止后续修复。
 
-归属信息保持不变：导入事件仍携带来源的 provider 与 model，正如归一化路径把外来用户文本标记为 `source.kind: 'user'`。事件词表在任何路径上都没有导入内容来源标记，因此保留外来归属是否需要该标记属于产品决策，在此记录为延后。
+归属信息保持不变：导入事件仍携带来源的 provider 与 model，正如归一化路径把外来用户文本标记为 `source.kind: 'user'`。事件词表在任何路径上都没有导入内容标记，因此保留外来归属是否需要该标记属于产品决策，在此记录为延后。
 
 ### [S2.3] 读取已存图像时执行准入限制
 
@@ -70,7 +70,7 @@ Windows 上的 `open_with_os` 在构造 `cmd /C start` argv 之前拒绝包含�
 ## [S3] 范围
 
 - 范围内：上述六条线索，每条只做移除该跨越的最小改动，并配一个聚焦测试。
-- 范围外：shell 沙箱的 home 排除、导入内容来源标记、附件复制的发布模式、发布 secret 的账户状态部分，以及审计第 6 节中的其余加固说明。
+- 范围外：shell 沙箱的 home 排除、导入内容标记、附件复制的发布模式、发布 secret 的账户状态部分，以及审计第 6 节中的其余加固说明。
 
 ## Tasks
 
