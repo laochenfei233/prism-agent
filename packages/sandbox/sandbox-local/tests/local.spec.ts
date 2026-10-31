@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, parse } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LAUNCHER_FAILURE_EXIT } from '@deepseek-ai/node-addon-system/landlock-run'
@@ -20,7 +20,7 @@ import {
   LocalSandboxProvider,
 } from '@deepseek-ai/dsh-sandbox-local'
 import type { Config } from '@deepseek-ai/dsh-sandbox-local'
-import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from '../src/profiles.ts'
+import { bwrapProfileArgs, isWithin, landlockProfileArgs, protectedRootsWithin, seatbeltProfileArgs } from '../src/profiles.ts'
 import { outsideTempWorkspaceParent } from '../../../../scripts/snapshot-workspace-parent.ts'
 
 const RO: SandboxPolicy = { mode: 'read-only', workspaceRoot: '/ws' }
@@ -542,5 +542,21 @@ describe('harness home inside the workspace', () => {
     expect(bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace }))
       .toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent', '--tmpfs', '/tmp', '--bind', workspace, workspace])
     expect(seatbeltProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace })[1]).not.toContain('(deny file-write* (subpath')
+  })
+
+  it('treats an equal root as contained and the filesystem root as containing everything', () => {
+    const { workspace, home } = nestHome()
+    expect(isWithin(home, home)).toBe(true)
+    expect(isWithin(join(home, 'x'), home)).toBe(true)
+    expect(isWithin(workspace, home)).toBe(false)
+    expect(isWithin(join(tmpdir(), 'x'), parse(tmpdir()).root)).toBe(true)
+  })
+
+  it('adds no mount for a home that does not exist yet', () => {
+    const { workspace } = nestHome()
+    const absent = join(workspace, '.prism-absent')
+    vi.stubEnv('DSH_HOME', absent)
+    expect(protectedRootsWithin({ mode: 'workspace-write', workspaceRoot: workspace })).toEqual([absent])
+    expect(bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace })).not.toContain(absent)
   })
 })

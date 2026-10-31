@@ -18,6 +18,7 @@ import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 
 /** Compare canonical paths with the host's case convention. */
 function comparable(path: string): string {
+  /* v8 ignore next -- the case-folding arm executes only on win32; the POSIX coverage lane takes the other arm */
   return process.platform === 'win32' ? path.toLowerCase() : path
 }
 
@@ -30,7 +31,8 @@ function comparable(path: string): string {
 export function isWithin(path: string, root: string): boolean {
   const target = comparable(canonicalPath(path))
   const base = comparable(canonicalPath(root))
-  return target === base || target.startsWith(base.endsWith(sep) ? base : `${base}${sep}`)
+  const prefix = base.endsWith(sep) ? base : `${base}${sep}`
+  return target === base || target.startsWith(prefix)
 }
 
 /**

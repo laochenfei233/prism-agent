@@ -133,6 +133,7 @@ These limits define when the provider is a poor fit or needs special operational
 - **Windows ACL enforcement is partial** — NTFS hard links alias one file object across workspace and external paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child. The provider reports `enforcement: 'partial'` rather than overstating that boundary as full.
 - **Landlock may be partial** — older supported kernel ABIs confine only the access classes they expose, reported as `enforcement: 'partial'` rather than overstated as full. It also refuses a `workspace-write` policy whose workspace contains the harness home, because an allow-list cannot exclude that subpath.
 - **Seatbelt depends on deprecated `sandbox-exec`** — macOS still ships it, but this provider cannot replace or probe that private policy engine if Apple removes it.
+- **The Windows ACL home denial is standing** — it outlives the provider like the workspace grant it narrows, so moving `$DSH_HOME` out of a workspace leaves that directory denied to the old workspace SID until the workspace ACL is reset.
 - **Runner selection is cached for the provider lifetime** — installing, removing, or repairing a runner requires reloading the plugin before selection changes.
 - **`runnerCommand` is an operator assertion** — a configured custom runner skips functional probes and is assumed to implement the bwrap-compatible profile honestly; if it is itself a Bash script, its interpreter startup runs before that script applies confinement.
 

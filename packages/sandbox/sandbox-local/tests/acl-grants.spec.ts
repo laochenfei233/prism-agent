@@ -377,6 +377,26 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
     }
   })
 
+  it('agentless workspace-write passes the nested home denial to the runner', async () => {
+    const { sandbox, fiber } = await setup()
+    const ws = workspaceRoot()
+    scratch.push(ws)
+    const home = join(ws, '.prism')
+    mkdirSync(home)
+    vi.stubEnv('DSH_HOME', home)
+    try {
+      const confined = await sandbox.confine(['pwsh', '/Command', 'x'], { mode: 'workspace-write', workspaceRoot: ws })
+      const at = confined.argv.indexOf('--deny')
+      expect(at).toBeGreaterThan(-1)
+      expect(confined.argv[at + 1]).toBe(realpathSync.native(home))
+      expect(confined.argv).not.toContain('--write-sid')
+    } finally {
+      vi.unstubAllEnvs()
+      await fiber.dispose()
+      cleanup()
+    }
+  })
+
   it('provider teardown reports grant and directory cleanup failures without aborting teardown', async () => {
     try {
       const { ctx, sandbox, fiber } = await setup()

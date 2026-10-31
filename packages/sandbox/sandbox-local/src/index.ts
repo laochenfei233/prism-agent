@@ -369,11 +369,17 @@ export class LocalSandboxProvider extends SandboxProvider {
   private windowsAclRunnerArgv(policy: SandboxPolicy): string[] {
     const sessionId = policy.sessionId
     if (sessionId === undefined || policy.mode === 'read-only') {
+      // The standalone runner manages its own DACLs, so the home denial travels
+      // with the argv instead of a seam-materialized grant.
+      const denied = protectedRootsWithin(policy)
+        .filter(root => existsSync(root))
+        .flatMap(root => ['--deny', root])
       return [
         ...this.windowsAclRunnerInvocation(),
         '--workspace', policy.workspaceRoot,
         '--temp', tmpdir(),
         '--mode', policy.mode,
+        ...denied,
       ]
     }
     const temp = this.materializeAclGrant(sessionId, policy.workspaceRoot)

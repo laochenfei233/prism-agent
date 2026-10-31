@@ -133,6 +133,7 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 - **Windows ACL 只能实现部分强制执行**——NTFS 硬链接会使工作区路径与外部路径指向同一个文件对象，读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。提供方报告 `enforcement: 'partial'`，而不会把该边界夸大为完整强制执行。
 - **Landlock 可能只实现部分强制执行**——较旧且受支持的内核 ABI 只能限制自身公开的访问类别，因此报告 `enforcement: 'partial'`，不会夸大为完整强制执行。它还会拒绝工作区包含 harness home 的 `workspace-write` 策略，因为允许列表无法排除该子路径。
 - **Seatbelt 依赖已弃用的 `sandbox-exec`**——macOS 仍会提供它，但若 Apple 移除该私有策略引擎，该提供方无法替换或探测。
+- **Windows ACL 的 home 拒绝是常驻的**——它与所收窄的工作区授权一样长于提供方，因此把 `$DSH_HOME` 移出工作区后，该目录对旧工作区 SID 仍保持拒绝，直到工作区 ACL 被重置。
 - **runner 选择在提供方生命周期内缓存**——安装、移除或修复 runner 后，必须重载插件才能改变选择。
 - **`runnerCommand` 是操作方断言**——配置的自定义 runner 会跳过功能探测，并假定它诚实实现与 bwrap 兼容的 profile；如果它本身是 Bash 脚本，其解释器启动发生在该脚本施加约束之前。
 

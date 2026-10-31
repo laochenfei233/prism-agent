@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import koffi from 'koffi'
 
 import { buildExplicitAccess, denyWrite, grantWrite, lockFilePath, revokeWrite, withPathLock } from '../src/acl.ts'
-import { AclSandbox } from '../src/index.ts'
+import { AclSandbox, AclWriteGrant } from '../src/index.ts'
 import { createRestrictedToken, makeWellKnownSid } from '../src/token.ts'
 import { allocOverlapped, allocPtrSlot, decodePtr, isInvalidHandle, isNullPtr, win32 } from '../src/ffi.ts'
 import type { NativePtr, Win32Bindings } from '../src/ffi.ts'
@@ -361,6 +361,51 @@ describe.skipIf(!isWin32)('ACL editing', () => {
       if (!isNullPtr(capabilitySid)) api.localFree(capabilitySid)
       if (!isNullPtr(lowSid)) api.localFree(lowSid)
       if (!isNullPtr(world)) api.localFree(world)
+    }
+  })
+
+  it('AclWriteGrant.deny pins a nested directory on the standing grant', async () => {
+    const api = await win32()
+    const dir = scratch()
+    const child = join(dir, 'home')
+    mkdirSync(child)
+    const grant = AclWriteGrant.create('S-1-4-4242-8', api)
+    try {
+      grant.add(dir, true)
+      grant.deny(child)
+      expect(readTypedAces(api, child)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-8',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      grant.dispose()
+    }
+  })
+
+  it('AclSandbox denies a nested protected directory when it manages DACLs', async () => {
+    const workspace = scratch()
+    const home = join(workspace, 'home')
+    mkdirSync(home)
+    const temp = scratch()
+    const sandbox = new AclSandbox({
+      writableDirs: [workspace],
+      tempDir: temp,
+      mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-21',
+      tempWriteSid: 'S-1-4-4242-22',
+      denyDirs: [home],
+    })
+    const api = await win32()
+    await sandbox.init()
+    try {
+      expect(readTypedAces(api, home)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-21',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      sandbox.dispose()
     }
   })
 
