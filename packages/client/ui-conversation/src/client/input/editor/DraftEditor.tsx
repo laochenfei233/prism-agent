@@ -43,6 +43,7 @@ export function DraftEditor({
           editable={editable}
           className={clsx(css.input, editorDisabled && css.inputDisabled)}
           data-phase={phase}
+          data-dsh-region="main"
           aria-disabled={editorDisabled || undefined}
           data-placeholder={placeholderText}
           // The placeholder was the textarea's accessible name; a div's

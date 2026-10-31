@@ -200,10 +200,44 @@ export function apply(ctx: ClientContext): void {
       regions: ['page', 'editable'], modals: [],
       resolve: () => ({ status: 'handled', run: () => { layout.toggleSidebar() } }),
     })
+    const cycle = (direction: 1 | -1) => () => {
+      const regions = [...document.querySelectorAll<HTMLElement>('[data-dsh-region]')]
+      if (regions.length === 0) return { status: 'blocked' as const, reason: t('focus.none') }
+      const active = document.activeElement
+      const current = active instanceof Element ? active.closest<HTMLElement>('[data-dsh-region]') : null
+      const index = current === null ? -1 : regions.indexOf(current)
+      const next = index === -1 ? (direction === 1 ? 0 : regions.length - 1) : (index + direction + regions.length) % regions.length
+      const target = regions[next]
+      return target === undefined ? { status: 'blocked' as const, reason: t('focus.none') }
+        : { status: 'handled' as const, run: () => { target.focus() } }
+    }
+    const disposeForward = ctx.shortcuts.register({
+      id: 'focus.cycle' as ShortcutCommandId, label: () => t('focus.cycle'), aliases: ['focus', 'region', 'next region'],
+      defaults: {
+        'desktop:macos': { code: 'F6', modifiers: [] },
+        'desktop:windows': { code: 'F6', modifiers: [] },
+        'web:macos': { code: 'F6', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'F6', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'editable'], modals: [], resolve: cycle(1),
+    })
+    const disposeReverse = ctx.shortcuts.register({
+      id: 'focus.cycleReverse' as ShortcutCommandId, label: () => t('focus.reverse'),
+      aliases: ['focus', 'region', 'previous region'],
+      defaults: {
+        'desktop:macos': { code: 'F6', modifiers: ['shift'] },
+        'desktop:windows': { code: 'F6', modifiers: ['shift'] },
+        'web:macos': { code: 'F6', modifiers: ['primary', 'alt', 'shift'] },
+        'web:windows': { code: 'F6', modifiers: ['primary', 'alt', 'shift'] },
+      },
+      regions: ['page', 'editable'], modals: [], resolve: cycle(-1),
+    })
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
     return () => {
       disposeShortcut()
+      disposeForward()
+      disposeReverse()
       layout.dispose()
       disposePanels()
       disposeRegistration()

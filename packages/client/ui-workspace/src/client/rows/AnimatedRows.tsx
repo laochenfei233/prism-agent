@@ -1,5 +1,5 @@
 /** React-commit-driven movement and entry/exit fades for the sidebar's keyed rows. */
-import { Component, createRef, type ReactNode } from 'react'
+import { Component, createRef, type KeyboardEvent, type ReactNode } from 'react'
 import css from './AnimatedRows.module.css'
 
 const ROW_FADE_MS = 100
@@ -165,6 +165,28 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
     for (const key of this.exits.keys()) this.removeExit(key)
   }
 
+  // Rows carry tabIndex -1 so the tree holds one tab stop; arrows move focus between them and Enter presses the row.
+  private readonly navigate = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]')]
+    if (items.length === 0) return
+    const focused = event.target instanceof Element ? event.target.closest<HTMLElement>('[role="treeitem"]') : null
+    const index = focused === null ? -1 : items.indexOf(focused)
+    const focus = (position: number): void => {
+      const target = items[(position + items.length) % items.length]
+      /* v8 ignore next -- a non-empty item list resolves every position it is asked for. */
+      if (target !== undefined) target.focus()
+    }
+    if (event.key === 'ArrowDown') { event.preventDefault(); focus(index + 1) }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); focus(index === -1 ? items.length - 1 : index - 1) }
+    else if (event.key === 'Home') { event.preventDefault(); focus(0) }
+    else if (event.key === 'End') { event.preventDefault(); focus(items.length - 1) }
+    else if (event.key === 'Enter' && focused !== null && event.target === focused) {
+      event.preventDefault()
+      focused.click()
+    }
+  }
+
   override render(): ReactNode {
     return <>
       <div
@@ -172,6 +194,9 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
         className={this.props.className}
         role="tree"
         aria-label={this.props.label}
+        data-dsh-region="sidebar"
+        tabIndex={0}
+        onKeyDown={this.navigate}
         onPointerDownCapture={() => { this.armed = true }}
         onKeyDownCapture={() => { this.armed = true }}
       >

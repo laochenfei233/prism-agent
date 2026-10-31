@@ -25,6 +25,7 @@ type Locale = PropsLocale<'shortcuts'>
 /** Core reference positions are independent of labels and plugin registration order. */
 const coreActionOrder = new Map<string, number>([
   'shortcuts.open',
+  'commands.open',
   'session.new',
   'sidebar.left.toggle',
   'session.search',

@@ -284,6 +284,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
       data-row-key={`workspace:${group.key}`}
       role="treeitem"
+      tabIndex={-1}
       aria-expanded={row.expanded}
       onClick={onToggle}
       onContextMenu={actions === undefined ? undefined : contextMenu.open}
@@ -527,6 +528,7 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
     <div
       className={clsx(css.searchResultRow, selected && css.selected, result.archived && css.archived)}
       role="treeitem"
+      tabIndex={-1}
       aria-selected={selected}
       aria-description={result.archived ? t('toast.archivedNotOpenable') : undefined}
       onClick={() => { onOpen(result.id) }}
@@ -646,6 +648,7 @@ export function SessionNodeItem({
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
+      tabIndex={-1}
       aria-selected={selected}
       aria-description={row.archived ? t('toast.archivedNotOpenable') : undefined}
       onClick={() => { onOpen(node.id) }}
