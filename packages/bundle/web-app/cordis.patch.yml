@@ -80,6 +80,12 @@
       name: '@prism/prism-session-import'
 
     # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+    # Transfer: the settings section and its Host routes for project and
+    # settings archive files.
+    - id: prism-transfer
+      name: '@prism/prism-transfer'
+
+    # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
     # Backup: the settings section, its POST route, and the WebDAV/SMB/S3 transports.
     - id: prism-backup
       name: '@prism/prism-backup'

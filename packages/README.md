@@ -73,6 +73,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 | [`credentials/`](credentials/README.md) | Credential-reference and credential-record seam + env-over-`.env` provider + authorization flows that ask a human |
 | [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form |
 | [`backup/`](backup/README.md) | Archives configuration, memory, and project folders to WebDAV, SMB, or S3 |
+| [`transfer/`](transfer/README.md) | Moves projects and settings between installs as archive files |
 | [`workspace/`](workspace/README.md) | Workspace entity |
 | [`sdk/`](sdk/README.md) | Out-of-process SDK: JSON-RPC protocol and TypeScript client/server |
 | [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server |
