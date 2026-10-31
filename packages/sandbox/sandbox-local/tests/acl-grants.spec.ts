@@ -5,7 +5,7 @@
  * is mocked; native access checks live in sandbox-windows-acl's runner suite.
  */
 
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,10 +13,16 @@ import { Context } from '@deepseek-ai/cordis'
 import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
+import { outsideTempWorkspaceParent } from '../../../../scripts/snapshot-workspace-parent.ts'
 
 /** Cross-file state shared with the vi.mock factory (hoisting contract). */
 const mockState = vi.hoisted(() => ({
-  grants: [] as Array<{ writeSid: string; added: Array<{ path: string; standing: boolean }>; disposed: boolean }>,
+  grants: [] as Array<{
+    writeSid: string
+    added: Array<{ path: string; standing: boolean }>
+    denied: string[]
+    disposed: boolean
+  }>,
   addFailure: undefined as Error | undefined,
   /** Restrict an add failure to standing (workspace) or revocable (temp). */
   addFailureStanding: undefined as boolean | undefined,
@@ -28,6 +34,7 @@ vi.mock('@deepseek-ai/dsh-sandbox-windows-acl', () => {
   class MockAclWriteGrant {
     readonly writeSid: string
     readonly added: Array<{ path: string; standing: boolean }> = []
+    readonly denied: string[] = []
     disposed = false
     constructor(writeSid: string) {
       this.writeSid = writeSid
@@ -43,6 +50,9 @@ vi.mock('@deepseek-ai/dsh-sandbox-windows-acl', () => {
         && (mockState.addFailureStanding === undefined || mockState.addFailureStanding === standing)) {
         throw mockState.addFailure
       }
+    }
+    deny(path: string): void {
+      this.denied.push(path)
     }
     dispose(): void {
       if (mockState.disposeFailure !== undefined) throw mockState.disposeFailure
@@ -153,6 +163,45 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       expect(mockState.grants.every(grant => grant.disposed)).toBe(true)
       expect(existsSync(tempDir ?? '')).toBe(false)
     } finally {
+      cleanup()
+    }
+  })
+
+  it('denies the harness home inside the workspace on the standing grant', async () => {
+    const { sandbox, fiber } = await setup()
+    const ws = workspaceRoot()
+    scratch.push(ws)
+    const home = join(ws, '.prism')
+    mkdirSync(home)
+    vi.stubEnv('DSH_HOME', home)
+    try {
+      await sandbox.confine(['pwsh', '/Command', 'x'], {
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-home'),
+      })
+      const workspaceGrant = mockState.grants.find(grant => grant.writeSid === WORKSPACE_SID)
+      expect(workspaceGrant?.denied).toEqual([realpathSync.native(home)])
+    } finally {
+      vi.unstubAllEnvs()
+      await fiber.dispose()
+      cleanup()
+    }
+  })
+
+  it('does not deny a harness home outside the workspace', async () => {
+    const { sandbox, fiber } = await setup()
+    const ws = workspaceRoot()
+    scratch.push(ws)
+    // Outside the workspace and every platform temp grant.
+    vi.stubEnv('DSH_HOME', join(outsideTempWorkspaceParent(), 'dsh-home-outside-acl'))
+    try {
+      await sandbox.confine(['pwsh', '/Command', 'x'], {
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-outside'),
+      })
+      const workspaceGrant = mockState.grants.find(grant => grant.writeSid === WORKSPACE_SID)
+      expect(workspaceGrant?.denied).toEqual([])
+    } finally {
+      vi.unstubAllEnvs()
+      await fiber.dispose()
       cleanup()
     }
   })
@@ -324,6 +373,26 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       expect(mockState.grants).toHaveLength(0)
       await fiber.dispose()
     } finally {
+      cleanup()
+    }
+  })
+
+  it('agentless workspace-write passes the nested home denial to the runner', async () => {
+    const { sandbox, fiber } = await setup()
+    const ws = workspaceRoot()
+    scratch.push(ws)
+    const home = join(ws, '.prism')
+    mkdirSync(home)
+    vi.stubEnv('DSH_HOME', home)
+    try {
+      const confined = await sandbox.confine(['pwsh', '/Command', 'x'], { mode: 'workspace-write', workspaceRoot: ws })
+      const at = confined.argv.indexOf('--deny')
+      expect(at).toBeGreaterThan(-1)
+      expect(confined.argv[at + 1]).toBe(realpathSync.native(home))
+      expect(confined.argv).not.toContain('--write-sid')
+    } finally {
+      vi.unstubAllEnvs()
+      await fiber.dispose()
       cleanup()
     }
   })

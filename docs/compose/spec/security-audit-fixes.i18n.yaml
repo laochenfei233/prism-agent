@@ -9,8 +9,8 @@
   en: 7884aba49464dd92
   zh: 67e6fe86cb5c9fe0
 /security-audit-fixes/report:
-  en: 58ac554d7e87ddbf
-  zh: 431adbb24cb3f765
+  en: 484791f69bb30e59
+  zh: 7f47df6bb4a51a33
 /security-audit-fixes/s1-problem:
   en: e7da19ef61da84b6
   zh: 10a8769c7fee7858
@@ -21,8 +21,8 @@
   en: b7887b900d543a08
   zh: 54ed1ef48408ebb3
 /security-audit-fixes/s2-design/s2-2-foreign-record-validation-before-a-native-import-is-written:
-  en: 0aa2e1da235a3269
-  zh: d8694a49098fa895
+  en: 3dfcde72571ed8f9
+  zh: 3419632f8ef3eb80
 /security-audit-fixes/s2-design/s2-3-admission-limits-enforced-when-a-stored-image-is-read:
   en: 1d51858ace7d2262
   zh: 15ccb19e358018e0
@@ -36,8 +36,8 @@
   en: 15d02fe5a5b499b5
   zh: c575aa4b32c11852
 /security-audit-fixes/s3-scope:
-  en: fa9d9910bf21e906
-  zh: f4f2c27560500d79
+  en: 65bbc770e9a21698
+  zh: b564e20aa26b931e
 /security-audit-fixes/tasks:
   en: 292bd02b00199830
   zh: 80c71737b81ebf26

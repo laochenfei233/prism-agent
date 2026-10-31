@@ -349,7 +349,10 @@ describe('SessionImportEngine apply', () => {
       'tool/call', 'tool/result', 'step/end', 'turn/end',
     ])
     expect([...fakesValue.attached.values()].flat()).toContain(id)
-    await expect(stat(join(root, 'prism', 'attachments', 'v1', 'objects', 'a.png'))).resolves.toBeTruthy()
+    const copied = await stat(join(root, 'prism', 'attachments', 'v1', 'objects', 'a.png'))
+    // No write bit is the cross-platform invariant; POSIX also pins the exact mode.
+    expect(copied.mode & 0o222).toBe(0)
+    if (process.platform !== 'win32') expect(copied.mode & 0o777).toBe(0o400)
 
     const header = fakesValue.headers.get(id)
     expect(header).toBeDefined()

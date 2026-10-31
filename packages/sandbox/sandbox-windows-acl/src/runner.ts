@@ -10,6 +10,7 @@
  * keep the same contract):
  *   [node, runner.js, '--workspace', <dir>, '--temp', <dir>,
  *    '--mode', <read-only|workspace-write>,
+ *    ['--deny', <dir>]...,            # standalone workspace-write only
  *    ['--write-sid', <S-1-4-…>,
  *     '--temp-write-sid', <S-1-4-…>], '--', <argv...>]
  *
@@ -69,6 +70,8 @@ interface ParsedArgs {
   mode: 'read-only' | 'workspace-write'
   writeSid: string | undefined
   tempWriteSid: string | undefined
+  /** Standalone-only subtree denials (the harness home inside the workspace). */
+  denyDirs: string[]
   command: string
   args: string[]
 }
@@ -79,6 +82,7 @@ function parseArgs(raw: string[]): ParsedArgs {
   let mode: string | undefined
   let writeSid: string | undefined
   let parsedTempWriteSid: string | undefined
+  const denyDirs: string[] = []
   let index = 0
   for (; index < raw.length; index++) {
     const token = raw[index]
@@ -95,6 +99,7 @@ function parseArgs(raw: string[]): ParsedArgs {
       case '--mode': mode = value; break
       case '--write-sid': writeSid = value; break
       case '--temp-write-sid': parsedTempWriteSid = value; break
+      case '--deny': denyDirs.push(value); break
       default: fail(`unknown argument: ${token}`)
     }
   }
@@ -104,7 +109,7 @@ function parseArgs(raw: string[]): ParsedArgs {
   const argv = raw.slice(index)
   const command = argv[0]
   if (command === undefined) fail('missing command after --')
-  return { workspace, temp, mode, writeSid, tempWriteSid: parsedTempWriteSid, command, args: argv.slice(1) }
+  return { workspace, temp, mode, writeSid, tempWriteSid: parsedTempWriteSid, denyDirs, command, args: argv.slice(1) }
 }
 
 function requireDirectory(label: string, path: string): void {
@@ -129,6 +134,10 @@ async function main(): Promise<number> {
   }
   if (parsed.mode === 'workspace-write') {
     assertTempRootOutsideWorkspace(parsed.workspace, parsed.temp)
+  }
+  for (const denyDir of parsed.denyDirs) requireDirectory('--deny', denyDir)
+  if (parsed.denyDirs.length > 0 && (parsed.mode !== 'workspace-write' || seamManaged)) {
+    fail('--deny is accepted only for a standalone workspace-write confinement')
   }
 
   const api = await win32()
@@ -166,6 +175,7 @@ async function main(): Promise<number> {
       ...writeSid === undefined ? {} : { writeSid },
       ...privateTempSid === undefined ? {} : { tempWriteSid: privateTempSid },
       manageDacls: !seamManaged,
+      ...seamManaged ? {} : { denyDirs: parsed.denyDirs },
     })
     await sandbox.init()
     initialized = true

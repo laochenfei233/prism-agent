@@ -9,7 +9,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { cp } from 'node:fs/promises'
+import { chmod, cp, readdir } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
 import { brandNumber, brandString } from '@deepseek-ai/dsh-brand'
 import {
@@ -127,6 +127,24 @@ export class ImportEngineError extends Error {
     super(message)
     this.name = 'ImportEngineError'
     this.code = code
+  }
+}
+
+/**
+ * Publish every copied attachment member read-only, matching the mode the
+ * attachment store gives its own objects. The source store already publishes
+ * `0400`, and `fs.cp` preserves it, but the copy is a foreign tree and the mode
+ * must not depend on how its writer published it.
+ * @param root - the copied `attachments` directory.
+ */
+async function publishReadOnly(root: string): Promise<void> {
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) {
+      await publishReadOnly(path)
+    } else if (entry.isFile()) {
+      await chmod(path, 0o400)
+    }
   }
 }
 
@@ -494,6 +512,7 @@ export class SessionImportEngine {
         force: false,
         errorOnExist: false,
       })
+      await publishReadOnly(join(this.options.currentHome, 'attachments'))
       this.attachmentsCopied = true
     } catch (error: unknown) {
       throw new ImportEngineError('import-failed', `attachment copy failed: ${errorText(error)}`)

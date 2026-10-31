@@ -15,8 +15,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import koffi from 'koffi'
 
-import { buildExplicitAccess, grantWrite, lockFilePath, revokeWrite, withPathLock } from '../src/acl.ts'
-import { AclSandbox } from '../src/index.ts'
+import { buildExplicitAccess, denyWrite, grantWrite, lockFilePath, revokeWrite, withPathLock } from '../src/acl.ts'
+import { AclSandbox, AclWriteGrant } from '../src/index.ts'
 import { createRestrictedToken, makeWellKnownSid } from '../src/token.ts'
 import { allocOverlapped, allocPtrSlot, decodePtr, isInvalidHandle, isNullPtr, win32 } from '../src/ffi.ts'
 import type { NativePtr, Win32Bindings } from '../src/ffi.ts'
@@ -361,6 +361,87 @@ describe.skipIf(!isWin32)('ACL editing', () => {
       if (!isNullPtr(capabilitySid)) api.localFree(capabilitySid)
       if (!isNullPtr(lowSid)) api.localFree(lowSid)
       if (!isNullPtr(world)) api.localFree(world)
+    }
+  })
+
+  it('AclWriteGrant.deny pins a nested directory on the standing grant', async () => {
+    const api = await win32()
+    const dir = scratch()
+    const child = join(dir, 'home')
+    mkdirSync(child)
+    const grant = AclWriteGrant.create('S-1-4-4242-8', api)
+    try {
+      grant.add(dir, true)
+      grant.deny(child)
+      expect(readTypedAces(api, child)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-8',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      grant.dispose()
+    }
+  })
+
+  it('rejects deny dirs it does not manage or that do not exist', () => {
+    const dir = scratch()
+    const home = join(dir, 'home')
+    mkdirSync(home)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], tempDir: null, mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-31', denyDirs: [home], manageDacls: false,
+    })).toThrow(/deny dirs/u)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], mode: 'read-only', denyDirs: [home],
+    })).toThrow(/deny dirs/u)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], tempDir: null, mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-32', denyDirs: [join(dir, 'missing')],
+    })).toThrow(/does not exist/u)
+  })
+
+  it('AclSandbox denies a nested protected directory when it manages DACLs', async () => {
+    const workspace = scratch()
+    const home = join(workspace, 'home')
+    mkdirSync(home)
+    const temp = scratch()
+    const sandbox = new AclSandbox({
+      writableDirs: [workspace],
+      tempDir: temp,
+      mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-21',
+      tempWriteSid: 'S-1-4-4242-22',
+      denyDirs: [home],
+    })
+    const api = await win32()
+    await sandbox.init()
+    try {
+      expect(readTypedAces(api, home)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-21',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      sandbox.dispose()
+    }
+  })
+
+  it('denyWrite pins a subtree with an inheritable deny for the capability SID', async () => {
+    const api = await win32()
+    const dir = scratch()
+    const protectedDir = join(dir, 'protected')
+    mkdirSync(protectedDir)
+    const capabilitySid = sidFromString(api, 'S-1-4-4242-7')
+    try {
+      expect(denyWrite(api, protectedDir, capabilitySid)).toBe(true)
+      expect(denyWrite(api, protectedDir, capabilitySid)).toBe(false)
+      expect(readTypedAces(api, protectedDir)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-7',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      if (!isNullPtr(capabilitySid)) api.localFree(capabilitySid)
     }
   })
 

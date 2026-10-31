@@ -47,7 +47,7 @@ import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Win32Error } from '@deepseek-ai/dsh-win32-process'
 
-import { grantWrite, revokeWrite } from './acl.ts'
+import { denyWrite, grantWrite, revokeWrite } from './acl.ts'
 import { allocPtrSlot, decodePtr, isNullPtr, throwLastError, win32 } from './ffi.ts'
 import type { NativePtr, Win32Bindings } from './ffi.ts'
 import { assertPrivateTempDisjoint } from './path-boundary.ts'
@@ -99,6 +99,14 @@ export interface AclSandboxOptions {
    * the caller holds the grants for its own lifetime and revokes them.
    */
   manageDacls?: boolean
+  /**
+   * Directories inside a writable dir whose subtree the capability SID must
+   * never write — the harness home inside a granted workspace. Requires
+   * workspace-write and `manageDacls` (this instance owns the grants); the
+   * standing deny is inherited to the subtree and outlives the instance like
+   * the workspace grant it narrows.
+   */
+  denyDirs?: readonly string[]
 }
 
 /** Per-spawn options: the program, its argv/cwd, and the stdio shape. */
@@ -163,6 +171,8 @@ function freeSidBestEffort(
 export class AclSandbox {
   /** Absolute writable directories (constructor-validated). */
   readonly writableDirs: string[]
+  /** Absolute directories denied to the workspace SID (constructor-validated). */
+  readonly denyDirs: string[]
   /** The workspace SID string whose ACEs form the workspace allowlist. */
   readonly writeSid: string | undefined
   /** The private temp directory's write SID (workspace-write with temp only). */
@@ -193,6 +203,15 @@ export class AclSandbox {
     this.tempDirOption = options.tempDir
     this.writeSid = options.writeSid
     this.tempWriteSid = options.tempWriteSid
+    this.denyDirs = (options.denyDirs ?? []).map(directory => resolve(directory))
+    if (this.denyDirs.length > 0 && (this.mode !== 'workspace-write' || !this.manageDacls)) {
+      throw new Error('AclSandbox deny dirs require workspace-write with manageDacls')
+    }
+    for (const directory of this.denyDirs) {
+      if (!existsSync(directory) || !statSync(directory).isDirectory()) {
+        throw new Error(`AclSandbox deny dir does not exist or is not a directory: ${directory}`)
+      }
+    }
     if (this.mode === 'workspace-write' && this.writeSid === undefined) {
       throw new Error('AclSandbox workspace-write requires a write SID — derive it from the workspace via workspaceWriteSid()')
     }
@@ -269,6 +288,9 @@ export class AclSandbox {
         if (this.writeSidPtr !== undefined) {
           for (const path of this.writableDirs) {
             grantWrite(api, path, this.writeSidPtr, lowLabelSid, worldSid)
+          }
+          for (const path of this.denyDirs) {
+            denyWrite(api, path, this.writeSidPtr)
           }
           if (tempDir !== null && this.tempWriteSidPtr !== undefined) {
             // Record BEFORE granting: grantWrite can throw after a successful

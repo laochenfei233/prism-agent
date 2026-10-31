@@ -16,7 +16,7 @@ English | [中文](security-audit-fixes.zh.md)
 
 Release builds now receive the documented updater signing key and upload `.sig`, `latest.json`, and `.app.tar.gz`; the static server authenticates every HTML entry, including the worker preview; and the desktop popup fallback refuses cmd metacharacters before `cmd /C start`.
 
-Residuals recorded in [S2] and [S3]: shell sandbox backends still derive writable roots from the workspace alone; attachment copies still skip the staged publication mode (digest and read limits govern); imported events carry no provenance marker; and the `latest.json` upload location still needs one real release run to confirm.
+Residuals recorded in [S2] and [S3]: imported events carry no imported-content marker (product decision); the shell backends, the attachment publication mode, and the `latest.json` ownership are closed in [security-audit-residuals](security-audit-residuals.md).
 
 **Verification** — `pnpm exec vitest run` over the four affected specs: 54 passed. The full `attachment-local` suite plus host `session-import` specs: 123 passed, 1 skipped. `pnpm run typecheck`: 5/5 gates passed. `cargo test --lib`: 30 passed before the review round; targeted `cargo test --lib cmd_start`: 3 passed, including a direct `open_with_os` refusal. Named translation pairs are consistent; the corpus-wide check belongs to `doc-sync`. `verify-md-wrap` and `verify-md-links`: pass. `verify-package-dependencies`: the pre-fix run reported exactly the two unclassified imports, and the policy now classifies the reader validator; the full rerun hangs in this worktree's tsx/esbuild environment, so no green rerun is claimed. Repo-wide `pnpm run lint` is red on untouched baseline files (verified on two untouched files in the main checkout); linting only the changed TypeScript paths reports 0 errors. The client `ImportSection` spec fails only under this worktree's local hoisted install and passes on the unmodified checkout; no client code changed.
 
@@ -47,7 +47,7 @@ The shell backends keep their own grant spellings and still derive writable root
 
 `SessionImportEngine.writeNative` validates the foreign log with the stored reader's own `validateStoredEvents` before it creates the session: an unknown required type, the retired `request/header` fallback, or an invalid envelope fails the row before anything is written. A refused log becomes a `failed` import row with the reader's reason and writes nothing, so no bricked session is created, no wrong refusal cause is stored, and the duplicate check cannot block a later repair.
 
-Attribution is unchanged: imported events still carry the source's provider and model, just as the normalized path labels foreign user text with `source.kind: 'user'`. The event vocabulary has no imported-content provenance marker on any path, so whether preserved foreign attribution needs one is a product decision recorded here as deferred.
+Attribution is unchanged: imported events still carry the source's provider and model, just as the normalized path labels foreign user text with `source.kind: 'user'`. The event vocabulary has no imported-content marker on any path, so whether preserved foreign attribution needs one is a product decision recorded here as deferred.
 
 ### [S2.3] Admission limits enforced when a stored image is read
 
@@ -70,7 +70,7 @@ The copy still skips the staged `0400` publication; that mode is not what protec
 ## [S3] Scope
 
 - In scope: the six leads above, each with the smallest change that removes the crossing and a focused test.
-- Out of scope: the shell sandbox home exclusion, imported-content provenance markers, attachment copy publication modes, the account-state parts of the release secret, and every other hardening note in the audit's section 6.
+- Out of scope: the shell sandbox home exclusion, imported-content markers, attachment copy publication modes, the account-state parts of the release secret, and every other hardening note in the audit's section 6.
 
 ## Tasks
 
