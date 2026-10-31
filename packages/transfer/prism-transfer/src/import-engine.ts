@@ -395,6 +395,22 @@ async function restoreAttachments(
   }
 }
 
+/**
+ * Refuse a materialized path whose name carries a colon: on Windows a colon
+ * after an existing name silently writes an NTFS alternate data stream, so a
+ * hostile `project/a:b` entry ordered after `project/a` would pollute a
+ * published file invisibly. The reader allows final-segment colons because
+ * attachment entries stream into the seam and never touch the filesystem;
+ * only `project/**` entries reach this check.
+ * @param relative - the entry's path below the project staging root.
+ * @param entryName - the full archive name, for the error message.
+ */
+function refuseColons(relative: string, entryName: string): void {
+  if (relative.split('/').some(segment => segment.includes(':'))) {
+    throw new TransferError('unsafe-path', `entry "${entryName}" carries a colon and cannot be written to disk`)
+  }
+}
+
 /** Whether one publication target collides with the harness home's own layout. */
 function publicationReserved(publishPath: string, homePath: string): boolean {
   const target = resolve(publishPath)
@@ -505,6 +521,7 @@ export async function runImport(
       if (!project.plan.manifest.hasProjectFolder) continue
       for (const entry of project.plan.folderEntries) {
         const relative = entry.name.slice(project.plan.prefix.length + PROJECT_FOLDER_PREFIX.length)
+        refuseColons(relative, entry.name)
         const target = join(project.stagingPath, relative)
         await mkdir(resolve(target, '..'), { recursive: true })
         const output = createWriteStream(target)

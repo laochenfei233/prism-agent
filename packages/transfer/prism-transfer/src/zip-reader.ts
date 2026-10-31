@@ -171,11 +171,57 @@ function validateEntryName(name: string, limits: ZipReaderLimits): void {
   if (/^[A-Za-z]:/u.test(name)) {
     throw new TransferError('unsafe-path', `entry name "${name}" carries a drive prefix`)
   }
-  for (const segment of name.split('/')) {
+  // A directory record's trailing slash produces one final empty segment;
+  // validate the path it names, not the slash.
+  const segments = name.split('/')
+  if (segments.at(-1) === '') segments.pop()
+  for (const [index, segment] of segments.entries()) {
     if (segment === '' || segment === '.' || segment === '..') {
       throw new TransferError('unsafe-path', `entry name "${name}" contains the forbidden segment "${segment}"`)
     }
+    // A colon in a directory segment (or a lone final segment an extractor
+    // would materialize) is an NTFS alternate-data-stream vector. Final
+    // segments may carry colons — content-addressed attachment names do —
+    // because those entries stream into the attachment seam and never touch
+    // the filesystem; the import engine re-checks before any disk write.
+    if (segment.includes(':') && index < segments.length - 1) {
+      throw new TransferError('unsafe-path', `entry name "${name}" carries a colon in a directory segment`)
+    }
   }
+}
+
+/**
+ * Record one parsed entry's file/directory role and refuse ancestor
+ * conflicts in both orders: a file named `a` followed by `a/b`, and `a/b`
+ * followed by a file named `a`. Both would fail mid-extraction with an
+ * untyped filesystem error; refusing here maps them to `path-conflict`.
+ * @param files - names already seen as files.
+ * @param directories - names already seen as directories (explicit or implied).
+ * @param name - the new entry's name.
+ * @param isDirectory - whether the new entry is a directory record.
+ */
+function recordEntryRole(files: Set<string>, directories: Set<string>, rawName: string, isDirectory: boolean): void {
+  const name = isDirectory ? rawName.slice(0, -1) : rawName
+  if (isDirectory) {
+    if (files.has(name)) {
+      throw new TransferError('path-conflict', `archive contains both the file "${name}" and entries below it`)
+    }
+    directories.add(name)
+    return
+  }
+  if (directories.has(name)) {
+    throw new TransferError('path-conflict', `archive contains both the file "${name}" and entries below it`)
+  }
+  let index = name.indexOf('/')
+  while (index > 0) {
+    const ancestor = name.slice(0, index)
+    if (files.has(ancestor)) {
+      throw new TransferError('path-conflict', `archive contains both the file "${ancestor}" and entries below it`)
+    }
+    directories.add(ancestor)
+    index = name.indexOf('/', index + 1)
+  }
+  files.add(name)
 }
 
 /**
@@ -190,6 +236,8 @@ function parseDirectory(directory: Buffer, limits: ZipReaderLimits): ZipEntry[] 
   const decoder = new TextDecoder('utf-8', { fatal: true })
   const entries: ZipEntry[] = []
   const foldKeys = new Set<string>()
+  const entryFiles = new Set<string>()
+  const entryDirectories = new Set<string>()
   let offset = 0
   while (offset < directory.byteLength) {
     if (entries.length >= limits.maxEntries) {
@@ -268,6 +316,7 @@ function parseDirectory(directory: Buffer, limits: ZipReaderLimits): ZipEntry[] 
       throw new TransferError('path-conflict', `archive contains conflicting entries folding to "${foldKey}"`)
     }
     foldKeys.add(foldKey)
+    recordEntryRole(entryFiles, entryDirectories, name, directoryEntry)
     entries.push({
       name,
       crc32: crc,
@@ -399,10 +448,20 @@ export class ZipArchiveReader {
         yield view
       }
     } else {
-      // fflate's synchronous Inflate reports chunks through `(data, final)`;
-      // malformed streams are thrown from `push`, never surfaced in the
-      // callback.
+      // The declared uncompressed size is the abort line, enforced in the
+      // producer callback: a hostile deflate entry whose directory record
+      // lies about its size is cut off the moment the output passes the
+      // declaration, instead of streaming a bomb to the consumer before the
+      // end-of-entry comparison runs.
+      const declared = entry.uncompressedSize
       const inflator = new Inflate((chunk) => {
+        if (written + chunk.byteLength > declared) {
+          pending.length = 0
+          throw new TransferError(
+            'bad-archive',
+            `entry "${entry.name}" decompresses past its declared size of ${String(declared)} bytes`,
+          )
+        }
         checksum.update(chunk)
         written += chunk.byteLength
         pending.push(chunk)
@@ -416,6 +475,7 @@ export class ZipArchiveReader {
         try {
           inflator.push(view, false)
         } catch (pushError: unknown) {
+          if (pushError instanceof TransferError) throw pushError
           /* v8 ignore next 1 -- fflate's Inflate rejects malformed streams with Error instances only */
           inflateFailure = pushError instanceof Error ? pushError : new Error(String(pushError))
         }
@@ -427,6 +487,8 @@ export class ZipArchiveReader {
       try {
         inflator.push(new Uint8Array(), true)
       } catch (pushError: unknown) {
+        // v8 ignore next 1 -- an overflow surfacing only during the final flush; the mid-stream guard owns the tested semantics
+        if (pushError instanceof TransferError) throw pushError
         /* v8 ignore next 1 -- fflate's Inflate rejects malformed streams with Error instances only */
         inflateFailure = pushError instanceof Error ? pushError : new Error(String(pushError))
       }

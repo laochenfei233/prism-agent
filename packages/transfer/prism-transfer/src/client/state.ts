@@ -35,9 +35,6 @@ export function snapshotOf(value: unknown): TransferJobSnapshot | undefined {
     projectsDone: typeof value['projectsDone'] === 'number' ? value['projectsDone'] : 0,
     projectsTotal: typeof value['projectsTotal'] === 'number' ? value['projectsTotal'] : 0,
     duplicates: typeof value['duplicates'] === 'number' ? value['duplicates'] : 0,
-    skippedLinks: typeof value['skippedLinks'] === 'number' ? value['skippedLinks'] : 0,
-    skippedUnreadable: typeof value['skippedUnreadable'] === 'number' ? value['skippedUnreadable'] : 0,
-    skippedSecrets: typeof value['skippedSecrets'] === 'number' ? value['skippedSecrets'] : 0,
     ...resultOf(value),
     ...errorOf(value),
     startedAt: typeof value['startedAt'] === 'number' ? value['startedAt'] : 0,
@@ -108,6 +105,36 @@ export function failureOf(body: unknown): { readonly code: string; readonly mess
     code: body['code'],
     message: typeof body['message'] === 'string' ? body['message'] : '',
   }
+}
+
+/**
+ * Build the export-card notice from one validation-pass response: skip
+ * counts for links, unreadable files, and secret fields. `null` when the
+ * response carries nothing to report.
+ * @param counts - the parsed validate response body.
+ * @param t - translate seat of the transfer namespace.
+ * @returns the joined notice text, or `null`.
+ */
+export function exportSkippedNotices(
+  counts: unknown,
+  t: (key: 'exportSkipped' | 'exportSecretsSkipped', params: Record<string, string>) => string,
+): string | null {
+  if (!isRecord(counts)) return null
+  const countOf = (key: string): number => {
+    const value = counts[key]
+    return typeof value === 'number' ? value : 0
+  }
+  const links = countOf('skippedLinks')
+  const unreadable = countOf('skippedUnreadable')
+  const secrets = countOf('skippedSecrets')
+  const notices: string[] = []
+  if (links > 0 || unreadable > 0) {
+    notices.push(t('exportSkipped', { links: String(links), unreadable: String(unreadable) }))
+  }
+  if (secrets > 0) {
+    notices.push(t('exportSecretsSkipped', { count: String(secrets) }))
+  }
+  return notices.length === 0 ? null : notices.join(' ')
 }
 
 /** Human byte size for the chosen-file line. */

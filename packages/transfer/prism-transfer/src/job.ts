@@ -30,9 +30,6 @@ export interface TransferJobProgress {
   /** Project counters; totals arrive once the manifest dispatch is done. */
   setProjectsTotal(total: number): void
   addProjectDone(count: number): void
-  /** Export-side skip counters mirrored into the import snapshot. */
-  setSkippedLinks(count: number): void
-  setSkippedUnreadable(count: number): void
 }
 
 /** Mutable store entry behind one running or finished job. */
@@ -51,9 +48,6 @@ interface JobEntry {
   projectsDone: number
   projectsTotal: number
   duplicates: number
-  skippedLinks: number
-  skippedUnreadable: number
-  skippedSecrets: number
   result: TransferJobSnapshot['result']
   error: TransferJobSnapshot['error']
   finishedAt: number | undefined
@@ -91,9 +85,6 @@ export class TransferJobStore {
       projectsDone: 0,
       projectsTotal: 0,
       duplicates: 0,
-      skippedLinks: 0,
-      skippedUnreadable: 0,
-      skippedSecrets: 0,
       result: undefined,
       error: undefined,
       finishedAt: undefined,
@@ -127,12 +118,6 @@ export class TransferJobStore {
       },
       addProjectDone: (count) => {
         entry.projectsDone += count
-      },
-      setSkippedLinks: (count) => {
-        entry.skippedLinks = count
-      },
-      setSkippedUnreadable: (count) => {
-        entry.skippedUnreadable = count
       },
     }
   }
@@ -200,9 +185,6 @@ export class TransferJobStore {
       projectsDone: entry.projectsDone,
       projectsTotal: entry.projectsTotal,
       duplicates: entry.duplicates,
-      skippedLinks: entry.skippedLinks,
-      skippedUnreadable: entry.skippedUnreadable,
-      skippedSecrets: entry.skippedSecrets,
       ...entry.result !== undefined ? { result: entry.result } : {},
       ...entry.error !== undefined ? { error: entry.error } : {},
       startedAt: entry.startedAt,

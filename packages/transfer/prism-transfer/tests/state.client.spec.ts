@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { failureOf, formatBytes, phaseKeyOf, snapshotOf } from '../src/client/state.ts'
+import { en } from '../src/client/locales.ts'
+import { exportSkippedNotices, failureOf, formatBytes, phaseKeyOf, snapshotOf } from '../src/client/state.ts'
 
 describe('snapshotOf', () => {
   it('parses a running snapshot and defaults unknown kinds', () => {
@@ -17,9 +18,6 @@ describe('snapshotOf', () => {
       projectsDone: 0,
       projectsTotal: 1,
       duplicates: 1,
-      skippedLinks: 2,
-      skippedUnreadable: 3,
-      skippedSecrets: 4,
       startedAt: 5,
       finishedAt: 6,
     })
@@ -29,9 +27,6 @@ describe('snapshotOf', () => {
       state: 'running',
       phase: 'restoring',
       duplicates: 1,
-      skippedLinks: 2,
-      skippedUnreadable: 3,
-      skippedSecrets: 4,
       startedAt: 5,
       finishedAt: 6,
     })
@@ -64,9 +59,6 @@ describe('snapshotOf', () => {
       projectsDone: 0,
       projectsTotal: 0,
       duplicates: 0,
-      skippedLinks: 0,
-      skippedUnreadable: 0,
-      skippedSecrets: 0,
       startedAt: 0,
     })
   })
@@ -163,6 +155,26 @@ describe('failureOf', () => {
     expect(failureOf({ message: 'no code' })).toBeUndefined()
     expect(failureOf(null)).toBeUndefined()
     expect(failureOf({ code: 'busy', message: 7 })).toEqual({ code: 'busy', message: '' })
+  })
+})
+
+describe('exportSkippedNotices', () => {
+  const t = (key: 'exportSkipped' | 'exportSecretsSkipped', params: Record<string, string>): string => {
+    let out: string = en[key]
+    for (const [name, value] of Object.entries(params)) out = out.replaceAll(`{${name}}`, value)
+    return out
+  }
+
+  it('joins the skip counts and answers null when nothing to report', () => {
+    expect(exportSkippedNotices({ skippedLinks: 2, skippedUnreadable: 1, skippedSecrets: 3 }, t))
+      .toBe('Skipped 2 links and 1 unreadable files. 3 secret fields were not exported.')
+    expect(exportSkippedNotices({ skippedLinks: 0, skippedUnreadable: 0, skippedSecrets: 0 }, t)).toBeNull()
+  })
+
+  it('treats non-number fields as zero and foreign bodies as nothing', () => {
+    expect(exportSkippedNotices({ skippedLinks: '2', skippedUnreadable: null, skippedSecrets: true }, t)).toBeNull()
+    expect(exportSkippedNotices('nope', t)).toBeNull()
+    expect(exportSkippedNotices(undefined, t)).toBeNull()
   })
 })
 

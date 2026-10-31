@@ -17,13 +17,18 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, opendir, rm, stat } from 'node:fs/promises'
 import { once } from 'node:events'
 import { isAbsolute, join } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { randomUUID } from 'node:crypto'
+import { scheduler } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { brandNumber, brandString } from '@deepseek-ai/dsh-brand'
+import type { SessionEvent, SessionHeader, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 // Type-only: the ctx.sessionQuery, ctx.sessions, and ctx.dshHomePath merges
-// the export surfaces read through.
+// the export surfaces read through, and the ctx.sessionProjectionCache merge
+// the import checkpoint folds into.
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { asTransferError, TransferError } from './errors.ts'
 import {
   exportFilename,
@@ -99,6 +104,40 @@ export function apply(ctx: Context): void {
   }), 'prism-transfer: settings application')
 }
 
+/** Bound on waiting for the restored row's fire-and-forget cache write. */
+const CHECKPOINT_DRAIN_TIMEOUT_MS = 2_000
+/** Poll interval while waiting for that cache write to become readable. */
+const CHECKPOINT_DRAIN_POLL_MS = 5
+
+/**
+ * Fold one restored log into the mounted projection cache, which is what the
+ * cold Session list reads a stored Session's title from. A log written
+ * outside the live Session lifecycle would otherwise list without its title.
+ * A composition without the cache still imports; its rows list without
+ * cached projections until the Session is opened.
+ * @param ctx - Host context carrying the optional projection cache.
+ * @param header - the stored Session header.
+ * @param events - the Session's complete log in seq order.
+ */
+async function checkpointInto(
+  ctx: Context,
+  header: SessionHeader,
+  events: readonly SessionEvent[],
+): Promise<void> {
+  // Looked up per write: the cache service may initialize after this plugin.
+  const cache = ctx.get('sessionProjectionCache')
+  if (cache === undefined) return
+  const snapshot = cache.coldSnapshot(header, brandNumber<SessionLogOffset>(0), events)
+  // No served value means no registered unit has a client view, so the row
+  // could never become readable and waiting would only delay the import.
+  if (Object.keys(snapshot.values).length === 0) return
+  const deadline = performance.now() + CHECKPOINT_DRAIN_TIMEOUT_MS
+  while (cache.cachedSnapshot(header) === undefined) {
+    if (performance.now() >= deadline) return
+    await scheduler.wait(CHECKPOINT_DRAIN_POLL_MS)
+  }
+}
+
 /** Read the harness home from the boot-provided path helper. */
 function dshHomeOf(ctx: Context): string {
   const provider: unknown = Reflect.get(ctx, 'dshHomePath')
@@ -156,7 +195,7 @@ function exportRequestOf(url: URL): ExportRequest {
   }
 }
 
-/** Answer the streaming export download, or the settings-only JSON. */
+/** Answer the streaming export download, the pre-download validation, or the settings-only JSON. */
 async function exportResponse(ctx: Context, request: Request): Promise<Response> {
   const url = new URL(request.url)
   try {
@@ -166,7 +205,7 @@ async function exportResponse(ctx: Context, request: Request): Promise<Response>
         throw new TransferError('no-projects', 'select at least one project or include settings')
       }
       const exported = exportSettingsFile(ctx.settings, parsed.includeSecrets)
-      return jsonAttachment(`${JSON.stringify(exported.file, null, 2)}\n`, `prism-settings-${stamp()}.json`)
+      return jsonAttachment(`${JSON.stringify(exported.file, null, 2)}\n`, `prism-settings-${stamp()}.json`, exported.skippedSecrets)
     }
     const deps = transferExportDeps(ctx, {
       get: async (id) => {
@@ -181,6 +220,17 @@ async function exportResponse(ctx: Context, request: Request): Promise<Response>
       },
     }, ctx.settings)
     const plan = await planTransferExport(deps, parsed, request.signal)
+    // Validation pass: the browser asks this first so a typed refusal (an
+    // oversized file, an unknown workspace) surfaces as copy instead of a
+    // downloaded error file, and the skip counts reach the page before the
+    // unbuffered anchor download starts.
+    if (url.searchParams.get('validate') === '1') {
+      return jsonResponse({
+        skippedLinks: plan.projects.reduce((sum, project) => sum + project.folder.skippedLinks, 0),
+        skippedUnreadable: plan.projects.reduce((sum, project) => sum + project.folder.skippedUnreadable, 0),
+        skippedSecrets: plan.includeSettings ? exportSettingsFile(ctx.settings, plan.includeSecrets).skippedSecrets : 0,
+      })
+    }
     const filename = exportFilename(plan)
     return new Response(streamTransferZip(transferArchiveEntries(deps, plan, request.signal), request.signal), {
       headers: {
@@ -229,6 +279,9 @@ async function importResponse(
     // Reserved synchronously after the spool: one tick cannot hold two slots.
     const reserved = jobs.tryBegin(url.searchParams.get('name') ?? 'archive.zip', archiveBytes)
     if (reserved === undefined) {
+      // The slot was refused; the spooled bytes are this request's own and go now.
+      // v8 ignore next 1 -- the just-closed spool cannot fail an rm under test; the busy spec asserts the end-state
+      await rm(spoolPath, { force: true }).catch(() => {})
       return failure(new TransferError('busy', 'another import is already running'))
     }
     const deps = {
@@ -237,6 +290,9 @@ async function importResponse(
       attachments: ctx.attachments,
       settings: ctx.settings,
       homePath: dshHomeOf(ctx),
+      projections: {
+        checkpoint: (header: SessionHeader, events: readonly SessionEvent[]) => checkpointInto(ctx, header, events),
+      },
     }
     void runImport(deps, {
       archivePath: spoolPath,
@@ -331,11 +387,12 @@ function stamp(): string {
 }
 
 /** JSON attachment for one settings document. */
-function jsonAttachment(body: string, filename: string): Response {
+function jsonAttachment(body: string, filename: string, skippedSecrets: number): Response {
   return new Response(body, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'content-disposition': contentDisposition(filename),
+      'x-prism-transfer-skipped-secrets': String(skippedSecrets),
     },
   })
 }

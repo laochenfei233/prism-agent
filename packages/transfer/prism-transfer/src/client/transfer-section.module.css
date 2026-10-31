@@ -91,6 +91,11 @@
   outline-offset: -2px;
 }
 
+/* Keyboard-only ring on the row, per the house focus contract. */
+.project:focus-within:not(:has(:focus-visible)) {
+  outline: none;
+}
+
 .projectCheck {
   min-width: 0;
 }

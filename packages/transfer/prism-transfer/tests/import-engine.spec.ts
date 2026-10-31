@@ -161,8 +161,6 @@ function silentProgress(): TransferJobProgress {
     addDuplicates: () => {},
     setProjectsTotal: () => {},
     addProjectDone: () => {},
-    setSkippedLinks: () => {},
-    setSkippedUnreadable: () => {},
   }
 }
 
@@ -438,6 +436,21 @@ describe('runImport refusals', () => {
       // the free-space refusal without filling a real volume.
       archivePath: archive.path, archiveBytes: Number.MAX_SAFE_INTEGER / 2, destinationRoot,
     }, silentProgress())).rejects.toMatchObject({ code: 'disk-space' })
+  })
+
+  it('refuses a project entry whose name carries a colon (NTFS stream vector)', async () => {
+    await mkdir(destinationRoot, { recursive: true })
+    const archive = await spool(projectArchive(
+      { title: 'Ads', exportedAt: 't', hasProjectFolder: true },
+      {
+        // Ordered after 'a' would silently write the stream 'a:b' onto 'a';
+        // the guard refuses regardless of order.
+        'project/a:b': new Uint8Array([1]),
+      },
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'unsafe-path' })
   })
 
   it('rejects a session log with a future format version', async () => {

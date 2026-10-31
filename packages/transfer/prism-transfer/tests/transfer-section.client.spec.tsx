@@ -4,6 +4,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TransferSection, type TransferFace, type TransferSectionProps } from '../src/client/TransferSection.tsx'
+import { TRANSFER_EXPORT_PATH } from '../src/routes.ts'
 import { en } from '../src/client/locales.ts'
 import type { TransferJobSnapshot } from '../src/types.ts'
 
@@ -110,10 +111,8 @@ function stubDownload(): ReturnType<typeof vi.fn> {
 function stubDownloadNames(): string[] {
   const names: string[] = []
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function spy(this: HTMLAnchorElement) {
-    names.push(this.download)
+    names.push(this.href)
   })
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:x')
-  vi.spyOn(URL, 'revokeObjectURL').mockReturnValue(undefined)
   return names
 }
 
@@ -181,6 +180,38 @@ describe('TransferSection export card', () => {
     vi.unstubAllGlobals()
   })
 
+  it('reports skip counts from the validation pass and the secrets header', async () => {
+    mockFetch({
+      '/api/prism.transfer/export': (url) => {
+        if (url.includes('validate=1')) {
+          return { body: { skippedLinks: 2, skippedUnreadable: 1, skippedSecrets: 3 } }
+        }
+        return { body: { ok: true } }
+      },
+    })
+    renderPage()
+    fireEvent.click(screen.getByLabelText('Alpha'))
+    fireEvent.click(screen.getByText('Export selected'))
+    await waitFor(() => {
+      expect(screen.getByText('Skipped 2 links and 1 unreadable files. 3 secret fields were not exported.')).toBeDefined()
+    })
+    vi.unstubAllGlobals()
+
+    mockFetch({
+      '/api/prism.transfer/export': () => ({
+        body: { format: 'prism-settings' },
+        headers: { 'x-prism-transfer-skipped-secrets': '4' },
+      }),
+    })
+    cleanup()
+    renderPage()
+    fireEvent.click(screen.getByText('Export settings only'))
+    await waitFor(() => {
+      expect(screen.getByText('4 secret fields were not exported.')).toBeDefined()
+    })
+    vi.unstubAllGlobals()
+  })
+
   it('exports settings only and includes the secrets flag', async () => {
     const click = stubDownload()
     mockFetch({
@@ -227,65 +258,19 @@ describe('TransferSection export card', () => {
     vi.restoreAllMocks()
   })
 
-  it('falls back to the plain and then the default download name from the disposition', async () => {
-    const names = stubDownloadNames()
+  it('hands the streaming route URL to the browser download manager', async () => {
+    const hrefs = stubDownloadNames()
     mockFetch({
-      '/api/prism.transfer/export': () => ({
-        body: {},
-        headers: { 'content-disposition': 'attachment; filename="plain.zip"' },
-      }),
+      '/api/prism.transfer/export': () => ({ body: { skippedLinks: 0, skippedUnreadable: 0, skippedSecrets: 0 } }),
     })
     renderPage()
     fireEvent.click(screen.getByLabelText('Alpha'))
     fireEvent.click(screen.getByText('Export selected'))
     await waitFor(() => {
-      expect(names).toContain('plain.zip')
+      expect(hrefs.some(href => href.includes(TRANSFER_EXPORT_PATH) && href.includes('projects=w1'))).toBe(true)
     })
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
-
-    cleanup()
-    const secondNames = stubDownloadNames()
-    mockFetch({
-      '/api/prism.transfer/export': () => ({
-        body: {},
-        headers: { 'content-disposition': 'attachment' },
-      }),
-    })
-    renderPage()
-    fireEvent.click(screen.getByLabelText('Alpha'))
-    fireEvent.click(screen.getByText('Export selected'))
-    await waitFor(() => {
-      expect(secondNames).toContain('prism-transfer.zip')
-    })
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
-  })
-
-  it('shows the bare failure code when the failure body carries no message', async () => {
-    mockFetch({
-      '/api/prism.transfer/export': () => ({ status: 409, body: { code: 'weird', message: '' } }),
-    })
-    renderPage()
-    fireEvent.click(screen.getByLabelText('Alpha'))
-    fireEvent.click(screen.getByText('Export selected'))
-    await waitFor(() => {
-      expect(screen.getByText('weird')).toBeDefined()
-    })
-    vi.unstubAllGlobals()
-  })
-
-  it('reports the HTTP status when the failure body is not JSON', async () => {
-    mockFetch({
-      '/api/prism.transfer/export': () => new Response('gateway exploded', { status: 502 }),
-    })
-    renderPage()
-    fireEvent.click(screen.getByLabelText('Alpha'))
-    fireEvent.click(screen.getByText('Export selected'))
-    await waitFor(() => {
-      expect(screen.getByText('Request failed (HTTP 502)')).toBeDefined()
-    })
-    vi.unstubAllGlobals()
   })
 
   it('reports a non-Error export rejection and a failing settings-only export', async () => {
@@ -307,7 +292,7 @@ describe('TransferSection export card', () => {
     renderPage()
     fireEvent.click(screen.getByText('Export settings only'))
     await waitFor(() => {
-      expect(screen.getByText('unreadable document')).toBeDefined()
+      expect(screen.getByText('The settings file format is not supported.')).toBeDefined()
     })
     vi.unstubAllGlobals()
 
@@ -338,6 +323,8 @@ describe('TransferSection import card', () => {
     await waitFor(() => {
       expect(screen.getByText('No system directory picker on this deployment; keeping the default.')).toBeDefined()
     })
+    // The unavailable capability hides the control entirely.
+    expect(screen.queryByText('Change…')).toBeNull()
   })
 
   it('uploads a chosen file and renders the done outcome with duplicates and settings', async () => {
@@ -374,8 +361,7 @@ describe('TransferSection import card', () => {
     const running: TransferJobSnapshot = {
       jobId: 'jf', kind: 'combined', state: 'running', phase: 'restoring', name: 'fail.zip',
       archiveBytes: 10, files: 0, bytes: 5, sessionsDone: 1, sessionsTotal: 4,
-      projectsDone: 0, projectsTotal: 2, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-      skippedSecrets: 0, startedAt: 1,
+      projectsDone: 0, projectsTotal: 2,      skippedSecrets: 0, startedAt: 1,
     }
     mockFetch({
       '/api/prism.transfer/import': () => ({ body: { jobId: 'jf' } }),
@@ -397,7 +383,7 @@ describe('TransferSection import card', () => {
       expect(screen.getByText('Restoring sessions and media…')).toBeDefined()
     }, { timeout: 5000 })
     await waitFor(() => {
-      expect(screen.getByText('entry "x" failed its checksum')).toBeDefined()
+      expect(screen.getByText('The archive is damaged: an entry failed its checksum.')).toBeDefined()
     }, { timeout: 5000 })
     vi.unstubAllGlobals()
   })
@@ -451,8 +437,7 @@ describe('TransferSection import card', () => {
             body: {
               jobId: 'jn', kind: 'project', state: 'failed', phase: 'restoring', name: 'noerror.zip',
               archiveBytes: 10, files: 0, bytes: 0, sessionsDone: 0, sessionsTotal: 0,
-              projectsDone: 0, projectsTotal: 0, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-              skippedSecrets: 0, startedAt: 1,
+              projectsDone: 0, projectsTotal: 0,              skippedSecrets: 0, startedAt: 1,
             },
           }
         }
@@ -461,8 +446,7 @@ describe('TransferSection import card', () => {
           body: {
             jobId: 'jn', kind: 'project', state: 'running', phase: 'validating', name: 'noerror.zip',
             archiveBytes: 10, files: 0, bytes: 0, sessionsDone: 0, sessionsTotal: 0,
-            projectsDone: 0, projectsTotal: 0, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-            skippedSecrets: 0, startedAt: 1,
+            projectsDone: 0, projectsTotal: 0,            skippedSecrets: 0, startedAt: 1,
           },
         }
       },
@@ -621,8 +605,7 @@ describe('TransferSection import card', () => {
         body: {
           jobId: 'jr1', kind: 'project', state: 'done', phase: 'done', name: 'plain.zip',
           archiveBytes: 10, files: 1, bytes: 5, sessionsDone: 2, sessionsTotal: 2,
-          projectsDone: 1, projectsTotal: 1, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-          skippedSecrets: 0, startedAt: 1,
+          projectsDone: 1, projectsTotal: 1,          skippedSecrets: 0, startedAt: 1,
           result: {
             projects: [{ name: 'Alpha', path: '/p/Alpha', sessions: 2, duplicates: 0 }],
             settings: [{ ns: 'web', outcome: 'applied' }],
@@ -650,8 +633,7 @@ describe('TransferSection import card', () => {
         body: {
           jobId: 'jr2', kind: 'project', state: 'done', phase: 'done', name: 'warn.zip',
           archiveBytes: 10, files: 0, bytes: 0, sessionsDone: 0, sessionsTotal: 0,
-          projectsDone: 0, projectsTotal: 0, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-          skippedSecrets: 0, startedAt: 1,
+          projectsDone: 0, projectsTotal: 0,          skippedSecrets: 0, startedAt: 1,
           result: {
             projects: [{ name: 'Alpha', path: '/p/Alpha', sessions: 1, duplicates: 0, registerError: 'registry is read-only' }],
           },
@@ -674,8 +656,7 @@ describe('TransferSection import card', () => {
         body: {
           jobId: 'jr3', kind: 'project', state: 'done', phase: 'done', name: 'noresult.zip',
           archiveBytes: 10, files: 0, bytes: 0, sessionsDone: 0, sessionsTotal: 0,
-          projectsDone: 0, projectsTotal: 0, duplicates: 0, skippedLinks: 0, skippedUnreadable: 0,
-          skippedSecrets: 0, startedAt: 1,
+          projectsDone: 0, projectsTotal: 0,          skippedSecrets: 0, startedAt: 1,
         },
       }),
     })

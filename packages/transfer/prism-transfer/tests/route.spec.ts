@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
+import { waitFor } from '@testing-library/react'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-query'
@@ -33,6 +35,44 @@ function fakeConnection() {
   }
 }
 
+
+
+/** Build a single-session archive, upload it through the import route, and return the job id. */
+async function postArchive(
+  ctx: Context,
+  connection: ReturnType<typeof fakeConnection>,
+  home: string,
+  title: string,
+  sessionId: string,
+): Promise<{ jobId: string; routes: ReturnType<typeof fakeConnection>['routes'] }> {
+  const archive = join(tempRoot, `${String(randomUUID())}.zip`)
+  const { zipSync } = await import('fflate')
+  const encoder = new TextEncoder()
+  await writeFile(archive, zipSync({
+    '.prism-project.json': encoder.encode(`${JSON.stringify({
+      format: 'prism-project', version: 1, title, exportedAt: 't',
+      sessions: 1, hasProjectFolder: false,
+    })}
+`),
+    [`sessions/${sessionId}/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: encoder.encode(
+      `${JSON.stringify({ type: 'session', version: SESSION_FORMAT_VERSION, id: sessionId, createdAt: 1000, isSeeded: false, delegationDepth: 0 })}
+`
+      + `${JSON.stringify({ type: 'turn/start', seq: 0, time: 2000, data: { turn: 1 } })}
+`,
+    ),
+  }, { level: 6 }))
+  const body = await readFile(archive)
+  await rm(archive)
+  const response = await routeHandler(connection.routes, TRANSFER_IMPORT_PATH)(
+    new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
+      method: 'POST',
+      body: body as unknown as BodyInit,
+      headers: { 'content-type': 'application/octet-stream' },
+    }),
+  )
+  const { jobId } = await response.json() as { jobId: string }
+  return { jobId, routes: connection.routes }
+}
 
 /** Fetch one registered handler, failing the test when the route is absent. */
 function routeHandler(routes: Map<string, (request: Request) => Promise<Response>>, path: string): (request: Request) => Promise<Response> {
@@ -286,6 +326,165 @@ describe('transfer routes', () => {
       new Request(`http://host${TRANSFER_JOB_PATH}`),
     )
     expect(await noId.json()).toEqual({ state: 'idle' })
+  })
+
+  it('answers the validation pass with the skip counts before any download', async () => {
+    const { routes } = await buildPlugin()
+    const response = await routeHandler(routes, TRANSFER_EXPORT_PATH)(
+      new Request(`http://host${TRANSFER_EXPORT_PATH}?projects=w1&settings=1&secrets=0&validate=1`),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ skippedLinks: 0, skippedUnreadable: 0, skippedSecrets: 0 })
+  })
+
+  it('hands the settings-only export the skipped-secrets header', async () => {
+    const { routes } = await buildPlugin()
+    const response = await routeHandler(routes, TRANSFER_EXPORT_PATH)(
+      new Request(`http://host${TRANSFER_EXPORT_PATH}?projects=&settings=1&secrets=0`),
+    )
+    expect(response.headers.get('x-prism-transfer-skipped-secrets')).toBe('0')
+  })
+
+  it('answers a projects-carrying validation pass and removes the spool on a busy refusal', async () => {
+    const { routes, home } = await buildPlugin()
+    const checked = await routeHandler(routes, TRANSFER_EXPORT_PATH)(
+      new Request(`http://host${TRANSFER_EXPORT_PATH}?projects=w1&validate=1`),
+    )
+    expect(await checked.json()).toEqual({ skippedLinks: 0, skippedUnreadable: 0, skippedSecrets: 0 })
+    // Busy refusal: park the persistence create so the job never finishes,
+    // then confirm the refused upload's spool file is removed.
+    const cacheDir = join(home, 'cache', 'prism-transfer')
+    const archive = join(tempRoot, `${randomUUID()}.zip`)
+    const { zipSync } = await import('fflate')
+    const encoder = new TextEncoder()
+    await writeFile(archive, zipSync({
+      '.prism-project.json': encoder.encode(`${JSON.stringify({
+        format: 'prism-project', version: 1, title: 'Busy', exportedAt: 't',
+        sessions: 0, hasProjectFolder: false,
+      })}\n`),
+    }, { level: 6 }))
+    const bytes = await readFile(archive)
+    await rm(archive)
+    const first = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
+      new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
+        method: 'POST',
+        body: bytes as unknown as BodyInit,
+        headers: { 'content-type': 'application/octet-stream' },
+      }),
+    )
+    expect(first.status).toBe(200)
+    const second = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
+      new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
+        method: 'POST',
+        body: bytes as unknown as BodyInit,
+        headers: { 'content-type': 'application/octet-stream' },
+      }),
+    )
+    expect(second.status).toBe(409)
+    await waitFor(() => {
+      expect(readdir(cacheDir)).resolves.toEqual([])
+    })
+  })
+
+  it('checkpoints restored sessions into the projection cache through the shipped route', async () => {
+    const { home } = await buildPlugin()
+    const checkpoints: string[] = []
+    // Re-apply over a context that carries the cache, then drive one import
+    // through the real route and watch the checkpoint fold land.
+    const ctx = new Context()
+    const connection = fakeConnection()
+    const stores = fakeStores(join(home, 'project'))
+    ctx.provide('connection', connection.connection as never)
+    ctx.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
+    ctx.provide('sessionPersistence', stores.sessionPersistence)
+    ctx.provide('workspaceRegistry', stores.workspaceRegistry)
+    ctx.provide('attachments', {
+      imageLimits: { maxImageBytes: 8 * 2 ** 20 },
+      saveImage: async () => {
+        throw new Error('not used')
+      },
+      saveFileStream: async () => {
+        throw new Error('not used')
+      },
+    } as never)
+    ctx.provide('settings', fakeSettings() as never)
+    ctx.provide('sessionProjectionCache', {
+      coldSnapshot: (header: { id: string }) => {
+        checkpoints.push(header.id)
+        return { values: { title: 'x' } }
+      },
+      cachedSnapshot: (header: { id: string }) => (checkpoints.includes(header.id) ? { values: {} } : undefined),
+    } as never)
+    Reflect.set(ctx, 'dshHomePath', () => home)
+    apply(ctx)
+    const { jobId, routes: importRoutes } = await postArchive(ctx, connection, home, 'Cached', 'c-9')
+    const snapshot = await awaitDone(importRoutes, jobId)
+    expect(snapshot['state']).toBe('done')
+    expect(checkpoints).toContain('c-9')
+    await ctx.fiber.dispose()
+  })
+
+  it('skips the checkpoint drain when the cache holds no client view and when it never becomes readable', async () => {
+    const { home } = await buildPlugin()
+    const ctx = new Context()
+    const connection = fakeConnection()
+    const stores = fakeStores(join(home, 'project'))
+    ctx.provide('connection', connection.connection as never)
+    ctx.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
+    ctx.provide('sessionPersistence', stores.sessionPersistence)
+    ctx.provide('workspaceRegistry', stores.workspaceRegistry)
+    ctx.provide('attachments', {
+      imageLimits: { maxImageBytes: 8 * 2 ** 20 },
+      saveImage: async () => {
+        throw new Error('not used')
+      },
+      saveFileStream: async () => {
+        throw new Error('not used')
+      },
+    } as never)
+    ctx.provide('settings', fakeSettings() as never)
+    // No served value: coldSnapshot returns an empty record, so the fold
+    // returns before waiting.
+    ctx.provide('sessionProjectionCache', {
+      coldSnapshot: () => ({ values: {} }),
+      cachedSnapshot: () => undefined,
+    } as never)
+    Reflect.set(ctx, 'dshHomePath', () => home)
+    apply(ctx)
+    const first = await postArchive(ctx, connection, home, 'Cold', 'cold-1')
+    const coldSnapshot = await awaitDone(connection.routes, first.jobId)
+    expect(coldSnapshot['state']).toBe('done')
+    await ctx.fiber.dispose()
+
+    // Never readable: the drain polls until its deadline and gives up, still
+    // finishing the import. The deadline is the fixed two-second bound.
+    const never = new Context()
+    const neverConnection = fakeConnection()
+    const neverStores = fakeStores(join(home, 'project'))
+    never.provide('connection', neverConnection.connection as never)
+    never.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
+    never.provide('sessionPersistence', neverStores.sessionPersistence)
+    never.provide('workspaceRegistry', neverStores.workspaceRegistry)
+    never.provide('attachments', {
+      imageLimits: { maxImageBytes: 8 * 2 ** 20 },
+      saveImage: async () => {
+        throw new Error('not used')
+      },
+      saveFileStream: async () => {
+        throw new Error('not used')
+      },
+    } as never)
+    never.provide('settings', fakeSettings() as never)
+    never.provide('sessionProjectionCache', {
+      coldSnapshot: () => ({ values: { title: 'x' } }),
+      cachedSnapshot: () => undefined,
+    } as never)
+    Reflect.set(never, 'dshHomePath', () => home)
+    apply(never)
+    const second = await postArchive(never, neverConnection, home, 'Never', 'never-1')
+    const neverSnapshot = await awaitDone(neverConnection.routes, second.jobId)
+    expect(neverSnapshot['state']).toBe('done')
+    await never.fiber.dispose()
   })
 
   it('refuses to compose without a working dshHomePath service', () => {

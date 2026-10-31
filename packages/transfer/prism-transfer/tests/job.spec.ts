@@ -40,8 +40,6 @@ describe('TransferJobStore', () => {
     job.addDuplicates(1)
     job.setProjectsTotal(2)
     job.addProjectDone(1)
-    job.setSkippedLinks(3)
-    job.setSkippedUnreadable(1)
     job.addFiles(7)
     job.addBytes(90)
     expect(store.snapshot(job.jobId)).toMatchObject({
@@ -52,8 +50,6 @@ describe('TransferJobStore', () => {
       duplicates: 1,
       projectsTotal: 2,
       projectsDone: 1,
-      skippedLinks: 3,
-      skippedUnreadable: 1,
       files: 7,
       bytes: 90,
     })

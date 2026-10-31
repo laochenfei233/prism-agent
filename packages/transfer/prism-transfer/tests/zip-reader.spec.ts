@@ -359,6 +359,68 @@ describe('ZipArchiveReader.open', () => {
     await expect(openArchive(nfcBytes)).rejects.toMatchObject({ code: 'path-conflict' })
   })
 
+  it('rejects ancestor conflicts in both orders', async () => {
+    // File `a` first, then the directory entry `a/`.
+    const fileFirst = zipSync({
+      'project/a': new Uint8Array([1]),
+      'project/a/b.txt': new Uint8Array([2]),
+    }, { level: 6 })
+    await expect(openArchive(fileFirst)).rejects.toMatchObject({ code: 'path-conflict' })
+    // Entries below `a/` first, then a file named `a`.
+    const directoryFirst = zipSync({
+      'project/a/b.txt': new Uint8Array([2]),
+      'project/a': new Uint8Array([1]),
+    }, { level: 6 })
+    await expect(openArchive(directoryFirst)).rejects.toMatchObject({ code: 'path-conflict' })
+  })
+
+  it('refuses ancestor conflicts involving explicit directory records', async () => {
+    // File `project/a` first, then the explicit directory record `project/a/`.
+    const fileFirst = zipSync({
+      'project/a': new Uint8Array([1]),
+      'project/a/': new Uint8Array([]),
+    }, { level: 6 })
+    await expect(openArchive(fileFirst)).rejects.toMatchObject({ code: 'path-conflict' })
+    // Directory record first, then a file taking the same name.
+    const directoryFirst = zipSync({
+      'project/a/': new Uint8Array([]),
+      'project/a': new Uint8Array([1]),
+    }, { level: 6 })
+    await expect(openArchive(directoryFirst)).rejects.toMatchObject({ code: 'path-conflict' })
+    // A clean explicit directory record parses and is skipped by bytes().
+    const clean = zipSync({
+      'project/': new Uint8Array([]),
+      'project/x.txt': new Uint8Array([1]),
+    }, { level: 6 })
+    const reader = await openArchive(clean)
+    try {
+      const directory = reader.entryByName('project/')
+      expect(directory?.directory).toBe(true)
+      const chunks: Uint8Array[] = []
+      for await (const chunk of reader.bytes(directory!)) chunks.push(chunk)
+      expect(chunks).toEqual([])
+    } finally {
+      await reader.close()
+    }
+  })
+
+  it('rejects colons in directory segments while keeping final-segment colons', async () => {
+    const adsDirectory = zipSync({
+      'project/media:sub/x.txt': new Uint8Array([1]),
+    }, { level: 6 })
+    await expect(openArchive(adsDirectory)).rejects.toMatchObject({ code: 'unsafe-path' })
+    // The attachment naming convention is a final-segment colon and stays legal.
+    const attachment = zipSync({
+      'sessions/s-1/media/sha256:abcd.png': new Uint8Array([1]),
+    }, { level: 6 })
+    const reader = await openArchive(attachment)
+    try {
+      expect(reader.entryByName('sessions/s-1/media/sha256:abcd.png')).toBeDefined()
+    } finally {
+      await reader.close()
+    }
+  })
+
   it('rejects encrypted, unsupported-method, and non-UTF-8 records', async () => {
     const bytes = zipSync({ 'a.txt': new TextEncoder().encode('x') }, { level: 6 })
     const record = centralRecordOf(bytes, 'a.txt')
@@ -629,6 +691,27 @@ describe('ZipArchiveReader.bytes integrity', () => {
       await expect(async () => {
         for await (const chunk of reader.bytes(reader.entries[0]!)) void chunk
       }).rejects.toMatchObject({ code: 'bad-archive' })
+    } finally {
+      await reader.close()
+    }
+  })
+
+  it('cuts a lying deflate entry off mid-stream instead of delivering the bomb', async () => {
+    // A highly compressible payload whose compressed form is tiny but whose
+    // true size dwarfs the declared central-directory value: the reader must
+    // stop at the declaration, not after streaming the expansion.
+    const bomb = zipSync({ 'bomb.bin': new Uint8Array(1024 * 1024) }, { level: 6 })
+    const record = centralRecordOf(bomb, 'bomb.bin')
+    const patched = Uint8Array.from(bomb)
+    const view = new DataView(patched.buffer)
+    view.setUint32(record + 24, 16, true)
+    const reader = await openArchive(patched)
+    try {
+      let delivered = 0
+      await expect(async () => {
+        for await (const chunk of reader.bytes(reader.entries[0]!)) delivered += chunk.byteLength
+      }).rejects.toMatchObject({ code: 'bad-archive' })
+      expect(delivered).toBeLessThanOrEqual(16)
     } finally {
       await reader.close()
     }

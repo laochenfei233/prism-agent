@@ -226,9 +226,6 @@ export interface TransferJobSnapshot {
   readonly projectsDone: number
   readonly projectsTotal: number
   readonly duplicates: number
-  readonly skippedLinks: number
-  readonly skippedUnreadable: number
-  readonly skippedSecrets: number
   readonly result?: {
     readonly projects: readonly ImportedProjectResult[]
     readonly settings?: readonly SettingsApplyOutcome[]

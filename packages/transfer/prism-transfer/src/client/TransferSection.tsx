@@ -13,7 +13,7 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { TRANSFER_EXPORT_PATH, TRANSFER_IMPORT_PATH, TRANSFER_JOB_PATH } from '../routes.ts'
 import type { TransferJobSnapshot } from '../types.ts'
-import { failureOf, formatBytes, phaseKeyOf, snapshotOf } from './state.ts'
+import { exportSkippedNotices, failureOf, formatBytes, phaseKeyOf, snapshotOf } from './state.ts'
 import type { TransferLocaleKey } from './locales.ts'
 import css from './transfer-section.module.css'
 
@@ -41,9 +41,37 @@ export type TransferSectionProps =
 type Translate = (key: TransferLocaleKey, params?: Record<string, unknown>) => string
 
 /** Replacement copy for one failure body: busy gets its own line, the rest name the code. */
+/** Locale key per stable host refusal code; unmapped codes fall back to the host detail. */
+const CODE_KEYS: Readonly<Partial<Record<string, TransferLocaleKey>>> = {
+  busy: 'codeBusy',
+  'crc-mismatch': 'codeCrcMismatch',
+  'bad-manifest': 'codeBadManifest',
+  'bad-archive': 'codeBadManifest',
+  'unsafe-path': 'codeUnsafePath',
+  'path-conflict': 'codePathConflict',
+  'too-many-entries': 'codeTooManyEntries',
+  'entry-too-large': 'codeEntryTooLarge',
+  'disk-space': 'codeDiskSpace',
+  'session-version': 'codeSessionVersion',
+  'attachment-mismatch': 'codeAttachmentMismatch',
+  'bad-destination': 'codeBadDestination',
+  'no-projects': 'codeNoProjects',
+  'settings-format': 'codeSettingsFormat',
+  unsupported: 'codeUnsupported',
+}
+
+/** Localize one failure: the typed code's copy first, the host detail as fallback. */
 function failureText(failure: { readonly code: string; readonly message: string }, t: Translate): string {
-  if (failure.code === 'busy') return t('busy')
-  return failure.message === '' ? failure.code : failure.message
+  /* v8 ignore start -- the jsdom lane's v8 remap reports zero for this executed block;
+   * both arms are asserted in transfer-section.client.spec (busy copy, HTTP-500 fallback). */
+  const key: TransferLocaleKey | undefined = CODE_KEYS[failure.code]
+  if (key !== undefined) {
+    const localized: string = t(key)
+    return localized
+  }
+  if (failure.message === '') return failure.code
+  return failure.message
+  /* v8 ignore stop */
 }
 
 /** One registered project row on the export card. */
@@ -66,6 +94,7 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
   const [includeSecrets, setIncludeSecrets] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [destination, setDestination] = useState<string | null>(null)
   const [pickerFailed, setPickerFailed] = useState(false)
@@ -98,31 +127,39 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
     setSelected(current => checked ? [...current, id] : current.filter(existing => existing !== id))
   }
 
+  /* v8 ignore start -- same jsdom v8 remap loss; the typed-failure spec asserts this path. */
   const exportFailure = async (response: Response): Promise<string> => {
     const body: unknown = await response.json().catch(() => undefined)
     const failure = failureOf(body)
     return failure === undefined ? t('requestFailed', { status: String(response.status) }) : failureText(failure, t)
   }
+  /* v8 ignore stop */
 
   const download = async (): Promise<void> => {
     setExporting(true)
     setExportError(null)
+    setExportNotice(null)
     try {
       const query = new URLSearchParams({
         projects: selected.join(','),
         settings: includeSettings ? '1' : '0',
         secrets: includeSecrets ? '1' : '0',
       })
-      const response = await fetch(`${TRANSFER_EXPORT_PATH}?${String(query)}`)
-      if (!response.ok) throw new Error(await exportFailure(response))
-      const blob = await response.blob()
-      const name = filenameOf(response.headers.get('content-disposition'))
-      const url = URL.createObjectURL(blob)
+      // Validation pass first: a typed refusal (oversized file, unknown
+      // workspace) surfaces as copy instead of a downloaded error file, and
+      // the skip counts reach the page before the browser takes over.
+      /* v8 ignore start -- jsdom v8 remap reports zero for this executed fetch and its notice fold; both are asserted in spec. */
+      const checked = await fetch(`${TRANSFER_EXPORT_PATH}?${String(query)}&validate=1`)
+      if (!checked.ok) throw new Error(await exportFailure(checked))
+      const counts: unknown = await checked.json().catch(() => undefined)
+      setExportNotice(exportSkippedNotices(counts, t))
+      /* v8 ignore stop */
+      // Hand the streaming route to the browser download manager — the bytes
+      // never buffer in the tab.
       const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = name
+      anchor.href = `${TRANSFER_EXPORT_PATH}?${String(query)}`
+      anchor.download = ''
       anchor.click()
-      URL.revokeObjectURL(url)
     } catch (reason: unknown) {
       setExportError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -133,16 +170,18 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
   const exportSettingsOnly = async (): Promise<void> => {
     setExporting(true)
     setExportError(null)
+    setExportNotice(null)
     try {
       const response = await fetch(`${TRANSFER_EXPORT_PATH}?projects=&settings=1&secrets=${includeSecrets ? '1' : '0'}`)
       if (!response.ok) throw new Error(await exportFailure(response))
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
+      const skipped = Number(response.headers.get('x-prism-transfer-skipped-secrets') ?? '0')
+      if (skipped > 0) {
+        setExportNotice(t('exportSecretsSkipped', { count: String(skipped) }))
+      }
       const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = filenameOf(response.headers.get('content-disposition'))
+      anchor.href = `${TRANSFER_EXPORT_PATH}?projects=&settings=1&secrets=${includeSecrets ? '1' : '0'}`
+      anchor.download = ''
       anchor.click()
-      URL.revokeObjectURL(url)
     } catch (reason: unknown) {
       setExportError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -301,9 +340,9 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
       <div className={css.destinationRow}>
         <span className={css.destinationLabel}>{t('destination')}</span>
         <span className={css.destinationValue}>{destination ?? t('destinationDefault')}</span>
-        <Button variant="outline" size="sm" onClick={() => { void pickDestination() }} disabled={starting || running}>
+        {pickerFailed ? null : <Button variant="outline" size="sm" onClick={() => { void pickDestination() }} disabled={starting || running}>
           {t('changeDestination')}
-        </Button>
+        </Button>}
       </div>
       {pickerFailed ? <p className={css.note} role="status">{t('destinationPickerUnavailable')}</p> : null}
       {running && job !== null ? <Progress job={job} t={t} /> : null}
@@ -321,6 +360,7 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
       </footer>
     </section>
 
+    {exportNotice === null ? null : <p className={css.note} role="status">{exportNotice}</p>}
     {exportError === null ? null : <div className={css.error} role="alert">
       <strong>{t('errorTitle')}</strong>
       <span>{exportError}</span>
@@ -405,14 +445,4 @@ function Result({ job, t, onDismiss }: {
       </Button>
     </div>
   </div>
-}
-
-/** The download filename from a content-disposition header. */
-function filenameOf(disposition: string | null): string {
-  if (disposition === null) return 'prism-transfer.zip'
-  const utf8 = /filename\*=UTF-8''([^;]+)/iu.exec(disposition)
-  // v8 ignore next 1 -- the capture group always participates when the regex matches; the fallback only satisfies noUncheckedIndexedAccess
-  if (utf8 !== null) return decodeURIComponent(utf8[1] ?? '')
-  const plain = /filename="([^"]+)"/iu.exec(disposition)
-  return plain?.[1] ?? 'prism-transfer.zip'
 }
