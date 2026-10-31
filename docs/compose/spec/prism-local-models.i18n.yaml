@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for prism-local-models.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-local-models.md
+/:
+  en: 1df7aa917b17de3f
+  zh: 1df7aa917b17de3f
+/prism-local-models:
+  en: 6a2f00c69a818ca6
+  zh: 5384c2cefb958711
+/prism-local-models/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/prism-local-models/s1-problem:
+  en: e7c372073814698a
+  zh: d123768bf94d5d0f
+/prism-local-models/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-local-models/s2-design/s2-1-shape-an-out-of-tree-dual-face-plugin-the-models-page-stays-untouched:
+  en: 4ac976bbd200e984
+  zh: a80f025616ec5cc0
+/prism-local-models/s2-design/s2-2-catalog-and-variants:
+  en: fb18f66d2643db2c
+  zh: f1b7dabdf1e807ce
+/prism-local-models/s2-design/s2-3-storage-layout-and-registry:
+  en: 1354c68bc9c9ac58
+  zh: cf819a4fe09031c6
+/prism-local-models/s2-design/s2-4-node-half-service-and-capability-contract:
+  en: 3157f66ffbe70f63
+  zh: 5a230baf657bd9dd
+/prism-local-models/s2-design/s2-5-runtime-provisioning:
+  en: 73a89eb2e315b650
+  zh: 8265d60f030474c6
+/prism-local-models/s2-design/s2-6-inference-wiring:
+  en: 0b2b2ca6b5be6c30
+  zh: a832f44ed6c64097
+/prism-local-models/s2-design/s2-7-http-api:
+  en: 1dde907c543e13b4
+  zh: faafe23aad32f95a
+/prism-local-models/s2-design/s2-8-browser-half-the-models-page-card:
+  en: 462ff158886f630c
+  zh: 1fb12f53bbd90542
+/prism-local-models/s3-scope:
+  en: adf2f420d67f69c7
+  zh: 42eb96b6387f113b
+/prism-local-models/tasks:
+  en: 568ca6fafc957fc0
+  zh: 599ae6aef3489387
+/prism-local-models/s4-acceptance:
+  en: 735fcd5d89577c1b
+  zh: 7d59442368f160cd
