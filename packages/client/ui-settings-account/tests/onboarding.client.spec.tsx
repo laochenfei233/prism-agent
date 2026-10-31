@@ -14,7 +14,7 @@ afterEach(cleanup)
 
 const theme: ThemeSnapshot = {
   preference: 'light', fontSizes: { text: 14, code: 11, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' },
-  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0,
+  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], custom: { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, revision: 0,
 }
 
 it('claims onboarding while loading, offers API key fallback, and completes after login', () => {

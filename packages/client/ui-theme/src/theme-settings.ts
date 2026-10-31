@@ -9,13 +9,25 @@ export const BUILTIN_SCHEMES = ['light', 'dark'] as const
 export const BUILTIN_THEME_IDS = ['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'] as const
 
 /** Built-in preferences accepted at the registry and settings boundaries. */
-export const THEME_PREFERENCES = ['system', ...BUILTIN_THEME_IDS] as const
+export const THEME_PREFERENCES = ['system', ...BUILTIN_THEME_IDS, 'custom'] as const
+
+/** Preference id selecting the user-synthesized custom theme. */
+export const CUSTOM_THEME_ID = 'custom'
 
 /** Settings namespace owned by the theme plugin. */
 export const THEME_SETTINGS_NAMESPACE = 'ui-theme'
 
 /** Field carrying the selected built-in theme preference. */
 export const THEME_PREFERENCE_FIELD = 'preference'
+
+/** Field carrying the custom theme's base palette mode. */
+export const CUSTOM_SCHEME_FIELD = 'customScheme'
+
+/** Field carrying the custom theme's canvas color. */
+export const CUSTOM_CANVAS_FIELD = 'customCanvas'
+
+/** Field carrying the custom theme's accent color. */
+export const CUSTOM_ACCENT_FIELD = 'customAccent'
 
 /** Field carrying the conversation content font size. */
 export const FONT_SIZE_FIELD = 'fontSize'
@@ -31,6 +43,40 @@ export type ThemeColorScheme = typeof BUILTIN_SCHEMES[number]
 
 /** Default preference when the user-settings document has no override. */
 export const DEFAULT_PREFERENCE: ThemePreference = 'system'
+
+/** Base palette mode of the custom theme when the settings document has none. */
+export const DEFAULT_CUSTOM_SCHEME: ThemeColorScheme = 'light'
+
+/** Canvas color of the custom theme when the settings document has none. */
+export const DEFAULT_CUSTOM_CANVAS = '#ffffff'
+
+/** Accent color of the custom theme when the settings document has none. */
+export const DEFAULT_CUSTOM_ACCENT = '#ff6900'
+
+/** Hex color accepted for custom theme colors: `#rgb` or `#rrggbb`. */
+export const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+
+/**
+ * Whether one value is an accepted custom theme color.
+ * @param value - candidate color.
+ * @returns true for `#rgb` or `#rrggbb`.
+ */
+export function isHexColor(value: string): boolean {
+  return HEX_COLOR_PATTERN.test(value)
+}
+
+/**
+ * Canonicalize a validated hex color: lowercase, three-digit forms expanded to six.
+ * @param value - a color that passed {@link isHexColor}.
+ * @returns the canonical `#rrggbb` form.
+ */
+export function normalizeHexColor(value: string): string {
+  if (!isHexColor(value)) throw new Error(`"${value}" is not a hex color; expected #rgb or #rrggbb`)
+  if (value.length === 4) {
+    return `#${value.charAt(1).repeat(2)}${value.charAt(2).repeat(2)}${value.charAt(3).repeat(2)}`.toLowerCase()
+  }
+  return value.toLowerCase()
+}
 
 /** Smallest accepted content font size (px). */
 export const FONT_SIZE_MIN = 10
@@ -147,6 +193,12 @@ export interface ThemeSettings {
   codeFontFamily: string
   /** Sidebar terminal fonts placed before the built-in terminal stack; `''` keeps the built-in stack. */
   terminalFontFamily: string
+  /** Base palette mode of the synthesized custom theme. */
+  customScheme: ThemeColorScheme
+  /** Canvas color of the synthesized custom theme (`#rgb`/`#rrggbb`). */
+  customCanvas: string
+  /** Accent color of the synthesized custom theme (`#rgb`/`#rrggbb`). */
+  customAccent: string
 }
 
 /**
@@ -165,6 +217,29 @@ export function fontSizeSchema(spec: FontSizeSpec): z<number> {
  */
 export function sectionFontSizes(section: ThemeSettings): FontSizes {
   return Object.freeze({ text: section.fontSize, code: section.codeFontSize, terminal: section.terminalFontSize })
+}
+
+/** The three user-chosen inputs the custom theme synthesizes from. */
+export interface CustomThemeInputs {
+  /** Base palette the synthesized tokens layer over. */
+  scheme: ThemeColorScheme
+  /** Canvas color (`#rrggbb`). */
+  canvas: string
+  /** Accent color (`#rrggbb`). */
+  accent: string
+}
+
+/**
+ * Collect the custom theme inputs from a settings section.
+ * @param section - accepted theme settings.
+ * @returns the scheme, canvas, and accent inputs (colors canonicalized).
+ */
+export function customInputsOf(section: ThemeSettings): CustomThemeInputs {
+  return {
+    scheme: section.customScheme,
+    canvas: normalizeHexColor(section.customCanvas),
+    accent: normalizeHexColor(section.customAccent),
+  }
 }
 
 /**
@@ -187,6 +262,9 @@ export const ThemeSettingsSchema: z<ThemeSettings> = z.object({
   [FONT_FAMILY_FIELDS.text]: z.string().default(''),
   [FONT_FAMILY_FIELDS.code]: z.string().default(''),
   [FONT_FAMILY_FIELDS.terminal]: z.string().default(''),
+  [CUSTOM_SCHEME_FIELD]: z.union([...BUILTIN_SCHEMES]).default(DEFAULT_CUSTOM_SCHEME),
+  [CUSTOM_CANVAS_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS),
+  [CUSTOM_ACCENT_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT),
 })
 
 /** CSS Fonts generic and system family keywords, which must stay unquoted. */

@@ -67,5 +67,9 @@
   ],
   "ui-theme/src/client/AppearanceRow.module.css": [
     ".preview: border-radius: 10px"
+  ],
+  "ui-theme/src/client/AppearanceSection.module.css": [
+    ".swatch: border-radius: 6px",
+    ".pickerInput: border-radius: 6px"
   ]
 }

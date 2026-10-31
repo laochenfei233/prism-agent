@@ -1,12 +1,13 @@
 /**
  * Browser theme registry over the `--dsw-*` token stylesheets. The service
- * owns the live theme preference (light/dark/system), resolves `system` through
- * `prefers-color-scheme`, and publishes immutable snapshots; it never touches
- * the DOM — ui-layout's presenter consumes the resolved snapshot. The Host
- * settings scope loads and stores the preference in the user-settings
- * document. The plugin also registers the Appearance and font settings rows
- * into the settings General section — the theme feature owns its own settings
- * surface. Desktop shortcuts adjust text, code, and terminal font sizes together.
+ * owns the live theme preference (light/dark/system/custom), resolves `system`
+ * through `prefers-color-scheme`, synthesizes `custom` from the stored inputs,
+ * and publishes immutable snapshots; it never touches the DOM — ui-layout's
+ * presenter consumes the resolved snapshot. The Host settings scope loads and
+ * stores the preference in the user-settings document. The plugin also
+ * registers the standalone Appearance section — the theme feature owns its own
+ * settings surface. Desktop shortcuts adjust text, code, and terminal font
+ * sizes together.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
@@ -19,31 +20,34 @@ import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { AppearanceRowInjected } from './AppearanceRow.tsx'
-import { AppearanceRow } from './AppearanceRow.tsx'
-import type { FontSettingsInjected } from './FontSettingsGroup.tsx'
-import { FontSettingsGroup } from './FontSettingsGroup.tsx'
+import type { AppearanceSectionInjected } from './AppearanceSection.tsx'
+import { AppearanceSection } from './AppearanceSection.tsx'
 import { projectThemeGallery } from './gallery.ts'
-import { createAppearanceRowStore, createFontRowStore } from './settings-store.ts'
+import { createAppearanceSectionStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
+  CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID,
+  DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME,
   DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_FAMILY_FIELDS, FONT_ROLES, FONT_SIZE_SPECS,
-  fontFamilyVariable, isFontSize, isThemePreference, normalizeFontFamily, sectionFontSizes,
-  THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition, type ThemePreference,
-  type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
+  fontFamilyVariable, isFontSize, isHexColor, isThemePreference, normalizeFontFamily, normalizeHexColor,
+  sectionFontSizes, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type CustomThemeInputs, type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition,
+  type ThemePreference, type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
 } from '../theme-settings.ts'
+import { synthesizeCustomTheme } from '../custom-theme.ts'
 
+export type { AppearanceSectionComponentProps, AppearanceSectionInjected } from './AppearanceSection.tsx'
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
+export type { CustomThemeGroupProps, CustomThemeGroupInjected } from './CustomThemeGroup.tsx'
 export type { FontSettingsGroupProps, FontSettingsInjected } from './FontSettingsGroup.tsx'
-export type { AppearanceRowState, FontRowState } from './settings-store.ts'
+export type { AppearanceSectionState } from './settings-store.ts'
 export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
 export type {
-  BuiltinThemeId, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes, ThemePreference,
-  ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
+  BuiltinThemeId, CustomThemeInputs, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes,
+  ThemePreference, ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
 } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
@@ -64,13 +68,16 @@ export interface ThemeSnapshot {
   fontSizes: FontSizes
   /** Normalized user font lists by role; `''` selects the role's built-in stack. */
   fontFamilies: FontFamilies
+  /** The stored custom theme inputs; the `custom` preference synthesizes its theme from these. */
+  custom: CustomThemeInputs
   /**
-   * The resolved active theme (`system` resolved via prefers-color-scheme)
-   * with override layers folded into its tokens (seq order, later layers win
-   * per-token; each value picked for the active color scheme).
+   * The resolved active theme (`system` resolved via prefers-color-scheme,
+   * `custom` synthesized from the stored inputs) with override layers folded
+   * into its tokens (seq order, later layers win per-token; each value picked
+   * for the active color scheme).
    */
   active: ThemeDefinition
-  /** Registered themes in registration order. */
+  /** Registered themes in registration order, then the synthesized custom theme. */
   themes: readonly ThemeDefinition[]
   /** Monotonic change counter (registry or active changes). */
   revision: number
@@ -147,6 +154,7 @@ export class ThemeRuntime {
   private preference: ThemePreference
   private fontSizes: FontSizes = bootstrapFontSizes()
   private fontFamilies: FontFamilies = bootstrapFontFamilies()
+  private custom: CustomThemeInputs = { scheme: DEFAULT_CUSTOM_SCHEME, canvas: DEFAULT_CUSTOM_CANVAS, accent: DEFAULT_CUSTOM_ACCENT }
   private revision = 0
   /** Own settings writes not yet settled; adoption waits for zero so a Host echo of an earlier write cannot revert a later local change. */
   private pendingWrites = 0
@@ -215,15 +223,46 @@ export class ThemeRuntime {
    * Switch the theme preference — the only user preference write entry.
    * Built-in preferences are written through the settings scope and every
    * accepted value emits `theme/change`.
-   * @param id - a registered theme id or `system`; unknown ids throw.
+   * @param id - a registered theme id, `system`, or `custom`; unknown ids throw.
    */
   setTheme(id: string): void {
-    if (id !== 'system' && !this.themes.some(t => t.id === id)) {
+    if (id !== 'system' && id !== CUSTOM_THEME_ID && !this.themes.some(t => t.id === id)) {
       throw new Error(`theme "${id}" is not registered`)
     }
     if (this.preference === id) return
     this.preference = id as ThemePreference
     if (isThemePreference(id)) this.write(() => this.host.set(THEME_PREFERENCE_FIELD, id))
+    this.publish()
+  }
+
+  /**
+   * Change the custom theme inputs — the only custom-theme write entry. Changed
+   * inputs are written through the settings scope together with the preference
+   * switch to `custom` (editing the controls means using the theme), and the
+   * change emits one `theme/change` with the re-synthesized theme. Colors must
+   * be valid hex values; anything else throws and nothing is written.
+   * @param patch - the inputs to change; omitted inputs keep their values.
+   */
+  setCustom(patch: Partial<CustomThemeInputs>): void {
+    const next: CustomThemeInputs = {
+      scheme: patch.scheme ?? this.custom.scheme,
+      canvas: patch.canvas === undefined ? this.custom.canvas : normalizeHexColor(patch.canvas),
+      accent: patch.accent === undefined ? this.custom.accent : normalizeHexColor(patch.accent),
+    }
+    const changed = next.scheme !== this.custom.scheme
+      || next.canvas !== this.custom.canvas
+      || next.accent !== this.custom.accent
+    const switching = this.preference !== CUSTOM_THEME_ID
+    if (!changed && !switching) return
+    const ops = [
+      ...(next.scheme !== this.custom.scheme ? [{ op: 'set' as const, path: [CUSTOM_SCHEME_FIELD], value: next.scheme }] : []),
+      ...(next.canvas !== this.custom.canvas ? [{ op: 'set' as const, path: [CUSTOM_CANVAS_FIELD], value: next.canvas }] : []),
+      ...(next.accent !== this.custom.accent ? [{ op: 'set' as const, path: [CUSTOM_ACCENT_FIELD], value: next.accent }] : []),
+      ...(switching ? [{ op: 'set' as const, path: [THEME_PREFERENCE_FIELD], value: CUSTOM_THEME_ID }] : []),
+    ]
+    this.custom = next
+    this.preference = CUSTOM_THEME_ID
+    this.write(() => this.host.mutate(ops))
     this.publish()
   }
 
@@ -288,18 +327,21 @@ export class ThemeRuntime {
     })
   }
 
-  /** Adopt the scope's accepted durable preference without writing it back. */
+  /** Adopt the scope's accepted durable preference and custom inputs without writing them back. */
   private adopt(): void {
     if (this.pendingWrites > 0) return
     const section = this.host.getSnapshot().value
     if (section === undefined) return
     const fontFamilies = durableFontFamilies(section)
     const fontSizes = sectionFontSizes(section)
+    const custom = sectionCustomInputs(section)
     if (this.preference === section.preference
+      && this.custom.scheme === custom.scheme && this.custom.canvas === custom.canvas && this.custom.accent === custom.accent
       && FONT_ROLES.every(role => this.fontSizes[role] === fontSizes[role] && this.fontFamilies[role] === fontFamilies[role])) return
     this.preference = section.preference
     this.fontSizes = fontSizes
     this.fontFamilies = fontFamilies
+    this.custom = custom
     this.publish()
   }
 
@@ -360,16 +402,18 @@ export class ThemeRuntime {
       ? (this.media?.matches === true ? 'dark' : 'light')
       : this.preference
     // Both built-ins always exist; a registered preference id resolves or has
-    // been reset by its disposer, so the lookup cannot miss.
-    const active = this.themes.find(t => t.id === resolvedId)
+    // been reset by its disposer, so the lookup cannot miss. `custom` carries
+    // its own synthesis.
+    const active = resolvedId === CUSTOM_THEME_ID ? synthesizeCustomTheme(this.custom) : this.themes.find(t => t.id === resolvedId)
     /* v8 ignore next 2 -- needs a registry without light/dark, which register()/dispose() cannot produce */
     if (active === undefined) throw new Error(`theme registry lost "${resolvedId}"`)
     return Object.freeze({
       preference: this.preference,
       fontSizes: this.fontSizes,
       fontFamilies: this.fontFamilies,
+      custom: this.custom,
       active: this.composeActive(active),
-      themes: Object.freeze([...this.themes]),
+      themes: Object.freeze([...this.themes, synthesizeCustomTheme(this.custom)]),
       revision: this.revision,
     })
   }
@@ -434,6 +478,22 @@ function durableFontFamilies(section: ThemeSettings): FontFamilies {
     code: normalizeFontFamily(section.codeFontFamily),
     terminal: normalizeFontFamily(section.terminalFontFamily),
   })
+}
+
+/**
+ * Custom theme inputs from one accepted settings section. Documents written
+ * before the custom fields existed carry none, and hand-edited documents may
+ * hold raw values; missing or malformed fields fall back to the custom schema
+ * defaults, mirroring what validation would have filled in.
+ * @param section - accepted settings section.
+ * @returns the scheme, canvas, and accent inputs.
+ */
+function sectionCustomInputs(section: ThemeSettings): CustomThemeInputs {
+  return {
+    scheme: section.customScheme === 'dark' ? 'dark' : 'light',
+    canvas: isHexColor(section.customCanvas) ? normalizeHexColor(section.customCanvas) : DEFAULT_CUSTOM_CANVAS,
+    accent: isHexColor(section.customAccent) ? normalizeHexColor(section.customAccent) : DEFAULT_CUSTOM_ACCENT,
+  }
 }
 
 /**
@@ -508,65 +568,54 @@ function installFontSizeShortcuts(ctx: ClientContext, adjust: (delta: 1 | -1) =>
 
 /**
  * Required services: settings transport plus slots/locale for the Appearance
- * row. `remote` carries the forwarded settings invalidation that
+ * section. `remote` carries the forwarded settings invalidation that
  * `ctx.configForms.get(entryId)` subscribes to on this context.
  */
 export const inject = ['slots', 'locale', 'remote', 'configForms']
 
 /**
- * Client plugin body: provide the theme service and register the
- * feature-owned Appearance gallery and font settings rows into the General section's item
- * slot (a feature owns its settings surface). Desktop font-size shortcuts share
- * all three font-size settings when the keyboard service is available.
+ * Client plugin body: provide the theme service and register the feature-owned
+ * Appearance section (a feature owns its settings surface). Desktop font-size
+ * shortcuts share all three font-size settings when the keyboard service is
+ * available.
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
   installThemeStyles(ctx)
-  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
+  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings dictionaries')
   const host = ctx.configForms.get<ThemeSettings>(THEME_SETTINGS_NAMESPACE)
   const theme = new ThemeRuntime(ctx, host)
   ctx.provide('theme', theme)
+  const t = ctx.locale.bind(SETTINGS_NS)
 
-  const store = createAppearanceRowStore()
+  const store = createAppearanceSectionStore()
   let bound: BoundActions<typeof store> | undefined
-  const fontStore = createFontRowStore()
-  let fontBound: BoundActions<typeof fontStore> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, projectThemeGallery(snapshot.themes), snapshot.revision)
-    fontBound?.sync(snapshot.fontSizes, snapshot.fontFamilies, snapshot.revision)
+    bound?.sync(
+      snapshot.preference, projectThemeGallery(snapshot.themes),
+      snapshot.fontSizes, snapshot.fontFamilies, snapshot.custom, snapshot.revision,
+    )
   }
   ctx.on('theme/change', sync)
-  const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
+  const injected = (actions: BoundActions<typeof store>): AppearanceSectionInjected => {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and
     // first render (the store's revision guard drops stale duplicates).
     sync(theme.getTheme())
     return {
       setTheme: (id) => { theme.setTheme(id) },
+      setCustom: (patch) => { theme.setCustom(patch) },
+      setFontSize: (role, px) => { theme.setFontSize(role, px) },
+      setFontFamily: (role, value) => { theme.setFontFamily(role, value) },
     }
   }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
     id: 'appearance',
-    order: 10,
+    order: 5,
+    label: () => t('appearance.title'),
     store,
     locale: SETTINGS_NS,
     inject: injected,
-  }, AppearanceRow))
-
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'font-size',
-    order: 11,
-    store: fontStore,
-    locale: SETTINGS_NS,
-    inject: (actions: BoundActions<typeof fontStore>): FontSettingsInjected => {
-      fontBound = actions
-      sync(theme.getTheme())
-      return {
-        setFontFamily: (role, value) => { theme.setFontFamily(role, value) },
-        setFontSize: (role, px) => { theme.setFontSize(role, px) },
-      }
-    },
-  }, FontSettingsGroup))
+  }, AppearanceSection))
 }

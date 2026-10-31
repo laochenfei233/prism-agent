@@ -2,6 +2,7 @@
   - navigation:
     - text: 设置
     - button "通用设置"
+    - button "外观"
     - button "模型"
     - button "内置插件"
     - button "Agent 预设"
@@ -13,18 +14,6 @@
   - button "工作区内修改"
   - text: 语言
   - button "中文"
-  - text: 外观
-  - button "跟随系统" [pressed]
-  - button "浅色"
-  - button "深色"
-  - button "方格纸玻璃卡"
-  - button "单强调色"
-  - button "暗底明度分层"
-  - text: 字号大小 仅影响会话内容的字号 14
-  - button "增大字号"
-  - button "减小字号"
-  - text: px
-  - button "更多字体设置"
   - text: 工作步骤展示 选择希望看到多少工具调用细节
   - button "详细"
   - text: 工作步骤收起时机 选择何时自动收起工作步骤
@@ -41,5 +30,3 @@
   - text: 在使用官方模型 API 时上传 Session Log 帮助改进 DeepSeek 模型与产品
   - switch "在使用官方模型 API 时上传 Session Log"
   - text: 当前版本：{{version}}
-  - link "意见反馈":
-    - /url: https://github.com/laochenfei233/prism-agent/issues

@@ -657,7 +657,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-client-ui-theme`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/client/ui-theme/src/index.ts:20`](../packages/client/ui-theme/src/index.ts)
+- `source`: [`packages/client/ui-theme/src/index.ts:23`](../packages/client/ui-theme/src/index.ts)
 
 ```ts config-catalog
 /** Runtime preferences projected to the browser. */
@@ -676,6 +676,12 @@ export interface Config {
   codeFontFamily: Volatile<string>
   /** Sidebar terminal font list; `''` keeps the built-in stack. */
   terminalFontFamily: Volatile<string>
+  /** Base palette mode of the custom theme. */
+  customScheme: Volatile<'light' | 'dark'>
+  /** Canvas color of the custom theme (`#rgb`/`#rrggbb`). */
+  customCanvas: Volatile<string>
+  /** Accent color of the custom theme (`#rgb`/`#rrggbb`). */
+  customAccent: Volatile<string>
 }
 
 /** Theme preference persisted by the product Appearance gallery. */
