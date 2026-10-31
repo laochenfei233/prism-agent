@@ -107,7 +107,9 @@ An approval carries two actions, and it uses the same movement: `ArrowUp`/`Arrow
 
 Everything registered with `ctx.shortcuts.register()` is rebindable in Settings → Keyboard, including every Phase 1 command; a saved override applies to the runtime and platform the user is on, exactly as the existing profiles do.
 
-Keys a focused control must own stay fixed and read-only: `Enter` to send and `Shift+Enter` for a newline in the composer, the double-`Escape` stop, the `/` and `@` triggers, approval `Enter`/`Esc`, and the question keys of [S2.8]. They are contributed with `registerFixed`, so they still show their keycaps, take part in conflict checks, and cannot be assigned to a command.
+Keys a focused control must own stay fixed and read-only: `Enter` to send and `Shift+Enter` for a newline in the composer, the double-`Escape` stop, the `/` and `@` triggers, and approval `Enter`/`Esc`. They are contributed with `registerFixed`, so they still show their keycaps, take part in conflict checks, and cannot be assigned to a command.
+
+The question keys stay local to the card instead of becoming fixed rows: reserving `Tab` and the arrow keys for a listing the card already shows would take them away from every editable binding. The card's README states those keys.
 
 The dividing rule is ownership, not importance: an application action is a command and can move; a keystroke that belongs to the control holding focus is fixed, because rebinding it would break typing in that control.
 
@@ -140,5 +142,5 @@ The dividing rule is ownership, not importance: an application action is a comma
 - [ ] `focus.composer` puts the caret in the current session's composer, and reports a reason when the main view has no composer.
 - [ ] With focus on a session tree row, arrows move between rows, `Home`/`End` reach the first and last row, and `Enter` opens the focused session; Tab enters and leaves the tree once, not once per row.
 - [ ] In a pending question, `ArrowUp`/`ArrowDown`/`Home`/`End` move the option selection, `Enter` confirms the question, `Tab` and `Shift+Tab` move between questions, and `Esc` dismisses through the same path as Cancel; the answer the agent receives is unchanged.
-- [ ] Every new command appears in the `⌘/` reference with its keycaps and can be rebound in Settings; every fixed dialog key appears there read-only; en and zh copy both exist.
+- [ ] Every new command appears in the `⌘/` reference with its keycaps and can be rebound in Settings; the fixed composer, stop, and approval actions appear there read-only; en and zh copy both exist.
 - [ ] `pnpm run test:gui` and `DSH_SNAPSHOT=replay pnpm run test:web` pass, and no existing default binding changed.
