@@ -1,9 +1,9 @@
 ---
 feature: prism-transfer
-status: in-progress
+status: delivered
 updated: 2026-10-31
 branch: feat/prism-transfer (worktree .worktrees/prism-transfer)
-commits: 42f8b7cfed（基线），交付时填写
+commits: 42f8b7cfed（基线）..d002a34b80
 ---
 
 # Prism 导入导出
@@ -12,7 +12,17 @@ commits: 42f8b7cfed（基线），交付时填写
 
 ## Report
 
-交付时填写。
+**交付内容** — `@prism/prism-transfer` 在设置里加入「导入导出」页并使其可用。导出勾选已登记项目并流式产出一个标准 zip（单项目归档或合并归档），内含工作区文件夹、每个挂接会话的完整日志及其子代理、引用的媒体与文件，外加一个可选 JSON 文件承载设置页可编辑的值（密钥默认排除，跳过计数上报到页面）。导入逐条目验证这类归档——中央目录解析、逐条目 CRC-32、路径与冲突守卫、条目/大小上限、剩余空间守卫——随后落盘、解压到暂存区、每个项目一次原子 rename 发布（同名发布 `name (2)`，永不覆盖）、按原 id 经持久化句柄恢复会话并写投影检查点（冷侧边栏标题的来源）、经附件接口带内容地址校验地恢复媒体与文件、登记工作区、按命名空间经修订防护写入路径重新应用设置。单飞任务存储与可轮询快照驱动进度界面；失败的导入不留暂存、不留半发布项目。
+
+**验证** — `node node_modules/vitest/vitest.mjs run packages/transfer/prism-transfer/tests --coverage --coverage.include='packages/transfer/prism-transfer/src/**'`：198 通过、1 跳过（Windows 门控的符号链接用例）、0 错误，每个 `src` 文件 100/100/100/100。`pnpm run typecheck` 通过（tsconfig 别名新增后复跑）；最终 src 状态后 `pnpm run build:artifacts` + `pnpm run build:check` 通过；`verify-cordis-config` 仅剩既有 acp fixture 失败；`verify-default-product-isolation`、`verify-dsh-package-licenses`、`verify-application-entrypoints`、`pnpm run constraints` 通过；`verify-client-ui-i18n`、`verify-md-links`、`verify-translation-pairing`、`verify-doc-budgets`、`gen-plugin-packages --check`、`gen-client-catalog --check`、`gen-config-catalog --check` 通过。本机既有失败（已在 master 验证一致）：`test:docs` 的四个失败（fork-upstream-divergence Report 行的 md-wrap、repository-references 的 uv.lock 行、ui-chat/ui-conversation 的 README Summaries、prism-backup zh README 的 doc-standard）、ui-settings-general 套件的 `dsh-web-app` 解析错误、`jscpd` 与 `pnpm install --online` 约束。独立对抗复审发现一个关键集成缺口（交付路由从未接线投影检查点）与五个 major（谎报尺寸的 deflate 内存暴露、缺失的 ADS/祖先守卫、死跳过计数器、A13 标记清单不全）——均已在分支内修复并配靶向测试，minor 记录在历程日志。
+
+**历程日志**
+
+- 复审的关键发现来自测试接缝：导入引擎把 `projections` 作为可选依赖，单测总是注入假件，导致交付路由静默地在没有它的情况下组装。任何改变用户可见行为的可选依赖，都需要断言接线本身的路由级集成测试，而不只是引擎行为。
+- fflate 的同步 `Inflate` 经 `(data, final)` 回调报告输出并从 `push` 抛错——异步风格的 `(err, data)` 签名会把数据误送进错误槽。初版读取器正是如此，直到校验和比较开始失败才被测试抓住。
+- 经 `saveImage` 恢复图片之所以安全，是因为规范化对干净字节逐字节透传；返回 id 校验把该性质变成受强制的不变量，图像策略不同的部署会大声失败而不是存储日志无法解析的引用。
+- 媒体与文件条目名带有 Windows 无法存储的 `sha256:` 冒号；把这些条目直接送入附件接缝（绝不在暂存区落盘）消除了会话侧整个 ADS 类别，`project/**` 专用的冒号守卫与读取器的目录段规则则闭合了实体文件一侧。
+- jsdom 通道的 v8 覆盖率重映射对较大的分区组件把已执行块报为零（探针验证）；受影响语句带 `v8 ignore` 注记并点名断言它们的 spec，其覆盖的纯逻辑（跳过计数通知）移入了重映射精确的 `state.ts`。
 
 ## [S1] 问题
 
@@ -146,24 +156,24 @@ settings.json                    ← prism-settings body, present only when sett
 
 ## Tasks
 
-- [ ] T1: zip 读取模块——EOCD/ZIP64 中央目录解析、逐条目 CRC32 验证、条目名守卫、重复/大小写/NFC 冲突检测、祖先冲突、条目数与大小上限；用构造归档单测覆盖每道守卫（`../`、绝对路径、反斜杠、ADS 冒号、重复条目含大小写/Unicode 折叠、两种顺序的祖先冲突、CRC 损坏、中央目录截断、超上限条目）。(depends: none)
-- [ ] T2: 导出引擎——工作区文件夹扫描带守卫（≥4 GiB、`\`/NUL 名称、链接/不可读跳过 + 计数）、清单生成、`project/**` 组装、每会话 `sessionLogZipEntries` 重根到 `sessions/<id>/`、单项目与合并布局选择、设置 JSON 投影（易变字段、密钥可选）、流式 fflate 写入；用临时目录与假依赖单测。(depends: T1)
-- [ ] T3: 导入引擎——落盘缓存、清单分发（project / combined / 拒绝）、CRC 暂存解压、空间守卫、清洗命名与 ` (n)` 冲突、会话恢复配方带去重 + 版本规则 + 投影检查点、附件恢复带返回 id 验证、工作区登记 + 挂接、设置应用阶段；任务状态机带 await 后单飞、快照、保留期、暂存清扫；每条路径与失败的单测。(depends: T1)
-- [ ] T4: 设置应用器独立单元（T3 的阶段与独立路由共用）——易变补丁构建、修订防护更新带一次冲突重试、逐命名空间结果；单测。(depends: none)
-- [ ] T5: 路由与接线——`/api/prism.transfer` 下四条路由、流式导入落盘、导出查询校验、错误码映射表、插件 `apply()` 注册（connection.fetch.register）、`packages/bundle/web-app/cordis.patch.yml` 组装行、package.json（`./client` 导出 + `dsh.client` 清单）、product-package-policy 行；假服务路由测试（busy/409、400、轮询语义、重启 idle）。(depends: T2, T3, T4)
-- [ ] T6: 客户端分区——`src/client/index.ts`（inject 列表、`LocaleNamespaceMap` 合并、`slots.inject('settings.section', …)`）、`locales.ts` zh/en、`TransferSection.tsx` 三卡片、文件输入 + 流式 POST、目的地行带原生选择回退、轮询进度 + 结果/错误渲染、无障碍状态；纯函数测试（布局检测辅助、错误文案映射）。(depends: T5)
-- [ ] T7: 核心与文档——`navIcon()` 的 `'transfer'` 分支带 `PRISM-DIVERGENCE` 标记、分歧索引 A13 分区行、`packages/transfer/README` 三件套 + 包 README 三件套带生成的 `.i18n.yaml` 记录、spec 三件套配对记录、目录再生成（`gen-plugin-packages`、`gen-client-catalog`）；运行受影响文档门。(depends: T6)
-- [ ] T8: 验证与复审——包 vitest 运行达逐文件 100% 覆盖、typecheck 宿主与客户端面、`build:artifacts` + `build:check`、受影响文档门、i18n 门；证据记入 spec；按 compose 流程独立复审；修复后复验。(depends: T7)
+- [x] T1: zip 读取模块——EOCD/ZIP64 中央目录解析、逐条目 CRC32 验证、条目名守卫、重复/大小写/NFC 冲突检测、祖先冲突、条目数与大小上限；用构造归档单测覆盖每道守卫（`../`、绝对路径、反斜杠、ADS 冒号、重复条目含大小写/Unicode 折叠、两种顺序的祖先冲突、CRC 损坏、中央目录截断、超上限条目）。(depends: none)
+- [x] T2: 导出引擎——工作区文件夹扫描带守卫（≥4 GiB、`\`/NUL 名称、链接/不可读跳过 + 计数）、清单生成、`project/**` 组装、每会话 `sessionLogZipEntries` 重根到 `sessions/<id>/`、单项目与合并布局选择、设置 JSON 投影（易变字段、密钥可选）、流式 fflate 写入；用临时目录与假依赖单测。(depends: T1)
+- [x] T3: 导入引擎——落盘缓存、清单分发（project / combined / 拒绝）、CRC 暂存解压、空间守卫、清洗命名与 ` (n)` 冲突、会话恢复配方带去重 + 版本规则 + 投影检查点、附件恢复带返回 id 验证、工作区登记 + 挂接、设置应用阶段；任务状态机带 await 后单飞、快照、保留期、暂存清扫；每条路径与失败的单测。(depends: T1)
+- [x] T4: 设置应用器独立单元（T3 的阶段与独立路由共用）——易变补丁构建、修订防护更新带一次冲突重试、逐命名空间结果；单测。(depends: none)
+- [x] T5: 路由与接线——`/api/prism.transfer` 下四条路由、流式导入落盘、导出查询校验、错误码映射表、插件 `apply()` 注册（connection.fetch.register）、`packages/bundle/web-app/cordis.patch.yml` 组装行、package.json（`./client` 导出 + `dsh.client` 清单）、product-package-policy 行；假服务路由测试（busy/409、400、轮询语义、重启 idle）。(depends: T2, T3, T4)
+- [x] T6: 客户端分区——`src/client/index.ts`（inject 列表、`LocaleNamespaceMap` 合并、`slots.inject('settings.section', …)`）、`locales.ts` zh/en、`TransferSection.tsx` 三卡片、文件输入 + 流式 POST、目的地行带原生选择回退、轮询进度 + 结果/错误渲染、无障碍状态；纯函数测试（布局检测辅助、错误文案映射）。(depends: T5)
+- [x] T7: 核心与文档——`navIcon()` 的 `'transfer'` 分支带 `PRISM-DIVERGENCE` 标记、分歧索引 A13 分区行、`packages/transfer/README` 三件套 + 包 README 三件套带生成的 `.i18n.yaml` 记录、spec 三件套配对记录、目录再生成（`gen-plugin-packages`、`gen-client-catalog`）；运行受影响文档门。(depends: T6)
+- [x] T8: 验证与复审——包 vitest 运行达逐文件 100% 覆盖、typecheck 宿主与客户端面、`build:artifacts` + `build:check`、受影响文档门、i18n 门；证据记入 spec；按 compose 流程独立复审；修复后复验。(depends: T7)
 
 ## [S4] 验收
 
-- [ ] 设置侧边栏在 backup/import 之后显示「导入导出」；全新 profile 下分区渲染出工作区列表、两张卡片与默认目的地 `~/.prism/projects`。
-- [ ] 导出单个项目（不带设置）下载 `<标题>.zip`；在文件管理器打开可见 `.prism-project.json` 在前、`project/**`、`sessions/**`；导出多个项目下载一个合并 zip，其 `projects/*` 子目录各带自己的清单；「仅导出配置项」下载可读的 `prism-settings-*.json`。
-- [ ] 往返（临时 home 导出 → 清空 → 导入）恢复逐字节一致的项目文件夹、每个会话（主 + 子代理）带标题出现在侧边栏、图片与文件再次可用、工作区登记一次（重复导入不产生重复登记；再导同一归档报告重复且不恢复两次）。
-- [ ] 目的地已有同名项目时以 `<标题> (2)` 发布且不动原目录；带 `settings.json` 的合并导入按命名空间应用设置并报告 applied/skipped/failed。
-- [ ] 敌意归档（T1 每种守卫用例，外加无清单 zip、`prism-project` version 2 清单、CRC 被篡改的 stored 媒体条目）都以映射的错误码失败、不留暂存目录、目的地之下毫无变化。
-- [ ] 含 ≥ 4 GiB 文件的项目在下载开始前导出失败并点名文件；符号链接与不可读文件被跳过并计数，结果在客户端可见。
-- [ ] 不勾「包含密钥」的设置导出不含任何 secret 角色值并报告跳过数量；勾选后在第二个 profile 导入可复现导出值（经 `describe()` 验证），新安装缺失的命名空间报告 skipped。
-- [ ] 同一 tick 提交的两个导入只产生一个任务（另一个 409）；轮询未知/过期任务返回 idle；中途杀掉只留一个 `.prism-import-*` 目录，超过 24 小时后由下次导入或重启清扫。
-- [ ] 分区文案全部字典持有（zh/en），导航图标渲染，每个新控件焦点描边可见，运行/失败态用 `role="status"`/`role="alert"`，reduced-motion 下无进度动画；`verify-client-ui-i18n` 通过。
-- [ ] `pnpm vitest run packages/transfer/prism-transfer` 对每个 `src` 文件 100% 覆盖；`tsc` 宿主与客户端面通过；`build:artifacts` + `build:check` 通过；受影响文档门（readme summaries/model-experience/limitations、translation pairing、md wrap/links、workspace constraints、product isolation、application entrypoints、plugin/client catalogs）通过；与 master 相同的 PRE-EXISTING 失败如实记录。
+- [x] 设置侧边栏在 backup/import 之后显示「导入导出」；全新 profile 下分区渲染出工作区列表、两张卡片与默认目的地 `~/.prism/projects`。
+- [x] 导出单个项目（不带设置）下载 `<标题>.zip`；在文件管理器打开可见 `.prism-project.json` 在前、`project/**`、`sessions/**`；导出多个项目下载一个合并 zip，其 `projects/*` 子目录各带自己的清单；「仅导出配置项」下载可读的 `prism-settings-*.json`。
+- [x] 往返（临时 home 导出 → 清空 → 导入）恢复逐字节一致的项目文件夹、每个会话（主 + 子代理）带标题出现在侧边栏、图片与文件再次可用、工作区登记一次（重复导入不产生重复登记；再导同一归档报告重复且不恢复两次）。
+- [x] 目的地已有同名项目时以 `<标题> (2)` 发布且不动原目录；带 `settings.json` 的合并导入按命名空间应用设置并报告 applied/skipped/failed。
+- [x] 敌意归档（T1 每种守卫用例，外加无清单 zip、`prism-project` version 2 清单、CRC 被篡改的 stored 媒体条目）都以映射的错误码失败、不留暂存目录、目的地之下毫无变化。
+- [x] 含 ≥ 4 GiB 文件的项目在下载开始前导出失败并点名文件；符号链接与不可读文件被跳过并计数，结果在客户端可见。
+- [x] 不勾「包含密钥」的设置导出不含任何 secret 角色值并报告跳过数量；勾选后在第二个 profile 导入可复现导出值（经 `describe()` 验证），新安装缺失的命名空间报告 skipped。
+- [x] 同一 tick 提交的两个导入只产生一个任务（另一个 409）；轮询未知/过期任务返回 idle；中途杀掉只留一个 `.prism-import-*` 目录，超过 24 小时后由下次导入或重启清扫。
+- [x] 分区文案全部字典持有（zh/en），导航图标渲染，每个新控件焦点描边可见，运行/失败态用 `role="status"`/`role="alert"`，reduced-motion 下无进度动画；`verify-client-ui-i18n` 通过。
+- [x] `pnpm vitest run packages/transfer/prism-transfer` 对每个 `src` 文件 100% 覆盖；`tsc` 宿主与客户端面通过；`build:artifacts` + `build:check` 通过；受影响文档门（readme summaries/model-experience/limitations、translation pairing、md wrap/links、workspace constraints、product isolation、application entrypoints、plugin/client catalogs）通过；与 master 相同的 PRE-EXISTING 失败如实记录。
