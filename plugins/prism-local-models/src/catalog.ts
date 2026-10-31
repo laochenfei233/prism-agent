@@ -92,6 +92,9 @@ const BGE_M3_TEXT_FILES: readonly CatalogFile[] = [
 /** The npm runtime BGE variants provision for transformers.js inference. */
 const BGE_RUNTIME: CatalogRuntime = { kind: 'npm', packages: ['@huggingface/transformers@^3', 'onnxruntime-node'] }
 
+/** The npm runtime HY-MT variants provision for llama.cpp inference. */
+const HY_MT_RUNTIME: CatalogRuntime = { kind: 'npm', packages: ['node-llama-cpp@^3'] }
+
 /** The built-in families. */
 export const BUILTIN_CATALOG: Catalog = [
   {
@@ -130,24 +133,28 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'Q4_K_M',
         device: 'cpu',
         files: [{ path: 'HY-MT1.5-1.8B-Q4_K_M.gguf', url: `${HY_MT}/HY-MT1.5-1.8B-Q4_K_M.gguf`, sizeBytes: 1133080512, sha256: '4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7' }],
+        runtime: HY_MT_RUNTIME,
       },
       {
         id: 'q8_0',
         displayName: 'Q8_0',
         device: 'cpu',
         files: [{ path: 'HY-MT1.5-1.8B-Q8_0.gguf', url: `${HY_MT}/HY-MT1.5-1.8B-Q8_0.gguf`, sizeBytes: 1908528288, sha256: '6789b06d0902f2f5312c0e1703d56ccbddfcfb6c653d22519b7c720f7db9a98e' }],
+        runtime: HY_MT_RUNTIME,
       },
       {
         id: 'q4_k_m-cuda',
         displayName: 'Q4_K_M (CUDA)',
         device: 'cuda',
         files: [{ path: 'HY-MT1.5-1.8B-Q4_K_M.gguf', url: `${HY_MT}/HY-MT1.5-1.8B-Q4_K_M.gguf`, sizeBytes: 1133080512, sha256: '4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7' }],
+        runtime: HY_MT_RUNTIME,
       },
       {
         id: 'q8_0-cuda',
         displayName: 'Q8_0 (CUDA)',
         device: 'cuda',
         files: [{ path: 'HY-MT1.5-1.8B-Q8_0.gguf', url: `${HY_MT}/HY-MT1.5-1.8B-Q8_0.gguf`, sizeBytes: 1908528288, sha256: '6789b06d0902f2f5312c0e1703d56ccbddfcfb6c653d22519b7c720f7db9a98e' }],
+        runtime: HY_MT_RUNTIME,
       },
     ],
   },

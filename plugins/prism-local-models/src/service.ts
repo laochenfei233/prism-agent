@@ -18,6 +18,7 @@ import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog
 import { downloadFile } from './download.ts'
 import { LocalModelsError } from './errors.ts'
 import { BgeEngine } from './engines/bge.ts'
+import { PaddleOcrSidecar } from './engines/paddleocr.ts'
 import { RapidOcrEngine } from './engines/rapidocr.ts'
 import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
 import { provisionRuntime } from './runtimes.ts'
@@ -149,6 +150,13 @@ export class PrismLocalModelsService {
         ? { ok: true, detail: text.slice(0, 120) }
         : { ok: false, error: 'the probe image produced no text' }
     }
+    if (modelId === 'paddleocr') {
+      const sidecar = await this.paddleOcrSidecar()
+      const text = await sidecar.probe()
+      return text.trim().length > 0
+        ? { ok: true, detail: text.slice(0, 120) }
+        : { ok: false, error: 'the probe image produced no text' }
+    }
     throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with its inference task`)
   }
 
@@ -219,9 +227,27 @@ export class PrismLocalModelsService {
     return engine
   }
 
-  /** The PaddleOCR sidecar call; arrives with the Python task. */
-  private async paddleOcr(_image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
-    throw new LocalModelsError('not-implemented', 'the PaddleOCR sidecar arrives with the Python task')
+  /** The PaddleOCR sidecar over the provisioned venv, starting and caching on demand. */
+  private async paddleOcrSidecar(): Promise<PaddleOcrSidecar> {
+    const record = this.document.families['paddleocr']
+    if (record?.status !== 'ready' || record.variantId === undefined) {
+      throw new LocalModelsError('not-installed', 'install a PaddleOCR variant from the Models page card first (this provisions a Python venv)')
+    }
+    const cached = this.engines.get('paddleocr')
+    if (cached?.variantId === record.variantId && cached.engine instanceof PaddleOcrSidecar) return cached.engine
+    const stale = this.engines.get('paddleocr')
+    if (stale !== undefined) {
+      this.engines.delete('paddleocr')
+      stale.engine.dispose()
+    }
+    const sidecar = await PaddleOcrSidecar.open(this.modelsRoot)
+    this.engines.set('paddleocr', { variantId: record.variantId, engine: sidecar })
+    return sidecar
+  }
+
+  /** The PaddleOCR sidecar call, after RapidOCR. */
+  private async paddleOcr(image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
+    return (await this.paddleOcrSidecar()).detectText(image)
   }
 
   /** Resolve the catalog and take the first scan of the models root. */
