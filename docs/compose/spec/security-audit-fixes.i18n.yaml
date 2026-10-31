@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for security-audit-fixes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/security-audit-fixes.md
+/:
+  en: b4433c6f3b369fdb
+  zh: b4433c6f3b369fdb
+/security-audit-fixes:
+  en: 7884aba49464dd92
+  zh: 67e6fe86cb5c9fe0
+/security-audit-fixes/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/security-audit-fixes/s1-problem:
+  en: e7da19ef61da84b6
+  zh: 10a8769c7fee7858
+/security-audit-fixes/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/security-audit-fixes/s2-design/s2-1-harness-home-fence-for-tool-filesystem-writes:
+  en: b7887b900d543a08
+  zh: 54ed1ef48408ebb3
+/security-audit-fixes/s2-design/s2-2-foreign-record-validation-before-a-native-import-is-written:
+  en: a2521ca9c6f52ead
+  zh: 5f983e0717af072c
+/security-audit-fixes/s2-design/s2-3-admission-limits-enforced-when-a-stored-image-is-read:
+  en: 8b42ce3fa033fbeb
+  zh: d48913c7668f09cb
+/security-audit-fixes/s2-design/s2-4-updater-signing-in-the-release-workflow:
+  en: c65f3938ac239b19
+  zh: 2a1cc1f61b7076ab
+/security-audit-fixes/s2-design/s2-5-authentication-for-every-html-entry:
+  en: 94a0ad1b9244e7d9
+  zh: b6f0981da99719b1
+/security-audit-fixes/s2-design/s2-6-metacharacter-refusal-in-the-desktop-popup-fallback:
+  en: 15d02fe5a5b499b5
+  zh: c575aa4b32c11852
+/security-audit-fixes/s3-scope:
+  en: fa9d9910bf21e906
+  zh: f4f2c27560500d79
+/security-audit-fixes/tasks:
+  en: be4b71a4105b41e2
+  zh: 46b1bfd2fa07d635
+/security-audit-fixes/s4-acceptance:
+  en: 6455dcd428cf5de2
+  zh: 5dc54adc20c79b46
