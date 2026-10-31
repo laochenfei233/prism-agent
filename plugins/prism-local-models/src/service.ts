@@ -1,23 +1,33 @@
 /**
- * Local-models host service: catalog reads, install lifecycle, and the
+ * Local-models host service: catalog reads, the install lifecycle, and the
  * capability entry points (`embed`, `ocr`, `translate`) future Prism features
  * consume. Claimed on the host context as `prismLocalModels`.
  *
  * One active operation per family; different families run concurrently. The
  * first awaited method lazily resolves the catalog (override merge, mirror
  * rewrite) and rescans the models root, so manual placement shows up without
- * a restart.
+ * a restart. `install` starts the operation and returns at once; the card
+ * follows progress through `status`.
  *
  * @module @prism/prism-local-models
  */
 
-import { readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog, type CatalogFamily, type CatalogVariant } from './catalog.ts'
+import { downloadFile } from './download.ts'
 import { LocalModelsError } from './errors.ts'
 import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
 import type { ResolvedConfig } from './config.ts'
-import type { CatalogView, ModelFamilyView, ModelProgress, ModelVariant, ProbeOutcome, StatusView } from './types.ts'
+import type { CatalogView, ModelFamilyView, ModelProgress, ModelStatus, ModelVariant, ProbeOutcome, StatusView } from './types.ts'
+
+/** One running install with its cancellation and live progress. */
+interface ActiveInstall {
+  /** Cancels the download in flight. */
+  readonly abort: () => void
+  /** Live progress; mutated by the running download. */
+  progress: ModelProgress
+}
 
 /**
  * Owns model state under the models root and drives installs and inference.
@@ -29,6 +39,7 @@ export class PrismLocalModelsService {
   private readonly config: ResolvedConfig
   private readonly registry: ModelRegistry
   private readonly init: Promise<void>
+  private readonly active = new Map<string, ActiveInstall>()
   private catalogImpl: Catalog = []
   private document: RegistryDocument = { version: 1, families: {} }
 
@@ -60,29 +71,56 @@ export class PrismLocalModelsService {
   }
 
   /**
-   * Install one variant: download the files, verify integrity, provision the
-   * runtime, and rescan.
+   * Start installing one variant: download the files, verify integrity, and
+   * record the result. Returns immediately; the card polls `status`.
+   * Installing the already-ready variant is a no-op.
    * @param modelId - target family id.
    * @param variantId - variant to install.
    */
   async install(modelId: string, variantId: string): Promise<void> {
     await this.init
     const variant = this.requireVariant(modelId, variantId)
-    throw new LocalModelsError('not-implemented', `install ${modelId}/${variant.id} arrives with the download task`)
+    const record = this.document.families[modelId]
+    if (this.active.has(modelId)) {
+      throw new LocalModelsError('busy', `"${modelId}" already has an operation running`)
+    }
+    if (record?.status === 'ready' && record.variantId === variant.id) return
+    const abort = new AbortController()
+    const firstFile = variant.files[0]
+    const activeInstall: ActiveInstall = {
+      abort: () => abort.abort(),
+      progress: { phase: 'download', done: 0, total: firstFile?.sizeBytes ?? 0, label: firstFile?.path ?? variant.id },
+    }
+    this.active.set(modelId, activeInstall)
+    void this.runInstall(modelId, variant, abort.signal, activeInstall)
   }
 
-  /** Stop the active download or provisioning of one family and clean its temp files. */
+  /**
+   * Stop the active download of one family and clean its temp files. A known
+   * family without an active operation cancels nothing successfully.
+   * @param modelId - target family id.
+   */
   async cancel(modelId: string): Promise<void> {
     await this.init
     this.requireFamily(modelId)
-    throw new LocalModelsError('not-implemented', `cancel ${modelId} arrives with the download task`)
+    this.active.get(modelId)?.abort()
   }
 
-  /** Delete the installed variant directory and reset the family to idle. */
+  /**
+   * Delete the installed variant directory and reset the family to idle.
+   * @param modelId - target family id.
+   */
   async remove(modelId: string): Promise<void> {
     await this.init
     this.requireFamily(modelId)
-    throw new LocalModelsError('not-implemented', `remove ${modelId} arrives with the download task`)
+    if (this.active.has(modelId)) {
+      throw new LocalModelsError('busy', `"${modelId}" has an operation running; cancel it first`)
+    }
+    const record = this.document.families[modelId]
+    if (record?.variantId !== undefined && record.variantId.includes('/') === false && record.variantId.includes('\\') === false) {
+      await rm(join(this.modelsRoot, modelId, record.variantId), { recursive: true, force: true })
+    }
+    await this.writeFamilyRecord(modelId, { status: 'idle' })
   }
 
   /** Run one smoke inference against the installed variant. */
@@ -110,8 +148,10 @@ export class PrismLocalModelsService {
     throw new LocalModelsError('not-implemented', 'translation arrives with the HY-MT task')
   }
 
-  /** Release engines, the sidecar process, and any in-flight download. */
-  dispose(): void {}
+  /** Cancel every in-flight download; engines and sidecars arrive with the inference tasks. */
+  dispose(): void {
+    for (const install of this.active.values()) install.abort()
+  }
 
   /** Resolve the catalog and take the first scan of the models root. */
   private async initialize(): Promise<void> {
@@ -124,16 +164,65 @@ export class PrismLocalModelsService {
     await this.rescan()
   }
 
+  /** The running install: downloads, verifies, provisions, and records. */
+  private async runInstall(modelId: string, variant: CatalogVariant, signal: AbortSignal, activeInstall: ActiveInstall): Promise<void> {
+    const dir = ModelRegistry.variantDir(this.modelsRoot, modelId, variant.id)
+    const files: Record<string, FileRecord> = {}
+    try {
+      await mkdir(dir, { recursive: true })
+      for (const file of variant.files) {
+        activeInstall.progress = { phase: 'download', done: 0, total: file.sizeBytes, label: file.path }
+        const destPath = join(dir, file.path)
+        await mkdir(dirname(destPath), { recursive: true })
+        await downloadFile({
+          url: file.url,
+          destPath,
+          sizeBytes: file.sizeBytes,
+          sha256: file.sha256,
+          signal,
+          onProgress: done => {
+            activeInstall.progress = { phase: 'download', done, total: file.sizeBytes, label: file.path }
+          },
+        })
+        const stats = await stat(destPath)
+        files[file.path] = { sizeBytes: file.sizeBytes, mtimeMs: stats.mtimeMs, verified: true }
+      }
+      if (signal.aborted) throw new LocalModelsError('download-failed', 'cancelled')
+      await this.writeFamilyRecord(modelId, { variantId: variant.id, status: 'ready', error: undefined, files })
+    } catch (error) {
+      if (signal.aborted) {
+        await this.writeFamilyRecord(modelId, { variantId: variant.id, status: 'idle', error: undefined, probe: this.document.families[modelId]?.probe })
+      } else {
+        const message = error instanceof Error ? error.message : String(error)
+        const code = error instanceof LocalModelsError ? error.code : 'download-failed'
+        await this.writeFamilyRecord(modelId, {
+          variantId: variant.id,
+          status: 'error',
+          error: code === 'integrity-failed' || code === 'download-failed' ? message : `install failed: ${message}`,
+        })
+      }
+    } finally {
+      this.active.delete(modelId)
+    }
+  }
+
   /** Re-verify every recorded variant tree; manual placement shows up here. */
   private async rescan(): Promise<void> {
     for (const family of this.catalogImpl) {
-      const record = this.document.families[family.id]
-      if (record?.variantId === undefined) continue
-      const variant = family.variants.find(candidate => candidate.id === record.variantId)
-      if (variant === undefined) continue
-      const outcome = await this.verifyVariantTree(family.id, variant, record)
-      if (outcome !== undefined) await this.writeFamilyRecord(family.id, outcome)
+      await this.rescanFamily(family.id)
     }
+  }
+
+  /** Re-verify one family's recorded variant tree against the catalog pins. */
+  private async rescanFamily(modelId: string): Promise<void> {
+    const family = this.catalogImpl.find(candidate => candidate.id === modelId)
+    if (family === undefined) return
+    const record = this.document.families[modelId]
+    if (record?.variantId === undefined) return
+    const variant = family.variants.find(candidate => candidate.id === record.variantId)
+    if (variant === undefined) return
+    const outcome = await this.verifyVariantTree(modelId, variant, record)
+    if (outcome !== undefined) await this.writeFamilyRecord(modelId, outcome)
   }
 
   /**
@@ -193,16 +282,20 @@ export class PrismLocalModelsService {
   private families(): ModelFamilyView[] {
     return this.catalogImpl.map(family => {
       const record = this.document.families[family.id]
+      const active = this.active.get(family.id)
       const selectedVariantId = record?.variantId ?? family.defaultVariantId
+      const status: ModelStatus = active === undefined
+        ? record?.status ?? 'idle'
+        : active.progress.phase === 'provision' ? 'provisioning' : 'downloading'
       return {
         id: family.id,
         displayName: family.displayName,
         kind: family.kind,
         selectedVariantId,
         variants: family.variants.map(variant => this.variantView(variant, record)),
-        status: record?.status ?? 'idle',
-        ...(record?.error !== undefined ? { error: record.error } : {}),
-        ...(this.activeProgress(family.id) !== undefined ? { progress: this.activeProgress(family.id) as ModelProgress } : {}),
+        status,
+        ...(record?.error !== undefined && active === undefined ? { error: record.error } : {}),
+        ...(active !== undefined ? { progress: active.progress } : {}),
         ...(record?.probe !== undefined ? { probe: record.probe } : {}),
       }
     })
@@ -217,11 +310,6 @@ export class PrismLocalModelsService {
       sizeBytes: variant.files.reduce((total, file) => total + file.sizeBytes, 0),
       installed: record?.variantId === variant.id && record.status === 'ready',
     }
-  }
-
-  /** The active operation's progress for one family, when one is running. */
-  private activeProgress(_modelId: string): ModelProgress | undefined {
-    return undefined
   }
 
   /** Look up one catalog family or fail with a typed error. */
