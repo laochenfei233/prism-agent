@@ -237,6 +237,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/api/cron-controller': { kind: 'none', reason: 'Scheduled-task API and state projection owner; the model reaches cron through dsh-tool-cron, and this package registers no prompt, tool, or session event.' },
   'packages/api/job-controller': { kind: 'none', reason: 'Job observation is browser and Host control state; it registers no prompt, tool, or session event.' },
   'packages/backup/prism-backup': { kind: 'none', reason: 'Backup is Host file transfer plus browser settings state; it registers no prompt, tool, or session event.' },
+  'packages/transfer/prism-transfer': { kind: 'none', reason: 'Transfer is Host file transfer plus browser settings state; it registers no prompt, tool, or session event.' },
   'packages/api/session-controller': { kind: 'none', reason: 'Session API and transport owner; invoked Agent commands own any model-visible effect.' },
   'packages/api/settings-controller': { kind: 'none', reason: 'Configuration-surface API owner; it registers no prompt, tool, or session event.' },
   'packages/api/workspace-controller': { kind: 'none', reason: 'Workspace API and state projection owner; it registers no prompt, tool, or session event.' },

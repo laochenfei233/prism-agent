@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/transfer/prism-transfer/README.md
+/:
+  en: 3c226d97f33a69ad
+  zh: 5b96fb4f77ac4c2b
+/prism-prism-transfer:
+  en: 3281095d48c60087
+  zh: d16071446e30a8a9
+/prism-prism-transfer/summary:
+  en: 5447a3970e9019e9
+  zh: 49fe39a023e39ecc
+/prism-prism-transfer/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: bbfde3e94b2fe768
+/prism-prism-transfer/use-this-package:
+  en: 71df67ff00a66779
+  zh: 4d08114cdece3386
+/prism-prism-transfer/use-this-package/composition:
+  en: 660678c683443aa0
+  zh: b69db424e6e24e93
+/prism-prism-transfer/use-this-package/route-contract:
+  en: a1a988ee4baa14bf
+  zh: 40e592c7be9f7aa1
+/prism-prism-transfer/use-this-package/archive-formats:
+  en: c426cce0e43fbda9
+  zh: 48a8383042ad6147
+/prism-prism-transfer/use-this-package/what-to-expect:
+  en: 64fd4474cdc9be50
+  zh: 8fe798bfc47a6849
+/prism-prism-transfer/use-this-package/failures:
+  en: 887119bfbde219e9
+  zh: 51f908b1fbe2f4e2
+/prism-prism-transfer/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: cfcb757213648bd9
+/prism-prism-transfer/understand-the-implementation/design-split:
+  en: 9f4675a58f01c97d
+  zh: 1454d743aeab50bb
+/prism-prism-transfer/understand-the-implementation/never-overwrite:
+  en: a7559090588362b8
+  zh: 68c9f3049eb99b60
+/prism-prism-transfer/understand-the-implementation/nothing-model-visible:
+  en: f61675dd7f083a80
+  zh: 13bdce15e4ce80f4
+/prism-prism-transfer/understand-the-implementation/test-coverage:
+  en: 6ae9ce99184f1c47
+  zh: 3b588b049e090a20
+/prism-prism-transfer/further-exploration:
+  en: b28ea9178ee5bc2e
+  zh: 580e1ea0e8375c6f
+/prism-prism-transfer/model-experience:
+  en: 2493a34919c49eb9
+  zh: f673bb0912ffe4b1
+/prism-prism-transfer/model-experience/kv-cache-effect:
+  en: 1aef1f9d7f6dc543
+  zh: 410448a5d822dbf6
+/prism-prism-transfer/known-limitations-and-deferred-work:
+  en: 407bb8cc448f8880
+  zh: 4cce3bc440e42d57

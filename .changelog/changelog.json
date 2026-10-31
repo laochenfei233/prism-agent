@@ -1,0 +1,126 @@
+{
+  "versions": [
+    {
+      "version": "0.2.1-rc.4",
+      "date": "2026-10-31",
+      "summary": "Prism gains in-app updates with a new About page, imports conversations from ten coding agents, and installs under its own prism-agent identity with a dedicated data root.",
+      "entries": [
+        {
+          "type": "added",
+          "text": "The desktop app now updates itself: the new About page shows the current version and lets you check for, download, and install updates in place.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "4f0fa9e"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Launching the app while it is already running focuses the existing window instead of starting a second copy; instances left over from a previous install are closed first.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4f0fa9e",
+            "e4526dc"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Existing conversations from ten coding agents - Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI - can now be imported into the session list, with titles visible right away.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "4eab8e6",
+            "589f2d7",
+            "51455bb"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "DeepSeek Harness sessions keep their full fidelity on import: the original log is copied natively instead of converted to plain text.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4faac41"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Prism installs under its own identity: the prism-agent command and a dedicated ~/.prism data root, isolated from any other DeepSeek Harness build on the machine.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "39d9f63"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The installed desktop app now runs as prism-agent.exe, and the installer no longer closes unrelated DeepSeek Harness processes.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ed28c35"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The runtime is synced to upstream DeepSeek Harness 0.2.1-rc.4, replaying the upstream changes from alpha.4 through rc.2 and rc.4.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "813a8ea",
+            "c64d35c",
+            "11d73b1"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "In the sidebar Last updated mode, project sections now rank by the newest activity of their sessions.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fb2fa62"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "Desktop packaging no longer runs the pnpm-11-incompatible native rebuild step; the shipped closure relies on the prebuilt node-pty bindings.",
+          "breaking": false,
+          "audience": "internal",
+          "highlight": false,
+          "commits": [
+            "2c9222d"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The desktop shell now quits cleanly before an installer replaces it, instead of leaving a stale tray icon behind.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "2ac53d3"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The Windows app icon now fills its slot correctly in the window, taskbar, and installer.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0daa316"
+          ]
+        }
+      ]
+    }
+  ]
+}

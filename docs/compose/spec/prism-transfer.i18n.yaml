@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for prism-transfer.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-transfer.md
+/:
+  en: 238c2e77f853f8a2
+  zh: 7d81c1a65c4f956f
+/prism-transfer:
+  en: c59b568521fe461e
+  zh: 5f27575479f024ca
+/prism-transfer/report:
+  en: 0372673021ad469d
+  zh: 3af85901387d6600
+/prism-transfer/s1-problem:
+  en: d1b0c234285fa1b2
+  zh: 7edfbace65716631
+/prism-transfer/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-transfer/s2-design/s2-1-package-and-composition:
+  en: b4d691bc222a488e
+  zh: bb7e6fc039a80851
+/prism-transfer/s2-design/s2-2-archive-and-file-formats:
+  en: 36826c06d3f73af8
+  zh: 0cf87ca8df84a24b
+/prism-transfer/s2-design/s2-3-export:
+  en: f082b92fae77f4ed
+  zh: 46fd71051cfcf981
+/prism-transfer/s2-design/s2-4-import:
+  en: 7d5c862314dc6770
+  zh: 7d88b8b6e609be96
+/prism-transfer/s2-design/s2-5-settings-config-items-export-and-import:
+  en: a1efcdc741734fee
+  zh: cf6050fcc025487e
+/prism-transfer/s2-design/s2-6-safety-and-consistency:
+  en: bbc3bcb51a0ea4d0
+  zh: 4448c30fa63a7500
+/prism-transfer/s2-design/s2-7-host-routes-and-job-model:
+  en: f9ae0e298762d04b
+  zh: e22140f9b81ef6b2
+/prism-transfer/s2-design/s2-8-settings-page-ui:
+  en: 2925f91d67ebb458
+  zh: ecf76e54aac5ee3d
+/prism-transfer/s2-design/s2-9-reuse-map:
+  en: fef267bfc8a51775
+  zh: e590816ebf29a345
+/prism-transfer/s2-design/s2-10-rejected-alternatives:
+  en: 0e09ed9b6769544a
+  zh: 2dc1343f6a93ed65
+/prism-transfer/s3-scope:
+  en: 5ee9c4c7465ff5e3
+  zh: ad693b12ec81efc3
+/prism-transfer/tasks:
+  en: 1277031ba226c36b
+  zh: 7d9cb977eb537c02
+/prism-transfer/s4-acceptance:
+  en: a04378e9cf7b696e
+  zh: 2c8def02f23317df

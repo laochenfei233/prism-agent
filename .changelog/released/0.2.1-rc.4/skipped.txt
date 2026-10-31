@@ -1,0 +1,1 @@
+5be9dc9	fix(desktop): read the rival sweep's CIM output as UTF-8
