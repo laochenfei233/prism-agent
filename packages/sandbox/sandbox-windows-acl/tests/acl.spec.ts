@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import koffi from 'koffi'
 
-import { buildExplicitAccess, grantWrite, lockFilePath, revokeWrite, withPathLock } from '../src/acl.ts'
+import { buildExplicitAccess, denyWrite, grantWrite, lockFilePath, revokeWrite, withPathLock } from '../src/acl.ts'
 import { AclSandbox } from '../src/index.ts'
 import { createRestrictedToken, makeWellKnownSid } from '../src/token.ts'
 import { allocOverlapped, allocPtrSlot, decodePtr, isInvalidHandle, isNullPtr, win32 } from '../src/ffi.ts'
@@ -361,6 +361,25 @@ describe.skipIf(!isWin32)('ACL editing', () => {
       if (!isNullPtr(capabilitySid)) api.localFree(capabilitySid)
       if (!isNullPtr(lowSid)) api.localFree(lowSid)
       if (!isNullPtr(world)) api.localFree(world)
+    }
+  })
+
+  it('denyWrite pins a subtree with an inheritable deny for the capability SID', async () => {
+    const api = await win32()
+    const dir = scratch()
+    const protectedDir = join(dir, 'protected')
+    mkdirSync(protectedDir)
+    const capabilitySid = sidFromString(api, 'S-1-4-4242-7')
+    try {
+      expect(denyWrite(api, protectedDir, capabilitySid)).toBe(true)
+      expect(denyWrite(api, protectedDir, capabilitySid)).toBe(false)
+      expect(readTypedAces(api, protectedDir)).toContainEqual(expect.objectContaining({
+        sid: 'S-1-4-4242-7',
+        mask: abi.GRANT_MASK,
+        type: abi.ACCESS_DENIED_ACE_TYPE,
+      }))
+    } finally {
+      if (!isNullPtr(capabilitySid)) api.localFree(capabilitySid)
     }
   })
 

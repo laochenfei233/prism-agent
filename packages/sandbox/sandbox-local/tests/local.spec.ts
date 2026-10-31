@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -21,6 +21,7 @@ import {
 } from '@deepseek-ai/dsh-sandbox-local'
 import type { Config } from '@deepseek-ai/dsh-sandbox-local'
 import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from '../src/profiles.ts'
+import { outsideTempWorkspaceParent } from '../../../../scripts/snapshot-workspace-parent.ts'
 
 const RO: SandboxPolicy = { mode: 'read-only', workspaceRoot: '/ws' }
 const WW: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: '/ws' }
@@ -488,5 +489,58 @@ describe('the windows-acl probe (runner invocation contract)', () => {
     })
     const confined = await sandbox.confine(['true'], RO)
     expect(confined.argv.slice(0, 2)).toEqual([process.execPath, builtEntry])
+  })
+})
+
+describe('harness home inside the workspace', () => {
+  /** A real workspace with the harness home nested inside it. */
+  function nestHome(): { workspace: string; home: string } {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-sandbox-home-'))
+    tempDirs.push(dir)
+    const workspace = realpathSync.native(dir)
+    const home = join(workspace, '.prism')
+    mkdirSync(home)
+    vi.stubEnv('DSH_HOME', home)
+    return { workspace, home }
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('seatbelt denies the home after allowing the workspace', () => {
+    const { workspace, home } = nestHome()
+    const profile = seatbeltProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace })[1] as string
+    const literal = `(subpath "${home.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}")`
+    expect(profile).toContain(`(deny file-write* ${literal})`)
+  })
+
+  it('bwrap rebinds the home read-only after the workspace bind', () => {
+    const { workspace, home } = nestHome()
+    const args = bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace })
+    const bind = args.indexOf('--bind')
+    const rebind = args.indexOf(home)
+    expect(bind).toBeGreaterThan(-1)
+    expect(rebind).toBeGreaterThan(bind)
+    expect(args[rebind - 1]).toBe('--ro-bind')
+    expect(args[rebind + 1]).toBe(home)
+  })
+
+  it('landlock refuses a policy it cannot exclude the home from', () => {
+    const { workspace } = nestHome()
+    expect(() => landlockProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace }))
+      .toThrow(SandboxUnavailableError)
+  })
+
+  it('leaves every profile unchanged when the home is outside the workspace', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'dsh-sandbox-outside-'))
+    tempDirs.push(workspace)
+    // Outside the workspace and every platform temp grant.
+    const outside = mkdtempSync(join(outsideTempWorkspaceParent(), 'dsh-sandbox-home-outside-'))
+    tempDirs.push(outside)
+    vi.stubEnv('DSH_HOME', join(outside, '.prism'))
+    expect(bwrapProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace }))
+      .toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--unshare-pid', '--proc', '/proc', '--die-with-parent', '--tmpfs', '/tmp', '--bind', workspace, workspace])
+    expect(seatbeltProfileArgs({ mode: 'workspace-write', workspaceRoot: workspace })[1]).not.toContain('(deny file-write* (subpath')
   })
 })

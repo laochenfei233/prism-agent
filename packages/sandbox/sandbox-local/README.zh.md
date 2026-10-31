@@ -80,6 +80,8 @@ Seatbelt profile 默认允许，带 `(deny file-write*)` 与来自共享 `writab
 
 Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同时为每个活跃的会话/工作区对分配一个随机私有临时目录，以及不同的 SID 和可撤销 ACE——共享工作区的会话共享其预期写权限，却不会继承彼此的临时目录权限。新的提供方总会选择新的临时路径和 SID，因此崩溃残留既无法阻止恢复的会话，也无法向其授权。该档报告 `partial` 强制执行，因为 NTFS 硬链接会把同一文件对象别名为多个路径、读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。
 
+当可写根包含 harness home（`$DSH_HOME`，默认 `~/.prism`）时，每个 profile 都会拒绝它：bwrap 在工作区绑定之后把 home 重新绑定为只读，Seatbelt 追加一条优先于允许规则的拒绝子路径规则，Windows 档为工作区能力 SID 添加 Deny ACE，而 Landlock——无法排除子路径的允许列表——以 `SANDBOX_UNAVAILABLE` 拒绝该策略，而不是授予该目录树。
+
 当内置 Windows runner 与技能注册表同时可用时，此提供方会注册 [ACL 诊断技能](../sandbox-windows-acl/README.zh.md#failures-and-recovery)。自定义 `runnerCommand` 不注册该技能；提供方释放时移除技能及其提取的资源。
 
 构建后的 ACL runner 缺失时，源码启动将 `tsx/esm/api` 加载器和 TypeScript 路径映射固定到本安装目录。命令的工作目录和环境中的 `TSX_TSCONFIG_PATH` 无法选择 runner 的源码依赖。
@@ -129,7 +131,7 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 这些限制说明提供方何时不合适，或何时需要特别运维。它们是当前包约束，不是通用平台对比或任务积压。
 
 - **Windows ACL 只能实现部分强制执行**——NTFS 硬链接会使工作区路径与外部路径指向同一个文件对象，读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。提供方报告 `enforcement: 'partial'`，而不会把该边界夸大为完整强制执行。
-- **Landlock 可能只实现部分强制执行**——较旧且受支持的内核 ABI 只能限制自身公开的访问类别，因此报告 `enforcement: 'partial'`，不会夸大为完整强制执行。
+- **Landlock 可能只实现部分强制执行**——较旧且受支持的内核 ABI 只能限制自身公开的访问类别，因此报告 `enforcement: 'partial'`，不会夸大为完整强制执行。它还会拒绝工作区包含 harness home 的 `workspace-write` 策略，因为允许列表无法排除该子路径。
 - **Seatbelt 依赖已弃用的 `sandbox-exec`**——macOS 仍会提供它，但若 Apple 移除该私有策略引擎，该提供方无法替换或探测。
 - **runner 选择在提供方生命周期内缓存**——安装、移除或修复 runner 后，必须重载插件才能改变选择。
 - **`runnerCommand` 是操作方断言**——配置的自定义 runner 会跳过功能探测，并假定它诚实实现与 bwrap 兼容的 profile；如果它本身是 Bash 脚本，其解释器启动发生在该脚本施加约束之前。

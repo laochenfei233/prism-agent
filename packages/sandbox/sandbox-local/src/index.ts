@@ -39,7 +39,7 @@ import type { ConfinedArgv, ConfinedSandboxMode, RunnerFailureRule, SandboxEnfor
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
-import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from './profiles.ts'
+import { bwrapProfileArgs, landlockProfileArgs, protectedRootsWithin, seatbeltProfileArgs } from './profiles.ts'
 
 /** Plugin config. All optional — `static Config` supplies the defaults. */
 export interface Config {
@@ -407,6 +407,12 @@ export class LocalSandboxProvider extends SandboxProvider {
       const grant = AclWriteGrant.create(writeSid)
       try {
         grant.add(workspaceRoot, true)
+        // The standing workspace ACE inherits into everything below it, so a
+        // harness home inside the workspace needs an explicit deny in front of
+        // that inherited allow.
+        for (const protectedRoot of protectedRootsWithin({ mode: 'workspace-write', workspaceRoot })) {
+          if (existsSync(protectedRoot)) grant.deny(protectedRoot)
+        }
       } catch (error) {
         // Free the SID; a standing ACE (if the apply succeeded before a
         // post-apply throw) is the intended end state, not an error
