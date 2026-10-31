@@ -51,7 +51,7 @@ export function apply(ctx: Context, config: ConfigShape = {}): void {
   const service = new PrismLocalModelsService(resolved, homeOf(ctx))
 
   ctx.effect(() => {
-    Reflect.set(ctx, 'prismLocalModels', service)
+    ctx.provide('prismLocalModels', service)
     return () => service.dispose()
   }, 'local-models: service claim')
 

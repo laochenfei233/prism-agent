@@ -158,7 +158,7 @@ function FamilyRow(props: {
         >
           {family.variants.map(variant => (
             <option key={variant.id} value={variant.id}>
-              {variant.installed ? '✓ ' : ''}{variant.displayName} · {variant.device === 'cuda' ? `${t('device.cuda')} · ` : ''}{formatBytes(variant.sizeBytes)}
+              {variant.installed ? '✓ ' : ''}{variant.displayName} · {variant.device === 'cuda' ? `${t('device.cuda')} · ` : ''}{variant.sizeBytes > 0 ? formatBytes(variant.sizeBytes) : t('variant.provisioned')}
             </option>
           ))}
         </select>

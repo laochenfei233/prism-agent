@@ -15,6 +15,7 @@ export type LocalModelsLocaleKey =
   | 'kind.translation'
   | 'kind.embedding'
   | 'device.cuda'
+  | 'variant.provisioned'
   | 'status.idle'
   | 'status.downloading'
   | 'status.provisioning'
@@ -39,6 +40,7 @@ export const en: Record<LocalModelsLocaleKey, string> = {
   'kind.translation': 'Translation',
   'kind.embedding': 'Embedding',
   'device.cuda': 'CUDA',
+  'variant.provisioned': 'runtime provisioned',
   'status.idle': 'Not installed',
   'status.downloading': 'Downloading',
   'status.provisioning': 'Setting up',
@@ -64,6 +66,7 @@ export const zh: Record<LocalModelsLocaleKey, string> = {
   'kind.translation': '翻译',
   'kind.embedding': '向量',
   'device.cuda': 'CUDA',
+  'variant.provisioned': '供给运行时',
   'status.idle': '未安装',
   'status.downloading': '下载中',
   'status.provisioning': '配置中',
