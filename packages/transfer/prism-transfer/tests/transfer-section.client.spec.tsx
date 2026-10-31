@@ -361,7 +361,7 @@ describe('TransferSection import card', () => {
     const running: TransferJobSnapshot = {
       jobId: 'jf', kind: 'combined', state: 'running', phase: 'restoring', name: 'fail.zip',
       archiveBytes: 10, files: 0, bytes: 5, sessionsDone: 1, sessionsTotal: 4,
-      projectsDone: 0, projectsTotal: 2,      skippedSecrets: 0, startedAt: 1,
+      projectsDone: 0, projectsTotal: 2, duplicates: 0, startedAt: 1,
     }
     mockFetch({
       '/api/prism.transfer/import': () => ({ body: { jobId: 'jf' } }),

@@ -39,7 +39,6 @@ function fakeConnection() {
 
 /** Build a single-session archive, upload it through the import route, and return the job id. */
 async function postArchive(
-  ctx: Context,
   connection: ReturnType<typeof fakeConnection>,
   home: string,
   title: string,
@@ -393,7 +392,7 @@ describe('transfer routes', () => {
     // through the real route and watch the checkpoint fold land.
     const ctx = new Context()
     const connection = fakeConnection()
-    const stores = fakeStores(join(home, 'project'))
+    const stores = fakeStores(join(home, 'project'), 'Cached')
     ctx.provide('connection', connection.connection as never)
     ctx.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
     ctx.provide('sessionPersistence', stores.sessionPersistence)
@@ -417,7 +416,7 @@ describe('transfer routes', () => {
     } as never)
     Reflect.set(ctx, 'dshHomePath', () => home)
     apply(ctx)
-    const { jobId, routes: importRoutes } = await postArchive(ctx, connection, home, 'Cached', 'c-9')
+    const { jobId, routes: importRoutes } = await postArchive(connection, home, 'Cached', 'c-9')
     const snapshot = await awaitDone(importRoutes, jobId)
     expect(snapshot['state']).toBe('done')
     expect(checkpoints).toContain('c-9')
@@ -428,7 +427,7 @@ describe('transfer routes', () => {
     const { home } = await buildPlugin()
     const ctx = new Context()
     const connection = fakeConnection()
-    const stores = fakeStores(join(home, 'project'))
+    const stores = fakeStores(join(home, 'project'), 'Cached')
     ctx.provide('connection', connection.connection as never)
     ctx.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
     ctx.provide('sessionPersistence', stores.sessionPersistence)
@@ -451,7 +450,7 @@ describe('transfer routes', () => {
     } as never)
     Reflect.set(ctx, 'dshHomePath', () => home)
     apply(ctx)
-    const first = await postArchive(ctx, connection, home, 'Cold', 'cold-1')
+    const first = await postArchive(connection, home, 'Cold', 'cold-1')
     const coldSnapshot = await awaitDone(connection.routes, first.jobId)
     expect(coldSnapshot['state']).toBe('done')
     await ctx.fiber.dispose()
@@ -460,7 +459,7 @@ describe('transfer routes', () => {
     // finishing the import. The deadline is the fixed two-second bound.
     const never = new Context()
     const neverConnection = fakeConnection()
-    const neverStores = fakeStores(join(home, 'project'))
+    const neverStores = fakeStores(join(home, 'project'), 'Never')
     never.provide('connection', neverConnection.connection as never)
     never.provide('sessionQuery', { traceSession: async () => ({ descendants: [] }) } as never)
     never.provide('sessionPersistence', neverStores.sessionPersistence)
@@ -481,7 +480,7 @@ describe('transfer routes', () => {
     } as never)
     Reflect.set(never, 'dshHomePath', () => home)
     apply(never)
-    const second = await postArchive(never, neverConnection, home, 'Never', 'never-1')
+    const second = await postArchive(neverConnection, home, 'Never', 'never-1')
     const neverSnapshot = await awaitDone(neverConnection.routes, second.jobId)
     expect(neverSnapshot['state']).toBe('done')
     await never.fiber.dispose()
