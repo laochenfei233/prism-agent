@@ -143,6 +143,18 @@ fn open_new_window_externally(
     NewWindowResponse::Deny
 }
 
+/// Whether `cmd /C start` may receive this URL. The URL comes from web content
+/// and cmd.exe parses the rest of its command line as text, so a metacharacter
+/// would end the `start` command and run the remainder as a second command.
+#[cfg(windows)]
+fn is_cmd_startable(url: &str) -> bool {
+    !url.is_empty()
+        && url.chars().all(|c| {
+            c.is_ascii_graphic()
+                && !matches!(c, '&' | '|' | '<' | '>' | '^' | '%' | '"' | '(' | ')' | '!')
+        })
+}
+
 /// OS-level fallback for the opener plugin: the shell runs without a console,
 /// so an opener failure is invisible; `cmd start` / `open` / `xdg-open` are
 /// the same calls the plugin wraps.
@@ -151,6 +163,12 @@ fn open_with_os(url: &str) -> std::io::Result<()> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        if !is_cmd_startable(url) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "URL contains characters cmd.exe would read as command text",
+            ));
+        }
         std::process::Command::new("cmd")
             .args(["/C", "start", "", url])
             .creation_flags(CREATE_NO_WINDOW)
@@ -291,4 +309,33 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(all(test, windows))]
+mod cmd_start_tests {
+    use super::is_cmd_startable;
+
+    #[test]
+    fn accepts_plain_link_urls() {
+        assert!(is_cmd_startable("https://example.test/path?q=1#frag"));
+        assert!(is_cmd_startable("mailto:user@example.test"));
+        assert!(is_cmd_startable("tel:+10000000000"));
+    }
+
+    #[test]
+    fn refuses_every_cmd_metacharacter() {
+        for url in [
+            "https://example.test/?a=1&calc",
+            "mailto:user@example.test|calc",
+            "https://example.test/<calc>",
+            "https://example.test/^calc",
+            "https://example.test/%PATH%",
+            "https://example.test/\"calc\"",
+            "https://example.test/(calc)",
+            "https://example.test/!calc",
+            "https://example.test/a b",
+        ] {
+            assert!(!is_cmd_startable(url), "{url}");
+        }
+    }
 }
