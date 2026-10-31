@@ -81,6 +81,22 @@ it('lists a command registered after the palette opened', () => {
   expect(screen.getAllByRole('option')).toHaveLength(2)
 })
 
+it('removes the blocked-reason toast after its hold', async () => {
+  vi.useFakeTimers()
+  const f = fixture([row('pane.split', 'Split pane')])
+  f.invoke.mockReturnValue({ status: 'blocked', reason: 'No pane' })
+  try {
+    act(() => { f.store.actions.open() })
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(32) })
+    expect(screen.getByText('No pane')).toBeTruthy()
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
+    expect(screen.queryByText('No pane')).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 it('runs the command a row click points at', async () => {
   const f = fixture([row('session.new', 'New session'), row('settings.open', 'Open settings')])
   act(() => { f.store.actions.open() })
