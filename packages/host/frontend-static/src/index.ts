@@ -3,12 +3,13 @@
  * fallback seat: serves the built frontend directory with explicit index
  * entry points. A readable index renders at the dist root and configured index
  * path; missing paths return 404, traversal outside the dist root is 403,
- * unknown extensions ship as octet-stream, and non-GET/HEAD is 405. Every
- * index response first passes Connection's browser authentication, then the
- * webserver's index render (structured injection rows, then raw taps).
- * Non-index assets stay public. The dist location is workspace knowledge of
- * the composing application, so `distIndex` is typically supplied through a
- * `!!js` expression, never hardcoded by a deployment.
+ * unknown extensions ship as octet-stream, and non-GET/HEAD is 405. Every HTML
+ * entry first passes Connection's browser authentication; the dist root and
+ * configured index then render through the webserver's index render (structured
+ * injection rows, then raw taps). Non-HTML assets stay public. The dist
+ * location is workspace knowledge of the composing application, so `distIndex`
+ * is typically supplied through a `!!js` expression, never hardcoded by a
+ * deployment.
  * @module @deepseek-ai/dsh-host-frontend-static
  */
 
@@ -64,7 +65,8 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
  * @param res - the node:http response to write.
  * @param distRoot - absolute dist root directory (resolved by the caller).
  * @param distIndex - absolute path of index.html inside distRoot.
- * @param authorizeIndex - authenticates an index response before its bytes are read.
+ * @param authorizeIndex - authenticates an index or other HTML entry response
+ *   before its bytes are read.
  * @param renderIndex - produces the index.html body (structured injection
  * rendering) for the dist root and configured index path.
  */
@@ -90,6 +92,12 @@ export async function serveStatic(
       body = await renderIndex()
       type = HTML_MIME
     } else {
+      // Every HTML entry authenticates like the index: an additional page such
+      // as the worker preview boots owner-authority code, so serving it to an
+      // unauthenticated peer would hand that peer the authenticated runtime.
+      // Lowercase the extension: a case-insensitive host resolves `/x.HTML`
+      // and `/x.html` to the same file.
+      if (extname(target).toLowerCase() === '.html' && !authorizeIndex()) return
       body = await readFile(target)
       type = MIME[extname(target)] ?? 'application/octet-stream'
     }
