@@ -62,6 +62,15 @@ export const CUSTOM_PRESETS_MAX = 16
 /** Largest accepted preset name length, in code points. */
 export const CUSTOM_PRESET_NAME_MAX = 24
 
+/**
+ * Count one string's code points (spread-based counting trips the no-misused-spread rule).
+ * @param value - the string to measure.
+ * @returns the number of Unicode code points.
+ */
+export function codePointLength(value: string): number {
+  return Array.from(value).length
+}
+
 /** One saved custom theme: a display name plus the three synthesis inputs. */
 export interface CustomThemePreset {
   /** Display name, unique among the saved presets. */

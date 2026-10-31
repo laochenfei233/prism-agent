@@ -29,7 +29,7 @@ import { en, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
   CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_PRESETS_FIELD, CUSTOM_PRESET_NAME_MAX, CUSTOM_PRESETS_MAX,
-  CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID,
+  CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID, codePointLength,
   DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME,
   DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_FAMILY_FIELDS, FONT_ROLES, FONT_SIZE_SPECS,
   fontFamilyVariable, isFontSize, isHexColor, isThemePreference, normalizeFontFamily, normalizeHexColor,
@@ -280,7 +280,7 @@ export class ThemeRuntime {
   saveCustomPreset(name: string): void {
     const trimmed = name.trim()
     if (trimmed === '') throw new Error('a preset name is required')
-    if ([...trimmed].length > CUSTOM_PRESET_NAME_MAX) {
+    if (codePointLength(trimmed) > CUSTOM_PRESET_NAME_MAX) {
       throw new Error(`a preset name is limited to ${CUSTOM_PRESET_NAME_MAX} code points`)
     }
     const entry: CustomThemePreset = {
@@ -559,14 +559,17 @@ function sectionCustomInputs(section: ThemeSettings): CustomThemeInputs {
 function sectionCustomPresets(section: ThemeSettings): CustomThemePreset[] {
   const presets: CustomThemePreset[] = []
   for (const preset of Array.isArray(section.customPresets) ? section.customPresets : []) {
-    if (typeof preset?.name !== 'string') continue
-    const name = preset.name.trim()
-    if (name === '' || [...name].length > CUSTOM_PRESET_NAME_MAX) continue
-    if (preset.scheme !== 'light' && preset.scheme !== 'dark') continue
-    if (!isHexColor(preset.canvas) || !isHexColor(preset.accent)) continue
+    const candidate = preset as Partial<CustomThemePreset> | null
+    if (typeof candidate?.name !== 'string') continue
+    const name = candidate.name.trim()
+    if (name === '' || codePointLength(name) > CUSTOM_PRESET_NAME_MAX) continue
+    if (candidate.scheme !== 'light' && candidate.scheme !== 'dark') continue
+    if (!isHexColor(candidate.canvas) || !isHexColor(candidate.accent)) continue
     if (presets.some(saved => saved.name === name)) continue
     if (presets.length >= CUSTOM_PRESETS_MAX) break
-    presets.push({ name, scheme: preset.scheme, canvas: normalizeHexColor(preset.canvas), accent: normalizeHexColor(preset.accent) })
+    presets.push({
+      name, scheme: candidate.scheme, canvas: normalizeHexColor(candidate.canvas), accent: normalizeHexColor(candidate.accent),
+    })
   }
   return presets
 }

@@ -11,7 +11,7 @@ import clsx from 'clsx'
 import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   CUSTOM_PRESET_NAME_MAX, CUSTOM_PRESETS_MAX, DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME,
-  isHexColor, type CustomThemeInputs, type CustomThemePreset,
+  codePointLength, isHexColor, type CustomThemeInputs, type CustomThemePreset,
 } from '../theme-settings.ts'
 import type { createAppearanceSectionStore } from './settings-store.ts'
 import css from './AppearanceSection.module.css'
@@ -127,7 +127,7 @@ function PresetField({ presets, nameLabel, placeholder, saveLabel, deleteLabel, 
   const [name, setName] = useState('')
   const trimmed = name.trim()
   const atCap = presets.length >= CUSTOM_PRESETS_MAX && !presets.some(preset => preset.name === trimmed)
-  const savable = trimmed !== '' && [...trimmed].length <= CUSTOM_PRESET_NAME_MAX && !atCap
+  const savable = trimmed !== '' && codePointLength(trimmed) <= CUSTOM_PRESET_NAME_MAX && !atCap
   const save = (): void => {
     onSave(trimmed)
     setName('')
@@ -146,6 +146,7 @@ function PresetField({ presets, nameLabel, placeholder, saveLabel, deleteLabel, 
             onChange={(event) => { setName(event.target.value) }}
             onKeyDown={(event) => {
               // Some IMEs report composition only through keyCode 229.
+              // oxlint-disable-next-line typescript/no-deprecated -- the deprecated keyCode is the one signal some IMEs set.
               if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
               if (event.key === 'Enter' && savable) save()
             }}
