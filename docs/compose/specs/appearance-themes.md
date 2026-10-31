@@ -1,14 +1,71 @@
 ---
 feature: appearance-themes
-status: in-progress
-updated: 2026-10-30
+status: delivered
+updated: 2026-10-31
 branch: feat/appearance-themes
-commits: 42f8b7cfed.. # filled at delivery
+commits: 42f8b7cfed..745b01c530
 ---
 
 # Appearance themes: standalone section, custom theme, five palettes, distinct previews
 
 ## Report
+
+**What was built** — The theme picker is now a standalone Appearance section in
+the settings sidebar (nav order 5, its own swatch glyph), holding the theme
+gallery, a custom-theme group, and the font settings; General no longer lists
+them. The gallery renders twelve rows — `system`, ten built-in palettes
+(`light`, `dark`, `graph-glass`, `mono-accent`, `strata-dark`, and the new
+`paper`, `blueprint`, `phosphor`, `sumi`, `sage`), and `custom` — each painting
+its own preview motif; designed themes show their canvas textures through the
+same tokens the runtime applies.
+
+The custom theme synthesizes a partial override layer at runtime from three
+persisted inputs (`customScheme`, `customCanvas`, `customAccent`, hex-validated
+at the settings boundary): surfaces derive from the canvas at clamped neutral
+saturation, the accent spends like `mono-accent` with luminance-resolved
+inverted text, and label/state ramps fall through to the proven base palette.
+`ThemeRuntime.setCustom` writes changed fields plus the preference switch in
+one settings mutation and republishes `theme/change`; the boot scripts paint
+the stored custom canvas before first paint. All `ThemeSnapshot` consumers were
+updated for the new `custom` field, and the config/slot catalogs were
+regenerated.
+
+**Verification** —
+`pnpm vitest run packages/client/ui-theme/tests/` PASS (2 failures
+PRE-EXISTING on base: corner-shape-styles, scrollbar-styles stylesheet scans);
+`packages/client/ui-settings-general/tests/` 86 PASS (2 previously failing
+ledger tests fixed by recording the true shipped roster); ThemeSnapshot
+consumer specs across ui-layout/ui-settings-account/ui-sidebar-terminal 164
+PASS; `pnpm run build` (build:artifacts + build:check) PASS; `pnpm run
+typecheck` PASS; `pnpm run duplication` FAIL(PRE-EXISTING, 13 clones identical
+on base, none in touched files); web e2e `settings-chrome.e2e.ts` 18 PASS and
+`settings-appearance.e2e.ts` PASS with `DSH_SNAPSHOT=refresh` goldens committed;
+`verify-config-catalog`/`verify-client-catalog` PASS after regeneration; doc
+gates clean for touched packages (ui-chat/ui-conversation summary budgets and
+the prism-backup README skeleton fail PRE-EXISTING from other master merges);
+visual walkthrough screenshots reviewed for all twelve motifs, five applied
+themes, and live custom synthesis. Review subagent: spec compliance PASS,
+correctness PASS, codebase consistency PASS after the catalog fix; re-review
+PASS on all items.
+
+**Journey log** —
+- A `settings.section` registration carries one store, so the two
+  `settings.general.item` row stores merged into a single section store; the
+  gallery, custom group, and font rows became section-internal components
+  typed on store + locale instead of the slot runtime.
+- Computed keys (`[CUSTOM_SCHEME_FIELD]:`) in the host `Config` z.object broke
+  the config-catalog generator, which cannot evaluate them; generated catalogs
+  need literal keys. Caught by review, fixed to literals.
+- The custom theme ships as a partial override layer (surfaces + accent set
+  derived, label/state ramps falling through to the base palette) rather than
+  synthesizing all ~60 tokens — contrast stays with proven values and the
+  derivation surface stays small.
+- The new section puts two buttons named 深色/浅色 on screen at once (theme
+  card vs base-palette segmented control); a `role="group"` + aria-label on the
+  gallery disambiguates for assistive tech and the e2e (`openAppearanceGallery`).
+- Master carried pre-existing red from earlier merges (stylesheet scans,
+  summary budgets, prism-backup README skeleton, duplication clones); each was
+  verified identical on the base tree before being recorded as PRE-EXISTING.
 
 ## [S1] Problem
 
@@ -146,20 +203,20 @@ key sets compile-checked.
 
 ## Tasks
 
-- [ ] T1: `theme-settings.ts` custom preference/fields/schema, hex
+- [x] T1: `theme-settings.ts` custom preference/fields/schema, hex
       validation, `synthesizeThemeTokens` + unit tests (depends: none)
-- [ ] T2: `builtin-themes.ts` five palettes; boot custom passthrough + Host
+- [x] T2: `builtin-themes.ts` five palettes; boot custom passthrough + Host
       `apply()` (depends: T1)
-- [ ] T3: `ThemeRuntime` custom synthesis, `setCustom`, snapshot exposure
+- [x] T3: `ThemeRuntime` custom synthesis, `setCustom`, snapshot exposure
       (depends: T1)
-- [ ] T4: Shell migration — `settings.section` registration,
+- [x] T4: Shell migration — `settings.section` registration,
       `AppearanceSection.tsx`, section store merge, nav icon (depends: T3)
-- [ ] T5: Preview motifs — `gallery.ts` + `AppearanceRow.module.css`
+- [x] T5: Preview motifs — `gallery.ts` + `AppearanceRow.module.css`
       (depends: T4)
-- [ ] T6: i18n keys; update ui-theme / ui-settings-general specs, web e2e
+- [x] T6: i18n keys; update ui-theme / ui-settings-general specs, web e2e
       helpers and expected markdown (depends: T4, T5)
-- [ ] T7: README/docs sync (depends: T6)
-- [ ] T8: Full verification, visual walkthrough, review subagent, finalize
+- [x] T7: README/docs sync (depends: T6)
+- [x] T8: Full verification, visual walkthrough, review subagent, finalize
       spec (depends: T1–T7)
 
 ## [S4] Acceptance
