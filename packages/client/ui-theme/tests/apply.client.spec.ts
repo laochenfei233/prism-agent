@@ -34,7 +34,7 @@ async function bench(isLoopback = true) {
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
   ctx.provide('locale', locale)
-  const section: Record<string, unknown> = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900' }
+  const section: Record<string, unknown> = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }
   const namespace = () => ({
     ns: THEME_SETTINGS_NAMESPACE,
     schema: ThemeSettingsSchema.toJSON(),
@@ -163,7 +163,7 @@ describe('ui-theme apply', () => {
   it('adopts all durable font sizes together after a refused batch settles', async () => {
     const host = stubConfigForm<ThemeSettings>()
     const section: ThemeSettings = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
-      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900' }
+      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }
     host.publish({ status: 'ready', value: section, revision: 1, writable: true })
     const { theme, keyboard } = await keyboardTheme(host)
     const write = Promise.withResolvers<boolean>()

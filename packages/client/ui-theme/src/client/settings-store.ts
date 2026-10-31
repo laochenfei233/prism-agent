@@ -38,6 +38,7 @@ type AppearanceSectionActions = {
     fontSizes: FontSizes,
     fontFamilies: FontFamilies,
     custom: CustomThemeInputs,
+    customPresets: readonly CustomThemePreset[],
     revision: number,
   ) => void
 }
