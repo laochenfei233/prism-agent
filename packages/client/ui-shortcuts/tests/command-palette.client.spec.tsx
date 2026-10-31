@@ -80,3 +80,25 @@ it('lists a command registered after the palette opened', () => {
   act(() => { f.catalog.set([...f.catalog.getSnapshot(), row('terminal.new', 'New terminal')]) })
   expect(screen.getAllByRole('option')).toHaveLength(2)
 })
+
+it('reports an empty result and shows unbound commands without keycaps', () => {
+  const f = fixture([row('session.new', 'New session', [], [])])
+  act(() => { f.store.actions.open() })
+  expect(screen.getByText(en.unbound)).toBeTruthy()
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzz-no-match' } })
+  expect(screen.queryAllByRole('option')).toHaveLength(0)
+  expect(screen.getByRole('status').textContent).toBe(en['palette.empty'])
+})
+
+it('jumps to the first and last match with Home and End', async () => {
+  const f = fixture([row('a', 'Alpha'), row('b', 'Beta'), row('c', 'Gamma')])
+  act(() => { f.store.actions.open() })
+  const input = screen.getByRole('combobox')
+  fireEvent.keyDown(input, { key: 'End' })
+  expect(screen.getAllByRole('option').at(-1)?.getAttribute('aria-selected')).toBe('true')
+  fireEvent.keyDown(input, { key: 'Home' })
+  expect(screen.getAllByRole('option')[0]?.getAttribute('aria-selected')).toBe('true')
+  fireEvent.keyDown(input, { key: 'Enter' })
+  await settle()
+  expect(f.invoke).toHaveBeenCalledWith('a', expect.anything())
+})
