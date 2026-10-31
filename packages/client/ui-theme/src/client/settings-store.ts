@@ -8,7 +8,7 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-sto
 import type { ThemeGalleryEntry } from './gallery.ts'
 import {
   DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME, DEFAULT_FONT_SIZES,
-  type CustomThemeInputs, type FontFamilies, type FontSizes, type ThemePreference,
+  type CustomThemeInputs, type CustomThemePreset, type FontFamilies, type FontSizes, type ThemePreference,
 } from '../theme-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
@@ -23,6 +23,8 @@ export interface AppearanceSectionState {
   fontFamilies: FontFamilies
   /** Persisted custom theme inputs. */
   custom: CustomThemeInputs
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: readonly CustomThemePreset[]
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
 }
@@ -52,6 +54,7 @@ export function createAppearanceSectionStore(): EngineStoreHandle<AppearanceSect
       fontSizes: DEFAULT_FONT_SIZES,
       fontFamilies: { text: '', code: '', terminal: '' },
       custom: { scheme: DEFAULT_CUSTOM_SCHEME, canvas: DEFAULT_CUSTOM_CANVAS, accent: DEFAULT_CUSTOM_ACCENT },
+      customPresets: [],
       revision: -1,
     }),
     actions: {
@@ -62,6 +65,7 @@ export function createAppearanceSectionStore(): EngineStoreHandle<AppearanceSect
         fontSizes: FontSizes,
         fontFamilies: FontFamilies,
         custom: CustomThemeInputs,
+        customPresets: readonly CustomThemePreset[],
         revision: number,
       ) => {
         if (revision <= d.revision) return
@@ -70,6 +74,7 @@ export function createAppearanceSectionStore(): EngineStoreHandle<AppearanceSect
         d.fontSizes = fontSizes
         d.fontFamilies = fontFamilies
         d.custom = custom
+        d.customPresets = customPresets
         d.revision = revision
       },
     },

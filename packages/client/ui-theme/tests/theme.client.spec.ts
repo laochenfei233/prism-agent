@@ -479,4 +479,108 @@ describe('ThemeRuntime', () => {
       expect(theme.getTheme().custom).toEqual({ scheme: 'light', canvas: '#ffffff', accent: '#ff6900' })
     })
   })
+
+  describe('custom theme presets', () => {
+    it('saves the current inputs under a name and publishes the preset list', () => {
+      const { theme, events, host } = make()
+      theme.setCustom({ canvas: '#112233', accent: '#00ff00' })
+      const settledEvents = events.length
+      theme.saveCustomPreset('Navy')
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      expect(host.set).toHaveBeenCalledWith('customPresets', [
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      // Saving never changes the active preference.
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(events.length).toBe(settledEvents + 1)
+    })
+
+    it('trims the name, replaces an existing entry in place, and no-ops on identical saves', () => {
+      const { theme, events, host } = make()
+      theme.saveCustomPreset('  Ink  ')
+      expect(theme.getTheme().customPresets.map(preset => preset.name)).toEqual(['Ink'])
+      const afterFirst = events.length
+      theme.setCustom({ canvas: '#000000' })
+      theme.saveCustomPreset('Ink')
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Ink', scheme: 'light', canvas: '#000000', accent: '#ff6900' },
+      ])
+      const afterSecond = events.length
+      theme.saveCustomPreset('Ink')
+      expect(theme.getTheme().customPresets).toHaveLength(1)
+      expect(events.length).toBe(afterSecond)
+      expect(afterSecond).toBeGreaterThan(afterFirst)
+      expect(host.set).toHaveBeenCalledTimes(2)
+    })
+
+    it('throws on an empty or overlong name and writes nothing', () => {
+      const { theme, host } = make()
+      expect(() => { theme.saveCustomPreset('   ') }).toThrow('a preset name is required')
+      expect(() => { theme.saveCustomPreset('x'.repeat(25)) }).toThrow('limited to 24 code points')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(host.set).not.toHaveBeenCalled()
+    })
+
+    it('caps the preset list and refuses a new name past the cap', () => {
+      const { theme } = make()
+      for (let index = 0; index < 16; index += 1) theme.saveCustomPreset(`Preset ${index}`)
+      expect(() => { theme.saveCustomPreset('One more') }).toThrow('at most 16 presets')
+      // Replacing an existing name still works at the cap.
+      theme.saveCustomPreset('Preset 0')
+      expect(theme.getTheme().customPresets).toHaveLength(16)
+    })
+
+    it('deletes a preset, keeps the active look, and no-ops on an unknown name', () => {
+      const { theme, events, host } = make()
+      theme.saveCustomPreset('Navy')
+      const look = theme.getTheme().custom
+      theme.deleteCustomPreset('Navy')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(theme.getTheme().custom).toEqual(look)
+      const writes = host.set.mock.calls.length
+      theme.deleteCustomPreset('Unknown')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(host.set.mock.calls).toHaveLength(writes)
+      expect(events.length).toBe(2)
+    })
+
+    it('adopts saved presets from the Host section, dropping junk entries', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customScheme: 'dark', customCanvas: '#000000', customAccent: '#ff6900',
+        customPresets: [
+          { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          null,
+          { name: 42, scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          { name: ' ', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          { name: 'Bad', scheme: 'sepia', canvas: '#112233', accent: '#00ff00' },
+          { name: 'Over', scheme: 'light', canvas: 'orange', accent: '#00ff00' },
+          { name: 'Navy', scheme: 'dark', canvas: '#000000', accent: '#ff6900' },
+        ],
+      } as ThemeSettings, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#000000', accent: '#ff6900' })
+    })
+
+    it('caps hand-edited preset lists at the same boundary the writer enforces', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customPresets: Array.from({ length: 17 }, (_, index) => ({
+          name: `Preset ${index}`, scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
+        })),
+      } as ThemeSettings, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().customPresets).toHaveLength(16)
+      expect(theme.getTheme().customPresets.at(-1)?.name).toBe('Preset 15')
+    })
+  })
 })

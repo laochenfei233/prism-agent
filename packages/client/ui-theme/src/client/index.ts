@@ -28,12 +28,13 @@ import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
-  CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID,
+  CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_PRESETS_FIELD, CUSTOM_PRESET_NAME_MAX, CUSTOM_PRESETS_MAX,
+  CUSTOM_SCHEME_FIELD, CUSTOM_THEME_ID,
   DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME,
   DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_FAMILY_FIELDS, FONT_ROLES, FONT_SIZE_SPECS,
   fontFamilyVariable, isFontSize, isHexColor, isThemePreference, normalizeFontFamily, normalizeHexColor,
   sectionFontSizes, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type CustomThemeInputs, type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition,
+  type CustomThemeInputs, type CustomThemePreset, type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition,
   type ThemePreference, type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
 } from '../theme-settings.ts'
 import { synthesizeCustomTheme } from '../custom-theme.ts'
@@ -46,7 +47,7 @@ export type { AppearanceSectionState } from './settings-store.ts'
 export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
 export type {
-  BuiltinThemeId, CustomThemeInputs, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes,
+  BuiltinThemeId, CustomThemeInputs, CustomThemePreset, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes,
   ThemePreference, ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
 } from '../theme-settings.ts'
 
@@ -70,6 +71,8 @@ export interface ThemeSnapshot {
   fontFamilies: FontFamilies
   /** The stored custom theme inputs; the `custom` preference synthesizes its theme from these. */
   custom: CustomThemeInputs
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: readonly CustomThemePreset[]
   /**
    * The resolved active theme (`system` resolved via prefers-color-scheme,
    * `custom` synthesized from the stored inputs) with override layers folded
@@ -155,6 +158,7 @@ export class ThemeRuntime {
   private fontSizes: FontSizes = bootstrapFontSizes()
   private fontFamilies: FontFamilies = bootstrapFontFamilies()
   private custom: CustomThemeInputs = { scheme: DEFAULT_CUSTOM_SCHEME, canvas: DEFAULT_CUSTOM_CANVAS, accent: DEFAULT_CUSTOM_ACCENT }
+  private customPresets: CustomThemePreset[] = []
   private revision = 0
   /** Own settings writes not yet settled; adoption waits for zero so a Host echo of an earlier write cannot revert a later local change. */
   private pendingWrites = 0
@@ -267,6 +271,49 @@ export class ThemeRuntime {
   }
 
   /**
+   * Save the current custom inputs as a named preset — the only preset write
+   * entry alongside {@link deleteCustomPreset}. A name that already exists is
+   * replaced in place; a new name past the {@link CUSTOM_PRESETS_MAX} cap
+   * throws. Saving never changes the active preference.
+   * @param name - display name; empty or over {@link CUSTOM_PRESET_NAME_MAX} code points throws and nothing is written.
+   */
+  saveCustomPreset(name: string): void {
+    const trimmed = name.trim()
+    if (trimmed === '') throw new Error('a preset name is required')
+    if ([...trimmed].length > CUSTOM_PRESET_NAME_MAX) {
+      throw new Error(`a preset name is limited to ${CUSTOM_PRESET_NAME_MAX} code points`)
+    }
+    const entry: CustomThemePreset = {
+      name: trimmed, scheme: this.custom.scheme, canvas: this.custom.canvas, accent: this.custom.accent,
+    }
+    const existing = this.customPresets.find(preset => preset.name === trimmed)
+    if (existing !== undefined) {
+      if (presetEqual(existing, entry)) return
+      this.customPresets = this.customPresets.map(preset => preset.name === trimmed ? entry : preset)
+    } else {
+      if (this.customPresets.length >= CUSTOM_PRESETS_MAX) {
+        throw new Error(`at most ${CUSTOM_PRESETS_MAX} presets can be saved; delete one first`)
+      }
+      this.customPresets = [...this.customPresets, entry]
+    }
+    this.write(() => this.host.set(CUSTOM_PRESETS_FIELD, this.customPresets))
+    this.publish()
+  }
+
+  /**
+   * Delete one named preset. Deleting the preset backing the active look
+   * keeps the current inputs — the active theme is the stored fields, not the
+   * preset. Deleting an unknown name is a no-op.
+   * @param name - the preset's display name.
+   */
+  deleteCustomPreset(name: string): void {
+    if (!this.customPresets.some(preset => preset.name === name)) return
+    this.customPresets = this.customPresets.filter(preset => preset.name !== name)
+    this.write(() => this.host.set(CUSTOM_PRESETS_FIELD, this.customPresets))
+    this.publish()
+  }
+
+  /**
    * Change one role's font size. Accepted
    * values are written through the settings scope and emit `theme/change`.
    * @param role - font role.
@@ -327,7 +374,7 @@ export class ThemeRuntime {
     })
   }
 
-  /** Adopt the scope's accepted durable preference and custom inputs without writing them back. */
+  /** Adopt the scope's accepted durable preference, custom inputs, and presets without writing them back. */
   private adopt(): void {
     if (this.pendingWrites > 0) return
     const section = this.host.getSnapshot().value
@@ -335,13 +382,17 @@ export class ThemeRuntime {
     const fontFamilies = durableFontFamilies(section)
     const fontSizes = sectionFontSizes(section)
     const custom = sectionCustomInputs(section)
+    const customPresets = sectionCustomPresets(section)
     if (this.preference === section.preference
       && this.custom.scheme === custom.scheme && this.custom.canvas === custom.canvas && this.custom.accent === custom.accent
+      && customPresets.length === this.customPresets.length
+      && this.customPresets.every((preset, index) => presetEqual(preset, customPresets[index] ?? preset))
       && FONT_ROLES.every(role => this.fontSizes[role] === fontSizes[role] && this.fontFamilies[role] === fontFamilies[role])) return
     this.preference = section.preference
     this.fontSizes = fontSizes
     this.fontFamilies = fontFamilies
     this.custom = custom
+    this.customPresets = customPresets
     this.publish()
   }
 
@@ -412,6 +463,7 @@ export class ThemeRuntime {
       fontSizes: this.fontSizes,
       fontFamilies: this.fontFamilies,
       custom: this.custom,
+      customPresets: Object.freeze([...this.customPresets]),
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes, synthesizeCustomTheme(this.custom)]),
       revision: this.revision,
@@ -494,6 +546,35 @@ function sectionCustomInputs(section: ThemeSettings): CustomThemeInputs {
     canvas: isHexColor(section.customCanvas) ? normalizeHexColor(section.customCanvas) : DEFAULT_CUSTOM_CANVAS,
     accent: isHexColor(section.customAccent) ? normalizeHexColor(section.customAccent) : DEFAULT_CUSTOM_ACCENT,
   }
+}
+
+/**
+ * Saved custom-theme presets from one accepted settings section. Hand-edited
+ * documents may carry junk: entries with an empty/overlong name, a bad scheme,
+ * or malformed colors are dropped, colors are normalized, duplicate names keep
+ * the first, and the list caps at {@link CUSTOM_PRESETS_MAX}.
+ * @param section - accepted settings section.
+ * @returns the valid presets in document order.
+ */
+function sectionCustomPresets(section: ThemeSettings): CustomThemePreset[] {
+  const presets: CustomThemePreset[] = []
+  for (const preset of Array.isArray(section.customPresets) ? section.customPresets : []) {
+    if (typeof preset?.name !== 'string') continue
+    const name = preset.name.trim()
+    if (name === '' || [...name].length > CUSTOM_PRESET_NAME_MAX) continue
+    if (preset.scheme !== 'light' && preset.scheme !== 'dark') continue
+    if (!isHexColor(preset.canvas) || !isHexColor(preset.accent)) continue
+    if (presets.some(saved => saved.name === name)) continue
+    if (presets.length >= CUSTOM_PRESETS_MAX) break
+    presets.push({ name, scheme: preset.scheme, canvas: normalizeHexColor(preset.canvas), accent: normalizeHexColor(preset.accent) })
+  }
+  return presets
+}
+
+/** Whether two presets carry identical values. */
+function presetEqual(left: CustomThemePreset, right: CustomThemePreset): boolean {
+  return left.name === right.name && left.scheme === right.scheme
+    && left.canvas === right.canvas && left.accent === right.accent
 }
 
 /**
@@ -593,7 +674,7 @@ export function apply(ctx: ClientContext): void {
   const sync = (snapshot: ThemeSnapshot): void => {
     bound?.sync(
       snapshot.preference, projectThemeGallery(snapshot.themes),
-      snapshot.fontSizes, snapshot.fontFamilies, snapshot.custom, snapshot.revision,
+      snapshot.fontSizes, snapshot.fontFamilies, snapshot.custom, snapshot.customPresets, snapshot.revision,
     )
   }
   ctx.on('theme/change', sync)
@@ -605,6 +686,8 @@ export function apply(ctx: ClientContext): void {
     return {
       setTheme: (id) => { theme.setTheme(id) },
       setCustom: (patch) => { theme.setCustom(patch) },
+      saveCustomPreset: (name) => { theme.saveCustomPreset(name) },
+      deleteCustomPreset: (name) => { theme.deleteCustomPreset(name) },
       setFontSize: (role, px) => { theme.setFontSize(role, px) },
       setFontFamily: (role, value) => { theme.setFontFamily(role, value) },
     }

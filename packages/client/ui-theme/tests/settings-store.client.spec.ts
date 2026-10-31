@@ -8,6 +8,7 @@ const GALLERY = projectThemeGallery(BUILTIN_THEMES)
 const SIZES = { text: 16, code: 12, terminal: 14 }
 const FONTS = { text: '"Inter"', code: '', terminal: '' }
 const CUSTOM = { scheme: 'dark' as const, canvas: '#112233', accent: '#00ff00' }
+const PRESETS = [{ name: 'Navy', scheme: 'light' as const, canvas: '#112233', accent: '#00ff00' }]
 
 describe('createAppearanceSectionStore', () => {
   it('init shape: system preference, no rows, schema defaults, revision at -1', () => {
@@ -15,17 +16,17 @@ describe('createAppearanceSectionStore', () => {
     expect(store.getSnapshot()).toEqual({
       preference: 'system', entries: [], fontSizes: { text: 14, code: 11, terminal: 13 },
       fontFamilies: { text: '', code: '', terminal: '' },
-      custom: { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, revision: -1,
+      custom: { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, customPresets: [], revision: -1,
     })
   })
 
   it('sync mirrors every snapshot slice and advances the revision', () => {
     const store = createAppearanceSectionStore().create()
-    store.actions.sync('dark', GALLERY, SIZES, FONTS, CUSTOM, 0)
+    store.actions.sync('dark', GALLERY, SIZES, FONTS, CUSTOM, PRESETS, 0)
     expect(store.getSnapshot()).toEqual({
-      preference: 'dark', entries: GALLERY, fontSizes: SIZES, fontFamilies: FONTS, custom: CUSTOM, revision: 0,
+      preference: 'dark', entries: GALLERY, fontSizes: SIZES, fontFamilies: FONTS, custom: CUSTOM, customPresets: PRESETS, revision: 0,
     })
-    store.actions.sync('graph-glass', GALLERY, { ...SIZES, text: 12 }, FONTS, CUSTOM, 2)
+    store.actions.sync('graph-glass', GALLERY, { ...SIZES, text: 12 }, FONTS, CUSTOM, PRESETS, 2)
     expect(store.getSnapshot().preference).toBe('graph-glass')
     expect(store.getSnapshot().fontSizes.text).toBe(12)
     expect(store.getSnapshot().revision).toBe(2)
@@ -33,9 +34,9 @@ describe('createAppearanceSectionStore', () => {
 
   it('revision guard drops stale and duplicate writes', () => {
     const store = createAppearanceSectionStore().create()
-    store.actions.sync('dark', GALLERY, SIZES, FONTS, CUSTOM, 3)
-    store.actions.sync('system', GALLERY, SIZES, FONTS, CUSTOM, 2)
-    store.actions.sync('system', GALLERY, SIZES, FONTS, CUSTOM, 3)
+    store.actions.sync('dark', GALLERY, SIZES, FONTS, CUSTOM, PRESETS, 3)
+    store.actions.sync('system', GALLERY, SIZES, FONTS, CUSTOM, PRESETS, 2)
+    store.actions.sync('system', GALLERY, SIZES, FONTS, CUSTOM, PRESETS, 3)
     expect(store.getSnapshot().preference).toBe('dark')
     expect(store.getSnapshot().revision).toBe(3)
   })

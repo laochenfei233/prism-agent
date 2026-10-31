@@ -6,7 +6,7 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { allowAllAccess, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
-import type { CustomThemeInputs } from '../src/theme-settings.ts'
+import type { CustomThemeInputs, CustomThemePreset } from '../src/theme-settings.ts'
 import { AppearanceSection } from '../src/client/AppearanceSection.tsx'
 import type { AppearanceSectionComponentProps } from '../src/client/AppearanceSection.tsx'
 import { createAppearanceSectionStore } from '../src/client/settings-store.ts'
@@ -31,6 +31,10 @@ const COPY: Record<string, string> = {
   'appearance.customCanvasInput': 'Pick the canvas color',
   'appearance.customAccentInput': 'Pick the accent color',
   'appearance.customReset': 'Reset',
+  'appearance.customPresets': 'Saved themes',
+  'appearance.customPresetPlaceholder': 'Name the current colors',
+  'appearance.customSave': 'Save',
+  'appearance.customPresetDelete': 'Delete {name}',
   'appearance.system': 'System',
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
@@ -67,11 +71,13 @@ type AttentionSnapshot = Parameters<Parameters<AppearanceSectionComponentProps['
 const noAttention: AttentionSnapshot = new Map()
 const useSessionStatus: AppearanceSectionComponentProps['useSessionStatus'] = selector => selector(noAttention)
 
-function mount(preference: ThemePreference = 'system', custom: CustomThemeInputs = DEFAULT_CUSTOM) {
+function mount(preference: ThemePreference = 'system', custom: CustomThemeInputs = DEFAULT_CUSTOM, presets: readonly CustomThemePreset[] = []) {
   const store = createAppearanceSectionStore().create()
-  store.actions.sync(preference, GALLERY, SIZES, FONTS, custom, 0)
+  store.actions.sync(preference, GALLERY, SIZES, FONTS, custom, presets, 0)
   const setTheme = vi.fn()
   const setCustom = vi.fn()
+  const saveCustomPreset = vi.fn()
+  const deleteCustomPreset = vi.fn()
   const setFontSize = vi.fn()
   const setFontFamily = vi.fn()
   const props: AppearanceSectionComponentProps = {
@@ -84,10 +90,10 @@ function mount(preference: ThemePreference = 'system', custom: CustomThemeInputs
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,
-    setTheme, setCustom, setFontSize, setFontFamily,
+    setTheme, setCustom, saveCustomPreset, deleteCustomPreset, setFontSize, setFontFamily,
   }
   render(<AppearanceSection {...props} />)
-  return { store, setTheme, setCustom, setFontSize, setFontFamily }
+  return { store, setTheme, setCustom, saveCustomPreset, deleteCustomPreset, setFontSize, setFontFamily }
 }
 
 beforeEach(() => { vi.useFakeTimers() })
@@ -134,5 +140,38 @@ describe('AppearanceSection', () => {
   it('reset is disabled while the custom inputs match the defaults', () => {
     mount()
     expect(screen.getByRole('button', { name: 'Reset' })).toHaveProperty('disabled', true)
+  })
+
+  it('saves the current inputs under a typed name and clears the field', () => {
+    const b = mount()
+    const input = document.querySelector('input[type="text"][aria-label="Name the current colors"]') as HTMLInputElement
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(input, { target: { value: '  Navy  ' } })
+    fireEvent.click(save)
+    expect(b.saveCustomPreset).toHaveBeenCalledWith('Navy')
+    expect(input.value).toBe('')
+  })
+
+  it('disables save for overlong names and, at the cap, for a new name', () => {
+    mount('system', DEFAULT_CUSTOM, [
+      { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+    ])
+    const input = document.querySelector('input[type="text"][aria-label="Name the current colors"]') as HTMLInputElement
+    const save = screen.getByRole('button', { name: 'Save' })
+    fireEvent.change(input, { target: { value: 'x'.repeat(25) } })
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(input, { target: { value: 'Navy' } })
+    expect(save).toHaveProperty('disabled', false)
+  })
+
+  it('applies a chip through setCustom and deletes it through the × button', () => {
+    const b = mount('system', DEFAULT_CUSTOM, [
+      { name: 'Navy', scheme: 'dark', canvas: '#112233', accent: '#00ff00' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Navy' }))
+    expect(b.setCustom).toHaveBeenCalledWith({ scheme: 'dark', canvas: '#112233', accent: '#00ff00' })
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Navy' }))
+    expect(b.deleteCustomPreset).toHaveBeenCalledWith('Navy')
   })
 })

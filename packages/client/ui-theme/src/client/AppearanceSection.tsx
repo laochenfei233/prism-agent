@@ -17,6 +17,10 @@ export interface AppearanceSectionInjected {
   setTheme: (id: string) => void
   /** Change the custom theme inputs; the service switches the preference to `custom`. */
   setCustom: (patch: Partial<CustomThemeInputs>) => void
+  /** Save the current custom inputs as a named preset; upserts by name. */
+  saveCustomPreset: (name: string) => void
+  /** Delete one named custom-theme preset. */
+  deleteCustomPreset: (name: string) => void
   /** Change one role's font size (integer px within its FONT_SIZE_SPECS range). */
   setFontSize: (role: FontRole, px: number) => void
   /** Change one role's font list (normalized by the theme service). */
@@ -34,11 +38,12 @@ export type AppearanceSectionComponentProps =
  * @returns the section element tree.
  */
 export function AppearanceSection(props: AppearanceSectionComponentProps) {
-  const { t, useStore, actions, setTheme, setCustom, setFontSize, setFontFamily } = props
+  const { t, useStore, actions, setTheme, setCustom, saveCustomPreset, deleteCustomPreset, setFontSize, setFontFamily } = props
   return (
     <div className={css.section}>
       <AppearanceRow t={t} useStore={useStore} actions={actions} setTheme={setTheme} />
-      <CustomThemeGroup t={t} useStore={useStore} actions={actions} setCustom={setCustom} />
+      <CustomThemeGroup t={t} useStore={useStore} actions={actions} setCustom={setCustom}
+        saveCustomPreset={saveCustomPreset} deleteCustomPreset={deleteCustomPreset} />
       <FontSettingsGroup t={t} useStore={useStore} actions={actions} setFontSize={setFontSize} setFontFamily={setFontFamily} />
     </div>
   )
