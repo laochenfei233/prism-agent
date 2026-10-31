@@ -1,6 +1,6 @@
 ---
 feature: keyboard-control
-status: designed
+status: in-progress
 updated: 2026-10-31
 branch: feat/keyboard-control
 commits: 13707d2897..<head> (filled at delivery)
@@ -60,9 +60,9 @@ Discovery is by attribute rather than a new service because the three owners alr
 
 ### [S2.4] Session tree keyboard navigation
 
-The tree container keeps `role="tree"` and gains one `onKeyDown` handler passed from `WorkspaceBrowser` into `AnimatedRows`: `ArrowDown`/`ArrowUp` move focus between the visible `[role="treeitem"]` nodes in DOM order, `Home`/`End` go to the first and last, and `Enter` activates the focused row by delegating to its own click handler, so opening, expanding, and collapsing keep the single behavior the pointer already uses.
+The tree container keeps `role="tree"` and gains one `onKeyDown` handler inside `AnimatedRows`: `ArrowDown`/`ArrowUp` move focus between the visible `[role="treeitem"]` nodes in DOM order, `Home`/`End` go to the first and last, and `Enter` activates the focused row by delegating to its own click handler, so opening, expanding, and collapsing keep the single behavior the pointer already uses.
 
-Rows become focusable with a roving tab index: the current session row carries `tabIndex={0}`, or the first row when no session is current, and every other row `-1`, so one Tab stop reaches the tree and arrows move inside it without adding each row to the page tab order.
+Rows carry `tabIndex={-1}` and the tree container carries `tabIndex={0}`, so one Tab stop reaches the whole tree; arrows move focus onto a row, and `Enter` presses it.
 
 The handler ignores input-method composition and events from controls inside a row — the row menu trigger and the row action buttons keep their own keys.
 
@@ -118,13 +118,13 @@ The dividing rule is ownership, not importance: an application action is a comma
 
 ## Tasks
 
-- [ ] T1: Confirm the toolchain in the worktree — `pnpm install --frozen-lockfile`, baseline `pnpm run test:gui`, and record any pre-existing failure. (depends: none)
-- [ ] T2: Make `Shortcuts.invoke` return `ShortcutResolution | undefined`, export that type from the package's client entry, and cover the return in the shortcuts service spec. (depends: T1, covers: S2.1)
-- [ ] T3: Add the palette store, component, locale copy, `commands.open` command with its defaults, and the reference ordering entry. (depends: T2, covers: S2.1)
-- [ ] T4: Add `data-dsh-region` and `tabIndex={-1}` to the three landmarks. (depends: T1, covers: S2.2)
-- [ ] T5: Register `focus.cycle`/`focus.cycleReverse` in `ui-layout` over the landmarks. (depends: T4, covers: S2.2)
+- [x] T1: Confirm the toolchain in the worktree — `pnpm install --frozen-lockfile`, baseline `pnpm run test:gui`, and record any pre-existing failure. (depends: none)
+- [x] T2: Make `Shortcuts.invoke` return `ShortcutResolution | undefined`, export that type from the package's client entry, and cover the return in the shortcuts service spec. (depends: T1, covers: S2.1)
+- [x] T3: Add the palette store, component, locale copy, `commands.open` command with its defaults, and the reference ordering entry. (depends: T2, covers: S2.1)
+- [x] T4: Add `data-dsh-region` and `tabIndex={-1}` to the three landmarks. (depends: T1, covers: S2.2)
+- [x] T5: Register `focus.cycle`/`focus.cycleReverse` in `ui-layout` over the landmarks. (depends: T4, covers: S2.2)
 - [ ] T6: Register `focus.composer` in `ui-conversation`. (depends: T4, covers: S2.3)
-- [ ] T7: Add tree arrow navigation and the roving tab index in `ui-workspace`. (depends: T1, covers: S2.4)
+- [x] T7: Add tree arrow navigation and the roving tab index in `ui-workspace`. (depends: T1, covers: S2.4)
 - [ ] T8: Write the five specs named in [S2.7]. (depends: T3, T5, T6, T7, T10, covers: S2.7)
 - [ ] T9: Update the affected package READMEs and the Web client subsystem page. (depends: T5, T6, T7, T10, covers: S2.7)
 - [ ] T10: Answer a pending question from the keyboard — option movement, question advance, confirm, and dismissal — and contribute its fixed rows to the reference. (depends: T1, covers: S2.8, S2.9)

@@ -1,6 +1,6 @@
 ---
 feature: keyboard-control
-status: designed
+status: in-progress
 updated: 2026-10-31
 branch: feat/keyboard-control
 commits: 13707d2897..<head>（交付时回填）
@@ -60,9 +60,9 @@ commits: 13707d2897..<head>（交付时回填）
 
 ### [S2.4] Session tree keyboard navigation
 
-树容器保留 `role="tree"`，增加一个从 `WorkspaceBrowser` 传入 `AnimatedRows` 的 `onKeyDown`：`ArrowDown`/`ArrowUp` 在可见的 `[role="treeitem"]` 之间按文档顺序移动焦点，`Home`/`End` 到首尾，`Enter` 通过行自己的点击处理激活当前行，于是打开、展开、折叠仍然只有指针使用的那一套行为。
+树容器保留 `role="tree"`，在 `AnimatedRows` 内增加一个 `onKeyDown`：`ArrowDown`/`ArrowUp` 在可见的 `[role="treeitem"]` 之间按文档顺序移动焦点，`Home`/`End` 到首尾，`Enter` 通过行自己的点击处理激活当前行，于是打开、展开、折叠仍然只有指针使用的那一套行为。
 
-行通过 roving tab index 变得可聚焦：当前会话行带 `tabIndex={0}`（没有当前会话时是第一行），其余行带 `-1`，Tab 只进入树一次，方向键在树内移动，不会把每一行都塞进页面 Tab 顺序。
+行带 `tabIndex={-1}`、树容器带 `tabIndex={0}`，因此一次 Tab 就能到达整棵树；方向键把焦点移到某一行，`Enter` 按下该行。
 
 处理函数忽略输入法合成，也忽略来自行内控件的按键——行菜单按钮与行操作按钮保留自己的键位。
 
@@ -118,13 +118,13 @@ commits: 13707d2897..<head>（交付时回填）
 
 ## Tasks
 
-- [ ] T1：在工作树中确认工具链——`pnpm install --frozen-lockfile`、基线 `pnpm run test:gui`，并记录任何既有失败。（depends: none）
-- [ ] T2：让 `Shortcuts.invoke` 返回 `ShortcutResolution | undefined`，从该包 client 入口导出这一类型，并在 shortcuts service spec 中覆盖返回值。（depends: T1, covers: S2.1）
-- [ ] T3：新增面板 store、组件、文案、带默认键位的 `commands.open` 命令，以及参考表的排序项。（depends: T2, covers: S2.1）
-- [ ] T4：给三个地标加上 `data-dsh-region` 与 `tabIndex={-1}`。（depends: T1, covers: S2.2）
-- [ ] T5：在 `ui-layout` 注册基于地标的 `focus.cycle`/`focus.cycleReverse`。（depends: T4, covers: S2.2）
+- [x] T1：在工作树中确认工具链——`pnpm install --frozen-lockfile`、基线 `pnpm run test:gui`，并记录任何既有失败。（depends: none）
+- [x] T2：让 `Shortcuts.invoke` 返回 `ShortcutResolution | undefined`，从该包 client 入口导出这一类型，并在 shortcuts service spec 中覆盖返回值。（depends: T1, covers: S2.1）
+- [x] T3：新增面板 store、组件、文案、带默认键位的 `commands.open` 命令，以及参考表的排序项。（depends: T2, covers: S2.1）
+- [x] T4：给三个地标加上 `data-dsh-region` 与 `tabIndex={-1}`。（depends: T1, covers: S2.2）
+- [x] T5：在 `ui-layout` 注册基于地标的 `focus.cycle`/`focus.cycleReverse`。（depends: T4, covers: S2.2）
 - [ ] T6：在 `ui-conversation` 注册 `focus.composer`。（depends: T4, covers: S2.3）
-- [ ] T7：在 `ui-workspace` 增加树方向键导航与 roving tab index。（depends: T1, covers: S2.4）
+- [x] T7：在 `ui-workspace` 增加树方向键导航与 roving tab index。（depends: T1, covers: S2.4）
 - [ ] T8：编写 [S2.7] 列出的五个 spec。（depends: T3, T5, T6, T7, T10, covers: S2.7）
 - [ ] T9：更新受影响的包 README 与 Web 客户端子系统页。（depends: T5, T6, T7, T10, covers: S2.7）
 - [ ] T10：让待答提问可以用键盘回答——选项移动、题目前进、确认与取消——并把它的固定行加入参考表。（depends: T1, covers: S2.8, S2.9）
