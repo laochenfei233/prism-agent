@@ -3,7 +3,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { bindingIssue, bindingKey, effectiveShortcuts, initialShortcutConfig, isWebBindingAllowed, normalizeBinding, overlappingBindings, presentBinding, resolveShortcutDefault } from '../protocol.ts'
 import type { ShortcutCommandId, ShortcutConfigSnapshot, ShortcutDefinition, ShortcutPlatform, ShortcutRuntime } from '../protocol.ts'
 import type { ShortcutCatalogEntry, ShortcutCommand, ShortcutContext, ShortcutGesture,
-  ShortcutFixedCommand, ShortcutFixedCatalogEntry } from './types.ts'
+  ShortcutFixedCommand, ShortcutFixedCatalogEntry, ShortcutResolution } from './types.ts'
 
 /** Dispatch consumption is independent of later business-operation success. */
 type ShortcutDispatch = { status: 'handled'; commandId: ShortcutCommandId }
@@ -133,15 +133,17 @@ export class ShortcutRegistry {
   }
 
   /**
-   * Invoke a native menu selection independently of its optional key binding.
+   * Invoke a command as an explicit selection independently of its optional key binding.
    * @param id - registered product command.
    * @param context - live input owner and modal state.
+   * @returns the command's resolution, or undefined when the command is unregistered or its modal gate refuses the call.
    */
-  invoke(id: ShortcutCommandId, context: ShortcutContext): void {
+  invoke(id: ShortcutCommandId, context: ShortcutContext): ShortcutResolution | undefined {
     const command = this.commands.get(id)
-    if (command === undefined || (context.modal !== null && !command.modals.includes(context.modal))) return
+    if (command === undefined || (context.modal !== null && !command.modals.includes(context.modal))) return undefined
     const result = command.resolve({ ...context, source: 'menu' })
     if (result.status === 'handled') result.run()
+    return result
   }
 
   /**

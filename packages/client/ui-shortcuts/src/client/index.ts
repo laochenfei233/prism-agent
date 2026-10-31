@@ -7,7 +7,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createShortcutsStore } from './store.ts'
+import { createCommandPaletteStore } from './palette-store.ts'
 import { ShortcutReference, ShortcutsRow } from './Reference.tsx'
+import { CommandPalette } from './CommandPalette.tsx'
 import { en, zh } from './locales.ts'
 import { fixedCommands } from './fixed.ts'
 
@@ -31,7 +33,11 @@ export function apply(ctx: Context): void {
   const handle = createShortcutsStore()
   const instance = handle.create()
   const store: typeof handle = { ...handle, create: () => instance }
+  const palette = createCommandPaletteStore()
+  const paletteInstance = palette.create()
+  const paletteStore: typeof palette = { ...palette, create: () => paletteInstance }
   const edit: typeof ctx.shortcuts.edit = (...args) => ctx.shortcuts.edit(...args)
+  const invoke: typeof ctx.shortcuts.invoke = (...args) => ctx.shortcuts.invoke(...args)
   const recording = (active: boolean) => ctx.shortcuts.recording(active)
   const describeBinding: typeof ctx.shortcuts.describeBinding = binding => ctx.shortcuts.describeBinding(binding)
   for (const command of fixedCommands(t)) {
@@ -67,6 +73,26 @@ export function apply(ctx: Context): void {
       name: 'shell.overlay', id: 'shortcuts', locale: 'shortcuts', store,
       inject: injected,
     }, ShortcutReference)
+    return () => { disposeCommand(); disposeSlot() }
+  })
+  ctx.slots.inject('shell.overlay', () => {
+    const disposeCommand = ctx.shortcuts.register({
+      id: 'commands.open' as ShortcutCommandId, label: () => t('palette.open'),
+      aliases: ['command palette', 'run command', 'commands'],
+      defaults: {
+        'desktop:macos': { code: 'KeyP', modifiers: ['primary', 'shift'] },
+        'desktop:windows': { code: 'KeyP', modifiers: ['primary', 'shift'] },
+        'desktop:linux': { code: 'KeyP', modifiers: ['primary', 'shift'] },
+        'web:macos': { code: 'KeyC', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'KeyC', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'editable', 'terminal'], modals: [],
+      resolve: () => ({ status: 'handled', run: () => { paletteInstance.actions.open() } }),
+    })
+    const disposeSlot = ctx.slots.register({
+      name: 'shell.overlay', id: 'commands', locale: 'shortcuts', store: paletteStore,
+      inject: () => ({ invoke, hooks: { catalog: ctx.shortcuts.catalog } }),
+    }, CommandPalette)
     return () => { disposeCommand(); disposeSlot() }
   })
 }

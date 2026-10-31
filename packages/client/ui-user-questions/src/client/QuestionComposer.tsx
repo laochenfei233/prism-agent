@@ -429,8 +429,42 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     submitDrafts(nextDrafts)
   }
 
+  // Arrows walk the options and select the one they land on, Tab moves between questions, Esc cancels the request.
+  const cardKeys = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest('input, textarea, [contenteditable="true"], [contenteditable=""]') != null) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      dismissFlow()
+      return
+    }
+    if (event.key === 'Tab' && questions.length > 1) {
+      event.preventDefault()
+      replaceProgress((index + (event.shiftKey ? -1 : 1) + questions.length) % questions.length, drafts)
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return
+    const options = [...(answerSurface.current?.querySelectorAll<HTMLButtonElement>('[role="radio"], [role="checkbox"]') ?? [])]
+    if (options.length === 0) return
+    event.preventDefault()
+    const current = options.indexOf(document.activeElement as HTMLButtonElement)
+    const delta = event.key === 'ArrowDown' ? 1 : -1
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+      : current === -1 ? (delta === 1 ? 0 : options.length - 1) : (current + delta + options.length) % options.length
+    const button = options[next]
+    /* v8 ignore next -- a non-empty option list resolves every position it is asked for. */
+    if (button === undefined) return
+    button.focus()
+    const label = question.options?.[next]?.label
+    if (question.multiSelect !== true && label !== undefined) {
+      updateDraft(() => ({ selected: [label], custom: '', skipped: false }))
+    }
+  }
+
   return (
-    <div className={css.frame} data-question-key={pending.key}>
+    <div className={css.frame} data-question-key={pending.key} onKeyDown={cardKeys}>
       <section
         className={clsx(css.card, minimized && css.cardMinimized)}
         aria-labelledby={`question-${pending.key}-${String(index)}`}

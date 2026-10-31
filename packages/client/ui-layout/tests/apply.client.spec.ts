@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import ShortcutsService from '../../shortcuts/src/client/index.ts'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { stubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
@@ -167,6 +168,37 @@ describe('ui-layout client apply', () => {
     expect(host.root.getSnapshot().hooks.panelInfo).toBeUndefined()
     // The built-in root declaration survives entry teardown (renderer-owned).
     expect(slots.spec('root')).toEqual({ kind: 'single', scope: 'root' })
+  })
+
+  it('cycles focus between region landmarks, reverses, and reports an empty layout', async () => {
+    const { ctx } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const shortcuts = ctx.get('shortcuts') as ShortcutsService
+    const landmarks = ['first', 'second'].map((name) => {
+      const node = document.createElement('div')
+      node.dataset.dshRegion = name
+      node.tabIndex = -1
+      document.body.append(node)
+      return node
+    })
+    const context = { region: 'page' as const, modal: null, target: null }
+    try {
+      expect(shortcuts.invoke('focus.cycle' as ShortcutCommandId, context)?.status).toBe('handled')
+      expect(document.activeElement).toBe(landmarks[0])
+      shortcuts.invoke('focus.cycle' as ShortcutCommandId, context)
+      expect(document.activeElement).toBe(landmarks[1])
+      shortcuts.invoke('focus.cycle' as ShortcutCommandId, context)
+      expect(document.activeElement).toBe(landmarks[0])
+      shortcuts.invoke('focus.cycleReverse' as ShortcutCommandId, context)
+      expect(document.activeElement).toBe(landmarks[1])
+    } finally {
+      for (const node of landmarks) node.remove()
+    }
+    const blocked = shortcuts.invoke('focus.cycle' as ShortcutCommandId, context)
+    expect(blocked?.status).toBe('blocked')
+    expect(blocked !== undefined && 'reason' in blocked ? blocked.reason.length : 0).toBeGreaterThan(0)
+    await fiber.dispose()
   })
 })
 

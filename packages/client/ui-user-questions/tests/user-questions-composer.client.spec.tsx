@@ -245,6 +245,25 @@ describe('QuestionComposer', () => {
     expect(answer).not.toHaveBeenCalled()
   })
 
+  it('walks options with the arrow keys, advances with Tab, and cancels with Escape', () => {
+    const { carrier, dismiss } = wait([{
+      id: 'mode', question: 'Which mode?', options: [{ label: 'Alpha' }, { label: 'Beta' }],
+    }, {
+      id: 'tone', question: 'Which tone?', options: [{ label: 'Gamma' }],
+    }])
+    render(<QuestionComposer matched={carrier} {...kit} />)
+    const alpha = screen.getByRole('radio', { name: 'Alpha' })
+    const beta = screen.getByRole('radio', { name: 'Beta' })
+    alpha.focus()
+    fireEvent.keyDown(alpha, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(beta)
+    expect(beta.getAttribute('aria-checked')).toBe('true')
+    fireEvent.keyDown(beta, { key: 'Tab' })
+    expect(screen.getByText('2 / 2')).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Gamma' }), { key: 'Escape' })
+    expect(dismiss).toHaveBeenCalled()
+  })
+
   it('collects single, custom, and multi-select answers before one batch submit', () => {
     const { carrier, answer } = wait()
     render(<QuestionComposer matched={carrier} {...kit} />)

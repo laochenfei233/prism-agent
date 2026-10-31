@@ -296,6 +296,25 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       stopShortcut.set(command.keys)
       return () => { stopShortcut.set([]); dispose() }
     }, 'ui-conversation: fixed stop reference')
+    scope.effect(() => scope.shortcuts.register({
+      id: 'focus.composer' as ShortcutCommandId, label: () => t('shortcut.focusComposer'),
+      aliases: ['composer', 'input', 'draft', 'focus'],
+      defaults: {
+        'desktop:macos': { code: 'KeyL', modifiers: ['primary'] },
+        'desktop:windows': { code: 'KeyL', modifiers: ['primary'] },
+        'desktop:linux': { code: 'KeyL', modifiers: ['primary'] },
+        'web:macos': { code: 'KeyL', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'KeyL', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'terminal'], modals: [],
+      resolve: () => {
+        // The composer's editor root carries the region marker, so the same element anchors cycling and this jump.
+        const composer = document.querySelector<HTMLElement>('[data-dsh-region="main"]')
+        return composer === null
+          ? { status: 'blocked', reason: t('shortcut.noComposer') }
+          : { status: 'handled', run: () => { composer.focus() } }
+      },
+    }), 'ui-conversation: focus composer')
   })
 
   const inputHub = new InputHub(ctx, t)

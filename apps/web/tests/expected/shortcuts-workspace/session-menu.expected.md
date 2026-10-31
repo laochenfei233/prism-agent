@@ -3,4 +3,9 @@
   - menuitem "Rename"
   - menuitem "Fork session"
   - menuitem "Archive session"
+  - separator
+  - menuitem "Reveal in file manager"
+  - menuitem "Copy path"
   - menuitem "Copy Session ID"
+  - separator
+  - menuitem "Open settings"

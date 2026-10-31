@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Browser approval presentation over the Agent-scoped Remote Event waterfall. The plugin publishes each pending request through `ctx.uiSession`, takes over the Conversation composer, optionally renders correlated Tool detail, and returns the user's decision to the waiting Host request. Use it when a browser must collect approval for a waiting Host operation.
+Browser approval presentation over the Agent-scoped Remote Event waterfall. The plugin publishes each pending request through `ctx.uiSession`, takes over the Conversation composer, optionally renders correlated Tool detail, and returns the user's decision to the waiting Host request. Use it when a browser must collect approval for a waiting Host operation. The card answers from the keyboard: Enter allows once and Escape rejects while the card owns focus, and the arrow keys move focus between the two actions so Enter presses the focused one; both run the same handlers as the buttons.
 
 ## Table of Contents
 

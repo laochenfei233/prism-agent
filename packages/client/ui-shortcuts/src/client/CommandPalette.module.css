@@ -1,0 +1,4 @@
+/** Selected-row emphasis for the command palette; layout classes come from the reference sheet. */
+.selected {
+  background: var(--dsw-alias-interactive-bg-hover);
+}

@@ -161,4 +161,61 @@ describe('AnimatedRows', () => {
     view.rerender(rows(['a', 'b', 'c', 'e', 'd']))
     expect(animations).toEqual([])
   })
+
+  it('walks rows with the arrow keys, reaches the ends, and presses the focused row on Enter', () => {
+    render(<div style={{ position: 'relative' }}>
+      <AnimatedRows className="rows" label="Sessions" rowKeys={['a', 'b', 'c']} ready resetKey="manual">
+        {['a', 'b', 'c'].map(key => <div key={key} data-row-key={key} role="treeitem" tabIndex={-1}>
+          <span>{key}</span><button type="button" aria-label={`menu ${key}`}>…</button>
+        </div>)}
+      </AnimatedRows>
+    </div>)
+    const tree = screen.getByRole('tree')
+    const [first, second, third] = [...tree.querySelectorAll<HTMLElement>('[role="treeitem"]')]
+    tree.focus()
+    fireEvent.keyDown(tree, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(third)
+    tree.focus()
+    fireEvent.keyDown(tree, { key: 'ArrowDown', ctrlKey: true })
+    expect(document.activeElement).toBe(tree)
+    fireEvent.keyDown(tree, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(first as HTMLElement, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(second)
+    fireEvent.keyDown(second as HTMLElement, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(second as HTMLElement, { key: 'Home' })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(second as HTMLElement, { key: 'End' })
+    expect(document.activeElement).toBe(third)
+    const opened = vi.fn()
+    third?.addEventListener('click', opened)
+    fireEvent.keyDown(third as HTMLElement, { key: 'Enter' })
+    expect(opened).toHaveBeenCalledOnce()
+  })
+
+  it('ignores navigation on a tree without rows', () => {
+    render(<div style={{ position: 'relative' }}>
+      <AnimatedRows className="rows" label="Sessions" rowKeys={[]} ready resetKey="manual">{null}</AnimatedRows>
+    </div>)
+    const tree = screen.getByRole('tree')
+    tree.focus()
+    expect(fireEvent.keyDown(tree, { key: 'ArrowDown' })).toBe(true)
+    expect(document.activeElement).toBe(tree)
+  })
+
+  it('leaves keys pressed on a row control to that control', () => {
+    render(<div style={{ position: 'relative' }}>
+      <AnimatedRows className="rows" label="Sessions" rowKeys={['a', 'b']} ready resetKey="manual">
+        {['a', 'b'].map(key => <div key={key} data-row-key={key} role="treeitem" tabIndex={-1}>
+          <button type="button">menu {key}</button>
+        </div>)}
+      </AnimatedRows>
+    </div>)
+    const [first] = [...screen.getByRole('tree').querySelectorAll<HTMLElement>('[role="treeitem"]')]
+    const trigger = within(first as HTMLElement).getByRole('button')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'End' })
+    expect(document.activeElement).toBe(trigger)
+  })
 })

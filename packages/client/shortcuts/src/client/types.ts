@@ -141,6 +141,7 @@ export interface Shortcuts {
    * key binding. The command's own modal gate applies.
    * @param id - registered product command.
    * @param context - live input owner and modal state.
+   * @returns the command's resolution, or undefined when the command is unregistered or its modal gate refuses the call.
    */
-  invoke(id: ShortcutCommandId, context: ShortcutContext): void
+  invoke(id: ShortcutCommandId, context: ShortcutContext): ShortcutResolution | undefined
 }

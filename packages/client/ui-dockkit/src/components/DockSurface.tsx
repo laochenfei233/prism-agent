@@ -290,7 +290,8 @@ function Surface({
   }
 
   return (
-    <div className={css.surface} ref={surface} data-dockkit-surface data-dockkit-drop-zones={dropZones}>
+    <div className={css.surface} ref={surface} data-dockkit-surface data-dockkit-drop-zones={dropZones}
+      data-dsh-region="rightbar" tabIndex={-1}>
       {draw(callbacks, preview.sizes)}
     </div>
   )

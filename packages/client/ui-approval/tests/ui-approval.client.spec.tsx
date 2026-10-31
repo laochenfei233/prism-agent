@@ -402,6 +402,41 @@ describe('ApprovalPanel', () => {
     },
   )
 
+  it('ignores modified arrows and leaves the action row to its buttons', async () => {
+    const pending = new PendingApproval(id('s1'), { toolName: 'bash' })
+    render(<ApprovalPanel {...panelProps(pending)} />)
+    const group = screen.getByRole('group', { name: 'Approval details' })
+    group.focus()
+    fireEvent.keyDown(group, { key: 'ArrowRight', code: 'ArrowRight', ctrlKey: true })
+    expect(document.activeElement).toBe(group)
+    fireEvent.keyDown(group, { key: 'Tab', code: 'Tab' })
+    expect(document.activeElement).toBe(group)
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    await expect(pending.result).resolves.toBe('rejected')
+    fireEvent.keyDown(group, { key: 'ArrowRight', code: 'ArrowRight' })
+    expect(document.activeElement).toBe(group)
+  })
+
+  it('moves focus between the two actions with the arrow keys', () => {
+    const pending = new PendingApproval(id('s1'), { toolName: 'bash' })
+    render(<ApprovalPanel {...panelProps(pending)} />)
+    const group = screen.getByRole('group', { name: 'Approval details' })
+    const [reject, allow] = [...document.querySelectorAll<HTMLElement>('[data-approval-actions] button')]
+    group.focus()
+    fireEvent.keyDown(group, { key: 'ArrowLeft', code: 'ArrowLeft' })
+    expect(document.activeElement).toBe(allow)
+    group.focus()
+    fireEvent.keyDown(group, { key: 'ArrowRight', code: 'ArrowRight' })
+    expect(document.activeElement).toBe(reject)
+    fireEvent.keyDown(reject as HTMLElement, { key: 'ArrowRight', code: 'ArrowRight' })
+    expect(document.activeElement).toBe(allow)
+    fireEvent.keyDown(allow as HTMLElement, { key: 'ArrowLeft', code: 'ArrowLeft' })
+    expect(document.activeElement).toBe(reject)
+    fireEvent.keyDown(reject as HTMLElement, { key: 'Enter', code: 'Enter' })
+    expect(document.activeElement).toBe(reject)
+    expect(pending.answerable).toBe(true)
+  })
+
   it('leaves button Enter to its native click and rejects from the reject button', async () => {
     const pending = new PendingApproval(id('s1'), { toolName: 'bash' })
     render(<ApprovalPanel {...panelProps(pending)} />)

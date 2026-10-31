@@ -10,6 +10,9 @@
         - button "修改快捷键速查快捷键"
         - text: 快捷键速查 ⌘ /
       - listitem:
+        - button "修改命令面板快捷键"
+        - text: 命令面板 ⌥ ⌘ C
+      - listitem:
         - button "修改新会话快捷键"
         - text: 新会话 ⌥ ⌘ N
       - listitem:
@@ -54,6 +57,15 @@
       - listitem:
         - button "修改关闭当前页面／窗口快捷键"
         - text: 关闭当前页面／窗口 ⌥ ⌘ W
+      - listitem:
+        - button "修改聚焦输入框快捷键"
+        - text: 聚焦输入框 ⌥ ⌘ L
+      - listitem:
+        - button "修改聚焦下一个区域快捷键"
+        - text: 聚焦下一个区域 ⌥ ⌘ F6
+      - listitem:
+        - button "修改聚焦上一个区域快捷键"
+        - text: 聚焦上一个区域 ⌥ ⇧ ⌘ F6
   - region "消息输入":
     - heading "消息输入" [level=3]
     - list:

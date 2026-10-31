@@ -10,6 +10,9 @@
         - button "Edit shortcut for Open keyboard shortcuts"
         - text: Open keyboard shortcuts Ctrl + /
       - listitem:
+        - button "Edit shortcut for Command palette"
+        - text: Command palette Ctrl + Alt + C
+      - listitem:
         - button "Edit shortcut for New Session"
         - text: New Session Ctrl + Alt + N
       - listitem:
@@ -54,6 +57,15 @@
       - listitem:
         - button "Edit shortcut for Close current page or window"
         - text: Close current page or window Ctrl + Alt + W
+      - listitem:
+        - button "Edit shortcut for Focus the composer"
+        - text: Focus the composer Ctrl + Alt + L
+      - listitem:
+        - button "Edit shortcut for Focus next region"
+        - text: Focus next region Ctrl + Alt + F6
+      - listitem:
+        - button "Edit shortcut for Focus previous region"
+        - text: Focus previous region Ctrl + Alt + Shift + F6
   - region "Message input":
     - heading "Message input" [level=3]
     - list:

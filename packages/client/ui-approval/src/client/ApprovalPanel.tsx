@@ -33,6 +33,26 @@ function ApprovalFlow({ pending, reason, detail, t }: {
     active.current = true
     return () => { active.current = false }
   }, [])
+  // Arrows move focus between the two actions; Enter then presses the focused one through its own click handler.
+  const moveFocus = (event: KeyboardEvent<HTMLDivElement>): boolean => {
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false
+    const row = event.currentTarget.querySelector<HTMLElement>('[data-approval-actions]')
+    /* v8 ignore next -- the action row is part of this component's own markup. */
+    if (row === null) return false
+    const actions = [...row.querySelectorAll<HTMLElement>('button:not(:disabled)')]
+    if (actions.length === 0) return false
+    const current = actions.indexOf(document.activeElement as HTMLElement)
+    const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1
+    const next = current === -1 ? (delta === 1 ? 0 : actions.length - 1) : (current + delta + actions.length) % actions.length
+    const target = actions[next]
+    /* v8 ignore next -- a non-empty action list resolves every position it is asked for. */
+    if (target === undefined) return false
+    target.focus()
+    event.preventDefault()
+    event.stopPropagation()
+    return true
+  }
   const answer = (outcome: 'allowed-once' | 'rejected'): void => {
     if (waiting.current || !pending.answerable) return
     waiting.current = true
@@ -47,6 +67,7 @@ function ApprovalFlow({ pending, reason, detail, t }: {
     const element = event.target as Element
     if (event.defaultPrevented || !event.currentTarget.contains(document.activeElement)
       || element.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]') !== null) return
+    if (moveFocus(event)) return
     if (event.key !== 'Enter' && event.key !== 'Escape') return
     if (event.key === 'Enter' && element.closest('button, a[href], [role="button"]') !== null) return
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
@@ -74,7 +95,7 @@ function ApprovalFlow({ pending, reason, detail, t }: {
           <div className={css.headline}>{reason ?? t('escalation', { toolName: pending.toolName })}</div>
           {detail !== null && <div className={css.command}>{detail}</div>}
         </div>
-        <div className={css.actionRow}>
+        <div className={css.actionRow} data-approval-actions="">
           <Button variant="outline" className={css.reject} disabled={answered} onClick={() => { answer('rejected') }}>
             {t('reject')}
           </Button>

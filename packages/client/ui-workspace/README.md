@@ -31,6 +31,8 @@ Use the sidebar to browse Workspaces and their Sessions, reorder them, and start
 
 History rows without a stored title use the localized unnamed label (未命名 / Untitled), rather than a directory name. The current blank row remains New Session; other blank rows remain hidden. Rename drafts use the stored title, or start empty when unnamed; unnamed rows do not offer title copying.
 
+The Session tree holds one Tab stop. Inside it, the arrow keys move focus between visible rows, Home and End reach the first and last row, and Enter presses the focused row through its own click handler, so opening, expanding, and collapsing behave exactly as they do under the pointer. A row's own menu and action buttons keep their keys.
+
 ### Reordering and view options
 
 Pinned Sessions lead ordinary Sessions in both grouped and flat views. **Last updated** sorts each partition strictly by the latest user prompt or steer time, newest first; pin time does not affect it. It also ranks project sections by their newest visible Session, so a newly imported project appears where its activity puts it. **Manual** uses the relative positions in one complete Session sequence, including hidden archives, and keeps the Host's project order, which is where a dragged project lands. Returning to Last updated discards the manual layout, and entering Manual again freezes the then-current chronological order. The browser defaults to Last updated and remembers the selected mode across reloads.

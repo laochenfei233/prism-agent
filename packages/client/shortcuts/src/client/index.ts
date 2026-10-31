@@ -13,7 +13,7 @@ import type { ShortcutFixedInput } from './types.ts'
 import { installNativeKeyboard } from './native.ts'
 import { Config } from '../config.ts'
 
-export type { ShortcutCatalogEntry, ShortcutCommand, ShortcutContext, ShortcutGesture, Shortcuts } from './types.ts'
+export type { ShortcutCatalogEntry, ShortcutCommand, ShortcutContext, ShortcutGesture, Shortcuts, ShortcutResolution } from './types.ts'
 export type { ShortcutFixedInput, ShortcutFixedCommand, ShortcutFixedCatalogEntry } from './types.ts'
 export type { ShortcutBinding, ShortcutCommandId, ShortcutPlatform, ShortcutRuntime } from '../protocol.ts'
 
@@ -85,9 +85,10 @@ export default class ShortcutsService extends Service implements Shortcuts {
    * Run a registered command as an explicit menu action.
    * @param id - registered product command.
    * @param context - live input owner and modal state.
+   * @returns the command's resolution, or undefined when it cannot run.
    */
-  invoke(id: Parameters<Shortcuts['invoke']>[0], context: Parameters<Shortcuts['invoke']>[1]): void {
-    this.registry.invoke(id, context)
+  invoke(id: Parameters<Shortcuts['invoke']>[0], context: Parameters<Shortcuts['invoke']>[1]): ReturnType<Shortcuts['invoke']> {
+    return this.registry.invoke(id, context)
   }
 
   registerFixed(command: Parameters<Shortcuts['registerFixed']>[0]): () => void {
