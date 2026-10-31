@@ -19,6 +19,7 @@ import {
   type SessionId,
   type SessionSeq,
 } from '@deepseek-ai/dsh-session'
+import { validateStoredEvents } from '@deepseek-ai/dsh-session-persistence'
 import type { AssistantMessage, MessageId, UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-title'
 import { SOURCE_READERS } from './sources/index.ts'
@@ -374,7 +375,6 @@ export class SessionImportEngine {
     if ((await this.options.persistence.stat(id)) !== undefined) {
       return { key, outcome: 'duplicate', sessionId: id }
     }
-    await this.copyAttachments()
     const cwd = group.path ?? native.header.cwd
     const header: SessionHeader = {
       version: SESSION_FORMAT_VERSION,
@@ -384,14 +384,21 @@ export class SessionImportEngine {
       isSeeded: false,
       delegationDepth: 0,
     }
+    // Refuse a log the stored reader would refuse, with the reader's own
+    // grammar: an unknown required type, a retired request/header fallback, or
+    // an invalid envelope would otherwise be stored and then fail to open, and
+    // the duplicate check would block a repair. The validator adopts events in
+    // place, so it receives an exclusively owned copy.
+    const events = validateStoredEvents(header, [...native.events])
+    await this.copyAttachments()
     const handle = await this.options.persistence.create(header)
     try {
-      await handle.append(native.events)
+      await handle.append(events)
       await handle.flush()
     } finally {
       await handle.close()
     }
-    return this.finish(key, header, native.events, group, workspaceFor, workspaces)
+    return this.finish(key, header, events, group, workspaceFor, workspaces)
   }
 
   /**

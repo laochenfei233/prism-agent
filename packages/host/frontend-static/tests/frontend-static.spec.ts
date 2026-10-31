@@ -36,6 +36,7 @@ async function loadComposition(): Promise<Context> {
   await mkdir(dist)
   const distIndex = join(dist, 'index.html')
   await writeFile(distIndex, '<head></head><body>shell</body>')
+  await writeFile(join(dist, 'preview.html'), '<head></head><body>preview</body>')
   await writeFile(join(dist, 'app.js'), 'export {}')
   await writeFile(join(dist, 'blob.bin'), 'BLOB')
   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
@@ -124,6 +125,19 @@ describe('real Loader composition', () => {
       status: 401,
       type: 'text/plain; charset=utf-8',
       body: 'dsh web authentication required; reopen the URL printed by dsh web.\n',
+    })
+
+    // Every HTML entry authenticates: an additional page is not reachable from
+    // an unauthenticated peer that could boot its owner-authority runtime.
+    expect(await request(port, '/preview.html')).toMatchObject({
+      status: 401,
+      type: 'text/plain; charset=utf-8',
+      body: 'dsh web authentication required; reopen the URL printed by dsh web.\n',
+    })
+    expect(await request(port, '/preview.html', authenticated())).toEqual({
+      status: 200,
+      type: 'text/html; charset=utf-8',
+      body: '<head></head><body>preview</body>',
     })
 
     // Real assets with their MIME types; a live rebuild is served on the next read.

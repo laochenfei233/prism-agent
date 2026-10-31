@@ -153,6 +153,9 @@ jobs:
       - name: Build Tauri app
         if: matrix.platform == 'macos-latest'
         working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
 
       - name: Build Tauri app and upload to Release
@@ -160,6 +163,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tagName: v__VERSION__
@@ -185,6 +190,12 @@ jobs:
             apps/desktop/src-tauri/target/*/release/bundle/appimage/*.AppImage
             apps/desktop/src-tauri/target/*/release/bundle/deb/*.deb
             apps/desktop/src-tauri/target/*/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/**/*.sig
+            apps/desktop/src-tauri/target/*/release/bundle/**/*.sig
+            apps/desktop/src-tauri/target/release/bundle/**/latest.json
+            apps/desktop/src-tauri/target/*/release/bundle/**/latest.json
+            apps/desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
+            apps/desktop/src-tauri/target/*/release/bundle/**/*.app.tar.gz
 
       - name: Restore workspace declarations
         if: always()

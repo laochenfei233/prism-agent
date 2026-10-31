@@ -3,7 +3,7 @@
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type {
   FileAttachmentRef,
   ImageAttachmentLimits,
@@ -89,6 +89,29 @@ function abortReason(signal: AbortSignal): Error {
   return reason instanceof Error
     ? reason
     : new Error('Attachment request cancelled with a non-Error reason.', { cause: reason })
+}
+
+/**
+ * Re-check one stored reference against the store's admission limits. A
+ * reference can name an object this process never admitted: session import
+ * copies foreign objects into the store without running admission, so the read
+ * path is the last check before a decode. The media type cannot drift here —
+ * the verified reference already matches the stored header's type — so the
+ * checks are the same pixel-then-dimension order admission applies.
+ * @param ref - reference verified against the stored bytes.
+ * @param limits - resolved admission limits of this store.
+ * @throws {AttachmentError} when the object exceeds a configured admission limit.
+ */
+function assertAdmitted(ref: ImageAttachmentRef, limits: ImageAttachmentLimits): void {
+  if (ref.bytes > limits.maxImageBytes) {
+    throw new AttachmentError('Stored image exceeds the configured byte limit.', 'IMAGE_TOO_LARGE')
+  }
+  if (ref.width * ref.height > limits.maxImagePixels) {
+    throw new AttachmentError('Stored image exceeds the configured pixel limit.', 'IMAGE_TOO_MANY_PIXELS')
+  }
+  if (ref.width > limits.maxImageDimension || ref.height > limits.maxImageDimension) {
+    throw new AttachmentError('Stored image exceeds the configured dimension limit.', 'IMAGE_DIMENSION_TOO_LARGE')
+  }
 }
 
 class SharedRequest<T> {
@@ -222,7 +245,9 @@ export class LocalAttachmentStore extends AttachmentStore {
   }
 
   async readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment> {
-    return readImageFile(this.root, ref, signal)
+    const stored = await readImageFile(this.root, ref, signal)
+    assertAdmitted(stored.ref, this.imageLimits)
+    return stored
   }
 
   override imageHostPath(ref: ImageAttachmentRef): string {
