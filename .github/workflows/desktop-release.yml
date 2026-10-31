@@ -192,8 +192,6 @@ jobs:
             apps/desktop/src-tauri/target/*/release/bundle/dmg/*.dmg
             apps/desktop/src-tauri/target/release/bundle/**/*.sig
             apps/desktop/src-tauri/target/*/release/bundle/**/*.sig
-            apps/desktop/src-tauri/target/release/bundle/**/latest.json
-            apps/desktop/src-tauri/target/*/release/bundle/**/latest.json
             apps/desktop/src-tauri/target/release/bundle/**/*.app.tar.gz
             apps/desktop/src-tauri/target/*/release/bundle/**/*.app.tar.gz
 
