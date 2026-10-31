@@ -12,7 +12,7 @@ import { LocalModelsCard } from './LocalModelsCard.tsx'
 import { en, NS, zh } from './locales.ts'
 
 export { NS }
-export { fetchCatalog, fetchStatus, postCancel, postInstall, postProbe, postRemove, type RouteError } from './api.ts'
+export { fetchCatalog, postCancel, postInstall, postProbe, postRemove, type RouteError } from './api.ts'
 export { LocalModelsCard, type LocalModelsCardProps } from './LocalModelsCard.tsx'
 export { en, zh, type LocalModelsLocaleKey } from './locales.ts'
 

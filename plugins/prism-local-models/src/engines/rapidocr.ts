@@ -66,7 +66,10 @@ export class RapidOcrEngine {
     } catch (error) {
       throw new LocalModelsError('runtime-unavailable', `RapidOCR detection failed: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
-      await rm(temp, { force: true }).catch(() => {})
+      // Temp cleanup is best-effort; the detection failure itself is reported.
+      await rm(temp, { force: true }).catch((cleanupError: unknown) => {
+        void cleanupError
+      })
     }
   }
 

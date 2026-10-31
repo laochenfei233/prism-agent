@@ -4,7 +4,7 @@
  * remove deletes the tree.
  */
 import { createHash } from 'node:crypto'
-import { mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -66,7 +66,8 @@ afterAll(async () => {
 async function serviceWith(variants: object[]): Promise<PrismLocalModelsService> {
   const override = join(root, `override-${Math.random().toString(36).slice(2)}.json`)
   await writeFile(override, JSON.stringify({ families: { bge: { defaultVariantId: 'tiny', variants } } }))
-  const config: ResolvedConfig = { pythonCommand: 'python', catalogOverride: override }
+  // Each call gets its own models root so tests do not share registry state.
+  const config: ResolvedConfig = { pythonCommand: 'python', catalogOverride: override, modelsRoot: join(root, 'models', Math.random().toString(36).slice(2)) }
   const service = new PrismLocalModelsService(config, root)
   await service.catalog()
   return service
@@ -133,5 +134,36 @@ describe('install lifecycle', () => {
     await expect(service.install('bge', 'tiny')).rejects.toThrow(/already has an operation/)
     await service.cancel('bge')
     await waitFor(service, ['idle'])
+  })
+})
+
+describe('manual placement and variant switching', () => {
+  it('detects a fully placed variant for a never-installed family on catalog read', async () => {
+    const service = await serviceWith([
+      { id: 'tiny', displayName: 'tiny', device: 'cpu', files: [{ path: 'model.onnx', url: `${origin}/good`, sizeBytes: good.byteLength, sha256: goodSha256 }] },
+      { id: 'spare', displayName: 'spare', device: 'cpu', files: [{ path: 'model.onnx', url: `${origin}/good`, sizeBytes: good.byteLength, sha256: goodSha256 }] },
+    ])
+    const placed = join(service.modelsRoot, 'bge', 'spare')
+    await mkdir(placed, { recursive: true })
+    await writeFile(join(placed, 'model.onnx'), good)
+    const catalog = await service.catalog()
+    const family = catalog.families.find(candidate => candidate.id === 'bge')
+    expect(family?.status).toBe('ready')
+    expect(family?.selectedVariantId).toBe('spare')
+  })
+
+  it('deletes the previous variant directory when a different variant installs', async () => {
+    const service = await serviceWith([
+      { id: 'tiny', displayName: 'tiny', device: 'cpu', files: [{ path: 'model.onnx', url: `${origin}/good`, sizeBytes: good.byteLength, sha256: goodSha256 }] },
+      { id: 'second', displayName: 'second', device: 'cpu', files: [{ path: 'other.onnx', url: `${origin}/good`, sizeBytes: good.byteLength, sha256: goodSha256 }] },
+    ])
+    await service.install('bge', 'tiny')
+    expect(await waitFor(service, ['ready'])).toBe('ready')
+    await service.install('bge', 'second')
+    expect(await waitFor(service, ['ready'])).toBe('ready')
+    const familyDir = join(service.modelsRoot, 'bge')
+    const entries = await readdir(familyDir)
+    expect(entries).toEqual(['second'])
+    await service.remove('bge')
   })
 })

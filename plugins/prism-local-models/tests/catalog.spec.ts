@@ -48,10 +48,11 @@ describe('built-in catalog', () => {
 
 describe('resolveCatalogUrls', () => {
   it('swaps the origin and keeps the pathname', () => {
+    const original = BUILTIN_CATALOG.flatMap(family => family.variants).flatMap(variant => variant.files)[0]
     const resolved = resolveCatalogUrls(BUILTIN_CATALOG, 'https://mirror.example')
     const file = resolved.flatMap(family => family.variants).flatMap(variant => variant.files)[0]
     expect(file.url).toMatch(/^https:\/\/mirror\.example\//)
-    expect(new URL(file.url).pathname).toBe(new URL(file.url).pathname)
+    expect(new URL(file.url).pathname).toBe(new URL(original.url).pathname)
   })
 
   it('keeps the catalog untouched without a mirror base', () => {
@@ -71,5 +72,12 @@ describe('applyCatalogOverride', () => {
     expect(() => applyCatalogOverride('not json')).toThrow()
     expect(() => applyCatalogOverride('{}')).toThrow(/families/)
     expect(() => applyCatalogOverride(JSON.stringify({ families: { bge: 3 } }))).toThrow(/object/)
+  })
+})
+describe('applyCatalogOverride validation', () => {
+  it('rejects unknown family ids, unknown fields, and unknown top-level keys', () => {
+    expect(() => applyCatalogOverride(JSON.stringify({ families: { nope: {} } }))).toThrow(/unknown family/)
+    expect(() => applyCatalogOverride(JSON.stringify({ families: { bge: { nope: 1 } } }))).toThrow(/unknown fields/)
+    expect(() => applyCatalogOverride(JSON.stringify({ families: {}, extra: true }))).toThrow(/unknown fields: extra/)
   })
 })

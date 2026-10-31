@@ -8,7 +8,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ProbeOutcome } from './types.ts'
 
@@ -108,7 +108,7 @@ export class ModelRegistry {
     }
     if (stats.size !== sizeBytes) return 'size-mismatch'
     const hash = createHash('sha256')
-    const handle = await (await import('node:fs/promises')).open(absolutePath, 'r')
+    const handle = await open(absolutePath, 'r')
     try {
       const chunk = Buffer.alloc(1024 * 1024)
       for (;;) {

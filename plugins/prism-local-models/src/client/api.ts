@@ -5,8 +5,8 @@
  * @module @prism/prism-local-models/client/api
  */
 
-import { LOCAL_MODELS_CANCEL_PATH, LOCAL_MODELS_CATALOG_PATH, LOCAL_MODELS_INSTALL_PATH, LOCAL_MODELS_PROBE_PATH, LOCAL_MODELS_REMOVE_PATH, LOCAL_MODELS_STATUS_PATH } from '../routes.ts'
-import type { CatalogView, ProbeOutcome, StatusView } from '../types.ts'
+import { LOCAL_MODELS_CANCEL_PATH, LOCAL_MODELS_CATALOG_PATH, LOCAL_MODELS_INSTALL_PATH, LOCAL_MODELS_PROBE_PATH, LOCAL_MODELS_REMOVE_PATH } from '../routes.ts'
+import type { CatalogView, ProbeOutcome } from '../types.ts'
 
 /** Route rejection body rendered by the card. */
 export interface RouteError {
@@ -19,11 +19,6 @@ export interface RouteError {
 /** Fetch the full catalog. @returns the catalog view. @throws RouteError when a typed failure answers. */
 export async function fetchCatalog(): Promise<CatalogView> {
   return fetchJson<CatalogView>(LOCAL_MODELS_CATALOG_PATH)
-}
-
-/** Fetch the pollable status snapshot. @returns the status view. */
-export async function fetchStatus(): Promise<StatusView> {
-  return fetchJson<StatusView>(LOCAL_MODELS_STATUS_PATH)
 }
 
 /**

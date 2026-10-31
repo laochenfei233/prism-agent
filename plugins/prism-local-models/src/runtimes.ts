@@ -100,9 +100,13 @@ function dirnameOf(execPath: string): string {
 
 /** Run one plan step; a nonzero exit or missing executable fails provision. */
 async function runPlan(plan: ProvisionPlan, signal: AbortSignal): Promise<void> {
-  await access(plan.command, constants.X_OK).catch(() => {
-    throw new LocalModelsError('provision-failed', `the provisioning executable does not exist: ${plan.command}`)
-  })
+  // Only path-shaped commands are pre-checked: bare names (`python`) resolve
+  // through PATH, and checking them against the cwd would falsely fail.
+  if (/[\\/]/.test(plan.command)) {
+    await access(plan.command, constants.X_OK).catch(() => {
+      throw new LocalModelsError('provision-failed', `the provisioning executable does not exist: ${plan.command}`)
+    })
+  }
   await new Promise<void>((resolve, reject) => {
     const child = spawn(plan.command, [...plan.args], { cwd: plan.cwd, signal, stdio: ['ignore', 'pipe', 'pipe'] })
     let stderr = ''

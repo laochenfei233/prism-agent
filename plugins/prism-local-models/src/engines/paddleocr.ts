@@ -171,7 +171,7 @@ export class PaddleOcrSidecar {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(600_000),
     })
     const value: unknown = await response.json()
     if (!response.ok) {

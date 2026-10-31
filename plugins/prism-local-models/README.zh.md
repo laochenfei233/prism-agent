@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Prism 的本地能力模型——OCR、翻译、RAG 向量——安装在 Prism 数据目录之下，并经设置模型页自带的 `settings.models.footer` 扩展座在模型页内管理，模型页本身零改动。。
+Prism 的本地能力模型——OCR、翻译、RAG 向量——安装在 Prism 数据目录之下，并经设置模型页自带的 `settings.models.footer` 扩展座在模型页内管理，模型页本身零改动。
 
 ## 模型家族
 

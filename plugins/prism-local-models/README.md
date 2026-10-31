@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Local capability models for Prism — OCR, translation, and RAG embeddings — installed under the Prism data directory and managed from the settings Models page through its `settings.models.footer` extension seat. The Models page itself is never edited.。
+Local capability models for Prism — OCR, translation, and RAG embeddings — installed under the Prism data directory and managed from the settings Models page through its `settings.models.footer` extension seat. The Models page itself is never edited.
 
 ## Model families
 

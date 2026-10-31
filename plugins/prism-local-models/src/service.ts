@@ -12,7 +12,7 @@
  * @module @prism/prism-local-models
  */
 
-import { mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog, type CatalogFamily, type CatalogVariant } from './catalog.ts'
 import { downloadFile } from './download.ts'
@@ -37,6 +37,12 @@ interface ActiveInstall {
   readonly abort: () => void
   /** Live progress; mutated by the running download. */
   progress: ModelProgress
+}
+
+/** Whether one variant-directory name is safe to delete inside a family tree. */
+function isSafeVariantId(variantId: string): boolean {
+  return variantId.length > 0 && variantId !== '.' && variantId !== '..'
+    && variantId.includes('/') === false && variantId.includes('\\') === false
 }
 
 /**
@@ -68,6 +74,7 @@ export class PrismLocalModelsService {
   /** Read the full catalog: families, variants, lifecycle state, probe results. */
   async catalog(): Promise<CatalogView> {
     await this.init
+    await this.rescan()
     return { modelsRoot: this.modelsRoot, families: this.families() }
   }
 
@@ -128,7 +135,7 @@ export class PrismLocalModelsService {
       throw new LocalModelsError('busy', `"${modelId}" has an operation running; cancel it first`)
     }
     const record = this.document.families[modelId]
-    if (record?.variantId !== undefined && record.variantId.includes('/') === false && record.variantId.includes('\\') === false) {
+    if (record?.variantId !== undefined && isSafeVariantId(record.variantId)) {
       await rm(join(this.modelsRoot, modelId, record.variantId), { recursive: true, force: true })
     }
     const staleEngine = this.engines.get(modelId)
@@ -139,10 +146,18 @@ export class PrismLocalModelsService {
     await this.writeFamilyRecord(modelId, { status: 'idle' })
   }
 
-  /** Run one smoke inference against the installed variant. */
+  /** Run one smoke inference against the installed variant and persist the outcome. */
   async probe(modelId: string): Promise<ProbeOutcome> {
     await this.init
     this.requireFamily(modelId)
+    const outcome = await this.runProbe(modelId)
+    const record = this.document.families[modelId]
+    if (record !== undefined) await this.writeFamilyRecord(modelId, { ...record, probe: outcome })
+    return outcome
+  }
+
+  /** Dispatch one smoke inference to the family's engine. */
+  private async runProbe(modelId: string): Promise<ProbeOutcome> {
     if (modelId === 'bge') return this.probeEmbedding()
     if (modelId === 'rapidocr') {
       const engine = await this.rapidOcrEngine()
@@ -226,6 +241,11 @@ export class PrismLocalModelsService {
     }
     const cached = this.engines.get(modelId)
     if (cached?.variantId === record.variantId && cached.engine instanceof BgeEngine) return cached.engine
+    const stale = this.engines.get(modelId)
+    if (stale !== undefined) {
+      this.engines.delete(modelId)
+      stale.engine.dispose()
+    }
     const variant = this.requireVariant(modelId, record.variantId)
     const quantized = variant.files.some(file => file.path.includes('quantized'))
     const engine = await BgeEngine.open(this.modelsRoot, ModelRegistry.variantDir(this.modelsRoot, modelId, record.variantId), { quantized, device: variant.device })
@@ -321,6 +341,7 @@ export class PrismLocalModelsService {
       }
       if (signal.aborted) throw new LocalModelsError('download-failed', 'cancelled')
       await this.writeFamilyRecord(modelId, { variantId: variant.id, status: 'ready', error: undefined, files })
+      await this.removePreviousVariant(modelId, variant.id)
     } catch (error) {
       if (signal.aborted) {
         await this.writeFamilyRecord(modelId, { variantId: variant.id, status: 'idle', error: undefined, probe: this.document.families[modelId]?.probe })
@@ -338,10 +359,24 @@ export class PrismLocalModelsService {
     }
   }
 
-  /** Re-verify every recorded variant tree; manual placement shows up here. */
+  /** Re-verify every recorded variant tree and detect manual placements. */
   private async rescan(): Promise<void> {
     for (const family of this.catalogImpl) {
-      await this.rescanFamily(family.id)
+      const record = this.document.families[family.id]
+      if (record?.variantId === undefined) await this.detectManualPlacement(family)
+      else await this.rescanFamily(family.id)
+    }
+  }
+
+  /** Detect a fully present variant tree for a family with no record yet. */
+  private async detectManualPlacement(family: CatalogFamily): Promise<void> {
+    for (const variant of family.variants) {
+      if (variant.files.length === 0) continue
+      const outcome = await this.verifyVariantTree(family.id, variant, { variantId: variant.id, status: 'idle' })
+      if (outcome?.status === 'ready') {
+        await this.writeFamilyRecord(family.id, { ...outcome, variantId: variant.id })
+        return
+      }
     }
   }
 
@@ -355,6 +390,22 @@ export class PrismLocalModelsService {
     if (variant === undefined) return
     const outcome = await this.verifyVariantTree(modelId, variant, record)
     if (outcome !== undefined) await this.writeFamilyRecord(modelId, outcome)
+  }
+
+  /** Delete variant directories left behind by earlier installs of this family. */
+  private async removePreviousVariant(modelId: string, installedVariantId: string): Promise<void> {
+    let entries: string[]
+    try {
+      entries = await readdir(join(this.modelsRoot, modelId))
+    } catch {
+      // No family directory yet: nothing previous to clean up.
+      return
+    }
+    for (const entry of entries) {
+      if (entry !== installedVariantId && isSafeVariantId(entry)) {
+        await rm(join(this.modelsRoot, modelId, entry), { recursive: true, force: true })
+      }
+    }
   }
 
   /**

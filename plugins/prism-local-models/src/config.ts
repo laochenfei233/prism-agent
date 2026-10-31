@@ -12,8 +12,8 @@ export interface Config {
   /** Models root directory; defaults to `<home>/models`. */
   readonly modelsRoot?: string
   /**
-   * Download mirror base replacing the `https://modelscope.cn` prefix of
-   * catalog file URLs; unset keeps the built-in URLs.
+   * Download mirror base swapping the origin of every catalog file URL;
+   * unset keeps the built-in hosts.
    */
   readonly mirrorBaseUrl?: string
   /** Interpreter command for the PaddleOCR environment; defaults to `python`. */

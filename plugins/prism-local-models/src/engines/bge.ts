@@ -75,6 +75,9 @@ export class BgeEngine {
 
   /** Release the underlying session, when the runtime exposes a disposer. */
   async dispose(): Promise<void> {
-    await this.extractor.dispose?.().catch(() => {})
+    // Best-effort dispose: the runtime exposes no failure surface for it.
+    await this.extractor.dispose?.().catch((disposeError: unknown) => {
+      void disposeError
+    })
   }
 }

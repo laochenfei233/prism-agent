@@ -60,14 +60,14 @@ export function apply(ctx: Context, config: ConfigShape = {}): void {
     path: LOCAL_MODELS_CATALOG_PATH,
     methods: ['GET'],
     requestBody: 'buffered',
-    fetch: async () => jsonResponse(await service.catalog()),
+    fetch: async () => routeResponse(async () => jsonResponse(await service.catalog())),
   }), 'local-models: catalog')
 
   ctx.effect(() => connection.fetch.register({
     path: LOCAL_MODELS_STATUS_PATH,
     methods: ['GET'],
     requestBody: 'buffered',
-    fetch: async () => jsonResponse(await service.status()),
+    fetch: async () => routeResponse(async () => jsonResponse(await service.status())),
   }), 'local-models: status')
 
   ctx.effect(() => connection.fetch.register({

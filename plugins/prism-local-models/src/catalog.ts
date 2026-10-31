@@ -74,7 +74,8 @@ const BGE_M3 = `${HF_MIRROR}/Xenova/bge-m3/resolve/main`
 const HY_MT = `${HF_MIRROR}/tencent/HY-MT1.5-1.8B-GGUF/resolve/main`
 
 /** The tokenizer side files shared by both BGE small variants. */
-const BGE_SMALL_TEXT_FILES: readonly CatalogFile[] = [  { path: 'tokenizer.json', url: `${BGE_SMALL}/tokenizer.json`, sizeBytes: 439125, sha256: '48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26' },
+const BGE_SMALL_TEXT_FILES: readonly CatalogFile[] = [
+  { path: 'tokenizer.json', url: `${BGE_SMALL}/tokenizer.json`, sizeBytes: 439125, sha256: '48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26' },
   { path: 'config.json', url: `${BGE_SMALL}/config.json`, sizeBytes: 716, sha256: 'd4193ead3a810fd694fa8a31d7fc72fbaebc0668b603e398734bf2f6538ff42f' },
   { path: 'tokenizer_config.json', url: `${BGE_SMALL}/tokenizer_config.json`, sizeBytes: 367, sha256: 'e6f3b96db926a37d4039995fbf5ad17de158dfb8f6343d607e4dbaad18d75f5a' },
   { path: 'special_tokens_map.json', url: `${BGE_SMALL}/special_tokens_map.json`, sizeBytes: 125, sha256: 'b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3' },
@@ -241,6 +242,9 @@ export function resolveCatalogUrls(catalog: Catalog, mirrorBaseUrl: string | und
   }))
 }
 
+/** Fields a family override may set. */
+const OVERRIDE_FAMILY_FIELDS = new Set(['displayName', 'defaultVariantId', 'variants'])
+
 /**
  * Merge a user JSON document over the built-in catalog; unknown fields fail.
  * @param text - raw JSON of the override document.
@@ -248,16 +252,32 @@ export function resolveCatalogUrls(catalog: Catalog, mirrorBaseUrl: string | und
  */
 export function applyCatalogOverride(text: string): Catalog {
   const value: unknown = JSON.parse(text)
-  if (typeof value !== 'object' || value === null || !('families' in value)) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('catalogOverride must be a JSON object with a families field')
   }
-  const overrides = (value as { families: Record<string, unknown> })['families']
-  return BUILTIN_CATALOG.map(family => {
-    const override = overrides[family.id]
-    if (override === undefined) return family
-    if (typeof override !== 'object' || override === null) {
-      throw new Error(`catalogOverride.${family.id} must be an object`)
+  const { families, ...unknownTopLevel } = value as Record<string, unknown>
+  if (typeof families !== 'object' || families === null || Array.isArray(families)) {
+    throw new Error('catalogOverride.families must be an object keyed by family id')
+  }
+  const unknownTopLevelKeys = Object.keys(unknownTopLevel)
+  if (unknownTopLevelKeys.length > 0) {
+    throw new Error(`catalogOverride has unknown fields: ${unknownTopLevelKeys.join(', ')}`)
+  }
+  for (const [id, override] of Object.entries(families as Record<string, unknown>)) {
+    if (BUILTIN_CATALOG.some(family => family.id === id) === false) {
+      throw new Error(`catalogOverride.families names unknown family "${id}"`)
     }
-    return { ...family, ...override } as CatalogFamily
+    if (typeof override !== 'object' || override === null || Array.isArray(override)) {
+      throw new Error(`catalogOverride.families.${id} must be an object`)
+    }
+    const unknownFields = Object.keys(override as Record<string, unknown>).filter(key => OVERRIDE_FAMILY_FIELDS.has(key) === false)
+    if (unknownFields.length > 0) {
+      throw new Error(`catalogOverride.families.${id} has unknown fields: ${unknownFields.join(', ')}`)
+    }
+  }
+  return BUILTIN_CATALOG.map(family => {
+    const override = (families as Record<string, unknown>)[family.id]
+    if (override === undefined) return family
+    return { ...family, ...(override as object) } as CatalogFamily
   })
 }
