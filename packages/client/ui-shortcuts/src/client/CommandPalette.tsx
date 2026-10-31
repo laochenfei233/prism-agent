@@ -49,7 +49,9 @@ export function CommandPalette({ useStore, actions, useCatalog, invoke, t }:
   }, [open, focusRequest])
   useLayoutEffect(() => {
     if (!open || selected === undefined) return
-    document.getElementById(`palette-${selected.id}`)?.scrollIntoView({ block: 'nearest' })
+    const row = document.getElementById(`palette-${selected.id}`)
+    // A test environment without layout leaves scrollIntoView undefined.
+    if (row !== null && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' })
   }, [open, selected])
   const move = (delta: number): void => {
     if (rows.length === 0) return
