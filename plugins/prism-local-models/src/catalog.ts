@@ -169,7 +169,7 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'bge-small-zh-v1.5',
         device: 'cpu',
         files: [
-          { path: 'model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
+          { path: 'onnx/model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
           ...BGE_SMALL_TEXT_FILES,
         ],
         runtime: BGE_RUNTIME,
@@ -179,7 +179,7 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'bge-small-zh-v1.5 (int8)',
         device: 'cpu',
         files: [
-          { path: 'model_quantized.onnx', url: `${BGE_SMALL}/onnx/model_quantized.onnx`, sizeBytes: 24010842, sha256: '15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc' },
+          { path: 'onnx/model_quantized.onnx', url: `${BGE_SMALL}/onnx/model_quantized.onnx`, sizeBytes: 24010842, sha256: '15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc' },
           ...BGE_SMALL_TEXT_FILES,
         ],
         runtime: BGE_RUNTIME,
@@ -189,7 +189,7 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'bge-m3 (int8, multilingual)',
         device: 'cpu',
         files: [
-          { path: 'model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
+          { path: 'onnx/model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
           ...BGE_M3_TEXT_FILES,
         ],
         runtime: BGE_RUNTIME,
@@ -199,7 +199,7 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'bge-small-zh-v1.5 (CUDA)',
         device: 'cuda',
         files: [
-          { path: 'model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
+          { path: 'onnx/model.onnx', url: `${BGE_SMALL}/onnx/model.onnx`, sizeBytes: 94851877, sha256: '69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a' },
           ...BGE_SMALL_TEXT_FILES,
         ],
         runtime: BGE_RUNTIME,
@@ -209,7 +209,7 @@ export const BUILTIN_CATALOG: Catalog = [
         displayName: 'bge-m3 (int8, CUDA)',
         device: 'cuda',
         files: [
-          { path: 'model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
+          { path: 'onnx/model_quantized.onnx', url: `${BGE_M3}/onnx/model_quantized.onnx`, sizeBytes: 569694530, sha256: '0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d' },
           ...BGE_M3_TEXT_FILES,
         ],
         runtime: BGE_RUNTIME,

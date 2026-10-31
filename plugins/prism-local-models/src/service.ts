@@ -228,7 +228,7 @@ export class PrismLocalModelsService {
     if (cached?.variantId === record.variantId && cached.engine instanceof BgeEngine) return cached.engine
     const variant = this.requireVariant(modelId, record.variantId)
     const quantized = variant.files.some(file => file.path.includes('quantized'))
-    const engine = await BgeEngine.open(ModelRegistry.variantDir(this.modelsRoot, modelId, record.variantId), { quantized, device: variant.device })
+    const engine = await BgeEngine.open(this.modelsRoot, ModelRegistry.variantDir(this.modelsRoot, modelId, record.variantId), { quantized, device: variant.device })
     this.engines.set(modelId, { variantId: record.variantId, engine })
     return engine
   }

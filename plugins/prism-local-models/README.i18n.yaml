@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write plugins/prism-local-models/README.md
+/prism-prism-local-models:
+  en: 4ac94046012c3741
+  zh: 9e48bca96ca6bc94
+/prism-prism-local-models/model-families:
+  en: a2fea0ce62e50846
+  zh: 927dbfcb2c51c02d
+/prism-prism-local-models/storage:
+  en: a7ffa035497b9867
+  zh: 2a876f591a33e23a
+/prism-prism-local-models/capability-contract:
+  en: 860ba3f986959994
+  zh: e8b15fd5fdbf6099
+/prism-prism-local-models/config-cordis-patch-yml-row-local-models:
+  en: 0aec657379603ecc
+  zh: 0ab291ac18d7dfae
+/prism-prism-local-models/http-api:
+  en: d183cb365bedef46
+  zh: cdaf21b151e77cad
+/prism-prism-local-models/limitations:
+  en: 8cf53919add530b9
+  zh: 0be1020c57011ae0
+/prism-prism-local-models/development:
+  en: 898da1a73156d816
+  zh: 301479c2f801eed9

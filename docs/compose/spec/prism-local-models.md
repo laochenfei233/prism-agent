@@ -67,15 +67,15 @@ The client half injects `['slots', 'locale']`, registers a `settings.models.foot
 
 ## Tasks
 
-- [ ] T1: plugin skeleton — package.json (`@prism/prism-local-models`, `dsh.bundle.patch`, `dsh.client`, `./client` export), cordis.patch.yml rows, tsdown two-face build, tsconfig, vitest (covers: S2.1)
-- [ ] T2: catalog module (four families, variants, pinned upstream files with live-checked URLs and sha256), Config schema (`modelsRoot`, `mirrorBaseUrl`, `pythonCommand`, `catalogOverride`), registry store with scan/verify/manual placement (covers: S2.2, S2.3)
-- [ ] T3: download engine (progress, cancel, sha256, atomic rename) and the six API routes over `connection.fetch.register` (covers: S2.4, S2.7)
-- [ ] T4: runtime provisioning + BGE embedding on CPU; cuda variant probe fails loud with an actionable message (covers: S2.5, S2.6)
-- [ ] T5: RapidOCR det/cls/rec inference and probe (covers: S2.6)
-- [ ] T6: PaddleOCR sidecar script, venv provisioning, Python detection, teardown (covers: S2.6)
-- [ ] T7: HY-MT1.5 GGUF translation through node-llama-cpp with the Hunyuan-MT prompt (covers: S2.6)
-- [ ] T8: browser-half footer card, variant selector, status polling, zh/en locale dictionaries (covers: S2.8)
-- [ ] T9: unit tests — catalog validation, registry state machine and manual placement, download verification, route handlers, provisioning command planning, pure UI logic, locale key parity (covers: S2.2, S2.3, S2.5, S2.7, S2.8)
+- [x] T1: plugin skeleton — package.json (`@prism/prism-local-models`, `dsh.bundle.patch`, `dsh.client`, `./client` export), cordis.patch.yml rows, tsdown two-face build, tsconfig, vitest (covers: S2.1)
+- [x] T2: catalog module (four families, variants, pinned upstream files with live-checked URLs and sha256), Config schema (`modelsRoot`, `mirrorBaseUrl`, `pythonCommand`, `catalogOverride`), registry store with scan/verify/manual placement (covers: S2.2, S2.3)
+- [x] T3: download engine (progress, cancel, sha256, atomic rename) and the six API routes over `connection.fetch.register` (covers: S2.4, S2.7)
+- [x] T4: runtime provisioning + BGE embedding on CPU; cuda variant probe fails loud with an actionable message (covers: S2.5, S2.6)
+- [x] T5: RapidOCR det/cls/rec inference and probe (covers: S2.6)
+- [x] T6: PaddleOCR sidecar script, venv provisioning, Python detection, teardown (covers: S2.6)
+- [x] T7: HY-MT1.5 GGUF translation through node-llama-cpp with the Hunyuan-MT prompt (covers: S2.6)
+- [x] T8: browser-half footer card, variant selector, status polling, zh/en locale dictionaries (covers: S2.8)
+- [x] T9: unit tests — catalog validation, registry state machine and manual placement, download verification, route handlers, provisioning command planning, pure UI logic, locale key parity (covers: S2.2, S2.3, S2.5, S2.7, S2.8)
 - [ ] T10: README en/zh, spec pair + pairing record, verification — build both faces, typecheck, focused tests, boot a web profile with the plugin, screenshot the Models page card (covers: S4)
 
 ## [S4] Acceptance

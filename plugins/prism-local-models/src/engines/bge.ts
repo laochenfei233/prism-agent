@@ -7,7 +7,7 @@
  */
 
 import { LocalModelsError } from '../errors.ts'
-import { requireFrom } from '../runtimes.ts'
+import { requireFrom, runtimeDir } from '../runtimes.ts'
 import type { ModelDevice } from '../types.ts'
 
 /** The slice of the transformers.js API this engine drives. */
@@ -31,19 +31,20 @@ export class BgeEngine {
 
   /**
    * Open the engine over an installed variant directory.
-   * @param modelsDir - directory holding `config.json`, tokenizer files, and the ONNX model.
+   * @param modelsRoot - the models root holding `runtimes/bge` and the variant trees.
+   * @param variantDir - directory holding `config.json`, tokenizer files, and the ONNX model.
    * @param options - `quantized` selects `model_quantized.onnx`; `device` selects the execution provider.
    * @throws {LocalModelsError} `runtime-unavailable` when the provisioned runtime is missing or the requested provider cannot initialize.
    */
-  static async open(modelsDir: string, options: { readonly quantized: boolean; readonly device: ModelDevice }): Promise<BgeEngine> {
+  static async open(modelsRoot: string, variantDir: string, options: { readonly quantized: boolean; readonly device: ModelDevice }): Promise<BgeEngine> {
     let module: TransformersModule
     try {
-      module = requireFrom(modelsDir)('@huggingface/transformers') as TransformersModule
+      module = requireFrom(runtimeDir(modelsRoot, 'bge'))('@huggingface/transformers') as TransformersModule
     } catch (error) {
       throw new LocalModelsError('runtime-unavailable', `the BGE runtime is not provisioned (install the model from the card first): ${error instanceof Error ? error.message : String(error)}`)
     }
     try {
-      const extractor = await module.pipeline('feature-extraction', modelsDir, {
+      const extractor = await module.pipeline('feature-extraction', variantDir, {
         local_files_only: true,
         dtype: options.quantized ? 'quantized' : 'fp32',
         device: options.device,

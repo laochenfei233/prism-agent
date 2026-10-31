@@ -67,15 +67,15 @@ commits: f879732059..(filled at delivery)
 
 ## 任务
 
-- [ ] T1: 插件骨架——package.json（`@prism/prism-local-models`、`dsh.bundle.patch`、`dsh.client`、`./client` 导出）、cordis.patch.yml 行、tsdown 双面构建、tsconfig、vitest（covers: S2.1）
-- [ ] T2: 目录模块（四个家族、变体、经实际检查钉死 URL 与 sha256 的上游文件）、Config schema（`modelsRoot`、`mirrorBaseUrl`、`pythonCommand`、`catalogOverride`）、带扫描/校验/手动放置的注册表存储（covers: S2.2, S2.3）
-- [ ] T3: 下载引擎（进度、取消、sha256、原子重命名）与经 `connection.fetch.register` 的六个 API 路由（covers: S2.4, S2.7）
-- [ ] T4: 运行时供给 + BGE 向量（CPU）；cuda 变体 probe 以可操作信息 fail-loud（covers: S2.5, S2.6）
-- [ ] T5: RapidOCR det/cls/rec 推理与 probe（covers: S2.6）
-- [ ] T6: PaddleOCR sidecar 脚本、venv 供给、Python 检测、卸载终止（covers: S2.6）
-- [ ] T7: HY-MT1.5 GGUF 翻译，经 node-llama-cpp 采用混元 MT 提示词（covers: S2.6）
-- [ ] T8: 浏览器半 footer 卡片、变体选择器、状态轮询、zh/en 字典（covers: S2.8）
-- [ ] T9: 单元测试——目录校验、注册表状态机与手动放置、下载校验、路由处理器、供给命令规划、纯 UI 逻辑、locale 键位配对（covers: S2.2, S2.3, S2.5, S2.7, S2.8）
+- [x] T1: 插件骨架——package.json（`@prism/prism-local-models`、`dsh.bundle.patch`、`dsh.client`、`./client` 导出）、cordis.patch.yml 行、tsdown 双面构建、tsconfig、vitest（covers: S2.1）
+- [x] T2: 目录模块（四个家族、变体、经实际检查钉死 URL 与 sha256 的上游文件）、Config schema（`modelsRoot`、`mirrorBaseUrl`、`pythonCommand`、`catalogOverride`）、带扫描/校验/手动放置的注册表存储（covers: S2.2, S2.3）
+- [x] T3: 下载引擎（进度、取消、sha256、原子重命名）与经 `connection.fetch.register` 的六个 API 路由（covers: S2.4, S2.7）
+- [x] T4: 运行时供给 + BGE 向量（CPU）；cuda 变体 probe 以可操作信息 fail-loud（covers: S2.5, S2.6）
+- [x] T5: RapidOCR det/cls/rec 推理与 probe（covers: S2.6）
+- [x] T6: PaddleOCR sidecar 脚本、venv 供给、Python 检测、卸载终止（covers: S2.6）
+- [x] T7: HY-MT1.5 GGUF 翻译，经 node-llama-cpp 采用混元 MT 提示词（covers: S2.6）
+- [x] T8: 浏览器半 footer 卡片、变体选择器、状态轮询、zh/en 字典（covers: S2.8）
+- [x] T9: 单元测试——目录校验、注册表状态机与手动放置、下载校验、路由处理器、供给命令规划、纯 UI 逻辑、locale 键位配对（covers: S2.2, S2.3, S2.5, S2.7, S2.8）
 - [ ] T10: README en/zh、spec 对 + pairing 记录、验证——双面构建、typecheck、聚焦测试、带插件启动 web profile、模型页卡片截图（covers: S4）
 
 ## [S4] 验收
