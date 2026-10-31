@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-local-models.md
 /:
-  en: 1df7aa917b17de3f
-  zh: 1df7aa917b17de3f
+  en: 3eb5aa6f1c0b0cba
+  zh: 3eb5aa6f1c0b0cba
 /prism-local-models:
   en: 6a2f00c69a818ca6
   zh: 5384c2cefb958711
 /prism-local-models/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 036ca947d944f463
+  zh: a79a285527cd6e5d
 /prism-local-models/s1-problem:
   en: e7c372073814698a
   zh: d123768bf94d5d0f
@@ -24,29 +24,29 @@
   en: 8cae2e9e4616ab9d
   zh: 49e42d3854336975
 /prism-local-models/s2-design/s2-3-storage-layout-and-registry:
-  en: 1354c68bc9c9ac58
-  zh: cf819a4fe09031c6
+  en: 9a09409e40e0525f
+  zh: 7093980165c98eb8
 /prism-local-models/s2-design/s2-4-node-half-service-and-capability-contract:
-  en: 3157f66ffbe70f63
-  zh: 5a230baf657bd9dd
+  en: 71a8e0728e40b996
+  zh: d72665721ab1abf6
 /prism-local-models/s2-design/s2-5-runtime-provisioning:
   en: 73a89eb2e315b650
   zh: 8265d60f030474c6
 /prism-local-models/s2-design/s2-6-inference-wiring:
-  en: 0b2b2ca6b5be6c30
-  zh: a832f44ed6c64097
+  en: 0cc33d9833f5ed0d
+  zh: acef707d80e1f99a
 /prism-local-models/s2-design/s2-7-http-api:
-  en: 6cba22efa4b4c916
-  zh: a1f15958b7e42c82
+  en: d4c2385486480fbe
+  zh: 89d21ed45597d542
 /prism-local-models/s2-design/s2-8-browser-half-the-models-page-card:
-  en: 462ff158886f630c
-  zh: 1fb12f53bbd90542
+  en: 04e89ef45dccff66
+  zh: 6e534b025dd045a0
 /prism-local-models/s3-scope:
   en: adf2f420d67f69c7
   zh: 42eb96b6387f113b
 /prism-local-models/tasks:
-  en: 4086b3b487b8f510
-  zh: beaecf49b94aff20
+  en: d7e8ae0d81839b39
+  zh: e9bb302e3aceb0ca
 /prism-local-models/s4-acceptance:
   en: 735fcd5d89577c1b
   zh: 7d59442368f160cd

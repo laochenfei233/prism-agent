@@ -13,7 +13,7 @@ Prism 的本地能力模型——OCR、翻译、RAG 向量——安装在 Prism 
 | HY-MT1.5（混元 Hunyuan-MT1.5-1.8B 官方 GGUF 导出） | 翻译 | `q4_k_m`（默认）、`q8_0` 及 `cuda` 孪生变体 | `node-llama-cpp` 供给到 `<modelsRoot>/runtimes/hy-mt-1.5` |
 | BGE（BAAI 向量） | 向量 | `bge-small-zh-v1.5`（默认）、其 int8 构建、`bge-m3` int8 及 `cuda` 孪生变体 | `@huggingface/transformers` + `onnxruntime-node` 供给到 `<modelsRoot>/runtimes/bge` |
 
-下载 URL 钉在经过实测的国内可达主机上（`hf-mirror.com`）；`mirrorBaseUrl` 整体替换每个 URL 的源站。每个下载文件都带钉死的字节数与 sha256；下载经 `.part` 临时文件流式写入，摘要匹配后才重命名。手动放置的文件由周期扫描检出并校验一次。
+下载 URL 钉在经过实测的国内可达主机上（`hf-mirror.com`）；`mirrorBaseUrl` 整体替换每个 URL 的源站。每个下载文件都带钉死的字节数与 sha256；下载经 `.part` 临时文件流式写入，摘要匹配后才重命名。手动放置的文件由模型根目录扫描检出并校验一次。
 
 ## 存储布局
 

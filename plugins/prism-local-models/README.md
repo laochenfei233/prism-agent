@@ -13,7 +13,7 @@ Local capability models for Prism — OCR, translation, and RAG embeddings — i
 | HY-MT1.5 (Hunyuan-MT1.5-1.8B, official GGUF export) | translation | `q4_k_m` (default), `q8_0`, plus `cuda` twins | `node-llama-cpp` provisioned into `<modelsRoot>/runtimes/hy-mt-1.5` |
 | BGE (BAAI embeddings) | embedding | `bge-small-zh-v1.5` (default), its int8 build, `bge-m3` int8, plus `cuda` twins | `@huggingface/transformers` + `onnxruntime-node` provisioned into `<modelsRoot>/runtimes/bge` |
 
-Download URLs pin the China-reachable hosts the files were verified against (`hf-mirror.com`); `mirrorBaseUrl` swaps the origin of every URL. Every downloaded file carries a pinned byte size and sha256; downloads stream through a `.part` temp file and rename only after the digest matches. Manually placed files are detected by the periodic scan and verified once.
+Download URLs pin the China-reachable hosts the files were verified against (`hf-mirror.com`); `mirrorBaseUrl` swaps the origin of every URL. Every downloaded file carries a pinned byte size and sha256; downloads stream through a `.part` temp file and rename only after the digest matches. Manually placed files are detected by the models-root scan and verified once.
 
 ## Storage
 

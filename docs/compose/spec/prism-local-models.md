@@ -1,9 +1,9 @@
 ---
 feature: prism-local-models
-status: in-progress
+status: delivered
 updated: 2026-10-31
 branch: feat/prism-local-models
-commits: f879732059..(filled at delivery)
+commits: f879732059..8048f7d1fb
 ---
 
 # Prism Local Models
@@ -12,6 +12,11 @@ English | [中文](prism-local-models.zh.md)
 
 ## Report
 
+**What was built** — `plugins/prism-local-models` (`@prism/prism-local-models`), a dual-face out-of-tree plugin that puts four local capability models under the Prism data directory and manages them from the settings Models page through the page's own `settings.models.footer` seat; `packages/` and `apps/` are untouched. The node half owns the catalog (pinned upstream files with sizes and sha256), a durable registry with integrity caching and manual-placement detection, verified downloads with cancel, npm/pip runtime provisioning, and four engines: RapidOCR (`@gutenye/ocr-node`), a PaddleOCR Python sidecar, HY-MT1.5 through `node-llama-cpp`, and BGE through transformers.js. It claims `ctx.prismLocalModels` with `embed`/`ocr`/`translate` plus the install lifecycle, and serves `/api/local-models/*`. The browser half renders the footer card: kind chips, variant selectors with device and size, live progress, and install/cancel/remove/probe actions, zh/en throughout.
+
+**Verification** — plugin `tsc --noEmit` clean; vitest 30/30 (catalog pins and override rejection, registry roundtrip/corruption/integrity classes, download lifecycle against a real local HTTP origin: install, checksum failure, cancel, busy, manual placement, variant-switch cleanup, provision plans and marker, capability guards, locale parity, pure helpers); two-face tsdown build and `pnpm run build:artifacts` pass; scoped `verify-translation-pairing` consistent for both pairs. Live on this machine: RapidOCR probe recognized the rendered probe image ("PRISM LOCAL OCR"); BGE produced 2x512-dim L2-normalized embeddings with probe `512 dims`; HY-MT1.5 translated the probe sentence through the official Q4_K_M GGUF; a `dsh web --patch` boot served the plugin's client bundle and the rendered Models page showed the local-models card (screenshot). Not executed here: the PaddleOCR pip provisioning with a real interpreter, and cuda variants on real GPU hardware (fail-loud probes implemented and unit-reviewed).
+
+**Journey log** — The Models page already declares its extension seats (`slot-contract.ts` says "without editing it"), so the injection needed zero core edits. The HF tree API's `oid` is a git sha1 for xet-stored files; `paths-info` returns the true LFS sha256, pinning multi-GB hashes without downloading. RapidOCR pivoted from loose pinned files to the `@gutenye/ocr-models` npm bundle, which ships the full PP-OCRv4 set including cls and dict. Out-of-tree bundles resolve from the profile context (`$DSH_HOME/profiles/node_modules`), not the repo — the dev smoke needs the junction there, exactly what the desktop shell does at runtime. Cordis context claims go through `ctx.provide`; a bare property set throws "without provide", and the pinned cordis declaration omits `provide`, so a local interface widening carries the type.
 ## [S1] Problem
 
 The settings Models page manages remote LLM providers only. The capability models Prism itself needs — OCR over images, machine translation, RAG embeddings — have no home: no install location, no lifecycle management, no capability entry point for future features. These models should live inside Prism's data directory, be installed and managed where model management already lives (the Models page), and expose typed capabilities (`embed`, `ocr`, `translate`) that Prism features can call.
@@ -35,11 +40,11 @@ Each variant carries: `id`, `displayName`, `device` (`cpu` | `cuda`), total size
 
 ### S2.3 Storage layout and registry
 
-Models live under the Config `modelsRoot`, defaulting to `dshHomePath('models')`, as `<modelsRoot>/<modelId>/<variantId>/<files…>`. A `registry.json` at `modelsRoot` records per-model state: `status` (`idle | downloading | provisioning | ready | error`), selected variant, per-file integrity (`sha256` result cached with file size and mtime), progress, and error. The registry scans `modelsRoot` on load and on every catalog read: manual placement is detected by presence plus file size, then sha256-verified once and cached. Downloads write to a `.part` file and rename atomically after verification; a failed verification deletes the temp file and reports a typed error.
+Models live under the Config `modelsRoot`, defaulting to `dshHomePath('models')`, as `<modelsRoot>/<modelId>/<variantId>/<files…>`. A `registry.json` at `modelsRoot` records per-model state: `status` (`idle | downloading | provisioning | ready | error`), selected variant, per-file integrity (`sha256` result cached with file size and mtime), progress, and error. The registry scans `modelsRoot` on load and on every catalog read: the recorded variant's tree is re-verified with results cached by size and mtime, and a family with no record is adopted when any catalog variant's complete tree is present on disk (manual placement), sha256-verified once and cached. Downloads write to a `.part` file and rename atomically after verification; a failed verification deletes the temp file and reports a typed error.
 
 ### S2.4 Node-half service and capability contract
 
-`PrismLocalModelsService` claims `ctx.prismLocalModels` through declaration merging and owns: `listStatus()`, `install(modelId, variantId)` (download plus provisioning, with progress and cancel), `cancel(modelId)`, `remove(modelId)`, `probe(modelId)` (runs a smoke inference and returns the observed result), and the capability methods `embed(texts: string[]): Promise<number[][]>`, `ocr(image: { bytes, mime }): Promise<OcrResult>`, and `translate(text: string, opts: { to: string; from?: string }): Promise<string>`. Capability methods throw a typed error with an actionable message when the model or its runtime is not ready. One active operation per model; different models run concurrently. OCR: RapidOCR is the default engine; PaddleOCR is opt-in.
+`PrismLocalModelsService` claims `ctx.prismLocalModels` through `ctx.provide` and owns: `status()`, `install(modelId, variantId)` (download plus provisioning, with progress and cancel), `cancel(modelId)`, `remove(modelId)`, `probe(modelId)` (runs a smoke inference and returns the observed result), and the capability methods `embed(texts: string[]): Promise<number[][]>`, `ocr(image: { bytes, mime }): Promise<string>`, and `translate(text: string, opts: { to: string; from?: string }): Promise<string>`. Capability methods throw a typed error with an actionable message when the model or its runtime is not ready. One active operation per model; different models run concurrently. OCR: RapidOCR is the default engine; PaddleOCR is opt-in.
 
 ### S2.5 Runtime provisioning
 
@@ -48,17 +53,17 @@ Native runtimes are not package dependencies of the plugin (out-of-tree plugins 
 ### S2.6 Inference wiring
 
 - BGE: transformers.js embedding pipeline (tokenizer included), mean pooling, L2 normalization; CPU; `probe` embeds a fixed string and returns the vector dimension.
-- RapidOCR: det → optional cls → rec over the installed ONNX models; `probe` OCRs a bundled sample image and returns the recognized text.
+- RapidOCR: det → optional cls → rec over the installed ONNX models; `probe` renders its own sample image through the runtime's sharp and OCRs it.
 - PaddleOCR: the plugin writes a stdlib-only HTTP sidecar script into the runtimes directory, spawns it with the provisioned venv python, and POSTs images for OCR; health-checked, terminated on teardown; without a usable Python the row reports the missing-Python state.
 - HY-MT1.5: an in-process llama.cpp context with the Hunyuan-MT prompt template; `probe` translates a fixed zh→en sentence. It is an internal capability only — no `ctx.llm` adapter, never selectable as a chat model.
 
 ### S2.7 HTTP API
 
-Exact Fetch routes registered through `connection.fetch.register` under `/api/local-models` (the prism-pocket / prism-meeting pattern, authenticated by the shared `/api` carrier): `GET /catalog` (models, variants, status, integrity, paths), `GET /status` (progress snapshot), `POST /install` `{modelId, variantId}`, `POST /cancel` `{modelId}`, `POST /remove` `{modelId}`, `POST /probe` `{modelId}`. The browser half polls `GET /status` at 1 s while one of its operations is active; no new forwardable events are proposed.
+Exact Fetch routes registered through `connection.fetch.register` under `/api/local-models` (the prism-pocket / prism-meeting pattern, authenticated by the shared `/api` carrier): `GET /catalog` (models, variants, status, integrity, paths), `GET /status` (progress snapshot), `POST /install` `{modelId, variantId}`, `POST /cancel` `{modelId}`, `POST /remove` `{modelId}`, `POST /probe` `{modelId}`. While one of its operations is active the browser half refreshes `GET /catalog` once a second — the catalog doubles as the status snapshot — and `GET /status` remains the light route for other pollers; no new forwardable events are proposed.
 
 ### S2.8 Browser half: the Models-page card
 
-The client half injects `['slots', 'locale']`, registers a `settings.models.footer` list entry, and renders one "本地模型 / Local models" card: a header with the models root path, and one row per family showing the name, a kind chip (OCR / 翻译 / 向量), a variant selector fed from the catalog, size, status or download progress, and 安装 / 取消 / 删除 / 检测 actions with their results; an OCR note states that RapidOCR is the default engine and PaddleOCR requires a Python environment. All copy routes through `ctx.locale` with merged zh/en dictionaries and a `LocaleNamespaceMap` entry; styling reuses app theme tokens.
+The client half injects `['slots', 'locale']`, registers a `settings.models.footer` list entry, and renders one "本地模型 / Local models" card: a header with the models root path, and one row per family showing the name, a kind chip (OCR / 翻译 / 向量), a variant selector fed from the catalog, size, status or download progress, and 安装 / 取消 / 删除 / 检测 actions with their results; an OCR note states that RapidOCR is the default engine and PaddleOCR requires a Python environment. All copy routes through `ctx.locale` with merged zh/en dictionaries (structural stand-ins, consistent with `prism-about`); styling reuses app theme tokens.
 
 ## [S3] Scope
 
@@ -75,8 +80,8 @@ The client half injects `['slots', 'locale']`, registers a `settings.models.foot
 - [x] T6: PaddleOCR sidecar script, venv provisioning, Python detection, teardown (covers: S2.6)
 - [x] T7: HY-MT1.5 GGUF translation through node-llama-cpp with the Hunyuan-MT prompt (covers: S2.6)
 - [x] T8: browser-half footer card, variant selector, status polling, zh/en locale dictionaries (covers: S2.8)
-- [x] T9: unit tests — catalog validation, registry state machine and manual placement, download verification, route handlers, provisioning command planning, pure UI logic, locale key parity (covers: S2.2, S2.3, S2.5, S2.7, S2.8)
-- [ ] T10: README en/zh, spec pair + pairing record, verification — build both faces, typecheck, focused tests, boot a web profile with the plugin, screenshot the Models page card (covers: S4)
+- [x] T9: unit tests — catalog validation and override rejection, registry state machine and manual placement, download lifecycle against a local origin, provisioning command planning, pure UI logic, locale key parity (covers: S2.2, S2.3, S2.5, S2.7, S2.8)
+- [x] T10: README en/zh, spec pair + pairing record, verification — build both faces, typecheck, focused tests, boot a web profile with the plugin, screenshot the Models page card (covers: S4)
 
 ## [S4] Acceptance
 

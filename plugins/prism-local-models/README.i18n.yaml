@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-local-models/README.md
 /prism-prism-local-models:
-  en: 4ac94046012c3741
-  zh: 9e48bca96ca6bc94
+  en: b5fcaabf7b02bc56
+  zh: 0c5e0b1365ba9e74
 /prism-prism-local-models/model-families:
-  en: a2fea0ce62e50846
-  zh: 927dbfcb2c51c02d
+  en: eed84f6080a3a18d
+  zh: 00167b48b25c648b
 /prism-prism-local-models/storage:
   en: a7ffa035497b9867
   zh: 2a876f591a33e23a
