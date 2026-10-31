@@ -56,7 +56,7 @@ commits: 13707d2897..<head>（交付时回填）
 
 ### [S2.3] Composer focus
 
-`focus.composer` 由 `ui-conversation` 注册，按工作区命令的同样方式解析当前会话，并通过 `InputHub` 调用已有的 `SessionInputShell.focus()`。主视图没有输入框或没有当前会话时返回带原因的拒绝。
+`focus.composer` 由 `ui-conversation` 注册，聚焦主区域的地标——编辑器根节点；没有输入框挂载时返回带原因的拒绝。
 
 ### [S2.4] Session tree keyboard navigation
 
@@ -123,7 +123,7 @@ commits: 13707d2897..<head>（交付时回填）
 - [x] T3：新增面板 store、组件、文案、带默认键位的 `commands.open` 命令，以及参考表的排序项。（depends: T2, covers: S2.1）
 - [x] T4：给三个地标加上 `data-dsh-region` 与 `tabIndex={-1}`。（depends: T1, covers: S2.2）
 - [x] T5：在 `ui-layout` 注册基于地标的 `focus.cycle`/`focus.cycleReverse`。（depends: T4, covers: S2.2）
-- [ ] T6：在 `ui-conversation` 注册 `focus.composer`。（depends: T4, covers: S2.3）
+- [x] T6：在 `ui-conversation` 注册 `focus.composer`。（depends: T4, covers: S2.3）
 - [x] T7：在 `ui-workspace` 增加树方向键导航与 roving tab index。（depends: T1, covers: S2.4）
 - [ ] T8：编写 [S2.7] 列出的五个 spec。（depends: T3, T5, T6, T7, T10, covers: S2.7）
 - [ ] T9：更新受影响的包 README 与 Web 客户端子系统页。（depends: T5, T6, T7, T10, covers: S2.7）

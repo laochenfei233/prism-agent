@@ -56,7 +56,7 @@ Discovery is by attribute rather than a new service because the three owners alr
 
 ### [S2.3] Composer focus
 
-`focus.composer`, owned by `ui-conversation`, resolves the current session the way the workspace commands do and calls the existing `SessionInputShell.focus()` through `InputHub`. When the main view has no composer, or no session is current, it returns blocked with a localized reason.
+`focus.composer`, owned by `ui-conversation`, focuses the main region's landmark — the composer editor root — and returns blocked with a localized reason when no composer is mounted.
 
 ### [S2.4] Session tree keyboard navigation
 
@@ -123,7 +123,7 @@ The dividing rule is ownership, not importance: an application action is a comma
 - [x] T3: Add the palette store, component, locale copy, `commands.open` command with its defaults, and the reference ordering entry. (depends: T2, covers: S2.1)
 - [x] T4: Add `data-dsh-region` and `tabIndex={-1}` to the three landmarks. (depends: T1, covers: S2.2)
 - [x] T5: Register `focus.cycle`/`focus.cycleReverse` in `ui-layout` over the landmarks. (depends: T4, covers: S2.2)
-- [ ] T6: Register `focus.composer` in `ui-conversation`. (depends: T4, covers: S2.3)
+- [x] T6: Register `focus.composer` in `ui-conversation`. (depends: T4, covers: S2.3)
 - [x] T7: Add tree arrow navigation and the roving tab index in `ui-workspace`. (depends: T1, covers: S2.4)
 - [ ] T8: Write the five specs named in [S2.7]. (depends: T3, T5, T6, T7, T10, covers: S2.7)
 - [ ] T9: Update the affected package READMEs and the Web client subsystem page. (depends: T5, T6, T7, T10, covers: S2.7)

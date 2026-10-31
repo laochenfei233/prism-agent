@@ -30,8 +30,8 @@ function fixture(rows: readonly ShortcutCatalogEntry[]) {
 /** Let the palette's post-close frame invoke the command. */
 async function settle(): Promise<void> {
   await act(async () => {
-    await new Promise(resolve => { requestAnimationFrame(() => { resolve(null) }) })
-    await new Promise(resolve => { requestAnimationFrame(() => { resolve(null) }) })
+    await new Promise((resolve) => { requestAnimationFrame(() => { resolve(null) }) })
+    await new Promise((resolve) => { requestAnimationFrame(() => { resolve(null) }) })
   })
 }
 
