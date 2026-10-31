@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Web e2e scenarios: the settings surface — the modal shell (trigger, nav,
 // section switching, both close paths), the Appearance preference row (the
 // real theme gesture — click 深色 and the whole cascade runs: ThemeRuntime preference -> Host settings
@@ -19,7 +20,7 @@ import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { openSettings, ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
+import { openAppearanceGallery, openSettings, ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/settings-chrome', import.meta.url))
 const DIALOG_EXPECTED = join(SNAPSHOT_DIR, 'dialog.expected.md')
@@ -75,20 +76,18 @@ describe('web e2e: settings modal and General preferences', () => {
       if (await dialog.isVisible()) await page.keyboard.press('Escape')
       await dialog.waitFor({ state: 'hidden' })
     })
-    const trigger = page.getByRole('button', { name: '账号菜单', exact: true })
-    expect(await trigger.getAttribute('aria-haspopup')).toBe('menu')
-    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    // The signed-out launcher opens the settings dialog directly; no menu sits
+    // between it and the dialog.
+    const trigger = page.getByRole('button', { name: '设置', exact: true })
+    expect(await trigger.getAttribute('aria-haspopup')).toBeNull()
     await trigger.click()
-    expect(await trigger.getAttribute('aria-expanded')).toBe('true')
-    await page.getByRole('menuitem', { name: '设置', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
-    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
-    // General is active by default; Permission, Language and Appearance are functional.
+    // General is active by default; the theme gallery now lives in its own section.
     expect(await dialog.getByRole('button', { name: '通用设置' }).getAttribute('aria-current')).toBe('true')
     await dialog.getByRole('button', { name: '工作区内修改' }).waitFor({ timeout: 10_000 })
     await expect.poll(() => dialog.getByText('语言', { exact: true }).count(), { timeout: 5_000 }).toBe(1)
-    await expect.poll(() => dialog.getByText('外观', { exact: true }).count(), { timeout: 5_000 }).toBe(1)
+    expect(await dialog.getByRole('button', { name: '外观', exact: true }).count()).toBe(1)
     await dialog.getByText('工作步骤展示', { exact: true }).locator('../..')
       .getByRole('button', { name: '详细', exact: true }).waitFor({ timeout: 10_000 })
     expect(await readFile(join(scaffold.harnessHome, 'profiles', 'scaffold', 'cordis.patch.yml'), 'utf8'))
@@ -206,10 +205,10 @@ describe('web e2e: settings modal and General preferences', () => {
     expect(await dialog.locator('[data-plugin-entry="tool-subagent-fork"] button')
       .getAttribute('aria-expanded')).toBe('true')
     await pluginSearch.fill('')
-    // Close path 1: Escape.
+    // Close path 1: Escape. The signed-out launcher is a plain button, so it
+    // carries no menu state to settle after the dialog closes.
     await page.keyboard.press('Escape')
     await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
-    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
     // Close path 2: the header close button (focus lands there on open).
     await openSettings(page, 'zh')
     await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭' }).click()
@@ -336,7 +335,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.emulateMedia({ colorScheme: 'light' })
     await openSettings(page, 'zh')
     const initialDialog = page.getByRole('dialog', { name: '设置' })
-    const darkCube = initialDialog.getByRole('button', { name: '深色' })
+    const darkCube = (await openAppearanceGallery(initialDialog, 'zh')).getByRole('button', { name: '深色' })
     await selectTheme(darkCube, 'dark')
     await expect.poll(() => darkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'profiles', 'scaffold', 'cordis.patch.yml'), 'utf8'), { timeout: 5_000 })
@@ -382,9 +381,10 @@ describe('web e2e: settings modal and General preferences', () => {
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await openSettings(page, 'zh')
     const restoredDialog = page.getByRole('dialog', { name: '设置' })
-    const systemCube = restoredDialog.getByRole('button', { name: '跟随系统' })
+    const restoredGallery = await openAppearanceGallery(restoredDialog, 'zh')
+    const systemCube = restoredGallery.getByRole('button', { name: '跟随系统' })
     // The boot palette precedes the settings mirror's saved preference.
-    const restoredDarkCube = restoredDialog.getByRole('button', { name: '深色' })
+    const restoredDarkCube = restoredGallery.getByRole('button', { name: '深色' })
     await expect.poll(() => restoredDarkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     await selectTheme(systemCube, 'system')
     await expect.poll(() => systemCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
@@ -437,7 +437,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await openSettings(page, 'zh')
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
-    const darkCube = dialog.getByRole('button', { name: '深色' })
+    const darkCube = (await openAppearanceGallery(dialog, 'zh')).getByRole('button', { name: '深色' })
     expect(await darkCube.getAttribute('aria-pressed')).toBe('false')
     await selectTheme(darkCube, 'dark')
     // The full cascade: pressed state, Host-backed preference, body attribute,
@@ -489,7 +489,8 @@ describe('web e2e: settings modal and General preferences', () => {
 
     // `system` follows the emulated OS scheme (dark stays dark, light clears).
     await openSettings(page, 'zh')
-    const systemCube = page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '跟随系统' })
+    const systemCube = (await openAppearanceGallery(page.getByRole('dialog', { name: '设置' }), 'zh'))
+      .getByRole('button', { name: '跟随系统' })
     await selectTheme(systemCube, 'system')
     await expect.poll(() => systemCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
@@ -500,7 +501,8 @@ describe('web e2e: settings modal and General preferences', () => {
     expectThemeColorSynchronized(await readState())
     // Restore for the specs that follow: light preference beats the emulated
     // dark OS scheme, leaving the shared page in the light default.
-    await selectTheme(page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '浅色' }), 'light')
+    await selectTheme((await openAppearanceGallery(page.getByRole('dialog', { name: '设置' }), 'zh'))
+      .getByRole('button', { name: '浅色' }), 'light')
     await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
     expect((await readState()).faviconPaths).toEqual(['/favicon-dark.svg'])
     await page.emulateMedia({ colorScheme: 'light' })
@@ -553,6 +555,8 @@ describe('web e2e: settings modal and General preferences', () => {
     await openSettings(page, 'zh')
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
+    // The font rows live in the Appearance section.
+    await dialog.getByRole('button', { name: '外观', exact: true }).click()
     // The stepper reveals its arrows on hover; the up arrow steps 14 → 15 → 16.
     await dialog.getByText('14', { exact: true }).hover()
     const increase = dialog.getByRole('button', { name: '增大字号' })
@@ -578,6 +582,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await openSettings(page, 'zh')
     const restored = page.getByRole('dialog', { name: '设置' })
     await restored.waitFor({ timeout: 10_000 })
+    await restored.getByRole('button', { name: '外观', exact: true }).click()
     await restored.getByText('16', { exact: true }).hover()
     const decrease = restored.getByRole('button', { name: '减小字号' })
     await stepFontSize(decrease, 15)
@@ -622,6 +627,7 @@ describe('web e2e: settings modal and General preferences', () => {
     const expandFonts = async (): Promise<void> => {
       const dialog = page.getByRole('dialog', { name: '设置' })
       await dialog.waitFor({ timeout: 10_000 })
+      await dialog.getByRole('button', { name: '外观', exact: true }).click()
       const toggle = dialog.getByRole('button', { name: '更多字体设置', exact: true })
       expect(await toggle.getAttribute('aria-expanded')).toBe('false')
       expect(await dialog.getByRole('textbox', { name: '代码字体', exact: true }).count()).toBe(0)
@@ -793,7 +799,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.reload({ waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
-    const enTrigger = page.getByRole('button', { name: 'Account menu' })
+    const enTrigger = page.getByRole('button', { name: 'Settings' })
     await enTrigger.waitFor({ timeout: 10_000 })
 
     // A Chinese browser on another port still receives the explicit English

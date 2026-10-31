@@ -559,10 +559,10 @@ export interface Config {
 ## `@deepseek-ai/dsh-client-ui-settings-account`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/client/ui-settings-account/src/index.ts:9`](../packages/client/ui-settings-account/src/index.ts)
+- `source`: [`packages/client/ui-settings-account/src/index.ts:10`](../packages/client/ui-settings-account/src/index.ts)
 
 ```ts config-catalog
-/** Public contact options and live device-local onboarding progress. */
+/** Public feedback options and live device-local onboarding progress. */
 export interface Config extends ContactConfig {
   /** Onboarding progress format version. */
   version: Volatile<1>
@@ -580,12 +580,10 @@ export interface Config extends ContactConfig {
   developerTools: Volatile<boolean>
 }
 
-/** Questionnaire destination and bonus notice timings shared by Host and Client. */
+/** Feedback destination and bonus notice timings shared by Host and Client. */
 export interface ContactConfig {
-  /** HTTPS questionnaire URL; override for a test form. */
-  contactFormUrl: string
-  /** Questionnaire source option; empty until Harness is supported by the form. */
-  contactSource: string
+  /** HTTPS GitHub issues URL the General settings feedback row opens. */
+  issuesUrl: string
   /** First delay before retrying a failed bonus acknowledgement. */
   bonusAckRetryDelayMs: number
   /** Ceiling for the acknowledgement retry backoff. */
@@ -659,7 +657,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-client-ui-theme`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/client/ui-theme/src/index.ts:20`](../packages/client/ui-theme/src/index.ts)
+- `source`: [`packages/client/ui-theme/src/index.ts:23`](../packages/client/ui-theme/src/index.ts)
 
 ```ts config-catalog
 /** Runtime preferences projected to the browser. */
@@ -678,10 +676,33 @@ export interface Config {
   codeFontFamily: Volatile<string>
   /** Sidebar terminal font list; `''` keeps the built-in stack. */
   terminalFontFamily: Volatile<string>
+  /** Base palette mode of the custom theme. */
+  customScheme: Volatile<'light' | 'dark'>
+  /** Canvas color of the custom theme (`#rgb`/`#rrggbb`). */
+  customCanvas: Volatile<string>
+  /** Accent color of the custom theme (`#rgb`/`#rrggbb`). */
+  customAccent: Volatile<string>
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: Volatile<CustomThemePreset[]>
 }
 
 /** Theme preference persisted by the product Appearance gallery. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
+
+/** One saved custom theme: a display name plus the three synthesis inputs. */
+export interface CustomThemePreset {
+  /** Display name, unique among the saved presets. */
+  name: string
+  /** Base palette the preset synthesizes over. */
+  scheme: ThemeColorScheme
+  /** Canvas color (`#rrggbb`). */
+  canvas: string
+  /** Accent color (`#rrggbb`). */
+  accent: string
+}
+
+/** Palette mode one theme builds on. */
+export type ThemeColorScheme = typeof BUILTIN_SCHEMES[number]
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
 

@@ -1,64 +1,43 @@
 // @vitest-environment jsdom
-import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { allowAllAccess, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import type { AppearanceRowComponentProps } from '../src/client/AppearanceRow.tsx'
-import { createAppearanceRowStore } from '../src/client/settings-store.ts'
+import { createAppearanceSectionStore } from '../src/client/settings-store.ts'
 import { projectThemeGallery } from '../src/client/gallery.ts'
 import type { ThemeGalleryEntry } from '../src/client/gallery.ts'
 import { BUILTIN_THEMES } from '../src/builtin-themes.ts'
 import type { ThemePreference } from '../src/client/index.ts'
 
-// Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
-const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
-const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
-
 afterEach(cleanup)
 
 const COPY: Record<string, string> = {
-  'appearance.title': 'Theme',
+  'appearance.gallery': 'Theme',
   'appearance.system': 'System',
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.graphGlass': 'Graph Paper Glass',
   'appearance.monoAccent': 'Single Accent',
   'appearance.strataDark': 'Lightness Strata',
+  'appearance.paper': 'Paper',
+  'appearance.blueprint': 'Blueprint',
+  'appearance.phosphor': 'Amber Phosphor',
+  'appearance.sumi': 'Sumi Ink',
+  'appearance.sage': 'Sage',
+  'appearance.custom': 'Custom',
 }
 
 const GALLERY = projectThemeGallery(BUILTIN_THEMES)
 
-function emptySessions() {
-  const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, phase: 'ready', projectionsBySession: {} })
-  return bindSnapshotSelector(store)
-}
-function emptyWorkspaces() {
-  const store = createSnapshotStore<WorkspaceSnapshot>({
-    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
-  })
-  return bindSnapshotSelector(store)
-}
-
-type AttentionSnapshot = Parameters<Parameters<AppearanceRowComponentProps['useSessionStatus']>[0]>[0]
-const noAttention: AttentionSnapshot = new Map()
-const useSessionStatus: AppearanceRowComponentProps['useSessionStatus'] = selector => selector(noAttention)
-
 function mount(preference: ThemePreference = 'system', entries: readonly ThemeGalleryEntry[] = GALLERY) {
   // Real store instance — the sanctioned zero-machinery path for tests.
-  const store = createAppearanceRowStore().create()
-  store.actions.sync(preference, entries, 0)
+  const store = createAppearanceSectionStore().create()
+  store.actions.sync(preference, entries, { text: 14, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, {
+    scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
+  }, [], 0)
   const setTheme = vi.fn()
   const props: AppearanceRowComponentProps = {
-    useSessions: emptySessions(),
-    useSessionStatus,
-    usePanelInfo, useSessionRetainInfo: () => undefined, useResource,
-    useWorkspaces: emptyWorkspaces(),
-    ...allowAllAccess,
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,
@@ -84,7 +63,7 @@ describe('AppearanceRow', () => {
   it('labels a designed theme from the locale dictionary and falls back to the id', () => {
     mount('system', [
       ...GALLERY,
-      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a' },
+      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a', motif: 'plain' as const },
     ])
     expect(screen.getByText('Single Accent')).toBeDefined()
     expect(screen.getByText('sepia')).toBeDefined()
@@ -98,13 +77,31 @@ describe('AppearanceRow', () => {
     expect(preview.style.getPropertyValue('--preview-accent')).toBe('#ff6900')
   })
 
+  it('renders each row with its motif composition and its texture variables', () => {
+    mount('system', [
+      ...GALLERY,
+      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a', motif: 'plain' },
+    ])
+    const paper = screen.getByRole('button', { name: /^Paper$/ }).querySelector<HTMLElement>('[style]')!
+    expect(paper.className).toContain('grain')
+    expect(paper.style.getPropertyValue('--preview-image')).toContain('data:image/svg+xml')
+    const sepia = screen.getByRole('button', { name: /^sepia$/ }).querySelector<HTMLElement>('[style]')!
+    // Plain motifs carry no texture variable and no per-motif class.
+    expect(sepia.className).not.toContain('grain')
+    expect(sepia.style.getPropertyValue('--preview-image')).toBe('')
+  })
+
   it('click drives setTheme; selection follows the store mirror, not the click echo', () => {
     const b = mount('dark')
     fireEvent.click(screen.getByRole('button', { name: /^Graph Paper Glass$/ }))
     expect(b.setTheme).toHaveBeenCalledWith('graph-glass')
     // No store write yet: selection is unchanged.
     expect(pressed(/^Dark$/)).toBe('true')
-    act(() => { b.store.actions.sync('graph-glass', GALLERY, 1) })
+    act(() => {
+      b.store.actions.sync('graph-glass', GALLERY, { text: 14, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, {
+        scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
+      }, [], 1)
+    })
     expect(pressed(/^Graph Paper Glass$/)).toBe('true')
     expect(pressed(/^Dark$/)).toBe('false')
   })

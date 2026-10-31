@@ -29,7 +29,7 @@ export {
   sessionLogZipEntries,
   sessionLogZipFilename,
   streamSessionLogZip,
-  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
   pushArtifactChunks,
   pushBinaryChunks,
   pushStreamChunks,

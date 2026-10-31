@@ -1,77 +1,81 @@
 /**
- * Appearance and font row slot stores: mirrors of the theme service
- * snapshot. The plugin's apply-world change listener is the only writer; the
- * row components read via props.useStore.
+ * Appearance section store: a mirror of the theme service snapshot feeding the
+ * section's three groups (theme gallery, custom theme, fonts). The plugin's
+ * apply-world change listener is the only writer; the section components read
+ * via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 import type { ThemeGalleryEntry } from './gallery.ts'
-import { DEFAULT_FONT_SIZES, type FontFamilies, type FontSizes, type ThemePreference } from '../theme-settings.ts'
+import {
+  DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME, DEFAULT_FONT_SIZES,
+  type CustomThemeInputs, type CustomThemePreset, type FontFamilies, type FontSizes, type ThemePreference,
+} from '../theme-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
-export interface AppearanceRowState {
+export interface AppearanceSectionState {
   /** Persisted preference (selection state reads this, never the resolved active theme). */
   preference: ThemePreference
-  /** Gallery rows for the current registry, `system` first. */
+  /** Gallery rows for the current registry, `system` first, the custom theme last. */
   entries: readonly ThemeGalleryEntry[]
+  /** Persisted font sizes in px by role. */
+  fontSizes: FontSizes
+  /** Persisted normalized font lists by role. */
+  fontFamilies: FontFamilies
+  /** Persisted custom theme inputs. */
+  custom: CustomThemeInputs
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: readonly CustomThemePreset[]
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
-type AppearanceRowActions = {
+type AppearanceSectionActions = {
   sync: (
-    draft: AppearanceRowState,
+    draft: AppearanceSectionState,
     preference: ThemePreference,
     entries: readonly ThemeGalleryEntry[],
+    fontSizes: FontSizes,
+    fontFamilies: FontFamilies,
+    custom: CustomThemeInputs,
+    customPresets: readonly CustomThemePreset[],
     revision: number,
   ) => void
 }
 
 /**
- * Declares the Appearance gallery state and write surface.
+ * Declares the Appearance section state and write surface.
  * @returns the store handle.
  */
-export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState, AppearanceRowActions> {
+export function createAppearanceSectionStore(): EngineStoreHandle<AppearanceSectionState, AppearanceSectionActions> {
   return defineStore({
-    init: (): AppearanceRowState => ({ preference: 'system', entries: [], revision: -1 }),
+    init: (): AppearanceSectionState => ({
+      preference: 'system',
+      entries: [],
+      fontSizes: DEFAULT_FONT_SIZES,
+      fontFamilies: { text: '', code: '', terminal: '' },
+      custom: { scheme: DEFAULT_CUSTOM_SCHEME, canvas: DEFAULT_CUSTOM_CANVAS, accent: DEFAULT_CUSTOM_ACCENT },
+      customPresets: [],
+      revision: -1,
+    }),
     actions: {
-      sync: (d, preference: ThemePreference, entries: readonly ThemeGalleryEntry[], revision: number) => {
+      sync: (
+        d,
+        preference: ThemePreference,
+        entries: readonly ThemeGalleryEntry[],
+        fontSizes: FontSizes,
+        fontFamilies: FontFamilies,
+        custom: CustomThemeInputs,
+        customPresets: readonly CustomThemePreset[],
+        revision: number,
+      ) => {
         if (revision <= d.revision) return
         d.preference = preference
         d.entries = entries
-        d.revision = revision
-      },
-    },
-  })
-}
-
-/** Store state mirrored from the theme snapshot's fonts (shared by the font-size row and the font settings group). */
-export interface FontRowState {
-  /** Persisted font sizes in px by role. */
-  fontSizes: FontSizes
-  /** Persisted normalized font lists by role. */
-  fontFamilies: FontFamilies
-  /** Service revision; -1 until first sync so revision 0 lands as a change. */
-  revision: number
-}
-
-/** Declared action shape giving the exported factory a stable return type. */
-type FontRowActions = {
-  sync: (draft: FontRowState, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => void
-}
-
-/**
- * Declares the font rows' state and write surface.
- * @returns the store handle.
- */
-export function createFontRowStore(): EngineStoreHandle<FontRowState, FontRowActions> {
-  return defineStore({
-    init: (): FontRowState => ({ fontSizes: DEFAULT_FONT_SIZES, fontFamilies: { text: '', code: '', terminal: '' }, revision: -1 }),
-    actions: {
-      sync: (d, fontSizes: FontSizes, fontFamilies: FontFamilies, revision: number) => {
-        if (revision <= d.revision) return
         d.fontSizes = fontSizes
         d.fontFamilies = fontFamilies
+        d.custom = custom
+        d.customPresets = customPresets
         d.revision = revision
       },
     },

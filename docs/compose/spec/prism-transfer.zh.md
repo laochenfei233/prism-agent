@@ -14,7 +14,7 @@ commits: 42f8b7cfed（基线）..d002a34b80
 
 **交付内容** — `@prism/prism-transfer` 在设置里加入「导入导出」页并使其可用。导出勾选已登记项目并流式产出一个标准 zip（单项目归档或合并归档），内含工作区文件夹、每个挂接会话的完整日志及其子代理、引用的媒体与文件，外加一个可选 JSON 文件承载设置页可编辑的值（密钥默认排除，跳过计数上报到页面）。导入逐条目验证这类归档——中央目录解析、逐条目 CRC-32、路径与冲突守卫、条目/大小上限、剩余空间守卫——随后落盘、解压到暂存区、每个项目一次原子 rename 发布（同名发布 `name (2)`，永不覆盖）、按原 id 经持久化句柄恢复会话并写投影检查点（冷侧边栏标题的来源）、经附件接口带内容地址校验地恢复媒体与文件、登记工作区、按命名空间经修订防护写入路径重新应用设置。单飞任务存储与可轮询快照驱动进度界面；失败的导入不留暂存、不留半发布项目。
 
-**验证** — `node node_modules/vitest/vitest.mjs run packages/transfer/prism-transfer/tests --coverage --coverage.include='packages/transfer/prism-transfer/src/**'`：198 通过、1 跳过（Windows 门控的符号链接用例）、0 错误，每个 `src` 文件 100/100/100/100。`pnpm run typecheck` 通过（tsconfig 别名新增后复跑）；最终 src 状态后 `pnpm run build:artifacts` + `pnpm run build:check` 通过；`verify-cordis-config` 仅剩既有 acp fixture 失败；`verify-default-product-isolation`、`verify-dsh-package-licenses`、`verify-application-entrypoints`、`pnpm run constraints` 通过；`verify-client-ui-i18n`、`verify-md-links`、`verify-translation-pairing`、`verify-doc-budgets`、`gen-plugin-packages --check`、`gen-client-catalog --check`、`gen-config-catalog --check` 通过。本机既有失败（已在 master 验证一致）：`test:docs` 的四个失败（fork-upstream-divergence Report 行的 md-wrap、repository-references 的 uv.lock 行、ui-chat/ui-conversation 的 README Summaries、prism-backup zh README 的 doc-standard）、ui-settings-general 套件的 `dsh-web-app` 解析错误、`jscpd` 与 `pnpm install --online` 约束。独立对抗复审发现一个关键集成缺口（交付路由从未接线投影检查点）与五个 major（谎报尺寸的 deflate 内存暴露、缺失的 ADS/祖先守卫、死跳过计数器、A13 标记清单不全）——均已在分支内修复并配靶向测试，minor 记录在历程日志。
+**验证** — `node node_modules/vitest/vitest.mjs run packages/transfer/prism-transfer/tests --coverage --coverage.include='packages/transfer/prism-transfer/src/**'`：198 通过、1 跳过（Windows 门控的符号链接用例）、0 错误，每个 `src` 文件 100/100/100/100。`pnpm run typecheck` 通过（tsconfig 别名新增后复跑）；最终 src 状态后 `pnpm run build:artifacts` + `pnpm run build:check` 通过；`verify-cordis-config` 仅剩既有 acp fixture 失败；`verify-default-product-isolation`、`verify-dsh-package-licenses`、`verify-application-entrypoints`、`pnpm run constraints` 通过；`verify-client-ui-i18n`、`verify-md-links`、`verify-translation-pairing`、`verify-doc-budgets`、`gen-plugin-packages --check`、`gen-client-catalog --check`、`gen-config-catalog --check` 通过。本机既有失败（已在 master 验证一致）：`test:docs` 的四个失败（fork-upstream-divergence Report 行的 md-wrap、repository-references 的 uv.lock 行、ui-chat/ui-conversation 的 README Summaries、prism-backup zh README 的 doc-standard）、ui-settings-general 套件的 `dsh-web-app` 解析错误、`jscpd` 与 `pnpm install --online` 约束。独立对抗复审发现一个关键集成缺口（交付路由从未接线投影检查点）与五个 major（谎报尺寸的 deflate 内存暴露、缺失的 ADS/祖先守卫、死跳过计数器、A14 标记清单不全）——均已在分支内修复并配靶向测试，minor 记录在历程日志。
 
 **历程日志**
 
@@ -41,7 +41,7 @@ Prism Agent 把每个项目保存为登记的工作区文件夹加挂接的会�
 
 新的 fork 包 `@prism/prism-transfer` 位于 `packages/transfer/prism-transfer`（新建分组 `transfer/` 并带 README 三件套），插件名 `prism-transfer`，沿用 `prism-backup` / `prism-session-import` 的先例：宿主插件在 `src/index.ts`，客户端插件在 `src/client/index.ts` 导出 `inject` + `apply`，`package.json` 含 `./client` 导出与 `dsh.client` 清单（`platform: "web"`），组装行写入 `packages/bundle/web-app/cordis.patch.yml`，免模型审计行写入 `scripts/verify-package-readme-model-experience.ts`（产品使用来自 web-app 组装，与兄弟包一致）。不建 Typert Remote 命名空间，不新增 npm 依赖：zip 读写用 `fflate`（已是 `session-log-export` 的工作区依赖），会话序列化复用 `@deepseek-ai/dsh-session-log-export` 的公开 API，客户端依赖 `slots`、`locale`、`remote`、`workspaces`、`remote.directoryPicker`。没有 `Config` schema：本分区没有随部署变化的调节项（导入目的地默认值是产品常量，可在每次导入时经系统目录选择器覆盖；条目与大小上限是固定的安全不变量）。
 
-分区在既有 `settings.section` 列表槽上注册，`id: 'transfer'`、`order: 30`（排在 backup 与 import 之后），label 为 `() => t('nav')`，命名空间 `settings.transfer`。唯一的核心改动是 `navIcon()`（`packages/client/ui-settings-general/src/client/SettingsRoot.tsx`）增加 `'transfer'` 分支，带 `PRISM-DIVERGENCE` 标记，并在 `docs/compose/spec/fork-upstream-divergence.md` 增加分区行（A13）。`packages/client/*` 其余不动。
+分区在既有 `settings.section` 列表槽上注册，`id: 'transfer'`、`order: 30`（排在 backup 与 import 之后），label 为 `() => t('nav')`，命名空间 `settings.transfer`。唯一的核心改动是 `navIcon()`（`packages/client/ui-settings-general/src/client/SettingsRoot.tsx`）增加 `'transfer'` 分支，带 `PRISM-DIVERGENCE` 标记，并在 `docs/compose/spec/fork-upstream-divergence.md` 增加分区行（A14；并入时该编号已由并行的 settings-entry-regroup 占用，故顺延）。`packages/client/*` 其余不动。
 
 ### S2.2 归档与文件格式
 
@@ -145,7 +145,7 @@ settings.json                    ← prism-settings body, present only when sett
   - 归档格式 v1（`prism-project`、`prism-transfer`、`prism-settings`），清单校验与 CRC 验证解压。
   - 会话恢复：去重、子代理、媒体/文件恢复带 id 校验、投影检查点、工作区登记。
   - 设置导出（易变投影、密钥可选）与按命名空间导入带报告。
-  - 核心 `navIcon` 分支 + 分歧标记/索引行；包 README 三件套 + 分组 README 三件套；product-package-policy 行；web-app 组装行；目录再生成。
+  - 核心 `navIcon` 分支 + 分歧标记/索引行（A14）（A14）；包 README 三件套 + 分组 README 三件套；product-package-policy 行；web-app 组装行；目录再生成。
   - 包级单测达到仓库的逐文件 100% 覆盖门槛。
 - 范围外：
   - 运行中导入的取消/暂停/续跑；并行任务。
@@ -162,7 +162,7 @@ settings.json                    ← prism-settings body, present only when sett
 - [x] T4: 设置应用器独立单元（T3 的阶段与独立路由共用）——易变补丁构建、修订防护更新带一次冲突重试、逐命名空间结果；单测。(depends: none)
 - [x] T5: 路由与接线——`/api/prism.transfer` 下四条路由、流式导入落盘、导出查询校验、错误码映射表、插件 `apply()` 注册（connection.fetch.register）、`packages/bundle/web-app/cordis.patch.yml` 组装行、package.json（`./client` 导出 + `dsh.client` 清单）、product-package-policy 行；假服务路由测试（busy/409、400、轮询语义、重启 idle）。(depends: T2, T3, T4)
 - [x] T6: 客户端分区——`src/client/index.ts`（inject 列表、`LocaleNamespaceMap` 合并、`slots.inject('settings.section', …)`）、`locales.ts` zh/en、`TransferSection.tsx` 三卡片、文件输入 + 流式 POST、目的地行带原生选择回退、轮询进度 + 结果/错误渲染、无障碍状态；纯函数测试（布局检测辅助、错误文案映射）。(depends: T5)
-- [x] T7: 核心与文档——`navIcon()` 的 `'transfer'` 分支带 `PRISM-DIVERGENCE` 标记、分歧索引 A13 分区行、`packages/transfer/README` 三件套 + 包 README 三件套带生成的 `.i18n.yaml` 记录、spec 三件套配对记录、目录再生成（`gen-plugin-packages`、`gen-client-catalog`）；运行受影响文档门。(depends: T6)
+- [x] T7: 核心与文档——`navIcon()` 的 `'transfer'` 分支带 `PRISM-DIVERGENCE` 标记、分歧索引 A14 分区行、`packages/transfer/README` 三件套 + 包 README 三件套带生成的 `.i18n.yaml` 记录、spec 三件套配对记录、目录再生成（`gen-plugin-packages`、`gen-client-catalog`）；运行受影响文档门。(depends: T6)
 - [x] T8: 验证与复审——包 vitest 运行达逐文件 100% 覆盖、typecheck 宿主与客户端面、`build:artifacts` + `build:check`、受影响文档门、i18n 门；证据记入 spec；按 compose 流程独立复审；修复后复验。(depends: T7)
 
 ## [S4] 验收

@@ -30,7 +30,7 @@ describe('ThemeRuntime', () => {
     // jsdom matchMedia is absent; system resolves to light.
     expect(snapshot.active.id).toBe('light')
     expect(snapshot.active.colorScheme).toBe('light')
-    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
   })
 
   it('switches to a designed built-in theme and persists it through the scope', () => {
@@ -47,7 +47,8 @@ describe('ThemeRuntime', () => {
     const host = stubConfigForm<ThemeSettings>()
     host.publish({ status: 'ready', value: {
       preference: 'mono-accent', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
-      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900',
+      customPresets: [],
     }, revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('mono-accent')
@@ -111,7 +112,7 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host font size without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 12, codeFontSize: 15, terminalFontSize: 18, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 12, codeFontSize: 15, terminalFontSize: 18, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 1, writable: true })
     expect(theme.getTheme().fontSizes).toEqual({ text: 12, code: 15, terminal: 18 })
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
@@ -141,10 +142,10 @@ describe('ThemeRuntime', () => {
 
   it('adopts published Host font lists, normalizing hand-edited values, without writing them back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: 'Inter', codeFontFamily: '"Fira Code"', terminalFontFamily: '' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: 'Inter', codeFontFamily: '"Fira Code"', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 1, writable: true })
     expect(theme.getTheme().fontFamilies).toEqual({ text: '"Inter"', code: '"Fira Code"', terminal: '' })
     expect(events).toHaveLength(1)
-    host.publish({ value: { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '"Inter"', codeFontFamily: 'Fira Code', terminalFontFamily: '' }, revision: 2 })
+    host.publish({ value: { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '"Inter"', codeFontFamily: 'Fira Code', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 2 })
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
   })
@@ -167,17 +168,17 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 1, writable: true })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }, revision: 2 })
+    host.publish({ value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('holds its own changes while writes are pending, then converges on the durable section', async () => {
     const { theme, host } = make()
-    const section = { preference: 'system' as const, fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }
+    const section = { preference: 'system' as const, fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light' as const, customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }
     host.publish({ status: 'ready', value: section, revision: 1, writable: true })
     const write = Promise.withResolvers<boolean>()
     host.set.mockReturnValue(write.promise)
@@ -192,7 +193,7 @@ describe('ThemeRuntime', () => {
 
   it('adopts a section already standing at construction', () => {
     const host = stubConfigForm<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }, revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
   })
@@ -208,13 +209,13 @@ describe('ThemeRuntime', () => {
     const { theme, events, host } = make()
     const dispose = theme.register({ id: 'sepia', colorScheme: 'light', tokens: { '--dsw-alias-bg-base': 'red' } })
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'sepia'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'sepia', 'custom'])
     theme.setTheme('sepia')
     expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('red')
     dispose()
     expect(theme.getTheme().preference).toBe('system')
     expect(theme.getTheme().themes.map(t => t.id))
-      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+      .toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
     // Custom ids are in-process extension themes; only the built-in product
     // preferences cross the Host settings schema.
     expect(host.set).not.toHaveBeenCalled()
@@ -379,6 +380,214 @@ describe('ThemeRuntime', () => {
       expect(media.listenerCount()).toBe(1)
       await ctx.fiber.dispose()
       expect(media.listenerCount()).toBe(0)
+    })
+  })
+
+  describe('custom theme', () => {
+    it('activates the synthesized custom theme and appends it to the gallery', () => {
+      const { theme, events, host } = make()
+      theme.setTheme('custom')
+      const snapshot = theme.getTheme()
+      expect(snapshot.preference).toBe('custom')
+      expect(snapshot.active.id).toBe('custom')
+      expect(snapshot.active.colorScheme).toBe('light')
+      expect(snapshot.active.tokens['--dsw-alias-bg-base']).toBe('#ffffff')
+      expect(snapshot.active.tokens['--dsw-alias-brand-primary']).toBe('#ff6900')
+      expect(snapshot.custom).toEqual({ scheme: 'light', canvas: '#ffffff', accent: '#ff6900' })
+      expect(snapshot.themes.map(t => t.id)).toEqual([
+        'light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom',
+      ])
+      expect(host.set).toHaveBeenCalledWith('preference', 'custom')
+      expect(events).toHaveLength(1)
+    })
+
+    it('writes changed inputs and the preference switch in one mutation', () => {
+      const { theme, events, host } = make()
+      theme.setCustom({ scheme: 'dark', canvas: '#112233', accent: '#00ff00' })
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('dark')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#112233')
+      expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#00ff00')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#112233', accent: '#00ff00' })
+      expect(host.mutate).toHaveBeenCalledWith([
+        { op: 'set', path: ['customScheme'], value: 'dark' },
+        { op: 'set', path: ['customCanvas'], value: '#112233' },
+        { op: 'set', path: ['customAccent'], value: '#00ff00' },
+        { op: 'set', path: ['preference'], value: 'custom' },
+      ])
+      expect(events).toHaveLength(1)
+    })
+
+    it('switches to custom with unchanged inputs writing only the preference', () => {
+      const { theme, host } = make()
+      theme.setCustom({})
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(host.mutate).toHaveBeenCalledWith([{ op: 'set', path: ['preference'], value: 'custom' }])
+    })
+
+    it('edits one input while custom is active without rewriting the preference', () => {
+      const { theme, host } = make()
+      theme.setTheme('custom')
+      theme.setCustom({ accent: '#00ff00' })
+      expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#00ff00')
+      expect(host.mutate).toHaveBeenLastCalledWith([{ op: 'set', path: ['customAccent'], value: '#00ff00' }])
+    })
+
+    it('no-ops when custom is already active with the same inputs', () => {
+      const { theme, events, host } = make()
+      theme.setTheme('custom')
+      const writes = host.mutate.mock.calls.length
+      theme.setCustom({})
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(host.mutate.mock.calls).toHaveLength(writes)
+      expect(events).toHaveLength(1)
+    })
+
+    it('throws on a malformed color and writes nothing', () => {
+      const { theme, events, host } = make()
+      expect(() => { theme.setCustom({ canvas: 'orange' }) }).toThrow('not a hex color')
+      expect(theme.getTheme().preference).toBe('system')
+      expect(host.mutate).not.toHaveBeenCalled()
+      expect(events).toHaveLength(0)
+    })
+
+    it('adopts a stored custom theme from the Host section', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customScheme: 'dark', customCanvas: '#000000', customAccent: '#ff6900',
+        customPresets: [],
+      }, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('dark')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#000000')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#000000', accent: '#ff6900' })
+    })
+
+    it('falls back to the custom defaults for sections without the custom fields', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        // Documents written before the custom fields existed carry none; the
+        // runtime must adopt them at the schema defaults.
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+      } as ThemeSettings, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().active.id).toBe('custom')
+      expect(theme.getTheme().active.colorScheme).toBe('light')
+      expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#ffffff')
+      expect(theme.getTheme().custom).toEqual({ scheme: 'light', canvas: '#ffffff', accent: '#ff6900' })
+    })
+  })
+
+  describe('custom theme presets', () => {
+    it('saves the current inputs under a name and publishes the preset list', () => {
+      const { theme, events, host } = make()
+      theme.setCustom({ canvas: '#112233', accent: '#00ff00' })
+      const settledEvents = events.length
+      theme.saveCustomPreset('Navy')
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      expect(host.set).toHaveBeenCalledWith('customPresets', [
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      // Saving never changes the active preference.
+      expect(theme.getTheme().preference).toBe('custom')
+      expect(events.length).toBe(settledEvents + 1)
+    })
+
+    it('trims the name, replaces an existing entry in place, and no-ops on identical saves', () => {
+      const { theme, events, host } = make()
+      theme.saveCustomPreset('  Ink  ')
+      theme.setCustom({ canvas: '#112233' })
+      theme.saveCustomPreset('Navy')
+      expect(theme.getTheme().customPresets.map(preset => preset.name)).toEqual(['Ink', 'Navy'])
+      const afterFirst = events.length
+      theme.setCustom({ canvas: '#000000' })
+      theme.saveCustomPreset('Ink')
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Ink', scheme: 'light', canvas: '#000000', accent: '#ff6900' },
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#ff6900' },
+      ])
+      const afterSecond = events.length
+      theme.saveCustomPreset('Ink')
+      expect(theme.getTheme().customPresets).toHaveLength(2)
+      expect(events.length).toBe(afterSecond)
+      expect(afterSecond).toBeGreaterThan(afterFirst)
+      // Ink save, Navy save, Ink replace — the identical re-save writes nothing.
+      expect(host.set).toHaveBeenCalledTimes(3)
+    })
+
+    it('throws on an empty or overlong name and writes nothing', () => {
+      const { theme, host } = make()
+      expect(() => { theme.saveCustomPreset('   ') }).toThrow('a preset name is required')
+      expect(() => { theme.saveCustomPreset('x'.repeat(25)) }).toThrow('limited to 24 code points')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(host.set).not.toHaveBeenCalled()
+    })
+
+    it('caps the preset list and refuses a new name past the cap', () => {
+      const { theme } = make()
+      for (let index = 0; index < 16; index += 1) theme.saveCustomPreset(`Preset ${index}`)
+      expect(() => { theme.saveCustomPreset('One more') }).toThrow('at most 16 presets')
+      // Replacing an existing name still works at the cap.
+      theme.saveCustomPreset('Preset 0')
+      expect(theme.getTheme().customPresets).toHaveLength(16)
+    })
+
+    it('deletes a preset, keeps the active look, and no-ops on an unknown name', () => {
+      const { theme, events, host } = make()
+      theme.saveCustomPreset('Navy')
+      const look = theme.getTheme().custom
+      theme.deleteCustomPreset('Navy')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(theme.getTheme().custom).toEqual(look)
+      const writes = host.set.mock.calls.length
+      theme.deleteCustomPreset('Unknown')
+      expect(theme.getTheme().customPresets).toEqual([])
+      expect(host.set.mock.calls).toHaveLength(writes)
+      expect(events.length).toBe(2)
+    })
+
+    it('adopts saved presets from the Host section, dropping junk entries', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'custom', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customScheme: 'dark', customCanvas: '#000000', customAccent: '#ff6900',
+        customPresets: [
+          { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          null,
+          { name: 42, scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          { name: ' ', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+          { name: 'Half', scheme: 'light' },
+          { name: 'Bad', scheme: 'sepia', canvas: '#112233', accent: '#00ff00' },
+          { name: 'Over', scheme: 'light', canvas: 'orange', accent: '#00ff00' },
+          { name: 'Navy', scheme: 'dark', canvas: '#000000', accent: '#ff6900' },
+        ],
+      } as ThemeSettings, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().customPresets).toEqual([
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
+      ])
+      expect(theme.getTheme().custom).toEqual({ scheme: 'dark', canvas: '#000000', accent: '#ff6900' })
+    })
+
+    it('caps hand-edited preset lists at the same boundary the writer enforces', () => {
+      const host = stubConfigForm<ThemeSettings>()
+      host.publish({ status: 'ready', value: {
+        preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customPresets: Array.from({ length: 17 }, (_, index) => ({
+          name: `Preset ${index}`, scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
+        })),
+      } as ThemeSettings, revision: 1, writable: true })
+      const { theme } = make(host)
+      expect(theme.getTheme().customPresets).toHaveLength(16)
+      expect(theme.getTheme().customPresets.at(-1)?.name).toBe('Preset 15')
     })
   })
 })

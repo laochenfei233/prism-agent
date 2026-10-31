@@ -10,7 +10,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | `prism-icon-badge.svg` | macOS 应用图标（白色圆角方底 + 黑色六边形点阵），生成 `icon.icns`；Windows 安装程序插画沿用它的底板比例 |
-| `prism-icon-badge-windows.svg` | Windows 版同一标识：底板与标记放大到适合任务栏的比例，生成 `icon.ico` 与 `apps/desktop/src-tauri/icons` 的位图 |
+| `prism-icon-badge-windows.svg` | Windows 版同一标识：满幅底板与放大的标记，生成 `icon.ico` 与 `apps/desktop/src-tauri/icons` 的位图 |
 | `prism-mark.svg` | 24 单位紧凑标记，`currentColor`，与应用内 `PrismLogo` 几何一致 |
 
 ## 几何约定
@@ -26,10 +26,11 @@
 ## 两种底板比例
 
 macOS 不给图标加遮罩，`prism-icon-badge.svg` 按 Apple 图标网格把底板取在 800/1024（约 78%）。
-Windows 由资源管理器把位图直接放进 24px 任务栏槽位、同样不加遮罩，沿用同一底板时标记在
-100% 缩放下只有约 11px，比同排图标明显小一圈。`prism-icon-badge-windows.svg` 因此把底板
-放大到 960/1024、标记按 30 倍缩放（点阵直径占底板 62.5%），并去掉投影：更大的底板没有
-投影余量，Windows 的窗口与任务栏也自备背景。两份源文件的点阵几何完全相同，改动时一起改。
+Windows 同样不加遮罩，而任务栏里并排的应用图标几乎都是满幅方块（底板画到图标边缘），
+沿用带边距的底板时实测比邻居小一圈（150% 缩放下 29px 对 36px）。`prism-icon-badge-windows.svg`
+因此把底板画满 1024 画布（圆角 22%，与 macOS 底板的圆角比例一致）、标记按 32 倍缩放
+（点阵直径占底板 62.5%），并去掉投影：Windows 的窗口与任务栏自备背景，图标不需要自带阴影。
+两份源文件的点阵几何完全相同，改动时一起改。
 macOS 的 Dock 图标仍用 78% 的 `icon.icns`；macOS 与 Linux 的默认窗口、托盘图标取首个 PNG
 （`32x32.png`），随位图一起放大。
 

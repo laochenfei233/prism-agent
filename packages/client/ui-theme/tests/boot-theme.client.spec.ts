@@ -2,8 +2,8 @@
 /** The theme bootstrap injection row and the resulting pre-plugin browser theme. */
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bootThemeInjections } from '../src/boot-theme.ts'
-import type { FontSizes, ThemePreference } from '../src/theme-settings.ts'
+import { bootThemeInjections, type BootCustomPalette } from '../src/boot-theme.ts'
+import type { FontFamilies, FontSizes, ThemePreference } from '../src/theme-settings.ts'
 
 const DARK_ATTRIBUTE = 'data-ds-dark-theme'
 
@@ -11,8 +11,13 @@ function mockSystemDark(matches: boolean): void {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches }) as MediaQueryList))
 }
 
-function executeBootstrap(preference?: ThemePreference, fontSizes?: FontSizes): void {
-  for (const row of bootThemeInjections(preference, fontSizes)) {
+function executeBootstrap(
+  preference?: ThemePreference,
+  fontSizes?: FontSizes,
+  fontFamilies?: FontFamilies,
+  custom?: BootCustomPalette,
+): void {
+  for (const row of bootThemeInjections(preference, fontSizes, fontFamilies, custom)) {
     if (row.kind === 'script') runInNewContext(row.text, { document, matchMedia: globalThis.matchMedia })
   }
 }
@@ -82,6 +87,25 @@ describe('theme bootstrap row', () => {
     mockSystemDark(false)
     executeBootstrap('strata-dark')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+  })
+
+  it('paints the stored custom canvas and palette mode, ignoring the OS scheme', () => {
+    mockSystemDark(true)
+    const [head] = bootThemeInjections('custom', undefined, undefined, { canvas: '#1b3a57', dark: true })
+    if (head?.kind !== 'style') throw new Error('theme head bootstrap row is not a style')
+    expect(head.text).toBe(':root{color-scheme:dark}body{background-color:#1b3a57;--dsh-boot-bg:#1b3a57}')
+    executeBootstrap('custom', undefined, undefined, { canvas: '#1b3a57', dark: true })
+    expect(document.documentElement.dataset.dsThemeSource).toBe('custom')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+  })
+
+  it('falls back to the custom defaults when no custom palette is resolved', () => {
+    mockSystemDark(false)
+    const [head] = bootThemeInjections('custom')
+    if (head?.kind !== 'style') throw new Error('theme head bootstrap row is not a style')
+    expect(head.text).toBe(':root{color-scheme:light}body{background-color:#ffffff;--dsh-boot-bg:#ffffff}')
+    executeBootstrap('custom')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
   })
 
   it('defaults to system and falls back to light when matchMedia is unavailable', () => {

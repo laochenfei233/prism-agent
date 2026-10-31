@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Browser coverage for the macOS window drag surface: which chrome rows drag,
 // which pixels stay content, and that no control is swallowed by the band.
 //
@@ -474,8 +475,7 @@ describe('web e2e: macOS window drag coverage', () => {
   it('keeps a covering overlay out of the drag surface', async () => {
     const { page, tripwire } = await darwinPage()
     try {
-      await page.getByRole('button', { name: 'Account menu', exact: true }).click()
-      await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+      await page.getByRole('button', { name: 'Settings', exact: true }).click()
       const dialog = page.locator('[role="dialog"]').first()
       await dialog.waitFor({ timeout: 15_000 })
       await settled(page)

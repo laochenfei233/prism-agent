@@ -99,6 +99,162 @@
   background: var(--preview-accent);
 }
 
+/* Per-theme motifs: each known preference paints its own miniature on top of
+ * the shared composition. Textures arrive as the theme's own tokens through
+ * --preview-image / --preview-center; unknown themes keep the plain form. */
+
+/* system: one diagonal half per base palette; the miniature composition steps aside. */
+.split {
+  background: linear-gradient(135deg, #ffffff 0 50%, #151517 50% 100%);
+}
+
+.split .previewRail,
+.split .previewBody,
+.split .previewAccent {
+  display: none;
+}
+
+/* light: a bare sheet — one card, one text line. */
+.sheet .previewRail {
+  display: none;
+}
+
+.sheet .previewCard:first-child {
+  flex: 1;
+}
+
+.sheet .previewCard:last-child {
+  flex: none;
+  height: 5px;
+  border-radius: 2px;
+}
+
+/* dark: the light miniature mirrored, rail on the right, accent above. */
+.night {
+  flex-direction: row-reverse;
+}
+
+.night .previewRail {
+  border-right: none;
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.night .previewAccent {
+  bottom: auto;
+  top: 7px;
+}
+
+/* graph-glass and blueprint: their own grid texture shows through the cards. */
+.grid,
+.plan {
+  background-image: var(--preview-image);
+}
+
+/* paper: its grain texture under the sheets. */
+.grain {
+  background-image: var(--preview-image);
+}
+
+.grain .previewAccent {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* mono-accent: the composition steps aside for one glowing slab. */
+.beacon .previewRail,
+.beacon .previewBody {
+  display: none;
+}
+
+.beacon .previewAccent {
+  right: 20%;
+  bottom: calc(50% - 5px);
+  width: 60%;
+  height: 10px;
+  box-shadow: 0 0 6px 1px var(--preview-accent);
+}
+
+/* strata-dark: the hatch texture under three lightness steps. */
+.strata {
+  background-image: var(--preview-center);
+}
+
+.strata .previewRail {
+  display: none;
+}
+
+.strata .previewCard:first-child {
+  background: var(--preview-accent);
+}
+
+.strata .previewCard:last-child {
+  background: var(--preview-accent);
+  opacity: 0.45;
+}
+
+/* phosphor: scanlines under the composition and a glowing accent. */
+.crt {
+  background-image: var(--preview-center);
+}
+
+.crt .previewAccent {
+  box-shadow: 0 0 6px 1px var(--preview-accent);
+}
+
+/* sumi: ink brush strokes on the cool sheet. */
+.ink .previewRail {
+  display: none;
+}
+
+.ink .previewBody {
+  gap: 4px;
+}
+
+.ink .previewCard {
+  flex: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--preview-accent);
+}
+
+.ink .previewCard:first-child {
+  width: 70%;
+}
+
+.ink .previewCard:last-child {
+  width: 45%;
+  opacity: 0.6;
+}
+
+.ink .previewAccent {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* sage: a text line and a leaf. */
+.fern .previewRail {
+  display: none;
+}
+
+.fern .previewCard:first-child {
+  flex: none;
+  height: 5px;
+  border-radius: 2px;
+}
+
+.fern .previewCard:last-child {
+  flex: 1;
+}
+
+.fern .previewAccent {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px 0 5px 5px;
+  transform: rotate(45deg);
+}
+
 .label {
   overflow: hidden;
   text-overflow: ellipsis;

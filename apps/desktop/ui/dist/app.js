@@ -1,6 +1,6 @@
 // Shell page logic: dsh lifecycle events and the
-// host <-> iframe bridge (interface readiness, native notifications, and
-// default-browser links).
+// host <-> iframe bridge (interface readiness, native notifications,
+// default-browser links, and the update relay).
 // The top navigation bar is intentionally gone; the dsh UI owns its chrome.
 // The hub port is delivered by the Rust side through dsh_status (it picks a
 // free port when the default 3081 is occupied); the constant below is only
@@ -154,9 +154,25 @@ async function convergeOnAuthenticatedUi() {
   return statusRequest;
 }
 
+// The updater commands the embedded UI may ask the shell to run. The relay is
+// allow-listed on purpose: the frame is web content, and a general invoke
+// passthrough would hand every Tauri capability to it.
+const UPDATE_COMMANDS = new Set([
+  'prism_update_state',
+  'prism_check_update',
+  'prism_install_update',
+]);
+
+function replyToFrame(id, payload) {
+  frame.contentWindow?.postMessage(
+    { source: 'dsh-desktop-host', kind: 'rpc-result', id, ...payload }, '*');
+}
+
 // The dsh iframe's injected host bridge posts here (source
-// 'dsh-desktop-host'): show native OS toasts through tauri-plugin-notification
-// and open external links in the default browser through the opener plugin.
+// 'dsh-desktop-host'): show native OS toasts through tauri-plugin-notification,
+// open external links in the default browser through the opener plugin, and
+// run the allow-listed updater commands whose results come back as a promise
+// RPC reply.
 function handleHostBridge(event) {
   if (!event.data || event.data.source !== 'dsh-desktop-host') return;
   if (event.data.kind === 'hold') {
@@ -170,6 +186,16 @@ function handleHostBridge(event) {
   } else if (event.data.kind === 'open') {
     invoke('plugin:opener|open_url', { url: event.data.url })
       .catch((err) => console.error('[desktop] open failed:', err));
+  } else if (event.data.kind === 'call') {
+    const { id, cmd } = event.data;
+    if (!UPDATE_COMMANDS.has(cmd)) {
+      replyToFrame(id, { ok: false, error: 'command not allowed through the desktop host bridge' });
+      return;
+    }
+    invoke(cmd).then(
+      (value) => replyToFrame(id, { ok: true, value }),
+      (err) => replyToFrame(id, { ok: false, error: String(err) }),
+    );
   }
 }
 
@@ -219,6 +245,12 @@ frame.addEventListener('load', () => {
   listen('dsh://failed', (e) => {
     setSplashStatus('本地服务启动失败');
     showError(String(e.payload ?? 'dsh 服务启动失败'));
+  });
+  // Update-state pushes ride the same bridge into the frame, where the
+  // injected carrier fans them out to its subscribers.
+  listen('prism://update-state', (e) => {
+    frame.contentWindow?.postMessage(
+      { source: 'dsh-desktop-host', kind: 'event', event: 'prism://update-state', payload: e.payload }, '*');
   });
 
   // The first round runs immediately: the shell may already be serving, and the

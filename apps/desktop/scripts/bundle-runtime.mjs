@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createWriteStream } from 'node:fs';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync, statSync, realpathSync } from 'node:fs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -345,12 +345,17 @@ function patchDesktopBrowserAuth() {
 // PermissionRequested, so web notification plugins never fire, and
 // NewWindowRequested is not raised for target=_blank clicks, so external
 // links die. The bridge routes both to the shell — native toasts through
-// tauri-plugin-notification, and external links through the opener plugin. Its
-// third job reports that the interface finished mounting, which is what the
-// shell's splash waits for; the frame's own load event fires while client
-// plugins are still activating. Plain-browser `dsh web` users stay untouched:
-// the bridge activates only when a parent frame exists.
-function injectDesktopHostBridge(distDest) {
+// tauri-plugin-notification, and external links through the opener plugin.
+// Its third job reports that the interface finished mounting, which is what
+// the shell's splash waits for; the frame's own load event fires while client
+// plugins are still activating. Its fourth job is the desktop update carrier:
+// `window.dshDesktop` exposes the presentation-only API the settings UI
+// already consumes (`protocolVersion: 1` with the optional `updates` bridge),
+// with calls relayed to the shell's allow-listed updater commands and
+// `prism://update-state` pushes fanned out to subscribers. Plain-browser
+// `dsh web` users stay untouched: the bridge activates only when a parent
+// frame exists.
+export function injectDesktopHostBridge(distDest) {
   const entry = join(distDest, 'index.html');
   if (!existsSync(entry)) return;
   let html = readFileSync(entry, 'utf8');
@@ -401,6 +406,59 @@ function injectDesktopHostBridge(distDest) {
       }
     } catch {}
     return nativeOpen(url, ...rest)
+  }
+
+  // The update carrier. Calls are a promise RPC over the same postMessage
+  // channel (the shell page invokes only its allow-listed updater commands);
+  // state changes arrive as prism://update-state pushes fanned out to
+  // subscribers. status/check get a timeout because the shell page can be
+  // gone; open does not, because a successful install ends with the shell
+  // process exiting and the reply never arriving — progress reaches the
+  // subscriber through events until the installer takes over.
+  const pendingCalls = new Map()
+  let rpcSeq = 0
+  const updateListeners = new Set()
+  window.addEventListener("message", (event) => {
+    const data = event.data
+    if (!data || data.source !== "dsh-desktop-host") return
+    if (data.kind === "rpc-result") {
+      const entry = pendingCalls.get(data.id)
+      if (!entry) return
+      pendingCalls.delete(data.id)
+      clearTimeout(entry.timer)
+      if (data.ok) entry.resolve(data.value)
+      else entry.reject(new Error(data.error ?? "desktop host call failed"))
+    } else if (data.kind === "event" && data.event === "prism://update-state") {
+      for (const listener of updateListeners) {
+        try { listener(data.payload) } catch (error) {
+          console.error("dsh-desktop-host: update-state listener failed:", error)
+        }
+      }
+    }
+  })
+  const callHost = (cmd, timeoutMs) => new Promise((resolve, reject) => {
+    const id = ++rpcSeq
+    const entry = { resolve, reject, timer: 0 }
+    pendingCalls.set(id, entry)
+    if (timeoutMs > 0) {
+      entry.timer = setTimeout(() => {
+        pendingCalls.delete(id)
+        reject(new Error("desktop host call timed out: " + cmd))
+      }, timeoutMs)
+    }
+    post({ kind: "call", id, cmd })
+  })
+  window.dshDesktop = {
+    protocolVersion: 1,
+    updates: {
+      status: () => callHost("prism_update_state", 30000),
+      check: () => callHost("prism_check_update", 30000),
+      open: () => callHost("prism_install_update", 0),
+      subscribe(listener) {
+        updateListeners.add(listener)
+        return () => updateListeners.delete(listener)
+      },
+    },
   }
 
   // The shell covers the frame with its own splash until the interface is
@@ -874,7 +932,13 @@ async function prepareDefaultPluginDshPlugin() {
   step('dsh-plugin closure installed');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Exported helpers (smoke tests import them) share this module with the
+// bundling pipeline, which must only run when the script itself is invoked.
+const invokedDirectly = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

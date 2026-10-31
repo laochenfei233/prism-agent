@@ -2,20 +2,12 @@
 /** FontSettingsGroup behavior: the text font-size row shows collapsed, its
  * disclosure button toggles the font and size rows, and each row routes its
  * write to its own role. */
-import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { allowAllAccess, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { FontSettingsGroup } from '../src/client/FontSettingsGroup.tsx'
 import type { FontSettingsGroupProps } from '../src/client/FontSettingsGroup.tsx'
-import { createFontRowStore } from '../src/client/settings-store.ts'
-
-// Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
-const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
-const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
+import { createAppearanceSectionStore } from '../src/client/settings-store.ts'
 
 afterEach(cleanup)
 
@@ -28,34 +20,12 @@ const COPY: Record<string, string> = {
   'fontSize.terminal.decrease': 'Decrease terminal font size',
 }
 
-/** Empty global standard-kit hooks (the row reads neither). */
-function emptySessions() {
-  const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, phase: 'ready', projectionsBySession: {} })
-  return bindSnapshotSelector(store)
-}
-function emptyWorkspaces() {
-  const store = createSnapshotStore<WorkspaceSnapshot>({
-    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
-  })
-  return bindSnapshotSelector(store)
-}
-
-type AttentionSnapshot = Parameters<Parameters<FontSettingsGroupProps['useSessionStatus']>[0]>[0]
-const noAttention: AttentionSnapshot = new Map()
-const useSessionStatus: FontSettingsGroupProps['useSessionStatus'] = selector => selector(noAttention)
-
 function mount() {
-  const store = createFontRowStore().create()
-  store.actions.sync({ text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, 0)
+  const store = createAppearanceSectionStore().create()
+  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 0)
   const setFontFamily = vi.fn()
   const setFontSize = vi.fn()
   const props: FontSettingsGroupProps = {
-    useSessions: emptySessions(),
-    useSessionStatus,
-    usePanelInfo, useSessionRetainInfo: () => undefined, useResource,
-    useWorkspaces: emptyWorkspaces(),
-    ...allowAllAccess,
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,

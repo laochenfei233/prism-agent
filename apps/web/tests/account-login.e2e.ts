@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Real-composition acceptance for DeepSeek account sign-in from a plain browser. The
 // scaffold boots the shipped Web Loader tree, so the real account provider drives
 // auth_init, the loopback OAuth callback, and auth_exchange against a loopback Platform
@@ -107,7 +108,7 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     root = await mkdtemp(join(tmpdir(), 'dsh-web-account-login-'))
     const overlay = join(root, 'account-login.overlay.yml')
     await writeFile(overlay, (await readFile(OVERLAY_TEMPLATE, 'utf8')).replaceAll('{{origin}}', platform.origin))
-    scaffold = await launchWebScaffold({ extraOverlayPath: overlay })
+    scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: overlay })
     browser = await chromium.launch()
   })
 
@@ -125,14 +126,21 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     const console = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-account-login'))
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    const menu = page.getByRole('button', { name: 'Account menu', exact: true })
-    await menu.click()
+    // Sign-in lives on the DeepSeek model card of the Models settings page.
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+    await settings.getByRole('button', { name: 'Models', exact: true }).click()
     const tab = context.waitForEvent('page')
-    await page.getByRole('menuitem', { name: 'Sign in', exact: true }).click()
+    await settings.getByRole('button', { name: 'Sign in', exact: true }).click()
     const authorization = await tab
     await authorization.waitForURL(url => url.pathname === '/dsh/authorized', { timeout: 30_000 })
     expect(await authorization.evaluate(() => window.opener === null)).toBe(true)
+    const menu = page.getByRole('button', { name: 'Account menu', exact: true })
     await expect.poll(() => menu.textContent(), { timeout: 30_000 }).toBe('Web User')
+    // The Models page stayed open behind the sign-in; close it so the later
+    // entries start from the closed state they assert against.
+    await page.keyboard.press('Escape')
+    await settings.waitFor({ state: 'detached' })
 
     const pageOrigin = new URL(scaffold.authenticatedUrl).origin
     expect(platform.inits).toHaveLength(1)
@@ -157,7 +165,6 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     await capture('Initial load')
     await menu.click()
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
     const account = settings.getByRole('region', { name: 'Account', exact: true })
     await expect.poll(platform.avatarRequests).toBe(2)
     await account.locator('[data-avatar-status="failed"]').waitFor()

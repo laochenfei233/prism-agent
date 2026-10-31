@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // Keyless assembled-browser coverage for the opt-in Agent Teams bundle
 // over the real Host projection frame flow.
 import { fileURLToPath } from 'node:url'
@@ -150,7 +151,7 @@ describe('web e2e: Agent Teams panel', () => {
       expect(await trigger.evaluate(element => element === document.activeElement)).toBe(true)
       await page.keyboard.press('Enter')
       await panel.waitFor()
-      const outside = page.getByRole('button', { name: 'Account menu', exact: true })
+      const outside = page.getByRole('button', { name: 'Settings', exact: true })
       await outside.focus()
       expect(await panel.count()).toBe(1)
       await page.keyboard.press('Escape')

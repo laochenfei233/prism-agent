@@ -1,18 +1,16 @@
 /**
  * Font-size preference row: title + role description + stepper pill (centered value; hover
  * reveals the up/down arrow column anchored to the pill's right edge) + a px
- * unit label after the pill. The text row is registered into the General
- * section item slot; the code and terminal rows render inside the font
- * settings group. The displayed value follows the persisted setting, never the
- * click echo.
+ * unit label after the pill. The text row opens the font settings group; the
+ * code and terminal rows render inside it. The displayed value follows the
+ * persisted setting, never the click echo.
  */
 import {
   IconChevronDownOutlineRegular, IconChevronUpOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { FONT_SIZE_SPECS, type FontRole } from '../theme-settings.ts'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { createFontRowStore } from './settings-store.ts'
+import type { createAppearanceSectionStore } from './settings-store.ts'
 import css from './FontSizeRow.module.css'
 
 /** Injected business face: the row's font role and its write (t rides the standard locale seat). */
@@ -23,9 +21,9 @@ export interface FontSizeRowInjected {
   setFontSize: (px: number) => void
 }
 
-/** Full component props: runtime share + store share + locale seat + injected face. */
+/** Component props: section store share + locale seat + injected face. */
 export type FontSizeRowComponentProps =
-  PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createFontRowStore>>
+  PropsStore<ReturnType<typeof createAppearanceSectionStore>>
   & PropsLocale<'settings.theme'> & FontSizeRowInjected & {
     /** Disclosure button after the unit label; the font settings group passes it for the text row. */
     expander?: FontSizeRowExpander | undefined

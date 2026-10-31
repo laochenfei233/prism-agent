@@ -1,9 +1,11 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** Account settings registration and reconnecting Remote subscription. */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { TranscriptViewMode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -13,12 +15,13 @@ import type { AccountView, AccountDetails } from '@deepseek-ai/dsh-deepseek-acco
 import type { OnboardingChange } from './onboarding-contract.ts'
 import type { PlatformBridge } from './PlatformOverlay.tsx'
 import { ContactConfig, CONTACT_CONFIG_GLOBAL } from '../contact-config.ts'
-import { contactUrl } from './contact-url.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
 import { BrowserLogin } from './browser-login.ts'
 import { AccountOnboarding } from './AccountOnboarding.tsx'
 import { AccountPlatformHost, type AccountPlatformHostInjected } from './AccountPlatformHost.tsx'
 import { AccountMenu } from './AccountMenu.tsx'
+import { DeepSeekSignInCard } from './DeepSeekSignInCard.tsx'
+import { FeedbackRow, type FeedbackRowInjected } from './FeedbackRow.tsx'
 import { createPlatformPages, type PlatformPages } from './platform-pages.ts'
 import { AccountSection, type AccountSnapshot, type AccountSectionInjected } from './AccountSection.tsx'
 import { createBonusNoticeController } from './bonus-notices.ts'
@@ -177,35 +180,6 @@ export function apply(ctx: Context): void {
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
     ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
     refreshAccount,
-    contactUs() {
-      // Sample the account, build and environment before awaiting native information, so
-      // a profile the read outlasts cannot replace the UID this click reported.
-      const profile = snapshot.details?.profile
-      const context = {
-        uid: profile?.status === 'ready' ? profile.value.id : null,
-        version: process.env.DSH_CLIENT_VERSION,
-        width: window.screen.width, height: window.screen.height, pixelRatio: window.devicePixelRatio,
-      }
-      const openForm = (deviceInfo: string): void => {
-        window.open(contactUrl(config, { ...context, deviceInfo }), '_blank', 'noopener,noreferrer')
-      }
-      const readDeviceInfo = (globalThis as typeof globalThis & {
-        dshDesktop?: { deviceInfo?: () => Promise<string> }
-      }).dshDesktop?.deviceInfo
-      if (readDeviceInfo === undefined) {
-        // A plain browser, or a Desktop bridge without the optional reader, reports the renderer user agent.
-        openForm(navigator.userAgent)
-        return
-      }
-      void (async () => {
-        let deviceInfo = ''
-        try { deviceInfo = await readDeviceInfo() }
-        catch (_error) {
-          // Native information is optional; the questionnaire opens without it.
-        }
-        openForm(deviceInfo)
-      })()
-    },
     showLogin(visible) { publish({ ...snapshot, loginVisible: visible }) },
     setOnboarding(active) { publish({ ...snapshot, onboarding: active }) },
     bonusNoticeShown(orderId) { notices.shown(orderId) },
@@ -310,6 +284,18 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('settings.launcher', () => ctx.slots.register({
     name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
   }, AccountMenu))
+  // Sign-in lives on the DeepSeek card of the Models page: the key follows the
+  // official provider's settings namespace, so every posture of that card
+  // carries the action while the account is signed out.
+  ctx.slots.inject('settings.models.provider-card', () => ctx.slots.register({
+    name: 'settings.models.provider-card', key: 'llm-deepseek', locale: 'settings.account', inject: () => operations,
+  }, DeepSeekSignInCard))
+  // Feedback closes the General settings column and opens the deployment's
+  // GitHub issues address.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'feedback', order: 110, locale: 'settings.account',
+    inject: (): FeedbackRowInjected => ({ issuesUrl: config.issuesUrl }),
+  }, FeedbackRow))
   ctx.slots.inject('settings.section', () => {
     let unregister: (() => void) | undefined
     const update = () => {

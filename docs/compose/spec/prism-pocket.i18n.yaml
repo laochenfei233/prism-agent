@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for prism-pocket.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-pocket.md
+/:
+  en: a5c312b9373f3bcb
+  zh: a5c312b9373f3bcb
+/prism-pocket:
+  en: 2a9eb80f4497fe69
+  zh: f775c44d7c90a909
+/prism-pocket/report:
+  en: 0ba15196d278da23
+  zh: 9fd55649df7fab84
+/prism-pocket/s1-problem:
+  en: aed87ffe7e8a4d1d
+  zh: 47d92441a4a0684f
+/prism-pocket/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-pocket/s2-design/s2-1-shape-a-client-side-patch-plugin-not-a-separate-app-and-not-core-edits:
+  en: 183b0627efe60236
+  zh: 2821d98943cd4be9
+/prism-pocket/s2-design/s2-2-activation:
+  en: e405080b17920a6f
+  zh: 31dda2968709f81f
+/prism-pocket/s2-design/s2-3-mobile-adaptation-layer-browser-half:
+  en: e07e49cc8b637f66
+  zh: 549419b1a8784a42
+/prism-pocket/s2-design/s2-4-notifications-browser-half:
+  en: 762e80b91c227b5d
+  zh: f3027d9849d7f066
+/prism-pocket/s2-design/s2-5-push-delivery-node-half:
+  en: 1fac8c60be3a3f52
+  zh: 24cf0982154d4483
+/prism-pocket/s2-design/s2-6-tailscale-remote-access-node-half-settings-page:
+  en: 1a28f3e634e8973f
+  zh: bde7c79427190353
+/prism-pocket/s2-design/s2-7-pwa-install:
+  en: 46cb5c22336859a4
+  zh: 86378499a6a9d1ad
+/prism-pocket/s2-design/s2-8-locale-ownership:
+  en: 01fe9a3df064c59c
+  zh: cdd67ab0447335cd
+/prism-pocket/s3-scope:
+  en: cdcfb82413dd48ec
+  zh: 65ded8b40148e17c
+/prism-pocket/tasks:
+  en: d32fd6771400c64c
+  zh: b0a240bdc74b1760
+/prism-pocket/s4-acceptance:
+  en: 646b82b115405862
+  zh: 0c1af4e0462ea31f

@@ -2,13 +2,16 @@
 import type {} from '@deepseek-ai/dsh-settings'
 
 import type { Volatile } from '@deepseek-ai/cordis'
-import type { ThemePreference } from './theme-settings.ts'
+import type { CustomThemePreset, ThemePreference } from './theme-settings.ts'
 import z from '@deepseek-ai/schemastery'
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { bootThemeInjections } from './boot-theme.ts'
-import { DEFAULT_PREFERENCE, FONT_SIZE_SPECS, fontSizeSchema, THEME_PREFERENCES } from './theme-settings.ts'
+import {
+  DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME, DEFAULT_PREFERENCE, FONT_SIZE_SPECS,
+  fontSizeSchema, HEX_COLOR_PATTERN, THEME_PREFERENCES,
+} from './theme-settings.ts'
 
 export {
   DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
@@ -32,6 +35,14 @@ export interface Config {
   codeFontFamily: Volatile<string>
   /** Sidebar terminal font list; `''` keeps the built-in stack. */
   terminalFontFamily: Volatile<string>
+  /** Base palette mode of the custom theme. */
+  customScheme: Volatile<'light' | 'dark'>
+  /** Canvas color of the custom theme (`#rgb`/`#rrggbb`). */
+  customCanvas: Volatile<string>
+  /** Accent color of the custom theme (`#rgb`/`#rrggbb`). */
+  customAccent: Volatile<string>
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: Volatile<CustomThemePreset[]>
 }
 
 /** Live theme and typography preferences. */
@@ -43,6 +54,15 @@ export const Config = z.object({
   textFontFamily: z.string().default('').volatile(),
   codeFontFamily: z.string().default('').volatile(),
   terminalFontFamily: z.string().default('').volatile(),
+  customScheme: z.union(['light', 'dark']).default(DEFAULT_CUSTOM_SCHEME).volatile(),
+  customCanvas: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS).volatile(),
+  customAccent: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT).volatile(),
+  customPresets: z.array(z.object({
+    name: z.string().pattern(/\S/),
+    scheme: z.union(['light', 'dark']),
+    canvas: z.string().pattern(HEX_COLOR_PATTERN),
+    accent: z.string().pattern(HEX_COLOR_PATTERN),
+  })).default([]).volatile(),
 })
 
 /** Supply the current palette before browser plugins start.
@@ -60,6 +80,9 @@ export function apply(ctx: Context, config: Config): void {
       text: config.textFontFamily.get(),
       code: config.codeFontFamily.get(),
       terminal: config.terminalFontFamily.get(),
+    }, {
+      canvas: config.customCanvas.get(),
+      dark: config.customScheme.get() === 'dark',
     }))
   }, { prepend: true })
 }

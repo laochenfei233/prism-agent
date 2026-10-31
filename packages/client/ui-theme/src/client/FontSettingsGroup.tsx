@@ -1,14 +1,12 @@
 /**
- * Font settings registered into the General section item slot: the text
- * font-size row, whose disclosure button expands a region holding the font
- * row for each role and the code and terminal size rows. The region starts
- * collapsed on every mount.
+ * Font settings group of the Appearance section: the text font-size row, whose
+ * disclosure button expands a region holding the font row for each role and
+ * the code and terminal size rows. The region starts collapsed on every mount.
  */
 import { useId, useState } from 'react'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { FontRole } from '../theme-settings.ts'
-import type { createFontRowStore } from './settings-store.ts'
+import type { createAppearanceSectionStore } from './settings-store.ts'
 import { FontFamilyRow } from './FontFamilyRow.tsx'
 import { FontSizeRow, type FontSizeRowExpander } from './FontSizeRow.tsx'
 import css from './FontSettingsGroup.module.css'
@@ -21,9 +19,9 @@ export interface FontSettingsInjected {
   setFontSize: (role: FontRole, px: number) => void
 }
 
-/** Full component props: runtime share + store share + locale seat + injected face. */
+/** Component props: section store share + locale seat + injected face. */
 export type FontSettingsGroupProps =
-  PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createFontRowStore>>
+  PropsStore<ReturnType<typeof createAppearanceSectionStore>>
   & PropsLocale<'settings.theme'> & FontSettingsInjected
 
 /**

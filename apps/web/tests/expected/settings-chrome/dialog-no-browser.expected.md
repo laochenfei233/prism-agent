@@ -2,24 +2,18 @@
   - navigation:
     - text: Settings
     - button "General"
+    - button "Appearance"
     - button "Models"
     - button "Built-in plugins"
     - button "Agent presets"
+    - button "Import"
+    - button "Backup"
   - button "Open configuration file"
   - button "Close"
   - text: Permission Choose the default permission mode for new sessions
   - button "Workspace Write"
   - text: Language
   - button "English"
-  - text: Appearance
-  - button "Light"
-  - button "Dark"
-  - button "System" [pressed]
-  - text: Font size Only affects conversation content 14
-  - button "Increase font size"
-  - button "Decrease font size"
-  - text: px
-  - button "More font settings"
   - text: Work details Choose how much detail to show for tool calls
   - button "Detailed"
   - text: When to Collapse Work Details Choose when to automatically collapse work details
@@ -36,3 +30,5 @@
   - text: Upload Session Log when using the official model API Help improve DeepSeek models and products.
   - switch "Upload Session Log when using the official model API"
   - text: "Current version: {{version}}"
+  - link "Feedback":
+    - /url: https://github.com/laochenfei233/prism-agent/issues

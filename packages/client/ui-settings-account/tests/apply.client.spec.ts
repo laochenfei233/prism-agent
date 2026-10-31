@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // @vitest-environment jsdom
 /** Account operations in the shipped client composition, in Desktop and in a plain browser. */
 import { afterEach, beforeEach, expect, vi } from 'vitest'
@@ -21,6 +22,7 @@ import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import type { AccountPlatformHostInjected } from '../src/client/AccountPlatformHost.tsx'
 import { AccountQuotaNotice } from '../src/client/AccountQuotaNotice.tsx'
 import type { AccountQuotaNoticeInjected } from '../src/client/AccountQuotaNotice.tsx'
+import type { FeedbackRowInjected } from '../src/client/FeedbackRow.tsx'
 
 const it = createClientTest({ roster: webApp })
 const SELF = '@deepseek-ai/dsh-client-ui-settings-account'
@@ -58,8 +60,6 @@ function injectedOf(entry: { inject?: (() => object) | undefined }): object {
 }
 beforeEach(() => {
   vi.stubEnv('DSH_CLIENT_VERSION', '0.0.0-test')
-  vi.stubGlobal('screen', { width: 1512, height: 982 })
-  vi.stubGlobal('devicePixelRatio', 2)
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
 
@@ -90,10 +90,7 @@ it('claims account balance notices from the frame-wide quota chain and declines 
   expect(select({ ...notice, code: 'QUOTA' })).toBeNull()
 }, 60_000)
 
-it('shares account actions across seats, publishes dialog ownership, and opens contextual support', async ({ start }) => {
-  vi.stubGlobal(CONTACT_CONFIG_GLOBAL, { contactFormUrl: 'https://example.test/form/?prefill_device_model=old&hide_device_model=1', contactSource: 'harness' })
-  const open = vi.spyOn(window, 'open').mockReturnValue(null)
-  vi.stubGlobal('dshDesktop', {})
+it('shares account actions across seats, publishes dialog ownership, and registers the regrouped entries', async ({ start }) => {
   const c = await start()
   const actions = operations(c)
   expect(c.ctx.slots.entries('settings.models.sign-in')[0]!.inject!()).toBe(actions)
@@ -106,7 +103,7 @@ it('shares account actions across seats, publishes dialog ownership, and opens c
   expect(onTheme).toHaveBeenCalledOnce()
   probe()
   offTheme()
-  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark'])
+  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
   await actions.refreshAccount()
   expect(c.mock.remote.account.getProfile).not.toHaveBeenCalled()
   const listener = vi.fn()
@@ -118,92 +115,23 @@ it('shares account actions across seats, publishes dialog ownership, and opens c
   off()
   actions.showLogin(false)
   expect(listener).toHaveBeenCalledTimes(2)
-  actions.contactUs()
-  const signedOut = new URL(String(open.mock.calls.at(-1)![0]))
-  expect(signedOut.searchParams.has('prefill_uid')).toBe(false)
-  expect(signedOut.searchParams.get('hide_uid')).toBe('1')
+  // The DeepSeek card shares the sign-in actions; the General row carries the deployment's issues address.
+  const card = c.ctx.slots.entries('settings.models.provider-card').find(entry => entry.options.key === 'llm-deepseek')
+  expect(card).toBeDefined()
+  expect(card!.inject!()).toBe(actions)
+  const feedback = c.ctx.slots.entries('settings.general.item').find(entry => entry.options.id === 'feedback')
+  const injected: object = feedback!.inject!()
+  expect((injected as FeedbackRowInjected).issuesUrl).toBe('https://github.com/laochenfei233/prism-agent/issues')
   c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
   c.mock.streams.push('account/watch', stored)
   await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile) })
   const entry = c.ctx.slots.entries('settings.section').find(entry => entry.options.id === 'account')!
   expect(entry.inject!()).toBe(actions)
   expect(resolveSlotLabel(entry.options.label)).toBe('Account')
-  actions.contactUs()
-  const support = new URL(String(open.mock.calls.at(-1)![0]))
-  expect(support.searchParams.get('prefill_uid')).toBe('account-user')
-  expect(support.searchParams.get('hide_uid')).toBe('1')
-  expect(support.searchParams.get('hide_harness_version')).toBe('1')
-  expect(support.searchParams.get('prefill_harness_version')).toBe('0.0.0-test')
-  expect(support.searchParams.get('hide_device_info')).toBe('1')
-  expect(support.searchParams.get('prefill_device_info')).toBe(`${navigator.userAgent}; screen_resolution=3024x1964`)
-  expect(support.searchParams.has('prefill_device_model')).toBe(false)
-  expect(support.searchParams.has('hide_device_model')).toBe(false)
-  for (const field of ['os_version', 'device_brand', 'app_locale', 'screen_resolution']) {
-    expect(support.searchParams.has(`prefill_${field}`)).toBe(false)
-    expect(support.searchParams.has(`hide_${field}`)).toBe(false)
-  }
-  expect(support.searchParams.has('prefill_app_version')).toBe(false)
-  c.mock.streams.push('account/watch', view)
-  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().view).toEqual(view) })
-  actions.contactUs()
-  const signedOutAgain = new URL(String(open.mock.calls.at(-1)![0]))
-  expect(signedOutAgain.searchParams.has('prefill_uid')).toBe(false)
-  expect(signedOutAgain.searchParams.get('hide_uid')).toBe('1')
   await c.unload(SELF)
   expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(0)
-}, 60_000)
-
-it('prefills the native device description from the Desktop bridge on every click', async ({ start }) => {
-  const open = vi.spyOn(window, 'open').mockReturnValue(null)
-  const deviceInfo = vi.fn(async () => 'platform=darwin; os=15.0; app_arch=arm64; cpu=Apple M3; memory_gib=16.0')
-  vi.stubGlobal('dshDesktop', { deviceInfo })
-  const c = await start()
-  const actions = operations(c)
-  actions.contactUs()
-  await vi.waitFor(() => { expect(open).toHaveBeenCalledOnce() })
-  const first = new URL(String(open.mock.calls.at(-1)![0]))
-  expect(first.searchParams.get('prefill_device_info'))
-    .toBe('platform=darwin; os=15.0; app_arch=arm64; cpu=Apple M3; memory_gib=16.0; screen_resolution=3024x1964')
-  expect(first.searchParams.get('hide_device_info')).toBe('1')
-  deviceInfo.mockResolvedValue('platform=win32; os=10.0; app_arch=x64; memory_gib=32.0')
-  vi.stubGlobal('screen', { width: 1920, height: 1080 })
-  vi.stubGlobal('devicePixelRatio', 1)
-  actions.contactUs()
-  await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2) })
-  expect(new URL(String(open.mock.calls.at(-1)![0])).searchParams.get('prefill_device_info'))
-    .toBe('platform=win32; os=10.0; app_arch=x64; memory_gib=32.0; screen_resolution=1920x1080')
-  expect(deviceInfo).toHaveBeenCalledTimes(2)
-}, 60_000)
-
-it('opens the questionnaire with screen resolution when the native read fails', async ({ start }) => {
-  const open = vi.spyOn(window, 'open').mockReturnValue(null)
-  const deviceInfo = vi.fn(async (): Promise<string> => { throw new Error('platform ipc unavailable') })
-  vi.stubGlobal('dshDesktop', { deviceInfo })
-  const c = await start()
-  operations(c).contactUs()
-  await vi.waitFor(() => { expect(open).toHaveBeenCalledOnce() })
-  const url = new URL(String(open.mock.calls.at(-1)![0]))
-  expect(url.searchParams.get('prefill_device_info')).toBe('screen_resolution=3024x1964')
-  expect(url.searchParams.get('hide_device_info')).toBe('1')
-  expect(url.searchParams.has('prefill_app_locale')).toBe(false)
-  expect(deviceInfo).toHaveBeenCalledOnce()
-}, 60_000)
-
-it('reports the account sampled by the click when a native read outlasts a sign-out', async ({ start }) => {
-  const open = vi.spyOn(window, 'open').mockReturnValue(null)
-  const device = Promise.withResolvers<string>()
-  vi.stubGlobal('dshDesktop', { deviceInfo: vi.fn(() => device.promise) })
-  const c = await start()
-  const actions = operations(c)
-  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
-  c.mock.streams.push('account/watch', stored)
-  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.profile).toEqual(profile) })
-  actions.contactUs()
-  c.mock.streams.push('account/watch', view)
-  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().view).toEqual(view) })
-  device.resolve('platform=darwin; os=15.0; app_arch=arm64; memory_gib=16.0')
-  await vi.waitFor(() => { expect(open).toHaveBeenCalledOnce() })
-  expect(new URL(String(open.mock.calls.at(-1)![0])).searchParams.get('prefill_uid')).toBe('account-user')
+  expect(c.ctx.slots.entries('settings.models.provider-card')).toHaveLength(0)
+  expect(c.ctx.slots.entries('settings.general.item').some(entry => entry.options.id === 'feedback')).toBe(false)
 }, 60_000)
 
 it('publishes one avatar load and retries it through the shared Settings refresh action', async ({ start }) => {

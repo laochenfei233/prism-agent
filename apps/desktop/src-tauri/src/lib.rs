@@ -10,6 +10,7 @@ mod dsh_runner;
 mod quit;
 mod setup;
 mod tray;
+mod update;
 
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::Manager;
@@ -224,7 +225,18 @@ pub fn run() {
     }
     dsh_runner::start_startup_clock();
     hide_child_consoles();
-    tauri::Builder::default()
+
+    let builder = tauri::Builder::default();
+    // A second launch must focus the running window instead of spawning
+    // another shell, tray icon, and hub — in dev builds too, so a stray
+    // `tauri dev` cannot open a second agent against the running app.
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        dsh_runner::append_startup_log("single-instance: focus window");
+        tray::show_main_window(app);
+    }));
+
+    builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -245,6 +257,10 @@ pub fn run() {
             // aborting the launch, so the window still opens to report it.
             let handle = DshHandle::spawn(app.handle());
             app.manage(handle);
+            // The updater state must exist before any page script can invoke
+            // its commands; the delayed auto-check rides on the same state.
+            app.manage(update::UpdateState::new(app.handle()));
+            update::schedule_auto_check(app.handle());
             build_main_window(app.handle())?;
             dsh_runner::append_startup_log("window ready");
             tray::build(app.handle())?;
@@ -262,6 +278,9 @@ pub fn run() {
             dsh_runner::dsh_status,
             dsh_runner::restart_dsh,
             dsh_runner::open_ui,
+            update::prism_update_state,
+            update::prism_check_update,
+            update::prism_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

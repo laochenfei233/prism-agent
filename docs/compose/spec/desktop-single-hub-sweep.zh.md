@@ -72,7 +72,7 @@ Windows 通过 `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` 枚举�
 ## [S3] Scope
 
 - In scope: `apps/desktop/src-tauri/src/dsh_runner.rs` 里的签名匹配、决策核、进程枚举、清场，以及收养/冷启两处接线；它们的单元测试；双语桌面 README 的 hub 契约；本次变更新增的分叉记录。
-- Out of scope: 壳运行期间常驻杀 server 的监视器；同时首启竞态（两个壳同时启动时可能各起一个 hub —— 下一次启动清掉输家）；壳侧单实例锁；其他 harness 构建的 hub（必须让它们继续跑）；手动启动的 `prism web` / `pnpm dsh web` server（3080 契约不动它们）；本分叉谱系的其他 checkout（如姊妹 `deepseek-harness` 树），因为匹配通用的 `deepseek-harness/apps/cli` 路径会结束原版 dsh 用户的 server、破坏安装隔离；按 home 隔离 —— 清场是按产品全机器生效的，因此仅靠 `PRISM_HOME` 分隔的两个 release 实例，或闭包路径不同但共享一个 home 的两个 release 安装，都不支持作为并发 hub（各自在下一个决策点清掉对方的 hub，其中一方可能耗尽重启预算）；POSIX 的结束升级 —— 清场只发 SIGTERM，不等待也不升级到 SIGKILL，忽略 SIGTERM 的 hub 会在那一次 spawn 中存活；超出既有 `terminate_pid` 的 Windows 进程树语义。
+- Out of scope: 壳运行期间常驻杀 server 的监视器；同时首启竞态（两个壳同时启动时可能各起一个 hub —— 下一次启动清掉输家）；其他 harness 构建的 hub（必须让它们继续跑）；手动启动的 `prism web` / `pnpm dsh web` server（3080 契约不动它们）；本分叉谱系的其他 checkout（如姊妹 `deepseek-harness` 树），因为匹配通用的 `deepseek-harness/apps/cli` 路径会结束原版 dsh 用户的 server、破坏安装隔离；按 home 隔离 —— 清场是按产品全机器生效的，因此仅靠 `PRISM_HOME` 分隔的两个 release 实例，或闭包路径不同但共享一个 home 的两个 release 安装，都不支持作为并发 hub（各自在下一个决策点清掉对方的 hub，其中一方可能耗尽重启预算）；POSIX 的结束升级 —— 清场只发 SIGTERM，不等待也不升级到 SIGKILL，忽略 SIGTERM 的 hub 会在那一次 spawn 中存活；超出既有 `terminate_pid` 的 Windows 进程树语义。本 spec 之后新增的单实例注册覆盖所有平台（含 dev 构建）的顺序重开；同时首启竞态仍在范围之外。
 
 ## Tasks
 

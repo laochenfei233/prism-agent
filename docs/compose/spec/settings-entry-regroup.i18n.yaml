@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for settings-entry-regroup.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/settings-entry-regroup.md
+/:
+  en: 21c679f041e2a89f
+  zh: 21c679f041e2a89f
+/settings-entry-regroup:
+  en: 6493a49781de99ef
+  zh: c474b520d9cfe40b
+/settings-entry-regroup/report:
+  en: 900b3c6c5dcf7104
+  zh: b53b667a7bdb4e4c
+/settings-entry-regroup/s1-problem:
+  en: a49bead5ab8da7bd
+  zh: 0d1cff4171d1d3d3
+/settings-entry-regroup/s2-design:
+  en: 56abf5a7ce89893d
+  zh: d0a9dc58118d7184
+/settings-entry-regroup/s3-scope:
+  en: 0814cfeea15fa300
+  zh: 812333da765e3667
+/settings-entry-regroup/tasks:
+  en: e5bad1524ad58485
+  zh: 27595f19556a3724
+/settings-entry-regroup/s4-acceptance:
+  en: 8f398d25c9328783
+  zh: 9e8e75dff5088119

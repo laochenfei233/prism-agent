@@ -1,0 +1,6 @@
+# The patch row name MUST be the bare package name: the client-module registry
+# resolves `<name>/package.json` from the profile by bare name, so a path-form
+# name would silently drop the browser half (desktop-dev-notes.md).
+- insert:
+    - id: prism-about
+      name: 'prism-about'

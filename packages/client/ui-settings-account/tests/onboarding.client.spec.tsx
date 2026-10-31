@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // @vitest-environment jsdom
 /** The credential onboarding step owns login until dismissal or completion. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -13,7 +14,7 @@ afterEach(cleanup)
 
 const theme: ThemeSnapshot = {
   preference: 'light', fontSizes: { text: 14, code: 11, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' },
-  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0,
+  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], custom: { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, customPresets: [], revision: 0,
 }
 
 it('claims onboarding while loading, offers API key fallback, and completes after login', () => {
@@ -31,7 +32,7 @@ it('claims onboarding while loading, offers API key fallback, and completes afte
     useAccount: <T,>(select: (snapshot: AccountSnapshot) => T) => select(account),
     useTheme: <T,>(select: (snapshot: ThemeSnapshot) => T) => select(theme),
     start: vi.fn(async () => {}), cancel: vi.fn(async () => {}), signOut: vi.fn(async () => {}),
-    contactUs: vi.fn(), t: makeTranslate(en),
+    t: makeTranslate(en),
     refreshAccount: vi.fn(async () => {}), bonusNoticeShown: vi.fn(), bonusNoticeDismissed: vi.fn(),
     avatarFailed: vi.fn(),
   }

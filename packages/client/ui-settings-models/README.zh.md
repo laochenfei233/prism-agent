@@ -116,7 +116,8 @@ Models 页面包含 **DeepSeek 账号**（`deepseek-account`，英文为 **DeepS
 
 -----
 
-`settings.models.sign-in` 插槽让账号登录在凭证编辑器之前提供选择；没有贡献者时直接显示编辑器。关闭账号选择弹窗会结束整个引导步骤。从账号菜单显式重新打开时，即使已有提供者配置，也会进入同一个编辑器。
+<!-- PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13. -->
+`settings.models.sign-in` 插槽让账号登录在凭证编辑器之前提供选择；没有贡献者时直接显示编辑器。关闭账号选择弹窗会结束整个引导步骤。显式重新打开时，即使已有提供者配置，也会进入同一个编辑器：未登录时，账号插件的 `settings.models.provider-card` 条目（键 `llm-deepseek`）在本页的 DeepSeek 卡片上显示「登录」动作。
 
 <a id="model-experience"></a>
 ## 模型体验

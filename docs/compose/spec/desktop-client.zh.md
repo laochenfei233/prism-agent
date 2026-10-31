@@ -39,7 +39,7 @@ apps/desktop/
       tray.rs           # 托盘常驻（关窗不退出，托盘菜单：显示/退出）
       host_rpc.rs       # POST /api/host.openPath 等宿主 RPC（session-context-menu 依赖）
       setup.rs          # 首次启动向导编排（profile 预设 + 插件安装）
-      updater.rs        # 版本检查（GitHub Releases / Tauri updater）
+      updater.rs        # 应用内更新器状态机（tauri-plugin-updater；更新源固定 GitHub Releases latest.json）
     tauri.conf.json
     capabilities/
     icons/
@@ -58,7 +58,7 @@ apps/desktop/
 
 ### 2.2 壳前端与宿主桥
 
-壳不渲染顶部导航栏：窗口内容即 dsh UI 本身（全窗口 iframe），导航/侧边栏全部由 dsh UI 自己提供。壳与 iframe 之间只走宿主桥（`source: 'dsh-desktop-host'`）：通知经 `tauri-plugin-notification` 弹原生 toast，外链经 `tauri-plugin-opener` 交默认浏览器，均由 bundle 期注入的桥脚本转发。错误横幅（服务失败 + 重启按钮）是唯一的壳级 UI 兜底。
+壳不渲染顶部导航栏：窗口内容即 dsh UI 本身（全窗口 iframe），导航/侧边栏全部由 dsh UI 自己提供。壳与 iframe 之间只走宿主桥（`source: 'dsh-desktop-host'`）：通知经 `tauri-plugin-notification` 弹原生 toast，外链经 `tauri-plugin-opener` 交默认浏览器，更新经白名单三条命令（`prism_update_state` / `prism_check_update` / `prism_install_update`）走壳内 `update.rs` 状态机并回推 `prism://update-state`，均由 bundle 期注入的桥脚本转发（桥同时定义 `globalThis.dshDesktop` 更新载具，`protocolVersion: 1`）。错误横幅（服务失败 + 重启按钮）是唯一的壳级 UI 兜底。
 
 ### 2.3 宿主 RPC
 
