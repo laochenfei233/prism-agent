@@ -95,6 +95,8 @@ commits: 13707d2897..<head>（交付时回填）
 
 测试：面板 spec（按标签与别名过滤、执行、拒绝原因、关闭与焦点归还）、循环 spec（顺序、环绕、缺少地标）、输入框聚焦 spec、树导航 spec（方向键、`Home`/`End`、`Enter`、roving tab index）、提问 spec（选项移动、题目前进、取消）。验证先跑 `pnpm run test:gui`，再跑 `DSH_SNAPSHOT=replay pnpm run test:web`，因为这是产品可见变更。
 
+已交付的证据：`pnpm run typecheck` 五项门禁全部通过；七个改动包共 93 个文件、1800 项测试全绿；`CommandPalette.tsx` 的语句、分支、函数、行覆盖率均为 100%，构建产物 `packages/client/ui-shortcuts/lib/client.js` 中含 `commands.open`。仍有两处分支臂未覆盖（`ApprovalPanel` 从动作行之外按反方向键、`AnimatedRows` 的事件目标不是 Element），且 `DSH_SNAPSHOT=replay pnpm run test:web` 在本机构建成功但浏览器回放无法启动。
+
 ### [S2.8] Questions and approvals on the keyboard
 
 待答提问用这套键回答：`ArrowUp`/`ArrowDown` 移动选中项并让焦点跟随，`Home`/`End` 到首尾选项，`Enter` 确认当前这道题，`Tab`/`Shift+Tab` 在多题提问里前进到下一题或退回上一题，`Esc` 走既有的取消路径关闭整个提问——和它的"取消"按钮同一个动作，同样的确认与忙碌状态。

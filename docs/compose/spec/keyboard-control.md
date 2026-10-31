@@ -95,6 +95,8 @@ New fork-owned files under `packages/client` carry the `PRISM-DIVERGENCE` marker
 
 Tests: a palette spec (filter by label and alias, run, blocked reason, close and focus return), a cycle spec (order, wrap, missing landmark), a composer-focus spec, a tree-navigation spec (arrows, `Home`/`End`, `Enter`, roving tab index), and a question spec (option movement, question advance, dismissal). Verification runs `pnpm run test:gui`, then `DSH_SNAPSHOT=replay pnpm run test:web` because the change is product-visible.
 
+Delivered evidence: `pnpm run typecheck` passes all five gates; the seven touched packages run 93 files and 1800 tests green; `CommandPalette.tsx` covers 100% of statements, branches, functions, and lines, and the built `packages/client/ui-shortcuts/lib/client.js` contains `commands.open`. Two branch arms remain uncovered (`ApprovalPanel`'s backward arrow from outside the action row and `AnimatedRows`'s non-Element event target), and `DSH_SNAPSHOT=replay pnpm run test:web` builds but its browser replay does not start on this machine.
+
 ### [S2.8] Questions and approvals on the keyboard
 
 A pending question answers with the keys the dialog already implies: `ArrowUp`/`ArrowDown` move the selected option and carry focus with it, `Home`/`End` reach the first and last option, `Enter` confirms the current question, `Tab` and `Shift+Tab` move to the next and previous question of a multi-question request, and `Esc` dismisses the request through the existing dismissal path — the same action its Cancel control performs, with the same confirmations and busy state.
