@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Store images and generic file attachments durably below `DSH_HOME` on the machine running DSH. Images are validated, normalized for model requests, and cached per route; generic files are preserved byte-for-byte without admission limits. Identical bytes are stored once even when uploads use different display names, reads verify file length and content, and admitted images remain readable if limits later tighten. The shipped `dsh` composition uses this package without configuration. Objects remain local to one machine and are never deleted automatically.
+Store images and generic file attachments durably below `DSH_HOME` on the machine running DSH. Images are validated, normalized for model requests, and cached per route; generic files are preserved byte-for-byte without admission limits. Identical bytes are stored once even when uploads use different display names, reads verify file length and content, and every image read re-checks the current admission limits before any decode. The shipped `dsh` composition uses this package without configuration. Objects remain local to one machine and are never deleted automatically.
 
 ## Table of Contents
 
@@ -52,7 +52,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Where your images are stored and how long they last
 
-Attached images are kept below `<DSH_HOME>/attachments/v1` on this machine. Stored images are never deleted automatically, identical images are stored only once, and a later tightening of the limits never makes already-saved images unreadable. If your images must be readable from another machine, this package is not the right fit.
+Attached images are kept below `<DSH_HOME>/attachments/v1` on this machine. Stored images are never deleted automatically, identical images are stored only once, and every read re-checks the current admission limits, so a later tightening of a limit also refuses images above it. If your images must be readable from another machine, this package is not the right fit.
 
 ### What happens when you attach an image
 
@@ -60,7 +60,7 @@ Attach an image and its source limits, media, dimensions, and pixels are checked
 
 ### What can go wrong
 
-An image can be refused when you attach it: unsupported format, over the byte, pixel, or per-side dimension limits, or bytes that do not match their declared type. On a later read, an image that was deleted or corrupted on disk fails with a clear error. Each failure carries a stable code so the client and protocol adapters can explain it in their own words.
+An image can be refused when you attach it: unsupported format, over the byte, pixel, or per-side dimension limits, or bytes that do not match their declared type. On a later read, an image that was deleted, corrupted on disk, or above the current limits fails with a clear error before its pixels are decoded. Each failure carries a stable code so the client and protocol adapters can explain it in their own words.
 
 -----
 
@@ -77,7 +77,7 @@ This section explains the durability and verification design behind the storage,
 - **Durability by fsync chain, not existence.** A synced file alone does not survive a crash when its directory entry never reached storage, so the write path syncs every ancestor entry to a process-proven boundary before a reference can reach a session checkpoint.
 - **Normalize once, project per route.** Admission persists one provider-independent normalized attachment; request projection derives deterministic variants without rewriting durable history.
 - **Lazy alpha-routed encoding.** Alpha images use WebP and opaque images use JPEG; quality candidates run in 85/75/60 order, and the smallest output is retained when none meets the encoded-byte target.
-- **Limits are write-time policy.** Byte, total-pixel, and per-side dimension limits bind admission only, so tightening them later never makes admitted history unreadable.
+- **Limits bind admission and reads.** Byte, total-pixel, and per-side dimension limits bind admission, and a verified reference is re-checked against them on read; an object copied into the store without admission (session import) therefore cannot reach a decode above the limits.
 
 ### Write and read paths
 

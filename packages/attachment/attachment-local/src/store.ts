@@ -445,9 +445,11 @@ export async function readImageFile(
   }
   signal?.throwIfAborted()
   if (digest(data) !== sha256) throw new AttachmentError('Stored attachment failed integrity verification.', 'ATTACHMENT_CORRUPT')
-  // The digest proves these are the exact bytes admission fully decoded, so
-  // the read path only re-derives the header fields (no raster decode, no
-  // per-request pixel amplification on history replay).
+  // The digest proves these are the bytes the writer published; the store
+  // re-checks admission limits afterwards because a reference can name an
+  // object copied in by session import. The read path still only re-derives
+  // the header fields (no raster decode, no per-request pixel amplification on
+  // history replay).
   const metadata = await probeImage(data)
   signal?.throwIfAborted()
   if (metadata.mediaType !== ref.mediaType || data.byteLength !== ref.bytes

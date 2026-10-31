@@ -1,7 +1,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -126,6 +127,32 @@ describe('local attachment service', () => {
       expect(refs.map(ref => ref.name)).toEqual(['first.png', 'second.png'])
       await expect(Promise.all(refs.map(ref => service.readImage(ref))))
         .resolves.toHaveLength(2)
+    } finally {
+      await rm(dshHome, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a stored image that exceeds the admission limits', async () => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'dsh-attachment-unadmitted-'))
+    try {
+      const service = new LocalAttachmentStore(new Context(), { dshHome, maxImageDimension: 2 })
+      const data = new Uint8Array(await sharp({
+        create: { width: 4, height: 4, channels: 3, background: { r: 1, g: 2, b: 3 } },
+      }).png().toBuffer())
+      const sha256 = createHash('sha256').update(data).digest('hex')
+      const object = join(dshHome, 'attachments', 'v1', 'objects', sha256.slice(0, 2), sha256)
+      await mkdir(join(object, '..'), { recursive: true })
+      await writeFile(object, data)
+      const ref = {
+        attachmentId: AttachmentId(`sha256:${sha256}`),
+        mediaType: 'image/png' as const,
+        bytes: data.byteLength,
+        width: 4,
+        height: 4,
+      }
+
+      // The object bypassed saveImage (as an import copy does); the read path refuses it.
+      await expect(service.readImage(ref)).rejects.toMatchObject({ code: 'IMAGE_DIMENSION_TOO_LARGE' })
     } finally {
       await rm(dshHome, { recursive: true, force: true })
     }
