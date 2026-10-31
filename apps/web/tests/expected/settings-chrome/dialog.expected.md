@@ -30,3 +30,5 @@
   - text: 在使用官方模型 API 时上传 Session Log 帮助改进 DeepSeek 模型与产品
   - switch "在使用官方模型 API 时上传 Session Log"
   - text: 当前版本：{{version}}
+  - link "意见反馈":
+    - /url: https://github.com/laochenfei233/prism-agent/issues

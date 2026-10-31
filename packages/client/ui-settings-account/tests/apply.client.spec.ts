@@ -103,7 +103,7 @@ it('shares account actions across seats, publishes dialog ownership, and registe
   expect(onTheme).toHaveBeenCalledOnce()
   probe()
   offTheme()
-  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark'])
+  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
   await actions.refreshAccount()
   expect(c.mock.remote.account.getProfile).not.toHaveBeenCalled()
   const listener = vi.fn()
