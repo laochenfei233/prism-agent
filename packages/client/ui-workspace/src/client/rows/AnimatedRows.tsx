@@ -168,6 +168,7 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
   // Rows carry tabIndex -1 so the tree holds one tab stop; arrows move focus between them and Enter presses the row.
   private readonly navigate = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    /* v8 ignore next -- a keydown handled on the tree targets an element inside it. */
     const focused = event.target instanceof Element ? event.target.closest<HTMLElement>('[role="treeitem"]') : null
     // A row's own controls keep their keys: menu triggers, action buttons, and anything editable.
     if (event.target instanceof Element && event.target !== focused

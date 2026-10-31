@@ -38,6 +38,7 @@ function ApprovalFlow({ pending, reason, detail, t }: {
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false
     const row = event.currentTarget.querySelector<HTMLElement>('[data-approval-actions]')
+    /* v8 ignore next -- the action row is part of this component's own markup. */
     if (row === null) return false
     const actions = [...row.querySelectorAll<HTMLElement>('button:not(:disabled)')]
     if (actions.length === 0) return false
