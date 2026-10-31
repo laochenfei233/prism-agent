@@ -8,7 +8,7 @@
  * denied write leaves no file on disk.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,6 +49,7 @@ beforeEach(async ({ onTestFinished }) => {
   await mkdir(outside)
 })
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await fiber?.dispose()
 })
 
@@ -188,6 +189,52 @@ describe('workspace-write with the filesystem root as the workspace (a root endi
     } finally {
       await rootFiber.dispose()
     }
+  })
+})
+
+describe('workspace-write harness-home fence', () => {
+  /** A harness home nested inside the workspace, which workspace-write would otherwise allow. */
+  async function homeInsideWorkspace(): Promise<string> {
+    const home = join(workspace, '.prism')
+    await mkdir(home, { recursive: true })
+    vi.stubEnv('DSH_HOME', home)
+    return home
+  }
+
+  it('refuses a write under the harness home', async () => {
+    const home = await homeInsideWorkspace()
+    await boot('workspace-write')
+    const patch = join(home, 'cordis.patch.yml')
+    await expect(fs.writeText(await target(patch), '- insert: []')).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(existsSync(patch)).toBe(false)
+  })
+
+  it('refuses an edit of an existing home file, leaving it unchanged', async () => {
+    const home = await homeInsideWorkspace()
+    const patch = join(home, 'cordis.patch.yml')
+    await writeFile(patch, 'original')
+    await boot('workspace-write')
+    await expect(fs.editText(await target(patch), { oldString: 'original', newString: 'changed', replaceAll: false }))
+      .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(await readFile(patch, 'utf8')).toBe('original')
+  })
+
+  it('still reads the harness home and writes workspace siblings', async () => {
+    const home = await homeInsideWorkspace()
+    await writeFile(join(home, 'AGENTS.md'), 'read me')
+    await boot('workspace-write')
+    expect(await fs.readText(await target(join(home, 'AGENTS.md')))).toBe('read me')
+    const sibling = join(workspace, 'sibling.txt')
+    await fs.writeText(await target(sibling), 'ok')
+    expect(await readFile(sibling, 'utf8')).toBe('ok')
+  })
+
+  it('an approved danger-full-access policy may write the home', async () => {
+    const home = await homeInsideWorkspace()
+    await boot('danger-full-access')
+    const patch = join(home, 'cordis.patch.yml')
+    await fs.writeText(await target(patch), '- insert: []')
+    expect(await readFile(patch, 'utf8')).toBe('- insert: []')
   })
 })
 

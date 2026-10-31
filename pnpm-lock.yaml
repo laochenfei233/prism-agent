@@ -10308,6 +10308,9 @@ importers:
       '@deepseek-ai/dsh-fs-local':
         specifier: workspace:*
         version: link:../fs-local
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
       '@deepseek-ai/dsh-sandbox':
         specifier: workspace:*
         version: link:../../sandbox/sandbox
