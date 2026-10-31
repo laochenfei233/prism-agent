@@ -79,6 +79,14 @@
 ### 跨架构闭包
 pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构建：内置 x64 node 的 `bin/` 目录前置到 PATH（corepack pnpm shim 经 `#!/usr/bin/env node` 解析到 x64 node）。**依赖此机制是否真正生效，已由 CI 的"Verify closure architecture"步骤兜底**。
 
+### 应用内更新器（update.rs + prism-about）
+更新链 = `tauri-plugin-updater`（下载/验签/拉起安装器）+ `src/update.rs`（状态机：三条 `prism_*` 命令、`prism://update-state` 事件、`update-state.json` 持久化、启动 30s 静默检查）+ 宿主桥（bundle 期注入 `globalThis.dshDesktop`，`protocolVersion: 1`）+ `plugins/prism-about`（设置·关于节）。
+- **更新源钉死**：`tauri.conf.json` endpoint = `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`（永远解析到最新已发布 release 的资产）；无自定义源入口。draft release 对该 URL 不可见。
+- **签名**：公钥入库，私钥在 `~/.prism-updater/prism-updater.key`（无口令）；CI secret `TAURI_SIGNING_PRIVATE_KEY`，本机 `pnpm tauri build` 也要设（`tauri dev` 不用）。`createUpdaterArtifacts: true` 首个 release 之前，应用内检查报「无法连接更新源」属预期。
+- **安装序列**（`RunEvent::Exit` 在 `std::process::exit` 时不触发）：先 `download()`（进度按整百分比节流，dsh 仍运行）→ `DshHandle::stop()` → `install(bytes)`；Windows 上插件拉起安装器后直接退出进程，安装器走既有 `--quit` 钩子链并以 `restart_after_install`（默认 true）重启应用。
+- **桥白名单**：壳页只放行三条 `prism_*` 命令；iframe 是 web 内容，绝不做成通用 invoke 中继。`install` 的 RPC 不设超时——成功路径进程即退，回包永不到达，进度靠事件。
+- **版本比对基准**：tauri.conf.json 的版本（tauri-action tag `v__VERSION__` 也读它）；tauri.conf / Cargo.toml / package.json 三处必须同步（本次已对齐 `0.2.1-rc.4`）。
+
 ## 三、注意事项
 
 1. **推送 GitHub 需代理**：github.com:443 间歇不可达（DNS 正常、api.github.com 正常），用 sing-box `127.0.0.1:32808`（HTTP/SOCKS5 混合端口）。推荐一次性参数：`git -c http.proxy=http://127.0.0.1:32808 push`，不改持久配置。
@@ -89,6 +97,8 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 6. **Gitea 仓库是私有只读镜像**（从 GitHub 拉取，`mirror repository is read-only`），不能直接 push；构建产物（dmg/exe）不在 Gitea 上（是 GitHub Actions Artifacts）。
 7. **`windows-11-arm` 是 GitHub 原生 arm64 Windows 运行器**；x64 主机无法运行 arm64 node，因此 Windows arm64 闭包必须在原生 arm 运行器上构建。
 8. 向导可选插件默认全部不勾选；`dsh-tauri` 已随导航栏移除而从向导删除。
+9. **`createUpdaterArtifacts: true` 后本机 `pnpm tauri build` 需要 `TAURI_SIGNING_PRIVATE_KEY`**（私钥 `~/.prism-updater/prism-updater.key`，无口令，PowerShell：`$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content ~/.prism-updater/prism-updater.key`）；`pnpm tauri dev` 不需要。
+10. **升级 `@tauri-apps/cli` 必须重对 NSIS 模板**：`src-tauri/installer-template.nsi` vendor 自 `tauri-cli-v2.11.4` 的 tauri-bundler 模板（唯一补丁：重装页升级分支默认改为原地覆盖，卸载降为第二选项，见文件头）。CLI 版本变更时从对应 tag 重取模板、重放补丁，并重新构建 diff 生成的 `installer.nsi`——预期差异只剩补丁块。手动装新包不想走重装页时也可 `setup.exe /P`（passive 模式本来就跳过该页、直接原地升级）。
 
 ## 四、常见报错速查
 
@@ -112,6 +122,9 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 | `duplicate loader entry id: dsh-plugin`（插件更新后崩溃循环） | 插件更新把 dsh-plugin 写进 package.json 的 `dsh.profile.bundles`，但 `ensure_default_plugins` 每次启动仍无条件往 cordis.patch.yml 写 insert 行 → 加载器 bundle 层 + patch 层重复同一条目 → 崩溃；手动删行后重启又会被写回 | `ensure_default_plugins` 检查 `profile_bundles()`：bundles 已含 dsh-plugin 则跳过 insert 并 remove 残留行 |
 | hub 永不启动 + spawn: 日志缺失（macOS，白屏根因实锤） | `spawn_child` 把整个 PATH 环境变量作为单个元素交给 `std::env::join_paths`——POSIX 的 join_paths 校验元素含 `:`（平台分隔符）即返回 Err → `?` 静默退出 → hub 不 spawn；`join_paths` 在 spawn: 日志写入之前，故日志停在 "default plugins ready"；Windows 的 join_paths 不校验 `;` 故一直正常（平台不对称） | `std::env::split_paths` 拆回元素再并入（回归测试：POSIX 断言整串 Err + split 后 Ok） |
 | `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` | pnpm 11 deps 预检需重建 node_modules | `pnpm install --config.confirmModulesPurge=false` |
+| 本机 `pnpm tauri build` 报缺签名私钥/环境变量 | `bundle.createUpdaterArtifacts: true` 需要签名密钥 | 设 `TAURI_SIGNING_PRIVATE_KEY`（见注意事项 9）；`tauri dev` 不受影响 |
+| 本机 makensis 报 `File: failed opening file …selectElementAccessibility…`（长路径） | 本地 checkout 路径深，NSIS 打不开 245+ 字符的 runtime 文件；CI 路径短不受影响 | 本地验证脚本时：`mklink /J C:\prism-nsis <apps\desktop>`，用 node 脚本把生成的 `installer.nsi` 里的长前缀替换成 `C:\prism-nsis\`，在该目录下手动跑 `tauri\NSIS\Bin\makensis.exe` 完整编译（产物无 `.sig`，只作本地验证/手动安装；`.sig` 由 tauri bundler 在正常构建时生成） |
+| 关于页/应用内检查报「无法连接更新源」 | 尚无携带 `latest.json` 的已发布 release（draft 不可见） | 发布首个带更新器产物的 release 后自愈；CI 需 `TAURI_SIGNING_PRIVATE_KEY` secret |
 
 ## 五、当前状态与待办
 

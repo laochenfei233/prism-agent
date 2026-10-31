@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write plugins/prism-about/README.md
+/prism-about:
+  en: 1ed9bd7ce0a2785d
+  zh: ba9113e54b56d011
+/prism-about/what-it-shows:
+  en: ece9f3e9fc5fa0d6
+  zh: bda35e4580731824
+/prism-about/what-it-does-not-do:
+  en: e89940f2f309fd95
+  zh: 15f434b95189a22b
+/prism-about/layout:
+  en: 1ab8b509e0fe148b
+  zh: c5295d9510d025f5
+/prism-about/build:
+  en: b09ff23eb8ce9780
+  zh: 7f72cbf6fe8b99f1
+/prism-about/install-into-a-profile:
+  en: e35fb264b5ede115
+  zh: 0fc019bcdb007c37

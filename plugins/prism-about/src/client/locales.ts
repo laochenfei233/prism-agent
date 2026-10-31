@@ -1,0 +1,68 @@
+/** Product copy for the About settings section. */
+
+/** Dictionary namespace owned by this plugin. */
+export const NS = 'settings.about'
+
+/** Chinese dictionary; the key set is this plugin's copy contract. */
+export const zh: Record<string, string> = {
+  nav: '关于',
+  appName: 'Prism Agent',
+  tagline: '桌面内的 Agent 工作台',
+  versionLabel: '当前版本',
+  checkUpdate: '检查更新',
+  checking: '检查中…',
+  upToDate: '已是最新',
+  availableAction: '立即更新',
+  retry: '重试',
+  availableHint: '新版本 {version} 可用',
+  downloadProgress: '正在下载 {percent}%',
+  downloadIndeterminate: '正在下载…',
+  installing: '正在安装…',
+  ready: '已安装，重启应用后生效',
+  lastCheck: '上次检查：{time}',
+  sourceTitle: '更新源',
+  sourceGitHub: 'GitHub Releases',
+  sourceUnavailable: '更新源不可用',
+  desktopOnly: '应用内更新仅桌面版提供。',
+  changelog: '更新日志',
+  feedback: '意见反馈',
+  failureCheck: '无法检查更新，请稍后重试。',
+  failureCheckNetwork: '无法连接更新源，请检查网络后重试。',
+  failureDownload: '下载更新失败，请重试。',
+  failureDownloadNetwork: '下载更新时网络中断，请重试。',
+  failureInstall: '安装更新失败，请重试。',
+  failureInstallNetwork: '下载安装包时网络中断，请重试。',
+  failureStop: '无法停止本地服务，请重启应用后重试。',
+}
+
+/** English dictionary, checked complete against the zh key set. */
+export const en: Record<string, string> = {
+  nav: 'About',
+  appName: 'Prism Agent',
+  tagline: 'An agent workbench on your desktop',
+  versionLabel: 'Current version',
+  checkUpdate: 'Check for updates',
+  checking: 'Checking…',
+  upToDate: 'Up to date',
+  availableAction: 'Update now',
+  retry: 'Retry',
+  availableHint: 'Version {version} is available',
+  downloadProgress: 'Downloading {percent}%',
+  downloadIndeterminate: 'Downloading…',
+  installing: 'Installing…',
+  ready: 'Installed. Restart the app to apply it.',
+  lastCheck: 'Last checked: {time}',
+  sourceTitle: 'Update source',
+  sourceGitHub: 'GitHub Releases',
+  sourceUnavailable: 'Update source unavailable',
+  desktopOnly: 'In-app updates are only available in the desktop app.',
+  changelog: 'Release notes',
+  feedback: 'Feedback',
+  failureCheck: 'Could not check for updates. Please try again later.',
+  failureCheckNetwork: 'Could not reach the update source. Check your network and try again.',
+  failureDownload: 'Could not download the update. Please try again.',
+  failureDownloadNetwork: 'The network dropped while downloading. Please try again.',
+  failureInstall: 'Could not install the update. Please try again.',
+  failureInstallNetwork: 'The network dropped while fetching the installer. Please try again.',
+  failureStop: 'Could not stop the local service. Restart the app and try again.',
+}
