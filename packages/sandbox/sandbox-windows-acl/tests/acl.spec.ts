@@ -383,6 +383,23 @@ describe.skipIf(!isWin32)('ACL editing', () => {
     }
   })
 
+  it('rejects deny dirs it does not manage or that do not exist', () => {
+    const dir = scratch()
+    const home = join(dir, 'home')
+    mkdirSync(home)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], tempDir: null, mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-31', denyDirs: [home], manageDacls: false,
+    })).toThrow(/deny dirs/u)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], mode: 'read-only', denyDirs: [home],
+    })).toThrow(/deny dirs/u)
+    expect(() => new AclSandbox({
+      writableDirs: [dir], tempDir: null, mode: 'workspace-write',
+      writeSid: 'S-1-4-4242-32', denyDirs: [join(dir, 'missing')],
+    })).toThrow(/does not exist/u)
+  })
+
   it('AclSandbox denies a nested protected directory when it manages DACLs', async () => {
     const workspace = scratch()
     const home = join(workspace, 'home')
