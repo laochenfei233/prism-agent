@@ -179,7 +179,7 @@ describe('AnimatedRows', () => {
     expect(document.activeElement).toBe(second)
     fireEvent.keyDown(second as HTMLElement, { key: 'ArrowUp' })
     expect(document.activeElement).toBe(first)
-    fireEvent.keyDown(first as HTMLElement, { key: 'Home' })
+    fireEvent.keyDown(second as HTMLElement, { key: 'Home' })
     expect(document.activeElement).toBe(first)
     fireEvent.keyDown(second as HTMLElement, { key: 'End' })
     expect(document.activeElement).toBe(third)
