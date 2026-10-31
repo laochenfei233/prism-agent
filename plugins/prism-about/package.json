@@ -1,0 +1,45 @@
+{
+  "name": "prism-about",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "About settings section for the Prism Agent desktop app: current version, the in-app updater (GitHub Releases only), and project links",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client.js.map",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28"
+  }
+}

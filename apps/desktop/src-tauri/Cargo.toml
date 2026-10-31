@@ -1,7 +1,7 @@
 # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 [package]
 name = "dsh-desktop"
-version = "0.1.1-rc.4"
+version = "0.2.1-rc.4"
 description = "Prism Agent desktop shell (Tauri 2)"
 authors = ["dsh-desktop contributors"]
 license = "MIT"
@@ -17,6 +17,16 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# Updater downloads and signature verification ride this plugin; the endpoint
+# is pinned to this repository's GitHub Releases. rustls pulls in ring, whose
+# C sources fail on this machine's MSVC environment (missing INCLUDE, C1083),
+# so TLS goes through native-tls (schannel on Windows, OpenSSL on Linux CI,
+# CommonCrypto on macOS).
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls"] }
+# Every build is single-instance: a second launch focuses the running window
+# instead of spawning another shell and tray icon. The Linux backend needs a
+# D-Bus session bus, which every desktop session provides.
+tauri-plugin-single-instance = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"

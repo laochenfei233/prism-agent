@@ -9,6 +9,7 @@
     "tauri": "npx --yes @tauri-apps/cli@2.11.4",
     "dev": "npx --yes @tauri-apps/cli@2.11.4 dev",
     "build": "npx --yes @tauri-apps/cli@2.11.4 build",
-    "bundle:runtime": "node scripts/bundle-runtime.mjs"
+    "bundle:runtime": "node scripts/bundle-runtime.mjs",
+    "smoke:bridge": "node scripts/smoke-bridge.mjs"
   }
 }

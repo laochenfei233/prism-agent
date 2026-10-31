@@ -6,12 +6,12 @@
     </linearGradient>
   </defs>
 
-  <rect x="32" y="32" width="960" height="960" rx="211" fill="#FFFFFF"/>
-  <g transform="translate(512 512) scale(30) translate(-12 -12)" fill="none" stroke="url(#windows-mark)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="0" y="0" width="1024" height="1024" rx="225" fill="#FFFFFF"/>
+  <g transform="translate(512 512) scale(32) translate(-12 -12)" fill="none" stroke="url(#windows-mark)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2 L20.66 7 L20.66 17 L12 22 L3.34 17 L3.34 7 Z"/>
     <path d="M12 12 L12 2 M12 12 L20.66 7 M12 12 L20.66 17 M12 12 L12 22 M12 12 L3.34 17 M12 12 L3.34 7"/>
   </g>
-  <g transform="translate(512 512) scale(30) translate(-12 -12)" fill="url(#windows-mark)">
+  <g transform="translate(512 512) scale(32) translate(-12 -12)" fill="url(#windows-mark)">
     <circle cx="12" cy="12" r="3.2"/>
     <circle cx="12" cy="2" r="2.6"/>
     <circle cx="20.66" cy="7" r="2.6"/>
