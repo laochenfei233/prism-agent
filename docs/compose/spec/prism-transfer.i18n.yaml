@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-transfer.md
 /:
-  en: 6f222ebd8eab629e
-  zh: 5619ef6864e13783
+  en: accc30b93f7842fa
+  zh: 92e9a5353f7e1dda
 /prism-transfer:
   en: c59b568521fe461e
   zh: 5f27575479f024ca
@@ -24,8 +24,8 @@
   en: 36826c06d3f73af8
   zh: 0cf87ca8df84a24b
 /prism-transfer/s2-design/s2-3-export:
-  en: 0e3bd824f0385fe1
-  zh: 1dabdae84ef098d2
+  en: f082b92fae77f4ed
+  zh: 46fd71051cfcf981
 /prism-transfer/s2-design/s2-4-import:
   en: 3be9a7d698cd8c70
   zh: d2934efbca49b8f3
@@ -36,8 +36,8 @@
   en: bbc3bcb51a0ea4d0
   zh: 4448c30fa63a7500
 /prism-transfer/s2-design/s2-7-host-routes-and-job-model:
-  en: f811abd3feeaf796
-  zh: 5ac50ae099c6bded
+  en: f9ae0e298762d04b
+  zh: e22140f9b81ef6b2
 /prism-transfer/s2-design/s2-8-settings-page-ui:
   en: 2925f91d67ebb458
   zh: ecf76e54aac5ee3d

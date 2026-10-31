@@ -1,7 +1,7 @@
 ---
 feature: prism-transfer
 status: in-progress
-updated: 2026-10-30
+updated: 2026-10-31
 branch: feat/prism-transfer (worktree .worktrees/prism-transfer)
 commits: 42f8b7cfed（基线），交付时填写
 ---
@@ -71,7 +71,7 @@ settings.json                    ← prism-settings body, present only when sett
 
 一条流式 GET 路由；无任务、无暂存——zip 像会话导出一样直接构建到响应上。查询参数：`projects`（逗号分隔的工作区 id）、`settings=0|1`、`secrets=0|1`。响应选择：单项目且不带设置 → 单项目 zip；任意项目集合带设置，或多于一个项目 → 合并 zip；仅设置 → JSON 附件。文件名经 `content-disposition: attachment` 下发，非 ASCII 标题带 RFC 5987 `filename*`。
 
-发出第一个字节之前，扫描趟先遍历每个选中工作区文件夹，遇到单个 ≥ 4 GiB 的文件（fflate 的单条目写入上限——错误点名文件并建议压缩或拆分）、名称含 `\` 或 NUL 的条目、或不可读条目时立即以类型化错误失败。符号链接与 junction 被跳过并计数，绝不跟随，文件夹之外的东西进不了归档。扫描同时汇总字节数，供浏览器自带的下载进度使用。会话内容由 `@deepseek-ai/dsh-session-log-export` 导出的生成器 `sessionLogZipEntries` 产生（根日志、经 `traceSession` 的子代理后代、媒体、文件——含它执行的活跃会话 flush），每个会话的条目重根到 `sessions/<sessionId>/` 下。导出的会话是登记表中工作区记录挂接的 id（`WorkspaceRecord.sessionIds`），含已归档会话；日志已无法打开的会话被跳过并经响应头报告给客户端，而不是让整个归档失败。
+发出第一个字节之前，扫描趟先遍历每个选中工作区文件夹，遇到单个 ≥ 4 GiB 的文件（fflate 的单条目写入上限——错误点名文件并建议压缩或拆分）、名称含 `\` 或 NUL 的条目、或不可读条目时立即以类型化错误失败。符号链接与 junction 被跳过并计数，绝不跟随，文件夹之外的东西进不了归档。扫描同时汇总字节数，供浏览器自带的下载进度使用。会话内容由 `@deepseek-ai/dsh-session-log-export` 导出的生成器 `sessionLogZipEntries` 产生（根日志、经 `traceSession` 的子代理后代、媒体、文件——含它执行的活跃会话 flush），每个会话的条目重根到 `sessions/<sessionId>/` 下。导出的会话是登记表中工作区记录挂接的 id（`WorkspaceRecord.sessionIds`），含已归档会话；日志已无法打开的会话让整个导出大声失败——下载在发出截断归档（会静默丢失一个会话）之前直接报错。
 
 设置导出在进程内读取 `ctx.settings.describe()`（`secrets=1` 时不脱敏），把每个活跃命名空间投影到易变字段；`secrets=0` 时省略 secret 角色字段并计数，`secrets=1` 时写入真实值。设置文档之外的凭据（`remote.credentials`）永不导出。
 
@@ -104,7 +104,7 @@ settings.json                    ← prism-settings body, present only when sett
 | `GET /api/prism.transfer/job` | — | `{ state: 'idle' }` 或下方快照 |
 | `POST /api/prism.transfer/settings` | 缓冲 JSON `prism-settings` 主体 | `{ results: [{ ns, outcome }] }`；400 `bad-settings` |
 
-任务快照：`{ jobId, kind: 'project' | 'combined', state: 'running' | 'done' | 'failed', phase, name, archiveBytes, files, bytes, sessionsDone, sessionsTotal, projectsDone, projectsTotal, duplicates, result?, error?, startedAt, finishedAt? }`。客户端只轮询自己拿到的 `jobId`，终态即停；服务端把未知或过期任务的轮询按 `idle` 处理（重启丢失进行中的任务；其暂存由清扫覆盖）。
+任务快照：`{ jobId, kind: 'project' | 'combined' | 'unknown', state: 'running' | 'done' | 'failed', phase, name, archiveBytes, files, bytes, sessionsDone, sessionsTotal, projectsDone, projectsTotal, duplicates, skippedLinks, skippedUnreadable, skippedSecrets, result?, error?, startedAt, finishedAt? }`（任务开始到清单分发之间 `kind` 为 `unknown`）。客户端只轮询自己拿到的 `jobId`，终态即停；服务端把未知或过期任务的轮询按 `idle` 处理（重启丢失进行中的任务；其暂存由清扫覆盖）。
 
 ### S2.8 设置页界面
 

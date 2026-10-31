@@ -1,7 +1,7 @@
 ---
 feature: prism-transfer
 status: in-progress
-updated: 2026-10-30
+updated: 2026-10-31
 branch: feat/prism-transfer (worktree .worktrees/prism-transfer)
 commits: 42f8b7cfed (base), filled at delivery
 ---
@@ -71,7 +71,7 @@ The volatile projection carries exactly the fields the settings page shows as ed
 
 One streaming GET route; no job, no staging — the zip is built straight onto the response like `session-log-export`. Query: `projects` (comma-separated workspace ids), `settings=0|1`, `secrets=0|1`. Response selection: one project and no settings → single-project zip; any project set with settings, or more than one project → combined zip; settings only → JSON attachment. Filenames via `content-disposition: attachment` with an RFC 5987 `filename*` for non-ASCII titles.
 
-Before the first byte is sent, a scan pass walks each selected workspace folder and fails fast with a typed error when it finds a single file ≥ 4 GiB (fflate's per-entry write limit — the error names the file and suggests compressing or splitting it), a name containing `\` or NUL, or an unreadable entry. Symbolic links and junctions are skipped and counted, never followed, so nothing outside the folder enters the archive. The scan also sums bytes for the progress-free phaseless download the browser already renders. Session content is produced by the exported generator `sessionLogZipEntries` from `@deepseek-ai/dsh-session-log-export` (root log, subagent descendants via `traceSession`, media, files — including the live-session flush it performs), with each session's entries re-rooted under `sessions/<sessionId>/`. Compression follows the house convention: media and already-compressed bytes stored, text deflated at level 6. Exported sessions are the ids attached to the workspace record in the registry (`WorkspaceRecord.sessionIds`), archived ones included; a session whose log can no longer be opened is skipped and reported in the response as a response header the client surfaces, not a failure of the whole archive.
+Before the first byte is sent, a scan pass walks each selected workspace folder and fails fast with a typed error when it finds a single file ≥ 4 GiB (fflate's per-entry write limit — the error names the file and suggests compressing or splitting it), a name containing `\` or NUL, or an unreadable entry. Symbolic links and junctions are skipped and counted, never followed, so nothing outside the folder enters the archive. The scan also sums bytes for the progress-free phaseless download the browser already renders. Session content is produced by the exported generator `sessionLogZipEntries` from `@deepseek-ai/dsh-session-log-export` (root log, subagent descendants via `traceSession`, media, files — including the live-session flush it performs), with each session's entries re-rooted under `sessions/<sessionId>/`. Compression follows the house convention: media and already-compressed bytes stored, text deflated at level 6. Exported sessions are the ids attached to the workspace record in the registry (`WorkspaceRecord.sessionIds`), archived ones included; a session whose log can no longer be opened fails the whole export loudly — the download errors before shipping a truncated archive that would silently lose a session.
 
 Settings export reads `ctx.settings.describe()` in-process (unredacted when `secrets=1`) and projects each active namespace to its volatile fields; with `secrets=0` secret-role fields are omitted and counted, with `secrets=1` their real values are written. Credentials outside the settings document (`remote.credentials`) are never exported.
 
@@ -104,7 +104,7 @@ All routes live under one prefix, in the `prism-backup` style:
 | `GET /api/prism.transfer/job` | — | `{ state: 'idle' }` or the snapshot below |
 | `POST /api/prism.transfer/settings` | buffered JSON `prism-settings` body | `{ results: [{ ns, outcome }] }`; 400 `bad-settings` |
 
-Job snapshot: `{ jobId, kind: 'project' | 'combined', state: 'running' | 'done' | 'failed', phase, name, archiveBytes, files, bytes, sessionsDone, sessionsTotal, projectsDone, projectsTotal, duplicates, result?, error?, startedAt, finishedAt? }`. The client polls only the `jobId` it received, stops on a terminal state, and the server treats a poll for an unknown or expired job as `idle` (a restart loses the in-flight job; its staging is covered by the sweep).
+Job snapshot: `{ jobId, kind: 'project' | 'combined' | 'unknown', state: 'running' | 'done' | 'failed', phase, name, archiveBytes, files, bytes, sessionsDone, sessionsTotal, projectsDone, projectsTotal, duplicates, skippedLinks, skippedUnreadable, skippedSecrets, result?, error?, startedAt, finishedAt? }` (`kind` is `unknown` between job start and manifest dispatch). The client polls only the `jobId` it received, stops on a terminal state, and the server treats a poll for an unknown or expired job as `idle` (a restart loses the in-flight job; its staging is covered by the sweep).
 
 ### S2.8 Settings page UI
 
