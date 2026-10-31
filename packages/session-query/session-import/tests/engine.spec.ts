@@ -361,6 +361,56 @@ describe('SessionImportEngine apply', () => {
       .resolves.toMatchObject({ results: [{ outcome: 'duplicate' }] })
   })
 
+  it('refuses a foreign log whose required event type this harness cannot read back', async () => {
+    const root = await rootOf('native-unknown')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    const sourceHome = join(root, 'dsh')
+    const id = 'source-unknown'
+    await write(join(sourceHome, 'sessions', '--proj--', id, 'session.v4.jsonl'), JSON.stringify({
+      type: 'session', version: 4, id, createdAt: 1000, cwd, isSeeded: false, delegationDepth: 0,
+    }) + '\n' + JSON.stringify({ type: 'future/event', seq: 0, time: 1100, data: { value: 1 } }))
+    const fakesValue = fakes()
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, 'prism'),
+      roots: { dsh: join(sourceHome, 'sessions') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+    })
+
+    const result = await engine.apply({ source: 'dsh', sessionIds: [id] })
+    expect(result.results[0]).toMatchObject({ key: id, outcome: 'failed' })
+    expect(result.results[0]?.reason).toContain('future/event')
+    // Nothing was written, so the refused log cannot brick a session or block a later retry.
+    expect(fakesValue.stored.size).toBe(0)
+  })
+
+  it('imports a foreign log whose unknown event is explicitly ignorable', async () => {
+    const root = await rootOf('native-ignorable')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    const sourceHome = join(root, 'dsh')
+    const id = 'source-ignorable'
+    await write(join(sourceHome, 'sessions', '--proj--', id, 'session.v4.jsonl'), JSON.stringify({
+      type: 'session', version: 4, id, createdAt: 1000, cwd, isSeeded: false, delegationDepth: 0,
+    }) + '\n' + JSON.stringify({ type: 'future/event', seq: 0, time: 1100, data: { value: 1 }, ignorable: true }))
+    const fakesValue = fakes()
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, 'prism'),
+      roots: { dsh: join(sourceHome, 'sessions') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+    })
+
+    const result = await engine.apply({ source: 'dsh', sessionIds: [id] })
+    expect(result.results[0]).toMatchObject({ key: id, outcome: 'imported' })
+    expect(fakesValue.stored.get(id)?.map(event => event.type)).toEqual(['future/event'])
+  })
+
   it('writes a converted log the real JSONL backend can cold-read', async () => {
     const root = await rootOf('coldread')
     const cwd = join(root, 'project')
