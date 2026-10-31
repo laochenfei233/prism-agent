@@ -353,6 +353,7 @@ export class ZipArchiveReader {
    */
   async *bytes(entry: ZipEntry, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
     if (entry.directory) return
+    // v8 ignore next 3 -- parseDirectory already refused entries above maxEntryBytes, and this reader hands out no other entries
     if (entry.uncompressedSize > this.limits.maxEntryBytes) {
       throw new TransferError('entry-too-large', `entry "${entry.name}" exceeds the supported size`)
     }
@@ -415,6 +416,7 @@ export class ZipArchiveReader {
         try {
           inflator.push(view, false)
         } catch (pushError: unknown) {
+          /* v8 ignore next 1 -- fflate's Inflate rejects malformed streams with Error instances only */
           inflateFailure = pushError instanceof Error ? pushError : new Error(String(pushError))
         }
         if (inflateFailure !== undefined) {
@@ -425,6 +427,7 @@ export class ZipArchiveReader {
       try {
         inflator.push(new Uint8Array(), true)
       } catch (pushError: unknown) {
+        /* v8 ignore next 1 -- fflate's Inflate rejects malformed streams with Error instances only */
         inflateFailure = pushError instanceof Error ? pushError : new Error(String(pushError))
       }
       if (inflateFailure !== undefined) {

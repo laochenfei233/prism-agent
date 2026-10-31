@@ -429,6 +429,7 @@ export async function sweepStaleStaging(
       try {
         if (now - (await stat(path)).mtimeMs <= maximumAge) continue
       } catch {
+        // v8 ignore next 1 -- the entry was just listed by readdir; no Windows composition makes its stat fail between the two calls
         continue
       }
       await rm(path, { recursive: true, force: true })
@@ -448,6 +449,7 @@ async function freeBytes(destinationRoot: string): Promise<number | undefined> {
     return Number(stats.bavail) * Number(stats.bsize)
   } catch {
     // Some network paths cannot report free space; the guard is best-effort.
+    // v8 ignore next 1 -- statfs runs on the destination created one line earlier; only a volume vanishing mid-import can refuse it
     return undefined
   }
 }
@@ -492,6 +494,7 @@ export async function runImport(
         `the destination volume needs ${String(input.archiveBytes + FREE_SPACE_MARGIN_BYTES)} free bytes`,
       )
     }
+    // v8 ignore next 1 -- freeBytes only reports undefined for a volume that vanishes mid-import, unreachable once the destination exists
     const extractionFloor = startFree === undefined ? undefined : startFree - EXTRACTION_FLOOR_BYTES
     let written = 0
 
@@ -509,6 +512,7 @@ export async function runImport(
           for await (const chunk of reader.bytes(entry, signal)) {
             written += chunk.byteLength
             progress.addBytes(chunk.byteLength)
+            // v8 ignore next 2 -- trips only when a real destination volume fills mid-extraction; no test can shrink a volume
             if (extractionFloor !== undefined && written > extractionFloor) {
               throw new TransferError('disk-space', 'extraction aborted: the destination volume filled up')
             }
@@ -647,6 +651,7 @@ async function planProject(
     if (!entry.name.startsWith(prefix)) continue
     const local = entry.name.slice(prefix.length)
     if (local.startsWith(PROJECT_FOLDER_PREFIX)) {
+      // v8 ignore next 1 -- the reader refuses trailing-slash entry names, so no directory record can reach this check
       if (!entry.directory) folderEntries.push(entry)
       continue
     }

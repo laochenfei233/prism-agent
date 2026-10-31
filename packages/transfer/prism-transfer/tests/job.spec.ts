@@ -40,6 +40,10 @@ describe('TransferJobStore', () => {
     job.addDuplicates(1)
     job.setProjectsTotal(2)
     job.addProjectDone(1)
+    job.setSkippedLinks(3)
+    job.setSkippedUnreadable(1)
+    job.addFiles(7)
+    job.addBytes(90)
     expect(store.snapshot(job.jobId)).toMatchObject({
       kind: 'combined',
       phase: 'restoring',
@@ -48,11 +52,32 @@ describe('TransferJobStore', () => {
       duplicates: 1,
       projectsTotal: 2,
       projectsDone: 1,
+      skippedLinks: 3,
+      skippedUnreadable: 1,
+      files: 7,
+      bytes: 90,
     })
     store.fail(job.jobId, { code: 'crc-mismatch', detail: 'bad entry' })
     expect(store.snapshot(job.jobId)).toMatchObject({
       state: 'failed',
       error: { code: 'crc-mismatch', detail: 'bad entry' },
     })
+  })
+
+  it('ignores finish and fail calls for foreign job ids', () => {
+    const store = new TransferJobStore()
+    const job = store.tryBegin('a.zip', 10)
+    if (job === undefined) throw new Error('reservation refused')
+    store.finish('foreign', 'x.zip', 0, { projects: [] })
+    store.fail('foreign', { code: 'io', detail: 'nope' })
+    expect(store.snapshot(job.jobId)).toMatchObject({ state: 'running' })
+  })
+
+  it('re-opens the slot after a failed job', () => {
+    const store = new TransferJobStore()
+    const first = store.tryBegin('a.zip', 10)
+    if (first === undefined) throw new Error('reservation refused')
+    store.fail(first.jobId, { code: 'bad-archive', detail: 'nope' })
+    expect(store.tryBegin('b.zip', 20)).toBeDefined()
   })
 })

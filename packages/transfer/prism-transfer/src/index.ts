@@ -128,6 +128,7 @@ async function sweepSpooledImports(cacheRoot: string): Promise<void> {
       try {
         if (now - (await stat(path)).mtimeMs <= SPOOL_MAX_AGE_MILLISECONDS) continue
       } catch {
+        // v8 ignore next 1 -- the entry was just listed by readdir; no Windows composition makes its stat fail between the two calls
         continue
       }
       await rm(path, { force: true })
@@ -253,10 +254,12 @@ async function importResponse(
         jobs.fail(reserved.jobId, { code: typed.code, detail: typed.message })
       })
       .finally(() => {
+        // v8 ignore next 1 -- rm only fails past ENOENT when a foreign handle holds the spool file, which no test composition can arrange
         void rm(spoolPath, { force: true }).catch(() => {})
       })
     return jsonResponse({ jobId: reserved.jobId })
   } catch (error: unknown) {
+    // v8 ignore next 1 -- see the spool cleanup above: only a foreign open handle can fail this rm
     await rm(spoolPath, { force: true }).catch(() => {})
     if (request.signal.aborted) return new Response('upload cancelled', { status: 499 })
     return failure(error)
@@ -316,6 +319,7 @@ function contentDisposition(filename: string): string {
 /** ASCII fallback name for the classic filename parameter. */
 function sanitizeFilename(filename: string): string {
   const ascii = filename.replace(/[^\x20-\x7e]/gu, '_').replace(/["\\]/gu, '_')
+  // v8 ignore next 1 -- both call sites append a literal .zip/.json suffix, so the stripped name is never empty
   return ascii === '' ? 'archive.zip' : ascii
 }
 

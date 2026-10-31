@@ -390,6 +390,24 @@ describe('runImport refusals', () => {
     }, silentProgress())).rejects.toMatchObject({ code: 'bad-manifest' })
   })
 
+  it('rejects a manifest entry that is not valid JSON', async () => {
+    const archive = await spool(zipSync({
+      [PROJECT_MANIFEST_NAME]: text('this is not json'),
+    }, { level: 6 }))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'bad-archive' })
+  })
+
+  it('rejects a manifest entry past the document size ceiling', async () => {
+    const archive = await spool(zipSync({
+      [PROJECT_MANIFEST_NAME]: text(`{"filler":"${'0'.repeat(17 * 2 ** 20)}"}`),
+    }, { level: 6 }))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'entry-too-large' })
+  })
+
   it('rejects an unsupported manifest version', async () => {
     const archive = await spool(projectArchive(
       { title: 'Future', exportedAt: 't', hasProjectFolder: false, version: 2 },
@@ -398,6 +416,28 @@ describe('runImport refusals', () => {
     await expect(runImport(buildDeps({ homePath }), {
       archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
     }, silentProgress())).rejects.toMatchObject({ code: 'bad-manifest' })
+  })
+
+  it('rejects a relative destination outright', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'Relative', exportedAt: 't', hasProjectFolder: false },
+      {},
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot: 'relative/dest',
+    }, silentProgress())).rejects.toMatchObject({ code: 'bad-destination' })
+  })
+
+  it('refuses an archive whose declared size does not fit the destination volume', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'DiskSpace', exportedAt: 't', hasProjectFolder: false },
+      {},
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      // The caller-supplied archive size is a claim, so a bogus one exercises
+      // the free-space refusal without filling a real volume.
+      archivePath: archive.path, archiveBytes: Number.MAX_SAFE_INTEGER / 2, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'disk-space' })
   })
 
   it('rejects a session log with a future format version', async () => {
@@ -413,6 +453,142 @@ describe('runImport refusals', () => {
     }, silentProgress())).rejects.toMatchObject({ code: 'session-version' })
   })
 
+  it('rejects structurally broken session logs', async () => {
+    const log = `sessions/b-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`
+    for (const [label, body, code] of [
+      ['header only', headerLine('b-1'), 'bad-archive'],
+      ['non-JSON header', `not json\n${eventLine(0)}`, 'bad-archive'],
+      ['non-session header', `${JSON.stringify({ type: 'turn/start', seq: 0 })}\n${eventLine(0)}`, 'bad-archive'],
+      ['header without id', `${JSON.stringify({ type: 'session', version: SESSION_FORMAT_VERSION })}\n${eventLine(0)}`, 'bad-archive'],
+    ] as const) {
+      const archive = await spool(projectArchive(
+        { title: 'BrokenLog', exportedAt: 't', hasProjectFolder: false },
+        { [log]: text(body) },
+      ))
+      await expect(runImport(buildDeps({ homePath }), {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress()), label).rejects.toMatchObject({ code })
+    }
+  })
+
+  it('rejects malformed event lines', async () => {
+    const log = `sessions/b-2/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`
+    for (const [label, body] of [
+      ['non-JSON event', `${headerLine('b-2')}not json\n`],
+      ['envelope-invalid event', `${headerLine('b-2')}${JSON.stringify({ type: 7, seq: 'x' })}\n`],
+    ] as const) {
+      const archive = await spool(projectArchive(
+        { title: 'BrokenEvent', exportedAt: 't', hasProjectFolder: false },
+        { [log]: text(body) },
+      ))
+      await expect(runImport(buildDeps({ homePath }), {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress()), label).rejects.toMatchObject({ code: 'bad-archive' })
+    }
+  })
+
+  it('rejects a session whose stored write fails', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'WriteFail', exportedAt: 't', hasProjectFolder: false },
+      { [`sessions/w-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('w-1')}${eventLine(0)}`) },
+    ))
+    for (const thrown of [new Error('volume is read-only'), 'volume is read-only']) {
+      const deps = buildDeps({ homePath })
+      deps.persistence.create = async () => ({
+        append: async () => {
+          throw thrown
+        },
+        flush: async () => {},
+        close: async () => {},
+      })
+      await expect(runImport(deps, {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress())).rejects.toMatchObject({ code: 'bad-archive', message: /volume is read-only/ })
+    }
+  })
+
+  it('refuses media entries that carry no readable image identity', async () => {
+    const log = `sessions/m-9/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`
+    for (const [label, name] of [
+      ['no extension', `sessions/m-9/media/sha256:${'a'.repeat(64)}`],
+      ['not content-addressed', 'sessions/m-9/media/photo.png'],
+    ] as const) {
+      const archive = await spool(projectArchive(
+        { title: 'MediaNames', exportedAt: 't', hasProjectFolder: false },
+        { [name]: text('PNGDATA'), [log]: text(`${headerLine('m-9')}${eventLine(0)}`) },
+      ))
+      await expect(runImport(buildDeps({ homePath }), {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress()), label).rejects.toMatchObject({ code: 'bad-archive' })
+    }
+  })
+
+  it('refuses media entries beyond the deployment image limit', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'MediaBig', exportedAt: 't', hasProjectFolder: false },
+      {
+        [`sessions/m-8/media/sha256:${'b'.repeat(64)}.png`]: text(`0:${'0'.repeat(9 * 2 ** 20)}`),
+        [`sessions/m-8/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('m-8')}${eventLine(0)}`),
+      },
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'entry-too-large' })
+  })
+
+  it('refuses media and file entries the attachment seam cannot store', async () => {
+    const imageBytes = text('PNGDATA')
+    const fileBytes = text('FILEDATA')
+    const archive = await spool(projectArchive(
+      { title: 'SeamFail', exportedAt: 't', hasProjectFolder: false },
+      {
+        [`sessions/sf-1/media/sha256:${digestOf(imageBytes)}.png`]: imageBytes,
+        [`sessions/sf-1/files/${digestOf(fileBytes).slice(0, 2)}/${digestOf(fileBytes)}/report.txt`]: fileBytes,
+        [`sessions/sf-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('sf-1')}${eventLine(0)}`),
+      },
+    ))
+    for (const thrown of [new Error('disk is full'), 'disk is full']) {
+      const deps = buildDeps({ homePath })
+      let images = 0
+      deps.attachments.saveImage = async () => {
+        images += 1
+        throw thrown
+      }
+      await expect(runImport(deps, {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress())).rejects.toMatchObject({ code: 'attachment-failed', message: /disk is full/ })
+    }
+  })
+
+  it('refuses file entries that are not content-addressed', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'FileDigest', exportedAt: 't', hasProjectFolder: false },
+      {
+        'sessions/fd-1/files/zz/report.txt': text('FILEDATA'),
+        [`sessions/fd-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('fd-1')}${eventLine(0)}`),
+      },
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'bad-archive' })
+  })
+
+  it('refuses file entries stored under a different content address', async () => {
+    const fileBytes = text('FILEDATA')
+    const archive = await spool(projectArchive(
+      { title: 'FileMismatch', exportedAt: 't', hasProjectFolder: false },
+      {
+        [`sessions/fm-1/files/${digestOf(fileBytes).slice(0, 2)}/${digestOf(fileBytes)}/report.txt`]: fileBytes,
+        [`sessions/fm-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('fm-1')}${eventLine(0)}`),
+      },
+    ))
+    const deps = buildDeps({ homePath })
+    deps.attachments.saveFileStream = async () => ({ attachmentId: `sha256:${'c'.repeat(64)}` })
+    await expect(runImport(deps, {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'attachment-mismatch' })
+  })
+
   it('surfaces reader CRC failures from a tampered media entry', async () => {
     const imageBytes = text('PNGDATA-tampered-target')
     const archive = zipSync({
@@ -425,6 +601,23 @@ describe('runImport refusals', () => {
     }, { level: 6 })
     // Flip one byte inside the entry's stored data: the CRC no longer matches.
     const dataAt = Buffer.from(archive).indexOf(Buffer.from(imageBytes))
+    if (dataAt < 0) throw new Error('entry data not found in archive')
+    archive[dataAt] = (archive[dataAt]! + 1) & 0xff
+    const spooled = await spool(archive)
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: spooled.path, archiveBytes: spooled.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'crc-mismatch' })
+  })
+
+  it('surfaces reader CRC failures from a tampered project folder entry during extraction', async () => {
+    const fileBytes = text('FOLDERDATA-tampered-target')
+    const archive = zipSync({
+      [PROJECT_MANIFEST_NAME]: text(`${JSON.stringify({
+        format: 'prism-project', version: 1, title: 'CrcFolder', exportedAt: 't', sessions: 0, hasProjectFolder: true,
+      })}\n`),
+      ['project/data.bin']: [fileBytes, { level: 0 }],
+    }, { level: 6 })
+    const dataAt = Buffer.from(archive).indexOf(Buffer.from(fileBytes))
     if (dataAt < 0) throw new Error('entry data not found in archive')
     archive[dataAt] = (archive[dataAt]! + 1) & 0xff
     const spooled = await spool(archive)
@@ -455,6 +648,38 @@ describe('runImport refusals', () => {
     expect(result.projects[0]?.sessions).toBe(1)
     expect(result.projects[0]?.registerError).toContain('registry is read-only')
   })
+
+  it('reports attach and registration failures as their string form for non-Error values', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'RegisterString', exportedAt: 't', hasProjectFolder: false },
+      { [`sessions/rs-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('rs-1')}${eventLine(0)}`) },
+    ))
+    for (const thrown of [new Error('registry denies writes'), 'registry denies writes']) {
+      const deps = buildDeps({ homePath })
+      deps.workspaces.create = async () => {
+        throw thrown
+      }
+      const result = await runImport(deps, {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress())
+      expect(result.projects[0]?.registerError).toContain('workspace registration failed: registry denies writes')
+    }
+    const deps = buildDeps({ homePath })
+    const originalCreate = deps.workspaces.create
+    deps.workspaces.create = async (path) => {
+      const workspace = await originalCreate(path)
+      return {
+        id: workspace.id,
+        attachSession: async () => {
+          throw 'attach refused'
+        },
+      }
+    }
+    const result = await runImport(deps, {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())
+    expect(result.projects[0]?.registerError).toContain('attach refused')
+  })
 })
 
 describe('safety rails', () => {
@@ -472,6 +697,20 @@ describe('safety rails', () => {
     expect(result.projects[0]?.name).toBe('sessions (2)')
   })
 
+  it('suffixes a publication target that would overwrite the home directory itself', async () => {
+    const homePath = join(tempRoot, 'home-pub')
+    await mkdir(homePath, { recursive: true })
+    const archive = await spool(projectArchive(
+      { title: 'home-pub', exportedAt: 't', hasProjectFolder: true },
+      { 'project/data.txt': text('x') },
+    ))
+    const deps = buildDeps({ homePath })
+    const result = await runImport(deps, {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot: tempRoot,
+    }, silentProgress())
+    expect(result.projects[0]?.name).toBe('home-pub (2)')
+  })
+
   it('sweeps staging directories only past the retention age', async () => {
     const destinationRoot = join(tempRoot, 'dest-sweep')
     await mkdir(destinationRoot, { recursive: true })
@@ -486,4 +725,105 @@ describe('safety rails', () => {
     await expect(stat(first)).rejects.toThrow()
     await expect(stat(second)).rejects.toThrow()
   })
+
+  it('answers zero for a destination whose staging directory cannot be listed', async () => {
+    expect(await sweepStaleStaging(join(tempRoot, 'sweep-missing-destination'))).toBe(0)
+  })
 })
+
+describe('full-featured imports', () => {
+  it('restores main and subagent logs, defaulting the header fields they omit', async () => {
+    const destinationRoot = join(tempRoot, 'dest-subagents')
+    const homePath = join(tempRoot, 'home-subagents')
+    await mkdir(destinationRoot, { recursive: true })
+    const header = `${JSON.stringify({
+      type: 'session',
+      version: SESSION_FORMAT_VERSION,
+      id: 'sub-child-1',
+      isSeeded: false,
+      parentSession: 'sub-parent-1',
+      origin: 'subagent',
+      agentPreset: 'reviewer',
+    })}\n`
+    const archive = await spool(projectArchive(
+      { title: 'Subagents', exportedAt: 't', hasProjectFolder: true },
+      {
+        [`sessions/sub-parent-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]:
+          // No trailing newline: the parser must not assume one.
+          text(`${headerLine('sub-parent-1')}${eventLine(0)}`.trimEnd()),
+        [`sessions/sub-parent-1/subagents/sub-child-1/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]:
+          text(`${header}${eventLine(0)}`),
+        // Neither log, media, nor files: the scan ignores it.
+        'sessions/sub-parent-1/notes.txt': text('notes'),
+        'project/big.bin': [pseudoRandomBytes(300_000), { level: 0 }],
+      },
+    ))
+    const deps = buildDeps({ homePath })
+    const result = await runImport(deps, {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())
+    expect(result.projects[0]?.sessions).toBe(2)
+    expect(result.projects[0]).not.toHaveProperty('registerError')
+    await expect(stat(join(destinationRoot, 'Subagents', 'big.bin'))).resolves.toMatchObject({ size: 300_000 })
+  })
+
+  it('refuses combined archives whose layout lies', async () => {
+    const destinationRoot = join(tempRoot, 'dest-combined-refusals')
+    const homePath = join(tempRoot, 'home-combined-refusals')
+    await mkdir(destinationRoot, { recursive: true })
+    const transferManifest = (projects: unknown[], settings: boolean): Uint8Array =>
+      text(`${JSON.stringify({ format: 'prism-transfer', version: 1, exportedAt: 't', projects, settings })}\n`)
+    const childManifest = text(`${JSON.stringify({
+      format: 'prism-project', version: 1, title: 'Alpha', exportedAt: 't', sessions: 0, hasProjectFolder: false,
+    })}\n`)
+    const cases: [string, Record<string, Uint8Array>, string][] = [
+      ['missing child manifest', {
+        [TRANSFER_MANIFEST_NAME]: transferManifest([{ dir: '1-Alpha', title: 'Alpha', sessions: 0 }], false),
+      }, 'bad-manifest'],
+      ['no projects', {
+        [TRANSFER_MANIFEST_NAME]: transferManifest([], false),
+      }, 'no-projects'],
+      ['declared settings without a settings entry', {
+        [TRANSFER_MANIFEST_NAME]: transferManifest([{ dir: '1-Alpha', title: 'Alpha', sessions: 0 }], true),
+        'projects/1-Alpha/.prism-project.json': childManifest,
+      }, 'bad-manifest'],
+    ]
+    for (const [label, entries, code] of cases) {
+      const archive = await spool(zipSync(entries, { level: 6 }))
+      await expect(runImport(buildDeps({ homePath }), {
+        archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+      }, silentProgress()), label).rejects.toMatchObject({ code })
+    }
+  })
+
+  it('imports a combined archive whose manifest declares no settings', async () => {
+    const destinationRoot = join(tempRoot, 'dest-combined-nosettings')
+    const homePath = join(tempRoot, 'home-combined-nosettings')
+    await mkdir(destinationRoot, { recursive: true })
+    const archive = await spool(zipSync({
+      [TRANSFER_MANIFEST_NAME]: text(`${JSON.stringify({
+        format: 'prism-transfer', version: 1, exportedAt: 't', settings: false,
+        projects: [{ dir: '1-Alpha', title: 'Alpha', sessions: 0 }],
+      })}\n`),
+      'projects/1-Alpha/.prism-project.json': text(`${JSON.stringify({
+        format: 'prism-project', version: 1, title: 'Alpha', exportedAt: 't', sessions: 0, hasProjectFolder: false,
+      })}\n`),
+    }, { level: 6 }))
+    const result = await runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())
+    expect(result.projects).toHaveLength(1)
+    expect(result.settings).toBeUndefined()
+  })
+})
+
+/** Deterministic pseudo-random bytes for incompressible folder entries. */
+function pseudoRandomBytes(length: number): Uint8Array {
+  let state = 0x53544154
+  const bytes = new Uint8Array(length)
+  for (let index = 0; index < length; index += 1) {
+    state = (state * 1664525 + 1013904223) >>> 0
+    bytes[index] = state >>> 24
+  }
+  return bytes
+}

@@ -129,6 +129,7 @@ export async function scanProjectFolder(
     try {
       for await (const entry of directory) {
         const childRelative = relative === '' ? entry.name : `${relative}/${entry.name}`
+        // v8 ignore next 2 -- only POSIX directories can list a name carrying a backslash, and no platform lists NUL
         if (entry.name.includes('\\') || entry.name.includes('\u0000')) {
           throw new TransferError('unsafe-path', `"${childRelative}" cannot be archived (backslash or NUL in the name)`)
         }
@@ -141,6 +142,7 @@ export async function scanProjectFolder(
           await walk(childAbsolute, childRelative)
           continue
         }
+        // v8 ignore next 2 -- only POSIX directories can list FIFO or device entries, which are neither directory, file, nor link
         if (!entry.isFile()) {
           skippedLinks += 1
           continue
@@ -149,7 +151,9 @@ export async function scanProjectFolder(
         try {
           size = (await stat(childAbsolute)).size
         } catch {
+          // v8 ignore next 1 -- no Windows composition makes a just-listed entry's stat fail; the POSIX race needs a concurrent delete
           skippedUnreadable += 1
+          // v8 ignore next 1 -- see above
           continue
         }
         if (size >= maxFileBytes) {

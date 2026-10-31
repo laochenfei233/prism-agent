@@ -17,7 +17,11 @@ describe('snapshotOf', () => {
       projectsDone: 0,
       projectsTotal: 1,
       duplicates: 1,
+      skippedLinks: 2,
+      skippedUnreadable: 3,
+      skippedSecrets: 4,
       startedAt: 5,
+      finishedAt: 6,
     })
     expect(snapshot).toMatchObject({
       jobId: 'j1',
@@ -25,6 +29,11 @@ describe('snapshotOf', () => {
       state: 'running',
       phase: 'restoring',
       duplicates: 1,
+      skippedLinks: 2,
+      skippedUnreadable: 3,
+      skippedSecrets: 4,
+      startedAt: 5,
+      finishedAt: 6,
     })
     expect(snapshot?.result).toBeUndefined()
     expect(snapshot?.error).toBeUndefined()
@@ -32,9 +41,76 @@ describe('snapshotOf', () => {
 
   it('answers undefined for idle, foreign, and malformed bodies', () => {
     expect(snapshotOf({ state: 'idle' })).toBeUndefined()
+    expect(snapshotOf({ jobId: 'j', state: 'idle' })).toBeUndefined()
     expect(snapshotOf({ jobId: 'j', state: 'nope' })).toBeUndefined()
     expect(snapshotOf('text')).toBeUndefined()
     expect(snapshotOf(undefined)).toBeUndefined()
+    expect(snapshotOf(['j'])).toBeUndefined()
+  })
+
+  it('defaults every typed field a foreign body omits', () => {
+    const snapshot = snapshotOf({ jobId: 'j4', state: 'running', phase: 'somewhere-new', startedAt: 'nope' })
+    expect(snapshot).toEqual({
+      jobId: 'j4',
+      kind: 'unknown',
+      state: 'running',
+      phase: 'validating',
+      name: '',
+      archiveBytes: 0,
+      files: 0,
+      bytes: 0,
+      sessionsDone: 0,
+      sessionsTotal: 0,
+      projectsDone: 0,
+      projectsTotal: 0,
+      duplicates: 0,
+      skippedLinks: 0,
+      skippedUnreadable: 0,
+      skippedSecrets: 0,
+      startedAt: 0,
+    })
+  })
+
+  it('keeps only recognizable result entries and settings outcomes', () => {
+    const snapshot = snapshotOf({
+      jobId: 'j5',
+      state: 'done',
+      result: {
+        projects: [
+          'junk',
+          { name: 'A', path: '/a', sessions: 'nope', duplicates: 'nope', registerError: 'registration refused' },
+          { name: 'B', path: '/b' },
+        ],
+        settings: [
+          'junk',
+          { outcome: 'applied' },
+          { ns: 'web', outcome: 'weird' },
+          { ns: 'web', outcome: 'failed', reason: 'nope' },
+        ],
+      },
+    })
+    expect(snapshot?.result?.projects).toEqual([
+      { name: 'A', path: '/a', sessions: 0, duplicates: 0, registerError: 'registration refused' },
+      { name: 'B', path: '/b', sessions: 0, duplicates: 0 },
+    ])
+    expect(snapshot?.result?.settings).toEqual([{ ns: 'web', outcome: 'failed', reason: 'nope' }])
+  })
+
+  it('answers undefined for result blocks without a project array and settings arrays without entries', () => {
+    const withoutProjects = snapshotOf({ jobId: 'j6', state: 'done', result: { projects: 'nope' } })
+    expect(withoutProjects?.result).toBeUndefined()
+    const withoutSettings = snapshotOf({
+      jobId: 'j7',
+      state: 'done',
+      result: { projects: [{ name: 'A', path: '/a' }] },
+    })
+    expect(withoutSettings?.result?.settings).toBeUndefined()
+  })
+
+  it('defaults the error detail when the body omits it', () => {
+    const snapshot = snapshotOf({ jobId: 'j8', state: 'failed', error: { code: 'crc-mismatch' } })
+    expect(snapshot?.error).toEqual({ code: 'crc-mismatch', detail: '' })
+    expect(snapshotOf({ jobId: 'j9', state: 'failed', error: 'plain text' })?.error).toBeUndefined()
   })
 
   it('parses the result and error blocks', () => {
@@ -71,6 +147,8 @@ describe('snapshotOf', () => {
   it('keeps only the recognized phases', () => {
     expect(phaseKeyOf('validating')).toBe('phaseValidating')
     expect(phaseKeyOf('extracting')).toBe('phaseExtracting')
+    expect(phaseKeyOf('restoring')).toBe('phaseRestoring')
+    expect(phaseKeyOf('applying-settings')).toBe('phaseApplyingSettings')
     expect(phaseKeyOf('registering')).toBe('phaseRegistering')
     expect(phaseKeyOf('done')).toBe('phaseValidating')
   })
@@ -84,14 +162,23 @@ describe('failureOf', () => {
     })
     expect(failureOf({ message: 'no code' })).toBeUndefined()
     expect(failureOf(null)).toBeUndefined()
+    expect(failureOf({ code: 'busy', message: 7 })).toEqual({ code: 'busy', message: '' })
   })
 })
 
 describe('formatBytes', () => {
   it('formats bytes, KiB, and MiB without trailing noise', () => {
     expect(formatBytes(500)).toBe('500 B')
+    expect(formatBytes(1023)).toBe('1023 B')
+    expect(formatBytes(1024)).toBe('1.0 KiB')
     expect(formatBytes(2048)).toBe('2.0 KiB')
     expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MiB')
     expect(formatBytes(3 * 1024 ** 3 + 500 * 1024 ** 2)).toBe('3.5 GiB')
+  })
+
+  it('rounds hundred-scale units instead of decimals', () => {
+    expect(formatBytes(200 * 1024)).toBe('200 KiB')
+    expect(formatBytes(200 * 1024 * 1024)).toBe('200 MiB')
+    expect(formatBytes(150 * 1024 ** 3)).toBe('150 GiB')
   })
 })

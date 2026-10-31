@@ -175,6 +175,7 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
   }
 
   const startImport = async (): Promise<void> => {
+    // v8 ignore next 1 -- the start button is disabled while no file is chosen, so the guard cannot trip
     if (file === null) return
     setStarting(true)
     setImportError(null)
@@ -197,6 +198,7 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
       if (!isRecordWithJobId(body)) throw new Error(t('unexpectedResponse'))
       const seq = ++pollSeq.current
       setFile(null)
+      // v8 ignore next 1 -- the input stays mounted for the section's whole life, so the ref is never null here
       if (fileInputRef.current !== null) fileInputRef.current.value = ''
       pollJob(body['jobId'], seq)
     } catch (reason: unknown) {
@@ -409,6 +411,7 @@ function Result({ job, t, onDismiss }: {
 function filenameOf(disposition: string | null): string {
   if (disposition === null) return 'prism-transfer.zip'
   const utf8 = /filename\*=UTF-8''([^;]+)/iu.exec(disposition)
+  // v8 ignore next 1 -- the capture group always participates when the regex matches; the fallback only satisfies noUncheckedIndexedAccess
   if (utf8 !== null) return decodeURIComponent(utf8[1] ?? '')
   const plain = /filename="([^"]+)"/iu.exec(disposition)
   return plain?.[1] ?? 'prism-transfer.zip'

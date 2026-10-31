@@ -174,6 +174,82 @@ describe('applySettingsFile', () => {
     })
     expect(outcomes).toEqual([{ ns: 'web', outcome: 'failed', reason: 'settings changed again during import' }])
   })
+
+  it('reports non-Error write failures as their string form', async () => {
+    const deps = fakeDeps([descriptor('web', { endpoint: '/x' }, 7)], async () => {
+      throw 'storage vanished'
+    })
+    const outcomes = await applySettingsFile(deps, {
+      format: 'prism-settings',
+      version: 1,
+      exportedAt: 't',
+      includeSecrets: false,
+      namespaces: { web: { endpoint: '/new' } },
+    })
+    expect(outcomes).toEqual([{ ns: 'web', outcome: 'failed', reason: 'storage vanished' }])
+  })
+
+  it('skips a namespace that stops being active between a conflict and the retry', async () => {
+    const deps = fakeDeps([descriptor('web', { endpoint: '/x' }, 7)])
+    let calls = 0
+    const rows: SettingsDescriptor[] = [descriptor('web', { endpoint: '/x' }, 7)]
+    deps.describe = () => {
+      calls += 1
+      return calls >= 2 ? [] : rows
+    }
+    deps.update = async () => {
+      throw new SettingsConflictError('web' as never, 7, 8)
+    }
+    const outcomes = await applySettingsFile(deps, {
+      format: 'prism-settings',
+      version: 1,
+      exportedAt: 't',
+      includeSecrets: false,
+      namespaces: { web: { endpoint: '/new' } },
+    })
+    expect(outcomes).toEqual([{ ns: 'web', outcome: 'skipped', reason: 'namespace stopped being active during import' }])
+  })
+
+  it('reports Error and non-Error failures thrown by the fenced retry', async () => {
+    for (const thrown of [new Error('read-only volume'), 'read-only volume']) {
+      const deps = fakeDeps([descriptor('web', { endpoint: '/x' }, 7)])
+      let calls = 0
+      deps.update = async () => {
+        calls += 1
+        if (calls === 1) throw new SettingsConflictError('web' as never, 7, 8)
+        throw thrown
+      }
+      const outcomes = await applySettingsFile(deps, {
+        format: 'prism-settings',
+        version: 1,
+        exportedAt: 't',
+        includeSecrets: false,
+        namespaces: { web: { endpoint: '/new' } },
+      })
+      expect(outcomes).toEqual([{ ns: 'web', outcome: 'failed', reason: 'read-only volume' }])
+    }
+  })
+
+  it('skips namespaces whose schema declares no dict at all', async () => {
+    const rows: SettingsDescriptor[] = [{
+      ns: 'web',
+      autoGenerate: true,
+      schema: { type: 'object' },
+      value: { endpoint: '/x' },
+      revision: 2,
+      applies: 'live',
+    } as SettingsDescriptor]
+    const deps = fakeDeps(rows)
+    const outcomes = await applySettingsFile(deps, {
+      format: 'prism-settings',
+      version: 1,
+      exportedAt: 't',
+      includeSecrets: false,
+      namespaces: { web: { endpoint: '/new' } },
+    })
+    expect(outcomes).toEqual([{ ns: 'web', outcome: 'skipped', reason: expect.stringContaining('no field') }])
+    expect(deps.updates).toEqual([])
+  })
 })
 
 describe('parseSettingsText', () => {

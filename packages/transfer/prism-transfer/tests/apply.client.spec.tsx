@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 /** What the browser half registers: one settings section, its label, and its teardown. */
 
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, inject, NS } from '../src/client/index.ts'
+import { TransferSection, type TransferFace } from '../src/client/TransferSection.tsx'
 import { en, zh } from '../src/client/locales.ts'
+
+afterEach(cleanup)
 
 /** Fake workspace list with one registered project. */
 function fakeWorkspaces() {
@@ -26,7 +30,7 @@ function fakeWorkspaces() {
 }
 
 /** Mount the slots shell, locale runtime, and the transfer page. */
-async function bench(): Promise<{ ctx: Context; slots: SlotRegistry; locale: LocaleRuntime }> {
+async function bench(options: { pickResult?: unknown } = {}): Promise<{ ctx: Context; slots: SlotRegistry; locale: LocaleRuntime }> {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const slots = ctx.get('slots') as SlotRegistry
@@ -38,8 +42,9 @@ async function bench(): Promise<{ ctx: Context; slots: SlotRegistry; locale: Loc
   locale.setLocale('zh')
   ctx.provide('locale', locale)
   ctx.provide('workspaces', fakeWorkspaces() as never)
-  ctx.provide('remote', { directoryPicker: { pick: async () => null } } as never)
-  ctx.provide('remote.directoryPicker', { pick: async () => null } as never)
+  const pick = async (): Promise<unknown> => options.pickResult ?? null
+  ctx.provide('remote', { directoryPicker: { pick } } as never)
+  ctx.provide('remote.directoryPicker', { pick } as never)
   return { ctx, slots, locale }
 }
 
@@ -80,5 +85,53 @@ describe('transfer client', () => {
   it('registers the shared dictionary namespace under the transfer NS', () => {
     expect(NS).toBe('settings.transfer')
     expect(Object.keys(zh)).toEqual(Object.keys(en))
+  })
+
+  it('unwraps the picker Result for the section and reports its failure', async () => {
+    const { ctx, slots } = await bench({ pickResult: { ok: false, error: { message: 'nope' } } })
+    try {
+      const fiber = ctx.plugin({ inject, apply })
+      await fiber.await()
+      const entry = slots.entries('settings.section')[0]
+      // The inject thunk hands the section the face with the unwrapping picker.
+      const face = (entry?.inject as () => TransferFace)()
+      const t = (key: keyof typeof en): string => en[key]
+      render(<TransferSection
+        close={vi.fn()}
+        t={t}
+        workspaces={fakeWorkspaces() as never}
+        directoryPicker={face.directoryPicker}
+      />)
+      fireEvent.click(screen.getByText('Change…'))
+      await waitFor(() => {
+        expect(screen.getByText('No system directory picker on this deployment; keeping the default.')).toBeDefined()
+      })
+      await fiber.dispose()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('carries the picked directory through the unwrapped Result', async () => {
+    const { ctx, slots } = await bench({ pickResult: { ok: true, value: '/picked/root' } })
+    try {
+      const fiber = ctx.plugin({ inject, apply })
+      await fiber.await()
+      const face = (slots.entries('settings.section')[0]?.inject as () => TransferFace)()
+      const t = (key: keyof typeof en): string => en[key]
+      render(<TransferSection
+        close={vi.fn()}
+        t={t}
+        workspaces={fakeWorkspaces() as never}
+        directoryPicker={face.directoryPicker}
+      />)
+      fireEvent.click(screen.getByText('Change…'))
+      await waitFor(() => {
+        expect(screen.getByText('/picked/root')).toBeDefined()
+      })
+      await fiber.dispose()
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 })

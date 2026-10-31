@@ -22,6 +22,14 @@ describe('sanitizeProjectDirectoryName', () => {
     expect(() => new TextEncoder().encode(bounded)).not.toThrow()
   })
 
+  it('backs the 80-unit cut off a split surrogate pair', () => {
+    // 79 ASCII units followed by a two-unit emoji: the cut lands between
+    // the pair's halves, so the boundary backs off to 79 units.
+    const bounded = sanitizeProjectDirectoryName('x'.repeat(79) + '🙂', 'fallback')
+    expect(bounded).toBe('x'.repeat(79))
+    expect(() => new TextEncoder().encode(bounded)).not.toThrow()
+  })
+
   it('guards Windows reserved device names', () => {
     expect(sanitizeProjectDirectoryName('con', 'fallback')).toBe('_con')
     expect(sanitizeProjectDirectoryName('COM1', 'fallback')).toBe('_COM1')
