@@ -5,6 +5,8 @@
     - button "Models"
     - button "Built-in plugins"
     - button "Agent presets"
+    - button "Import"
+    - button "Backup"
   - button "Open configuration file"
   - button "Close"
   - text: Permission Choose the default permission mode for new sessions
@@ -12,9 +14,12 @@
   - text: Language
   - button "English"
   - text: Appearance
+  - button "System" [pressed]
   - button "Light"
   - button "Dark"
-  - button "System" [pressed]
+  - button "Graph Paper Glass"
+  - button "Single Accent"
+  - button "Lightness Strata"
   - text: Font size Only affects conversation content 14
   - button "Increase font size"
   - button "Decrease font size"
@@ -36,3 +41,5 @@
   - text: Upload Session Log when using the official model API Help improve DeepSeek models and products.
   - switch "Upload Session Log when using the official model API"
   - text: "Current version: {{version}}"
+  - link "Feedback":
+    - /url: https://github.com/laochenfei233/prism-agent/issues

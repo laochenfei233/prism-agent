@@ -5,8 +5,13 @@
   config:
     platformOrigin: "{{origin}}"
     allowLoopbackHttp: true
-# The scenario signs in from the account menu after initial setup.
+# The scenario signs in from the DeepSeek card on the Models page; the keyless
+# replay masks the ambient key, so the automatic first-run credential dialog is
+# suppressed to keep the DeepSeek card clickable.
 - id: ui-settings-account
   config:
     step: done
     completion: completed
+- id: ui-settings-models
+  config:
+    credentialOnboarding: false

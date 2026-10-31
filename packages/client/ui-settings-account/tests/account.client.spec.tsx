@@ -11,6 +11,7 @@ import { AccountPlatformHost } from '../src/client/AccountPlatformHost.tsx'
 import { AccountSection, type AccountSectionInjected, type AccountSnapshot } from '../src/client/AccountSection.tsx'
 import type { BonusNotice } from '../src/client/bonus-notices.ts'
 import type { AccountMenuProps } from '../src/client/AccountMenu.tsx'
+import type { DeepSeekSignInCardProps } from '../src/client/DeepSeekSignInCard.tsx'
 import type {} from '../src/client/index.ts'
 import { en, zh, type AccountKey } from '../src/client/locales.ts'
 import css from '../src/client/AccountSection.module.css'
@@ -36,7 +37,7 @@ function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<Accou
       theme: { getSnapshot: () => themeOf('light'), subscribe: () => () => {} },
     },
     hasRunningAccountTasks: vi.fn(async () => false),
-    contactUs: vi.fn(), showLogin: vi.fn(), setOnboarding: vi.fn(),
+    showLogin: vi.fn(), setOnboarding: vi.fn(),
     bonusNoticeShown: vi.fn(), bonusNoticeDismissed: vi.fn(),
     refreshAccount: vi.fn(() => Promise.resolve()),
     avatarFailed: vi.fn(),
@@ -134,14 +135,10 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={openSettings}
     t={key => key in copy ? copy[key as AccountKey] : key} />)
   fireEvent.click(screen.getByRole('button', { name: copy.menu }))
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([copy.settings, copy.contactUs, copy.signOut])
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([copy.settings, copy.signOut])
   await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot(`./expected/menu-${copy === en ? 'en' : 'zh'}.txt`)
   fireEvent.click(screen.getByRole('menuitem', { name: copy.settings }))
   expect(openSettings).toHaveBeenCalledOnce()
-  fireEvent.click(screen.getByRole('button', { name: copy.menu }))
-  fireEvent.click(screen.getByRole('menuitem', { name: copy.contactUs }))
-  expect(operations.contactUs).toHaveBeenCalledOnce()
-  expect(screen.queryByRole('menu')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: copy.menu }))
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: copy.signOut })) })
   expect(signOut).not.toHaveBeenCalled()
@@ -152,7 +149,7 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
 })
 
 it.each([en, zh])('updates the Settings menu keycaps and accessible combination from its owner', async (copy) => {
-  const operations = mount({ status: 'signed-out', attempt: null }, copy)
+  const operations = mount({ status: 'credential-stored', attempt: null }, copy)
   cleanup()
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
   const props: AccountMenuProps = {
@@ -180,25 +177,55 @@ it.each([en, zh])('updates the Settings menu keycaps and accessible combination 
   expect(props.openSettings).toHaveBeenCalledOnce()
 })
 
-it.each([en, zh])('offers settings, contact and sign-in from the signed-out account menu', async (copy) => {
+it.each([en, zh])('opens settings directly from the signed-out launcher, with no menu', async (copy) => {
   const openSettings = vi.fn()
   const operations = operationsOf({ status: 'signed-out', attempt: null })
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
   render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
     useAccount={selector => selector(operations.hooks.account.getSnapshot())}
-    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={openSettings}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide
+    openOnboarding={() => {}} openSettings={openSettings}
     t={key => key in copy ? copy[key as AccountKey] : key} />)
-  const trigger = screen.getByRole('button', { name: copy.menu })
-  expect(trigger.textContent).toBe(copy.more)
+  const trigger = screen.getByRole('button', { name: copy.settings })
+  expect(trigger.textContent).toBe(copy.settings)
   expect(trigger.querySelector('svg')).not.toBeNull()
+  expect(trigger.getAttribute('aria-haspopup')).toBeNull()
   fireEvent.click(trigger)
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([copy.settings, copy.contactUs, copy.signIn])
-  await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot(`./expected/menu-signed-out-${copy === en ? 'en' : 'zh'}.txt`)
-  fireEvent.click(screen.getByRole('menuitem', { name: copy.settings }))
   expect(openSettings).toHaveBeenCalledOnce()
-  fireEvent.click(screen.getByRole('button', { name: copy.menu }))
-  fireEvent.click(screen.getByRole('menuitem', { name: copy.contactUs }))
-  expect(operations.contactUs).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: copy.signIn })).toBeNull()
+})
+
+it.each([en, zh])('starts sign-in from the DeepSeek card and disappears once the credential is stored', async (copy) => {
+  let state: Omit<AccountView, 'links'> = { status: 'signed-out', attempt: null }
+  const operations = operationsOf(state)
+  const links = { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' }
+  operations.hooks.account.getSnapshot = () => ({ view: { ...state, links }, details: undefined, avatar: undefined, failed: false })
+  const { DeepSeekSignInCard } = await import('../src/client/DeepSeekSignInCard.tsx')
+  const official = {
+    provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true,
+  } as const
+  const props: DeepSeekSignInCardProps = {
+    ...({} as GlobalStandardProps), ...operations, provider: official, configured: true, keyConfigured: false,
+    useAccount: selector => selector(operations.hooks.account.getSnapshot()),
+    useTheme: selector => selector(operations.hooks.theme.getSnapshot()),
+    t: key => key in copy ? copy[key as AccountKey] : key,
+  }
+  const view = render(<DeepSeekSignInCard {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: copy.signIn }))
+  expect(operations.start).toHaveBeenCalledOnce()
+  state = { status: 'credential-stored', attempt: null }
+  view.rerender(<DeepSeekSignInCard {...props} />)
+  expect(screen.queryByRole('button', { name: copy.signIn })).toBeNull()
+})
+
+it('renders the General feedback row with the configured issues address', async () => {
+  const { FeedbackRow } = await import('../src/client/FeedbackRow.tsx')
+  render(<FeedbackRow {...({} as GlobalStandardProps)} issuesUrl="https://github.com/example/test/issues"
+    t={key => en[key as AccountKey]} />)
+  const link = screen.getByRole('link', { name: en.contactUs })
+  expect(link.getAttribute('href')).toBe('https://github.com/example/test/issues')
+  expect(link.getAttribute('target')).toBe('_blank')
 })
 
 it('reports a failed start in the login dialog, not as a sidebar alert', async () => {
@@ -216,8 +243,9 @@ it('reports a failed start in the login dialog, not as a sidebar alert', async (
     useAccount={selector => selector(snapshot)} useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
     wide openOnboarding={() => {}} openSettings={() => {}}
     t={key => key in en ? en[key as AccountKey] : key} />)
-  fireEvent.click(screen.getByRole('button', { name: en.menu }))
-  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: en.signIn })) })
+  // The DeepSeek card's click reaches the launcher-hosted dialog through the
+  // published snapshot, not through launcher chrome.
+  await act(async () => { start() })
   expect(start).toHaveBeenCalledOnce()
   expect(screen.queryByRole('alert')).toBeNull()
   view.rerender(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false} start={start}

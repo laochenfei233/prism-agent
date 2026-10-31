@@ -5,6 +5,8 @@
     - button "模型"
     - button "内置插件"
     - button "Agent 预设"
+    - button "导入"
+    - button "备份"
   - button "打开配置文件"
   - button "关闭"
   - heading "模型" [level=2]
@@ -19,4 +21,5 @@
       - group: 自定义设置
       - button "取消"
       - button "保存"
+      - button "登录"
   - button "添加模型提供商"

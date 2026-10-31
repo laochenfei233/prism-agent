@@ -116,7 +116,8 @@ These pages cover the settings base, the seams this page joins, and the design r
 
 -----
 
-The `settings.models.sign-in` slot lets account login offer a choice before the credential editor; without a contributor the editor renders directly. Closing the account choice completes the whole onboarding step. Explicit reopening from the account menu enters the same editor even when a provider is already configured.
+<!-- PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13. -->
+The `settings.models.sign-in` slot lets account login offer a choice before the credential editor; without a contributor the editor renders directly. Closing the account choice completes the whole onboarding step. Explicit reopening enters the same editor even when a provider is already configured: while the account is signed out, the account plugin's `settings.models.provider-card` entry (key `llm-deepseek`) shows the Sign in action on this page's DeepSeek card.
 
 <a id="model-experience"></a>
 ## Model Experience

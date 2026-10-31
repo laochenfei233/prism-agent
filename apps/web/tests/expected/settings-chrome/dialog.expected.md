@@ -5,6 +5,8 @@
     - button "模型"
     - button "内置插件"
     - button "Agent 预设"
+    - button "导入"
+    - button "备份"
   - button "打开配置文件"
   - button "关闭"
   - text: 权限 选择新会话的默认权限模式
@@ -12,9 +14,12 @@
   - text: 语言
   - button "中文"
   - text: 外观
+  - button "跟随系统" [pressed]
   - button "浅色"
   - button "深色"
-  - button "跟随系统" [pressed]
+  - button "方格纸玻璃卡"
+  - button "单强调色"
+  - button "暗底明度分层"
   - text: 字号大小 仅影响会话内容的字号 14
   - button "增大字号"
   - button "减小字号"
@@ -36,3 +41,5 @@
   - text: 在使用官方模型 API 时上传 Session Log 帮助改进 DeepSeek 模型与产品
   - switch "在使用官方模型 API 时上传 Session Log"
   - text: 当前版本：{{version}}
+  - link "意见反馈":
+    - /url: https://github.com/laochenfei233/prism-agent/issues

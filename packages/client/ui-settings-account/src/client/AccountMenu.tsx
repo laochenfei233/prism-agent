@@ -1,7 +1,8 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 /** Sidebar account launcher and locally authoritative sign-out action. */
 import { useEffect, useRef, useState } from 'react'
 import {
-  Toast, Menu, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  Toast, Menu, IconSettingsOutlineMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
@@ -22,7 +23,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, bonusNoticeShown, bonusNoticeDismissed,
-  contactUs, showLogin, start, cancel, avatarFailed, t,
+  showLogin, start, cancel, avatarFailed, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
@@ -52,8 +53,6 @@ export function AccountMenu({
     catch (_error) { setSignOutImpact('unknown'); setOpen(false) }
     finally { setBusy(false) }
   }
-  // The plugin's start publishes `loginFailed` before it rejects, so the dialog owns the report.
-  const beginSignIn = (): void => { setOpen(false); void start().catch(() => undefined) }
   return <div ref={anchor} className={css.root}>
     {signInNotice > 0 && <Toast key={signInNotice} text={t('modelSignInRequired')} onDone={() => { setSignInNotice(0) }} />}
     {expiryNotice && <Toast text={t('sessionExpired')} onDone={() => { setExpiryNotice(false) }} />}
@@ -61,30 +60,34 @@ export function AccountMenu({
       notices={account.notices}
       anchor={anchor} title={t('bonusNoticeTitle')} closeLabel={t('close')}
       onShown={bonusNoticeShown} onDismiss={bonusNoticeDismissed} />}
-    <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={signedIn ? undefined : css.signedOutMenu}
-      anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!signedIn} aria-label={t('menu')}
-        aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
-        {signedIn
-          ? <span className={css.avatar} data-avatar-status={account.avatar?.status}>
-            <AccountAvatar avatar={account.avatar} avatarFailed={avatarFailed} />
-          </span>
-          : <IconEllipsisOutlineMedium size={14} />}
-        {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
-      </button>}
-      items={[
-        { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
-          ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
-        { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
-        ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
-          : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
-      ]}
-      onClose={() => { setOpen(false) }}
-      onSelect={(id) => {
-        if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
-        else if (id === 'contact') { setOpen(false); contactUs() }
-        else if (id === 'signin') beginSignIn()
-        else void requestSignOut()
-      }} />
+    {signedIn
+      ? (
+        <Menu open={open} side="top" portal autoFocus className={css.anchor}
+          anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} aria-label={t('menu')}
+            aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
+            <span className={css.avatar} data-avatar-status={account.avatar?.status}>
+              <AccountAvatar avatar={account.avatar} avatarFailed={avatarFailed} />
+            </span>
+            {wide && <span className={css.label}>{label}</span>}
+          </button>}
+          items={[
+            { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
+              ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
+            { id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy },
+          ]}
+          onClose={() => { setOpen(false) }}
+          onSelect={(id) => {
+            if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
+            else void requestSignOut()
+          }} />
+      )
+      : (
+        <button type="button" className={css.trigger} data-collapsed={!wide} aria-label={t('settings')}
+          onClick={() => { openSettings() }}>
+          <IconSettingsOutlineMedium size={16} />
+          {wide && <span className={css.label}>{t('settings')}</span>}
+        </button>
+      )}
     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
       start={start} cancel={cancel} t={t}
       close={() => { showLogin(false) }} useApiKey={() => { showLogin(false); openOnboarding('deepseek-official') }} />}

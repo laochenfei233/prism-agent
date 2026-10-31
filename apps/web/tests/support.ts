@@ -329,11 +329,17 @@ export function conversationContextKey(kind: string, id: string): string {
   return `${kind.length}:${kind}${id}`
 }
 
-/** Open Settings through the sidebar account menu.
+/** Open Settings through the signed-out launcher or the signed-in account menu.
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
-export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<void> {
+export async function openSettings(page: Page, locale: 'zh' | 'en'): Promise<void> {
+  const label = locale === 'zh' ? '设置' : 'Settings'
+  const launcher = page.getByRole('button', { name: label, exact: true })
+  if (await launcher.count() > 0) {
+    await launcher.click()
+    return
+  }
   await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
-  await page.getByRole('menuitem', { name: locale === 'zh' ? '设置' : 'Settings', exact: true }).click()
+  await page.getByRole('menuitem', { name: label, exact: true }).click()
 }
