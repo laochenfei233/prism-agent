@@ -338,4 +338,11 @@ mod cmd_start_tests {
             assert!(!is_cmd_startable(url), "{url}");
         }
     }
+
+    #[test]
+    fn open_with_os_refuses_a_metacharacter_url() {
+        let error = super::open_with_os("https://example.test/?a=1&calc")
+            .expect_err("the cmd fallback must refuse a metacharacter URL");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
 }

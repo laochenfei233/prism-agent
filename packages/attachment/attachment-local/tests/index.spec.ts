@@ -132,10 +132,14 @@ describe('local attachment service', () => {
     }
   })
 
-  it('refuses a stored image that exceeds the admission limits', async () => {
+  it.each([
+    [{ maxImageBytes: 1 }, 'IMAGE_TOO_LARGE'],
+    [{ maxImagePixels: 1 }, 'IMAGE_TOO_MANY_PIXELS'],
+    [{ maxImageDimension: 2 }, 'IMAGE_DIMENSION_TOO_LARGE'],
+  ] as const)('refuses a stored image beyond %o', async (limits, code) => {
     const dshHome = await mkdtemp(join(tmpdir(), 'dsh-attachment-unadmitted-'))
     try {
-      const service = new LocalAttachmentStore(new Context(), { dshHome, maxImageDimension: 2 })
+      const service = new LocalAttachmentStore(new Context(), { dshHome, ...limits })
       const data = new Uint8Array(await sharp({
         create: { width: 4, height: 4, channels: 3, background: { r: 1, g: 2, b: 3 } },
       }).png().toBuffer())
@@ -152,7 +156,7 @@ describe('local attachment service', () => {
       }
 
       // The object bypassed saveImage (as an import copy does); the read path refuses it.
-      await expect(service.readImage(ref)).rejects.toMatchObject({ code: 'IMAGE_DIMENSION_TOO_LARGE' })
+      await expect(service.readImage(ref)).rejects.toMatchObject({ code })
     } finally {
       await rm(dshHome, { recursive: true, force: true })
     }

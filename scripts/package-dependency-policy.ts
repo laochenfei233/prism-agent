@@ -64,10 +64,9 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   // `instanceof` checks need the translator's own class instance.
   '@deepseek-ai/dsh-experimental-translator': ['TranslationError'],
   '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'createScope', 'scopeOf', 'scopeTarget'],
-  // The reader's vocabulary decides whether an imported log stays openable, so
-  // a duplicate session package could admit a log this harness cannot reopen.
-  '@deepseek-ai/dsh-session': ['KNOWN_SESSION_EVENT_TYPES', 'SESSION_FORMAT_VERSION', 'adoptSessionEvent'],
-  '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
+  '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION'],
+  // The importer validates foreign logs with the provider's own reader grammar.
+  '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError', 'validateStoredEvents'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */

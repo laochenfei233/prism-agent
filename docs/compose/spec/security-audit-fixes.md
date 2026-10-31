@@ -35,13 +35,13 @@ The shell backends keep their own grant spellings and still derive writable root
 
 ### [S2.2] Foreign-record validation before a native import is written
 
-`SessionImportEngine.writeNative` validates every foreign event before it creates the session: an event type outside `KNOWN_SESSION_EVENT_TYPES` that is not marked `ignorable` fails the row, and every event passes `adoptSessionEvent`, the same envelope and message validation the reader applies. A refused log becomes a `failed` import row with the reader's reason and writes nothing, so no bricked session is created, no wrong refusal cause is stored, and the duplicate check cannot block a later repair.
+`SessionImportEngine.writeNative` validates the foreign log with the stored reader's own `validateStoredEvents` before it creates the session: an unknown required type, the retired `request/header` fallback, or an invalid envelope fails the row before anything is written. A refused log becomes a `failed` import row with the reader's reason and writes nothing, so no bricked session is created, no wrong refusal cause is stored, and the duplicate check cannot block a later repair.
 
 Attribution is unchanged: imported events still carry the source's provider and model, just as the normalized path labels foreign user text with `source.kind: 'user'`. The event vocabulary has no imported-content provenance marker on any path, so whether preserved foreign attribution needs one is a product decision recorded here as deferred.
 
 ### [S2.3] Admission limits enforced when a stored image is read
 
-`LocalAttachmentStore.readImage` re-checks the verified reference against the store's admission limits before returning bytes: media type membership, encoded bytes, total pixels, and per-side dimension. Every consumer reads images through that method, including `readImageRequest`, which re-encodes from the same verified bytes. A foreign attachment object copied into the store by the import can therefore no longer feed a decoded image past the configured pixel and dimension caps into sharp or into a provider request.
+`LocalAttachmentStore.readImage` re-checks the verified reference against the store's admission limits before returning bytes: encoded bytes, total pixels, and per-side dimension, in the same order admission applies. The verified reference already matches the stored header's media type, so type membership needs no separate check. Every consumer reads images through that method, including `readImageRequest`, which re-encodes from the same verified bytes. A foreign attachment object copied into the store by the import can therefore no longer feed a decoded image past the configured pixel and dimension caps into sharp or into a provider request.
 
 The copy still skips the staged `0400` publication; that mode is not what protects the bytes inside the owner-private store, because every read re-verifies the digest and the reference fields. Bytes and metadata are authoritative; file mode is not.
 
@@ -77,7 +77,7 @@ The copy still skips the staged `0400` publication; that mode is not what protec
 
 - [ ] `workspace-write` writes and edits under `$DSH_HOME` are refused with `FS_SANDBOX_DENIED`, no file is created, and a `danger-full-access` call still writes.
 - [ ] A native import whose log carries an unknown required event type returns a `failed` row and creates no session; a known log still imports natively.
-- [ ] `readImage` refuses a stored image above the configured pixel or dimension cap with an admission error code, and still returns an admitted image.
+- [ ] `readImage` refuses a stored image above a configured byte, pixel, or dimension cap with an admission error code, and still returns an admitted image.
 - [ ] The release workflow passes the signing key to both build steps and uploads `.sig`, `latest.json`, and `.app.tar.gz`.
 - [ ] An unauthenticated `/preview.html` request receives the index 401 response, while an authenticated one serves the page.
 - [ ] `open_with_os` refuses a URL with shell metacharacters on Windows and accepts a plain `https` URL.

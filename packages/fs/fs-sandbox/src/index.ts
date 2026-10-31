@@ -61,8 +61,9 @@ export class SandboxedFileSystem extends LocalFileSystem {
    * Canonical harness home. It holds composition the host consumes — the home
    * patch, profile patches, installed bundle sources — and the loader executes
    * that composition as host-process JavaScript, so a model write there is code
-   * execution rather than a workspace edit. Resolved once from the same
-   * `$DSH_HOME`/`~/.prism` source every home-rooted store uses.
+   * execution rather than a workspace edit. Resolved once from `$DSH_HOME`/
+   * `~/.prism`, the environment source the shipped composition resolves; a store
+   * configured with an explicit home can differ.
    */
   private readonly harnessHome: string
   constructor(ctx: Context, config: Config) {

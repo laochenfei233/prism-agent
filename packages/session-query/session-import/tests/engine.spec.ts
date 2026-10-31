@@ -387,6 +387,31 @@ describe('SessionImportEngine apply', () => {
     expect(fakesValue.stored.size).toBe(0)
   })
 
+  it('refuses the retired request/header fallback the reader would reject', async () => {
+    const root = await rootOf('native-retired')
+    const cwd = join(root, 'project')
+    await mkdir(cwd)
+    const sourceHome = join(root, 'dsh')
+    const id = 'source-retired'
+    await write(join(sourceHome, 'sessions', '--proj--', id, 'session.v4.jsonl'), JSON.stringify({
+      type: 'session', version: 4, id, createdAt: 1000, cwd, isSeeded: false, delegationDepth: 0,
+    }) + '\n' + JSON.stringify({ type: 'request/header', seq: 0, time: 1100, data: { reason: 'fallback' } }))
+    const fakesValue = fakes()
+    const engine = new SessionImportEngine({
+      persistence: fakesValue.persistence,
+      workspaces: fakesValue.registry,
+      currentHome: join(root, 'prism'),
+      roots: { dsh: join(sourceHome, 'sessions') },
+      maxMessages: 2000,
+      maxMessageTextBytes: 32768,
+    })
+
+    const result = await engine.apply({ source: 'dsh', sessionIds: [id] })
+    expect(result.results[0]).toMatchObject({ key: id, outcome: 'failed' })
+    expect(result.results[0]?.reason).toContain('fallback')
+    expect(fakesValue.stored.size).toBe(0)
+  })
+
   it('imports a foreign log whose unknown event is explicitly ignorable', async () => {
     const root = await rootOf('native-ignorable')
     const cwd = join(root, 'project')

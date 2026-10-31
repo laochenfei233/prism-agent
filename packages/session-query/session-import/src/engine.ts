@@ -13,14 +13,13 @@ import { cp } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
 import { brandNumber, brandString } from '@deepseek-ai/dsh-brand'
 import {
-  adoptSessionEvent,
-  KNOWN_SESSION_EVENT_TYPES,
   SESSION_FORMAT_VERSION,
   type SessionEvent,
   type SessionHeader,
   type SessionId,
   type SessionSeq,
 } from '@deepseek-ai/dsh-session'
+import { validateStoredEvents } from '@deepseek-ai/dsh-session-persistence'
 import type { AssistantMessage, MessageId, UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-title'
 import { SOURCE_READERS } from './sources/index.ts'
@@ -133,24 +132,18 @@ export class ImportEngineError extends Error {
 
 /**
  * Refuse foreign events this harness could not reopen. The stored reader
- * refuses an unknown type that is not `ignorable` and validates every copied
- * event envelope, so appending such a log first would only create a Session
- * that fails to open — with the reader's "newer harness" cause — and the
- * duplicate check would then block a repair.
+ * refuses an unknown required type, a retired `request/header` fallback, and an
+ * invalid copied envelope, so appending such a log first would only create a
+ * Session that fails to open — with the reader's "newer harness" cause — and the
+ * duplicate check would then block a repair. The validation is the reader's own
+ * `validateStoredEvents`, so the import cannot drift from the stored grammar.
+ * @param header - the header the events will be stored under.
  * @param events - decoded foreign records about to be appended verbatim.
- * @throws {ImportEngineError} when the reader would refuse the log.
+ * @returns the validated events, adopted by the same grammar the reader uses.
+ * @throws when the reader would refuse the log.
  */
-function assertReadableEvents(events: readonly SessionEvent[]): void {
-  for (const event of events) {
-    if (!KNOWN_SESSION_EVENT_TYPES.has(event.type) && event.ignorable !== true) {
-      throw new ImportEngineError(
-        'import-failed',
-        `foreign session contains event type "${event.type}" (seq ${event.seq}) unknown to this harness; `
-        + 'refusing to import a log it cannot reopen',
-      )
-    }
-    adoptSessionEvent(event)
-  }
+function readableEvents(header: SessionHeader, events: SessionEvent[]): SessionEvent[] {
+  return validateStoredEvents(header, events)
 }
 
 /** Pure import planning and writing. */
@@ -398,8 +391,6 @@ export class SessionImportEngine {
     if ((await this.options.persistence.stat(id)) !== undefined) {
       return { key, outcome: 'duplicate', sessionId: id }
     }
-    assertReadableEvents(native.events)
-    await this.copyAttachments()
     const cwd = group.path ?? native.header.cwd
     const header: SessionHeader = {
       version: SESSION_FORMAT_VERSION,
@@ -409,14 +400,16 @@ export class SessionImportEngine {
       isSeeded: false,
       delegationDepth: 0,
     }
+    const events = readableEvents(header, [...native.events])
+    await this.copyAttachments()
     const handle = await this.options.persistence.create(header)
     try {
-      await handle.append(native.events)
+      await handle.append(events)
       await handle.flush()
     } finally {
       await handle.close()
     }
-    return this.finish(key, header, native.events, group, workspaceFor, workspaces)
+    return this.finish(key, header, events, group, workspaceFor, workspaces)
   }
 
   /**

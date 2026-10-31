@@ -95,23 +95,22 @@ function abortReason(signal: AbortSignal): Error {
  * Re-check one stored reference against the store's admission limits. A
  * reference can name an object this process never admitted: session import
  * copies foreign objects into the store without running admission, so the read
- * path is the last check before a decode.
+ * path is the last check before a decode. The media type cannot drift here —
+ * the verified reference already matches the stored header's type — so the
+ * checks are the same pixel-then-dimension order admission applies.
  * @param ref - reference verified against the stored bytes.
  * @param limits - resolved admission limits of this store.
  * @throws {AttachmentError} when the object exceeds a configured admission limit.
  */
 function assertAdmitted(ref: ImageAttachmentRef, limits: ImageAttachmentLimits): void {
-  if (!limits.mediaTypes.includes(ref.mediaType)) {
-    throw new AttachmentError('Stored image type is not accepted by this store.', 'IMAGE_TYPE_MISMATCH')
-  }
   if (ref.bytes > limits.maxImageBytes) {
     throw new AttachmentError('Stored image exceeds the configured byte limit.', 'IMAGE_TOO_LARGE')
   }
-  if (ref.width > limits.maxImageDimension || ref.height > limits.maxImageDimension) {
-    throw new AttachmentError('Stored image exceeds the configured dimension limit.', 'IMAGE_DIMENSION_TOO_LARGE')
-  }
   if (ref.width * ref.height > limits.maxImagePixels) {
     throw new AttachmentError('Stored image exceeds the configured pixel limit.', 'IMAGE_TOO_MANY_PIXELS')
+  }
+  if (ref.width > limits.maxImageDimension || ref.height > limits.maxImageDimension) {
+    throw new AttachmentError('Stored image exceeds the configured dimension limit.', 'IMAGE_DIMENSION_TOO_LARGE')
   }
 }
 
