@@ -130,22 +130,6 @@ export class ImportEngineError extends Error {
   }
 }
 
-/**
- * Refuse foreign events this harness could not reopen. The stored reader
- * refuses an unknown required type, a retired `request/header` fallback, and an
- * invalid copied envelope, so appending such a log first would only create a
- * Session that fails to open — with the reader's "newer harness" cause — and the
- * duplicate check would then block a repair. The validation is the reader's own
- * `validateStoredEvents`, so the import cannot drift from the stored grammar.
- * @param header - the header the events will be stored under.
- * @param events - decoded foreign records about to be appended verbatim.
- * @returns the validated events, adopted by the same grammar the reader uses.
- * @throws when the reader would refuse the log.
- */
-function readableEvents(header: SessionHeader, events: SessionEvent[]): SessionEvent[] {
-  return validateStoredEvents(header, events)
-}
-
 /** Pure import planning and writing. */
 export class SessionImportEngine {
   private attachmentsCopied = false
@@ -400,7 +384,12 @@ export class SessionImportEngine {
       isSeeded: false,
       delegationDepth: 0,
     }
-    const events = readableEvents(header, [...native.events])
+    // Refuse a log the stored reader would refuse, with the reader's own
+    // grammar: an unknown required type, a retired request/header fallback, or
+    // an invalid envelope would otherwise be stored and then fail to open, and
+    // the duplicate check would block a repair. The validator adopts events in
+    // place, so it receives an exclusively owned copy.
+    const events = validateStoredEvents(header, [...native.events])
     await this.copyAttachments()
     const handle = await this.options.persistence.create(header)
     try {
