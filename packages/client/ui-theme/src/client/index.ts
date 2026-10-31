@@ -564,12 +564,12 @@ function sectionCustomPresets(section: ThemeSettings): CustomThemePreset[] {
     const name = candidate.name.trim()
     if (name === '' || codePointLength(name) > CUSTOM_PRESET_NAME_MAX) continue
     if (candidate.scheme !== 'light' && candidate.scheme !== 'dark') continue
-    if (!isHexColor(candidate.canvas) || !isHexColor(candidate.accent)) continue
+    const { canvas, accent } = candidate
+    if (canvas === undefined || accent === undefined) continue
+    if (!isHexColor(canvas) || !isHexColor(accent)) continue
     if (presets.some(saved => saved.name === name)) continue
     if (presets.length >= CUSTOM_PRESETS_MAX) break
-    presets.push({
-      name, scheme: candidate.scheme, canvas: normalizeHexColor(candidate.canvas), accent: normalizeHexColor(candidate.accent),
-    })
+    presets.push({ name, scheme: candidate.scheme, canvas: normalizeHexColor(canvas), accent: normalizeHexColor(accent) })
   }
   return presets
 }
