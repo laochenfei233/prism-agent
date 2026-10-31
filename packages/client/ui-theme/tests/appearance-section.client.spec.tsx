@@ -6,6 +6,7 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { allowAllAccess, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import type { CustomThemeInputs } from '../src/theme-settings.ts'
 import { AppearanceSection } from '../src/client/AppearanceSection.tsx'
 import type { AppearanceSectionComponentProps } from '../src/client/AppearanceSection.tsx'
 import { createAppearanceSectionStore } from '../src/client/settings-store.ts'
@@ -66,7 +67,7 @@ type AttentionSnapshot = Parameters<Parameters<AppearanceSectionComponentProps['
 const noAttention: AttentionSnapshot = new Map()
 const useSessionStatus: AppearanceSectionComponentProps['useSessionStatus'] = selector => selector(noAttention)
 
-function mount(preference: ThemePreference = 'system', custom = DEFAULT_CUSTOM) {
+function mount(preference: ThemePreference = 'system', custom: CustomThemeInputs = DEFAULT_CUSTOM) {
   const store = createAppearanceSectionStore().create()
   store.actions.sync(preference, GALLERY, SIZES, FONTS, custom, 0)
   const setTheme = vi.fn()
@@ -77,7 +78,7 @@ function mount(preference: ThemePreference = 'system', custom = DEFAULT_CUSTOM) 
     close: () => {},
     useSessions: emptySessions(),
     useSessionStatus,
-    usePanelInfo, useResource,
+    usePanelInfo, useResource, useSessionRetainInfo: () => undefined,
     useWorkspaces: emptyWorkspaces(),
     ...allowAllAccess,
     useStore: bindSnapshotSelector(store),

@@ -63,7 +63,7 @@ describe('AppearanceRow', () => {
   it('labels a designed theme from the locale dictionary and falls back to the id', () => {
     mount('system', [
       ...GALLERY,
-      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a' },
+      { id: 'sepia', base: '#f4ecd8', surface: '#efe3c8', accent: '#7c5b2a', motif: 'plain' as const },
     ])
     expect(screen.getByText('Single Accent')).toBeDefined()
     expect(screen.getByText('sepia')).toBeDefined()

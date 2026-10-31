@@ -5,6 +5,9 @@ import {
   normalizeHexColor, ThemeSettingsSchema, type ThemeSettings,
 } from '../src/theme-settings.ts'
 
+/** The schema is the durable wire validator; tests feed it raw partial documents. */
+const parseSection = ThemeSettingsSchema as (input: object) => ThemeSettings
+
 const settings = (overrides: Partial<ThemeSettings>): ThemeSettings => ({
   preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
   textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
@@ -35,7 +38,7 @@ describe('normalizeHexColor', () => {
 
 describe('ThemeSettingsSchema custom fields', () => {
   it('defaults the custom fields so older documents load unchanged', () => {
-    const section = ThemeSettingsSchema({}) as ThemeSettings
+    const section = parseSection({})
     expect(section.customScheme).toBe('light')
     expect(section.customCanvas).toBe('#ffffff')
     expect(section.customAccent).toBe('#ff6900')
@@ -43,12 +46,12 @@ describe('ThemeSettingsSchema custom fields', () => {
   })
 
   it('accepts a custom preference with hex colors and rejects malformed ones', () => {
-    const section = ThemeSettingsSchema({ customScheme: 'dark', customCanvas: '#112233', customAccent: '#f60' }) as ThemeSettings
+    const section = parseSection({ customScheme: 'dark', customCanvas: '#112233', customAccent: '#f60' })
     expect(section.customScheme).toBe('dark')
     expect(section.customCanvas).toBe('#112233')
     expect(section.customAccent).toBe('#f60')
-    expect(() => { ThemeSettingsSchema({ customCanvas: 'orange' }) }).toThrow()
-    expect(() => { ThemeSettingsSchema({ customAccent: '#12345' }) }).toThrow()
+    expect(() => { parseSection({ customCanvas: 'orange' }) }).toThrow()
+    expect(() => { parseSection({ customAccent: '#12345' }) }).toThrow()
   })
 })
 
