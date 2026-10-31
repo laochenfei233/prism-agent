@@ -64,12 +64,12 @@ all four extra directions, fonts moved, compose-next workflow).
   - Surfaces derive from the canvas: layer steps lighten by fixed deltas
     (+3/6/9% light, +5/10/15% dark) with saturation clamped to <= 8%;
     borders use the desaturated canvas hue at the existing alpha ramp
-    (7/11/15/20% light, 7/12/16/20% dark).
+    (7/11/15/20% light, 6/12/16/20% dark).
   - Label ramps are the proven base-palette ink values per scheme, never
     derived — contrast is guaranteed for canvases in the scheme's lightness
     band (documented assumption; the user picks the canvas).
   - Accent spends like `mono-accent`: brand/link/button fills/business =
-    accent; hover darkens 10% (light) or lightens 12% (dark); dimmed and
+    accent; hover darkens 8% (light) or lightens 10% (dark); dimmed and
     interactive layers use accent alphas; `brand-primary-invert` resolves to
     white or near-black by WCAG luminance. Success/warn fold to neutral;
     error keeps the platform red (mono-accent precedent).
@@ -90,7 +90,7 @@ all four extra directions, fonts moved, compose-next workflow).
 token the existing designed themes override, plus `bootBackground`):
 
 - `paper` 纸感 (light, boot `#f4eee1`): canvas-image is an inline SVG
-  feTurbulence grain data-URI (~2.5% opacity); warm cream ramp
+  feTurbulence grain data-URI (3.5% alpha); warm cream ramp
   `#f4eee1`/`#faf6ec`/`#fcf9f2`/`#fefcf6`; warm umber hairline borders; ink
   `#35291a` label ramp; vermilion `#c2402a` accent and buttons.
 - `blueprint` 蓝晒图 (dark, boot `#10293f`): 32px white grid canvas-image;
@@ -103,7 +103,8 @@ token the existing designed themes override, plus `bootBackground`):
   business; success/warn fold neutral; error keeps platform red.
 - `sumi` 墨韵 (light, boot `#fafaf8`): no texture; cool paper ramp
   `#fafaf8`/`#f3f3f0`/`#ecece8`/`#e4e4df`; neutral ink borders; ink `#1c1c1a`
-  labels; cinnabar `#c73a2d` accent.
+  labels; ink-black brand and buttons with cinnabar `#b53a26` on links, the
+  business state, and the selected row.
 - `sage` 苔原绿 (light, boot `#edf0e8`): green-gray ramp
   `#edf0e8`/`#f4f6ef`/`#f9faf4`/`#fcfdf9`; green-gray hairlines; deep
   green-ink `#26332a` labels; moss `#3f6b4a` accent.

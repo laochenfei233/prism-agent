@@ -9,8 +9,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { bootThemeInjections } from './boot-theme.ts'
 import {
-  CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_SCHEME_FIELD, DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS,
-  DEFAULT_CUSTOM_SCHEME, DEFAULT_PREFERENCE, FONT_SIZE_SPECS, fontSizeSchema, HEX_COLOR_PATTERN, THEME_PREFERENCES,
+  DEFAULT_CUSTOM_ACCENT, DEFAULT_CUSTOM_CANVAS, DEFAULT_CUSTOM_SCHEME, DEFAULT_PREFERENCE, FONT_SIZE_SPECS,
+  fontSizeSchema, HEX_COLOR_PATTERN, THEME_PREFERENCES,
 } from './theme-settings.ts'
 
 export {
@@ -52,9 +52,9 @@ export const Config = z.object({
   textFontFamily: z.string().default('').volatile(),
   codeFontFamily: z.string().default('').volatile(),
   terminalFontFamily: z.string().default('').volatile(),
-  [CUSTOM_SCHEME_FIELD]: z.union(['light', 'dark']).default(DEFAULT_CUSTOM_SCHEME).volatile(),
-  [CUSTOM_CANVAS_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS).volatile(),
-  [CUSTOM_ACCENT_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT).volatile(),
+  customScheme: z.union(['light', 'dark']).default(DEFAULT_CUSTOM_SCHEME).volatile(),
+  customCanvas: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS).volatile(),
+  customAccent: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT).volatile(),
 })
 
 /** Supply the current palette before browser plugins start.
