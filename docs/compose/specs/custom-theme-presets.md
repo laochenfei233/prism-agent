@@ -1,14 +1,58 @@
 ---
 feature: custom-theme-presets
-status: in-progress
+status: delivered
 updated: 2026-10-31
 branch: feat/custom-theme-presets
-commits: 0d1cb5bf50.. # filled at delivery
+commits: 0d1cb5bf50..81d23f693f
 ---
 
 # Custom theme presets: save, apply, and delete named color schemes
 
 ## Report
+
+**What was built** — The custom theme's three inputs can be kept as named
+presets: a save row (name input + Save) in the custom-theme group stores the
+current scheme/canvas/accent under a name, each saved preset is a chip that
+re-applies its colors through the existing `setCustom` path (switching the
+preference to `custom` and re-synthesizing live), and a per-chip × deletes the
+entry without touching the active look. Presets persist as
+`ThemeSettings.customPresets` (additive, default `[]`, item schema with a
+non-empty name and hex colors, capped at 16 by the writer and the runtime
+adopter, which also drops hand-edited junk and normalizes colors), mirror into
+the Host `Config` (literal key, catalog regenerated), ride
+`ThemeSnapshot.customPresets` through the section store, and never affect
+first paint.
+
+**Verification** — `pnpm vitest run packages/client/ui-theme/tests/ …packages/client/ui-settings-general/tests/` 245 PASS (2 failures PRE-EXISTING
+on base: the corner-shape-styles and scrollbar-styles stylesheet scans flagging
+session-import CSS); `pnpm run typecheck` PASS; `pnpm run build` (incl.
+build:check) PASS; `verify-config-catalog` PASS after regeneration; scoped
+oxlint over `packages/client/ui-theme` clean (the repo-wide `pnpm run lint`
+carries ~310 PRE-EXISTING errors from master); coverage on
+`client/index.ts`/`CustomThemeGroup.tsx`/`theme-settings.ts` at 100/100/100/100
+in the joint run (the section-label arrow is covered by the general-shell
+composition specs, as CI runs it); visual walkthrough in the real app saved and
+applied two presets (screenshot reviewed). Review subagent: 4/4 findings fixed
+and re-verified PASS.
+
+**Journey log** —
+- The staged pre-commit lint (49 rules) and the real gate (`run-oxlint.ts`,
+  90 rules) disagree: `keyCode` is deprecated to the real gate only, and
+  string-spread code-point counting is banned. Verify with
+  `tsx scripts/run-oxlint.ts <package>` before claiming lint clean.
+- `ThemeSnapshot` is a pre-stable shape: adding a field means touching every
+  consumer's snapshot literals (ui-layout, ui-settings-account,
+  ui-sidebar-terminal) or the client aggregate check fails on
+  `exactOptionalPropertyTypes`.
+- The `{name}` aria interpolation must use the function form of
+  `String.replace` (or the Translate params mechanism) — raw replacement
+  corrupts names containing `$&`-style sequences.
+- The IME Enter guard (isComposing + keyCode 229) is mandatory on any text
+  input that commits on Enter; the deprecation needs the sibling's documented
+  oxlint-disable.
+- The tolerant reader's junk branches (null/non-string/half entries) are
+  unreachable through the validated wire but required by hand-edited documents;
+  they need explicit tests or the per-file 100% gate goes red.
 
 ## [S1] Problem
 
@@ -66,23 +110,23 @@ save, and delete labels.
 
 ## Tasks
 
-- [ ] T1: schema + types, runtime save/delete/adopt, snapshot field,
+- [x] T1: schema + types, runtime save/delete/adopt, snapshot field,
       consumer literals + tests (depends: none)
-- [ ] T2: section store, `CustomThemeGroup` preset UI, i18n (depends: T1)
-- [ ] T3: Host `Config` mirror, config-catalog regen, README sync (depends: T1)
-- [ ] T4: verification, visual walkthrough, review subagent, finalize spec
+- [x] T2: section store, `CustomThemeGroup` preset UI, i18n (depends: T1)
+- [x] T3: Host `Config` mirror, config-catalog regen, README sync (depends: T1)
+- [x] T4: verification, visual walkthrough, review subagent, finalize spec
       (depends: T1–T3)
 
 ## [S4] Acceptance
 
 - Saving the current inputs under a name persists an entry, appears as a
-  chip, and survives reload (durable document).
+  chip, and survives reload (durable document). ✅
 - Clicking a chip applies its colors, switches the preference to `custom`,
-  and the synthesized tokens update live.
+  and the synthesized tokens update live. ✅
 - The × chip deletes the entry; deleting the active one keeps the current
-  look; saving over an existing name replaces it.
+  look; saving over an existing name replaces it. ✅
 - Malformed preset documents are dropped at the runtime boundary; the schema
-  rejects malformed wire values; the array caps at 16 entries.
-- Old documents load unchanged; zh/en dictionaries stay complete.
+  rejects malformed wire values; the array caps at 16 entries. ✅
+- Old documents load unchanged; zh/en dictionaries stay complete. ✅
 - Focused specs, `typecheck`, `build` (incl. build:check), catalog gates, and
-  the review subagent pass.
+  the review subagent pass. ✅
