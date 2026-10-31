@@ -36,7 +36,7 @@ function fakeWorkspaces(items: ReturnType<typeof project>[]): TransferFace['work
       getSnapshot: () => ({ items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle' as const, error: null }),
       subscribe: vi.fn(() => () => {}),
     },
-  } as TransferFace['workspaces']
+  } as unknown as TransferFace['workspaces']
 }
 
 /** Fake picker resolving or failing. */
@@ -87,7 +87,7 @@ function mockFetch(routes: Record<string, (url: string) => FetchReply | Promise<
         if (reply instanceof Response) return reply
         return new Response(reply.body === undefined ? '{}' : JSON.stringify(reply.body), {
           status: reply.status ?? 200,
-          headers: reply.headers,
+          ...(reply.headers === undefined ? {} : { headers: reply.headers }),
         })
       }
     }

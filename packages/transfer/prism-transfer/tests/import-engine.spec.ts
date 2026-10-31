@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { SESSION_FORMAT_VERSION, type SessionEvent, type SessionHeader, type SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionLineageNode } from '@deepseek-ai/dsh-session-query'
-import { zipSync } from 'fflate'
+import { zipSync, type Zippable } from 'fflate'
 import {
   runImport,
   sweepStaleStaging,
@@ -174,7 +174,7 @@ async function spool(bytes: Uint8Array): Promise<{ path: string; bytes: number }
 }
 
 /** Build one single-project archive with the given entries beside the manifest. */
-function projectArchive(manifest: Record<string, unknown>, entries: Record<string, Uint8Array>): Uint8Array {
+function projectArchive(manifest: Record<string, unknown>, entries: Zippable): Uint8Array {
   return zipSync({
     [PROJECT_MANIFEST_NAME]: text(`${JSON.stringify({ format: 'prism-project', version: 1, sessions: 1, ...manifest }, null, 2)}\n`),
     ...entries,

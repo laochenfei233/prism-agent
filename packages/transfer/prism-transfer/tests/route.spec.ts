@@ -33,6 +33,14 @@ function fakeConnection() {
   }
 }
 
+
+/** Fetch one registered handler, failing the test when the route is absent. */
+function routeHandler(routes: Map<string, (request: Request) => Promise<Response>>, path: string): (request: Request) => Promise<Response> {
+  const handler = routes.get(path)
+  if (handler === undefined) throw new Error(`route ${path} was not registered`)
+  return handler
+}
+
 /** Fake settings surface with one live namespace. */
 function fakeSettings() {
   return {
@@ -270,11 +278,11 @@ describe('transfer routes', () => {
 
   it('answers job polls for unknown ids with idle', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_JOB_PATH)(
+    const response = await routeHandler(routes, TRANSFER_JOB_PATH)(
       new Request(`http://host${TRANSFER_JOB_PATH}?jobId=missing`),
     )
     expect(await response.json()).toEqual({ state: 'idle' })
-    const noId = await routes.get(TRANSFER_JOB_PATH)(
+    const noId = await routeHandler(routes, TRANSFER_JOB_PATH)(
       new Request(`http://host${TRANSFER_JOB_PATH}`),
     )
     expect(await noId.json()).toEqual({ state: 'idle' })
@@ -306,7 +314,7 @@ describe('transfer routes', () => {
 
   it('names non-ASCII downloads with an RFC 5987 filename and an ASCII fallback', async () => {
     const { routes } = await buildPlugin({ title: '项目:测试' })
-    const response = await routes.get(TRANSFER_EXPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_EXPORT_PATH)(
       new Request(`http://host${TRANSFER_EXPORT_PATH}?projects=w1`),
     )
     expect(response.status).toBe(200)
@@ -319,7 +327,7 @@ describe('transfer routes', () => {
 
   it('answers settings-only exports carrying real secret values when asked', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_EXPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_EXPORT_PATH)(
       new Request(`http://host${TRANSFER_EXPORT_PATH}?projects=&settings=1&secrets=1`),
     )
     expect(response.status).toBe(200)
@@ -331,7 +339,7 @@ describe('transfer routes', () => {
   it('defaults the destination, the display name, and the job id', async () => {
     const { routes, home } = await buildPlugin()
     const archive = await spoolImportArchive()
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}`, {
         method: 'POST',
         body: archive as unknown as BodyInit,
@@ -350,7 +358,7 @@ describe('transfer routes', () => {
   it('reduces a control-character-only display name to the default', async () => {
     const { routes } = await buildPlugin()
     const archive = await spoolImportArchive()
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=${encodeURIComponent('\t \u0007')}`, {
         method: 'POST',
         body: archive as unknown as BodyInit,
@@ -366,7 +374,7 @@ describe('transfer routes', () => {
   it('applies backpressure while spooling a large upload', async () => {
     const { routes } = await buildPlugin()
     const big = new Uint8Array(2 ** 20)
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=big.bin`, {
         method: 'POST',
         body: big as unknown as BodyInit,
@@ -380,7 +388,7 @@ describe('transfer routes', () => {
 
   it('fails uploads whose body errors mid-flight', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       erroringBodyRequest(`http://host${TRANSFER_IMPORT_PATH}`, null),
     )
     expect(response.status).toBe(500)
@@ -389,7 +397,7 @@ describe('transfer routes', () => {
 
   it('answers 499 when the upload is cancelled mid-body', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       erroringBodyRequest(`http://host${TRANSFER_IMPORT_PATH}`, new AbortController()),
     )
     expect(response.status).toBe(499)
@@ -404,7 +412,7 @@ describe('transfer routes', () => {
     })
     stores.parkCreate.current = parked
     const firstArchive = await importArchiveBytes('Parked', false)
-    const first = await routes.get(TRANSFER_IMPORT_PATH)(
+    const first = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=first.zip`, {
         method: 'POST',
         body: firstArchive as unknown as BodyInit,
@@ -414,7 +422,7 @@ describe('transfer routes', () => {
     expect(first.status).toBe(200)
     const { jobId } = await first.json() as { jobId: string }
     await waitForJobPhase(routes, jobId, 'restoring')
-    const second = await routes.get(TRANSFER_IMPORT_PATH)(
+    const second = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}`, {
         method: 'POST',
         body: firstArchive as unknown as BodyInit,
@@ -431,7 +439,7 @@ describe('transfer routes', () => {
   it('reports a failed import through the poll route with the typed code', async () => {
     const { routes } = await buildPlugin()
     const bad = zipSync({ 'plain.txt': text('x') }, { level: 6 })
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=bad.zip`, {
         method: 'POST',
         body: Buffer.from(bad) as unknown as BodyInit,
@@ -447,7 +455,7 @@ describe('transfer routes', () => {
 
   it('starts and fails a job for an empty upload body', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}`, {
         method: 'POST',
         headers: { 'content-type': 'application/octet-stream' },
@@ -462,7 +470,7 @@ describe('transfer routes', () => {
 
   it('answers settings uploads whose body cannot be read', async () => {
     const { routes } = await buildPlugin()
-    const response = await routes.get(TRANSFER_SETTINGS_PATH)(
+    const response = await routeHandler(routes, TRANSFER_SETTINGS_PATH)(
       erroringBodyRequest(`http://host${TRANSFER_SETTINGS_PATH}`, null),
     )
     expect(response.status).toBe(400)
@@ -484,7 +492,7 @@ describe('transfer routes', () => {
         namespaces: { web: { endpoint: '/restored' } },
       })}\n`),
     }, { level: 6 })
-    const response = await routes.get(TRANSFER_IMPORT_PATH)(
+    const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}&name=combined.zip`, {
         method: 'POST',
         body: Buffer.from(archive) as unknown as BodyInit,
@@ -546,7 +554,7 @@ async function waitForJobPhase(
   phase: string,
 ): Promise<void> {
   for (let attempt = 0; attempt < 300; attempt += 1) {
-    const snapshot = await (await routes.get(TRANSFER_JOB_PATH)(
+    const snapshot = await (await routeHandler(routes, TRANSFER_JOB_PATH)(
       new Request(`http://host${TRANSFER_JOB_PATH}?jobId=${encodeURIComponent(jobId)}`),
     )).json() as Record<string, unknown>
     if (snapshot['phase'] === phase || snapshot['state'] !== 'running') return

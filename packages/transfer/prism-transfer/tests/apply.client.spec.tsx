@@ -8,7 +8,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, inject, NS } from '../src/client/index.ts'
-import { TransferSection, type TransferFace } from '../src/client/TransferSection.tsx'
+import { TransferSection, type TransferFace, type TransferSectionProps } from '../src/client/TransferSection.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -94,14 +94,14 @@ describe('transfer client', () => {
       await fiber.await()
       const entry = slots.entries('settings.section')[0]
       // The inject thunk hands the section the face with the unwrapping picker.
-      const face = (entry?.inject as () => TransferFace)()
-      const t = (key: keyof typeof en): string => en[key]
-      render(<TransferSection
-        close={vi.fn()}
-        t={t}
-        workspaces={fakeWorkspaces() as never}
-        directoryPicker={face.directoryPicker}
-      />)
+      const face = (entry?.inject as unknown as () => TransferFace)()
+      const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
+      render(<TransferSection {...{
+        close: vi.fn(),
+        t,
+        workspaces: fakeWorkspaces() as never,
+        directoryPicker: face.directoryPicker,
+      } as unknown as TransferSectionProps} />)
       fireEvent.click(screen.getByText('Change…'))
       await waitFor(() => {
         expect(screen.getByText('No system directory picker on this deployment; keeping the default.')).toBeDefined()
@@ -117,14 +117,14 @@ describe('transfer client', () => {
     try {
       const fiber = ctx.plugin({ inject, apply })
       await fiber.await()
-      const face = (slots.entries('settings.section')[0]?.inject as () => TransferFace)()
-      const t = (key: keyof typeof en): string => en[key]
-      render(<TransferSection
-        close={vi.fn()}
-        t={t}
-        workspaces={fakeWorkspaces() as never}
-        directoryPicker={face.directoryPicker}
-      />)
+      const face = (slots.entries('settings.section')[0]?.inject as unknown as () => TransferFace)()
+      const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
+      render(<TransferSection {...{
+        close: vi.fn(),
+        t,
+        workspaces: fakeWorkspaces() as never,
+        directoryPicker: face.directoryPicker,
+      } as unknown as TransferSectionProps} />)
       fireEvent.click(screen.getByText('Change…'))
       await waitFor(() => {
         expect(screen.getByText('/picked/root')).toBeDefined()
