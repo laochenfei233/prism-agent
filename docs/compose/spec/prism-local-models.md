@@ -26,12 +26,12 @@ The settings Models page manages remote LLM providers only. The capability model
 
 A built-in catalog module defines four model families, each with installable variants:
 
-- `rapidocr` — the default OCR engine: PP-OCRv4 ONNX det/cls/rec models plus the PPOCR dict; CPU; small (tens of MB).
+- `rapidocr` — the default OCR engine: the PP-OCRv4 ONNX det/cls/rec models and dict ship inside the provisioned npm model bundle (`@gutenye/ocr-models`); one `standard` variant; CPU; tens of MB.
 - `paddleocr` — the alternate OCR engine, provisioned into a Python environment; variants `cpu` (paddlepaddle) and `cuda` (paddlepaddle-gpu).
 - `hy-mt-1.5` — Tencent Hunyuan-MT1.5-1.8B translation model, GGUF quantizations run through llama.cpp; variants `Q4_K_M` (default) and `Q8_0`, device `cpu` or `cuda`.
 - `bge` — BAAI embeddings for RAG; variants `bge-small-zh-v1.5` (default) and `bge-m3`; ONNX, CPU; a `cuda` variant exists in the catalog and its probe verifies execution-provider availability (see S2.5).
 
-Each variant carries: `id`, `displayName`, `device` (`cpu` | `cuda`), total size, `files` (`{ path, sha256, url }`), and runtime requirements. URLs are ModelScope-first with the mirror base configurable through Config. The exact upstream files (repo, revision, sha256) are pinned in T2 after a live availability check; the Hunyuan-MT1.5 GGUF comes from a community quantization of the official ModelScope weights when Tencent publishes no official GGUF. A Config `catalogOverride` path merges a user JSON over the built-in catalog; unknown fields fail at load.
+Each variant carries: `id`, `displayName`, `device` (`cpu` | `cuda`), total size, `files` (`{ path, sha256, url }`), and runtime requirements. URLs pin the China-reachable hosts the files were verified against (`hf-mirror.com`; ModelScope mirrors where they exist), and the Config `mirrorBaseUrl` swaps the origin of every URL. The exact upstream files (repo, revision, sha256 — the upstream LFS object ids) were live-verified in T2; the Hunyuan-MT1.5 GGUF comes from Tencent's official `tencent/HY-MT1.5-1.8B-GGUF` export. A Config `catalogOverride` path merges a user JSON over the built-in catalog; unknown fields fail at load.
 
 ### S2.3 Storage layout and registry
 
@@ -54,7 +54,7 @@ Native runtimes are not package dependencies of the plugin (out-of-tree plugins 
 
 ### S2.7 HTTP API
 
-Exact Fetch routes registered through `connection.fetch.register` under `/api/prism-local-models` (the prism-pocket / prism-meeting pattern, authenticated by the shared `/api` carrier): `GET /catalog` (models, variants, status, integrity, paths), `GET /status` (progress snapshot), `POST /install` `{modelId, variantId}`, `POST /cancel` `{modelId}`, `POST /remove` `{modelId}`, `POST /probe` `{modelId}`. The browser half polls `GET /status` at 1 s while one of its operations is active; no new forwardable events are proposed.
+Exact Fetch routes registered through `connection.fetch.register` under `/api/local-models` (the prism-pocket / prism-meeting pattern, authenticated by the shared `/api` carrier): `GET /catalog` (models, variants, status, integrity, paths), `GET /status` (progress snapshot), `POST /install` `{modelId, variantId}`, `POST /cancel` `{modelId}`, `POST /remove` `{modelId}`, `POST /probe` `{modelId}`. The browser half polls `GET /status` at 1 s while one of its operations is active; no new forwardable events are proposed.
 
 ### S2.8 Browser half: the Models-page card
 

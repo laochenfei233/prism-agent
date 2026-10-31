@@ -24,6 +24,8 @@ export interface ModelVariant {
   readonly device: ModelDevice
   /** Download size of all files together, in bytes. */
   readonly sizeBytes: number
+  /** Whether this variant is the family's installed and verified one. */
+  readonly installed: boolean
 }
 
 /** Progress of the active download or provisioning step. */

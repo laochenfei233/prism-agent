@@ -26,12 +26,12 @@ commits: f879732059..(filled at delivery)
 
 内置目录模块定义四个模型家族，各带可安装变体：
 
-- `rapidocr` —— 默认 OCR 引擎：PP-OCRv4 ONNX det/cls/rec 模型加 PPOCR 字典；CPU；数十 MB。
+- `rapidocr` —— 默认 OCR 引擎：PP-OCRv4 ONNX det/cls/rec 模型与字典随 npm 模型包（`@gutenye/ocr-models`）一同供给；单一 `standard` 变体；CPU；数十 MB。
 - `paddleocr` —— 备选 OCR 引擎，供给到 Python 环境中运行；变体 `cpu`（paddlepaddle）与 `cuda`（paddlepaddle-gpu）。
 - `hy-mt-1.5` —— 腾讯混元 Hunyuan-MT1.5-1.8B 翻译模型，GGUF 量化经 llama.cpp 运行；变体 `Q4_K_M`（默认）与 `Q8_0`，设备 `cpu` 或 `cuda`。
 - `bge` —— BAAI 面向 RAG 的向量模型；变体 `bge-small-zh-v1.5`（默认）与 `bge-m3`；ONNX，CPU；目录中存在 `cuda` 变体，其 probe 负责验证执行提供器的可用性（见 S2.5）。
 
-每个变体携带：`id`、`displayName`、`device`（`cpu` | `cuda`）、总大小、`files`（`{ path, sha256, url }`）以及运行时要求。URL 以 ModelScope 优先，镜像基址可经 Config 配置。确切的上游文件（仓库、revision、sha256）在 T2 经实际可用性检查后钉死；腾讯未发布官方 GGUF 时，Hunyuan-MT1.5 的 GGUF 取自官方 ModelScope 权重的社区量化。Config 的 `catalogOverride` 路径将用户 JSON 合并进内置目录；未知字段在加载时失败。
+每个变体携带：`id`、`displayName`、`device`（`cpu` | `cuda`）、总大小、`files`（`{ path, sha256, url }`）以及运行时要求。URL 钉在经过实测的国内可达主机上（`hf-mirror.com`；存在 ModelScope 镜像处用 ModelScope），Config 的 `mirrorBaseUrl` 整体替换每个 URL 的源站。确切的上游文件（仓库、revision、sha256——即上游 LFS 对象 id）已在 T2 实测钉死；Hunyuan-MT1.5 的 GGUF 取自腾讯官方 `tencent/HY-MT1.5-1.8B-GGUF` 导出。Config 的 `catalogOverride` 路径将用户 JSON 合并进内置目录；未知字段在加载时失败。
 
 ### S2.3 存储布局与注册表
 
@@ -54,7 +54,7 @@ commits: f879732059..(filled at delivery)
 
 ### S2.7 HTTP API
 
-经 `connection.fetch.register` 在 `/api/prism-local-models` 下注册 exact Fetch 路由（prism-pocket / prism-meeting 模式，由共享 `/api` 载体验证身份）：`GET /catalog`（模型、变体、状态、完整性、路径）、`GET /status`（进度快照）、`POST /install` `{modelId, variantId}`、`POST /cancel` `{modelId}`、`POST /remove` `{modelId}`、`POST /probe` `{modelId}`。浏览器半在自己的操作活动期间以 1 秒轮询 `GET /status`；不提议新的可转发事件。
+经 `connection.fetch.register` 在 `/api/local-models` 下注册 exact Fetch 路由（prism-pocket / prism-meeting 模式，由共享 `/api` 载体验证身份）：`GET /catalog`（模型、变体、状态、完整性、路径）、`GET /status`（进度快照）、`POST /install` `{modelId, variantId}`、`POST /cancel` `{modelId}`、`POST /remove` `{modelId}`、`POST /probe` `{modelId}`。浏览器半在自己的操作活动期间以 1 秒轮询 `GET /status`；不提议新的可转发事件。
 
 ### S2.8 浏览器半：模型页卡片
 

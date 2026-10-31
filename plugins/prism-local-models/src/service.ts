@@ -3,37 +3,55 @@
  * capability entry points (`embed`, `ocr`, `translate`) future Prism features
  * consume. Claimed on the host context as `prismLocalModels`.
  *
+ * One active operation per family; different families run concurrently. The
+ * first awaited method lazily resolves the catalog (override merge, mirror
+ * rewrite) and rescans the models root, so manual placement shows up without
+ * a restart.
+ *
  * @module @prism/prism-local-models
  */
 
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog, type CatalogFamily, type CatalogVariant } from './catalog.ts'
 import { LocalModelsError } from './errors.ts'
+import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
 import type { ResolvedConfig } from './config.ts'
-import type { CatalogView, ModelFamilyView, ProbeOutcome, StatusView } from './types.ts'
+import type { CatalogView, ModelFamilyView, ModelProgress, ModelVariant, ProbeOutcome, StatusView } from './types.ts'
 
 /**
  * Owns model state under the models root and drives installs and inference.
- * One active operation per family; different families run concurrently.
  */
 export class PrismLocalModelsService {
   /** Absolute directory every model installs into. */
   readonly modelsRoot: string
+
+  private readonly config: ResolvedConfig
+  private readonly registry: ModelRegistry
+  private readonly init: Promise<void>
+  private catalogImpl: Catalog = []
+  private document: RegistryDocument = { version: 1, families: {} }
 
   /**
    * @param config - validated plugin configuration.
    * @param home - harness home directory, the default parent of the models root.
    */
   constructor(config: ResolvedConfig, home: string) {
+    this.config = config
     this.modelsRoot = config.modelsRoot ?? join(home, 'models')
+    this.registry = new ModelRegistry(this.modelsRoot)
+    this.init = this.initialize()
   }
 
   /** Read the full catalog: families, variants, lifecycle state, probe results. */
   async catalog(): Promise<CatalogView> {
+    await this.init
     return { modelsRoot: this.modelsRoot, families: this.families() }
   }
 
   /** Read the pollable per-family lifecycle snapshot. */
   async status(): Promise<StatusView> {
+    await this.init
     const families: StatusView['families'] = {}
     for (const family of this.families()) {
       families[family.id] = { status: family.status, ...(family.error !== undefined ? { error: family.error } : {}), ...(family.progress !== undefined ? { progress: family.progress } : {}) }
@@ -48,44 +66,178 @@ export class PrismLocalModelsService {
    * @param variantId - variant to install.
    */
   async install(modelId: string, variantId: string): Promise<void> {
-    throw new LocalModelsError('not-implemented', `install ${modelId}/${variantId} arrives with the catalog task`)
+    await this.init
+    const variant = this.requireVariant(modelId, variantId)
+    throw new LocalModelsError('not-implemented', `install ${modelId}/${variant.id} arrives with the download task`)
   }
 
   /** Stop the active download or provisioning of one family and clean its temp files. */
   async cancel(modelId: string): Promise<void> {
+    await this.init
+    this.requireFamily(modelId)
     throw new LocalModelsError('not-implemented', `cancel ${modelId} arrives with the download task`)
   }
 
   /** Delete the installed variant directory and reset the family to idle. */
   async remove(modelId: string): Promise<void> {
+    await this.init
+    this.requireFamily(modelId)
     throw new LocalModelsError('not-implemented', `remove ${modelId} arrives with the download task`)
   }
 
   /** Run one smoke inference against the installed variant. */
   async probe(modelId: string): Promise<ProbeOutcome> {
+    await this.init
+    this.requireFamily(modelId)
     throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with the inference tasks`)
   }
 
   /** Capability entry point for RAG and memory consumers. */
   async embed(_texts: readonly string[]): Promise<number[][]> {
+    await this.init
     throw new LocalModelsError('not-implemented', 'embedding arrives with the BGE task')
   }
 
   /** Capability entry point for image text extraction. */
   async ocr(_image: { readonly bytes: Uint8Array; readonly mime: string }): Promise<string> {
+    await this.init
     throw new LocalModelsError('not-implemented', 'OCR arrives with the engine tasks')
   }
 
   /** Capability entry point for translation through HY-MT1.5. */
   async translate(_text: string, _opts: { readonly to: string; readonly from?: string }): Promise<string> {
+    await this.init
     throw new LocalModelsError('not-implemented', 'translation arrives with the HY-MT task')
   }
 
   /** Release engines, the sidecar process, and any in-flight download. */
   dispose(): void {}
 
-  /** Catalog families; the catalog task replaces the empty stub. */
+  /** Resolve the catalog and take the first scan of the models root. */
+  private async initialize(): Promise<void> {
+    let catalog = BUILTIN_CATALOG
+    if (this.config.catalogOverride !== undefined) {
+      catalog = applyCatalogOverride(await readFile(this.config.catalogOverride, 'utf8'))
+    }
+    this.catalogImpl = resolveCatalogUrls(catalog, this.config.mirrorBaseUrl)
+    this.document = await this.registry.load()
+    await this.rescan()
+  }
+
+  /** Re-verify every recorded variant tree; manual placement shows up here. */
+  private async rescan(): Promise<void> {
+    for (const family of this.catalogImpl) {
+      const record = this.document.families[family.id]
+      if (record?.variantId === undefined) continue
+      const variant = family.variants.find(candidate => candidate.id === record.variantId)
+      if (variant === undefined) continue
+      const outcome = await this.verifyVariantTree(family.id, variant, record)
+      if (outcome !== undefined) await this.writeFamilyRecord(family.id, outcome)
+    }
+  }
+
+  /**
+   * Verify one variant's files against the catalog pins, reusing cached
+   * verifications while size and mtime are unchanged.
+   * @returns the record to persist, or undefined when the record is still accurate.
+   */
+  private async verifyVariantTree(modelId: string, variant: CatalogVariant, record: FamilyRecord): Promise<FamilyRecord | undefined> {
+    if (variant.files.length === 0) return undefined
+    const files: Record<string, FileRecord> = { ...(record.files ?? {}) }
+    let missing = 0
+    for (const file of variant.files) {
+      const absolutePath = join(ModelRegistry.variantDir(this.modelsRoot, modelId, variant.id), file.path)
+      const cached = files[file.path]
+      let stats
+      try {
+        stats = await stat(absolutePath)
+      } catch {
+        missing += 1
+        delete files[file.path]
+        continue
+      }
+      if (cached?.verified === true && stats.size === file.sizeBytes && stats.mtimeMs === cached.mtimeMs) continue
+      const result = await ModelRegistry.verifyFile(absolutePath, file.sizeBytes, file.sha256)
+      if (result === 'match') {
+        files[file.path] = { sizeBytes: file.sizeBytes, mtimeMs: stats.mtimeMs, verified: true }
+      } else if (result === 'hash-mismatch') {
+        return {
+          variantId: variant.id,
+          status: 'error',
+          error: `${file.path} does not match its catalog checksum; delete the variant directory and install again`,
+        }
+      } else {
+        missing += 1
+        delete files[file.path]
+      }
+    }
+    if (missing === 0) {
+      return { ...record, variantId: variant.id, status: 'ready', error: undefined, files }
+    }
+    if (missing === variant.files.length) {
+      return { variantId: variant.id, status: 'idle', error: undefined, files: undefined, probe: record.probe }
+    }
+    return { variantId: variant.id, status: 'idle', error: undefined, files: Object.keys(files).length > 0 ? files : undefined, probe: record.probe }
+  }
+
+  /** Persist one family record and keep the in-memory document current. */
+  private async writeFamilyRecord(modelId: string, record: FamilyRecord): Promise<void> {
+    this.document = {
+      version: 1,
+      families: { ...this.document.families, [modelId]: record },
+    }
+    await this.registry.save(this.document)
+  }
+
+  /** The catalog families projected onto the wire view. */
   private families(): ModelFamilyView[] {
-    return []
+    return this.catalogImpl.map(family => {
+      const record = this.document.families[family.id]
+      const selectedVariantId = record?.variantId ?? family.defaultVariantId
+      return {
+        id: family.id,
+        displayName: family.displayName,
+        kind: family.kind,
+        selectedVariantId,
+        variants: family.variants.map(variant => this.variantView(variant, record)),
+        status: record?.status ?? 'idle',
+        ...(record?.error !== undefined ? { error: record.error } : {}),
+        ...(this.activeProgress(family.id) !== undefined ? { progress: this.activeProgress(family.id) as ModelProgress } : {}),
+        ...(record?.probe !== undefined ? { probe: record.probe } : {}),
+      }
+    })
+  }
+
+  /** One catalog variant projected onto the wire view. */
+  private variantView(variant: CatalogVariant, record: FamilyRecord | undefined): ModelVariant {
+    return {
+      id: variant.id,
+      displayName: variant.displayName,
+      device: variant.device,
+      sizeBytes: variant.files.reduce((total, file) => total + file.sizeBytes, 0),
+      installed: record?.variantId === variant.id && record.status === 'ready',
+    }
+  }
+
+  /** The active operation's progress for one family, when one is running. */
+  private activeProgress(_modelId: string): ModelProgress | undefined {
+    return undefined
+  }
+
+  /** Look up one catalog family or fail with a typed error. */
+  private requireFamily(modelId: string): CatalogFamily {
+    const family = this.catalogImpl.find(candidate => candidate.id === modelId)
+    if (family === undefined) throw new LocalModelsError('unknown-model', `unknown model family "${modelId}"`)
+    return family
+  }
+
+  /** Look up one catalog variant or fail with a typed error. */
+  private requireVariant(modelId: string, variantId: string): CatalogVariant {
+    const family = this.requireFamily(modelId)
+    const variant = family.variants.find(candidate => candidate.id === variantId)
+    if (variant === undefined) {
+      throw new LocalModelsError('unknown-variant', `unknown variant "${variantId}" for model family "${modelId}"`)
+    }
+    return variant
   }
 }
