@@ -43,14 +43,23 @@ it('stays closed until the command opens it', () => {
 })
 
 it('filters by alias and runs the selected command after closing', async () => {
-  const f = fixture([row('session.new', 'New session', ['new chat']), row('settings.open', 'Open settings', ['preferences'])])
+  const f = fixture([row('session.new', 'New session', ['new chat']), row('settings.open', 'Open settings', ['preferences'], ['Ctrl', 'P'])])
   act(() => { f.store.actions.open() })
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'preferences' } })
   expect(screen.getAllByRole('option')).toHaveLength(1)
+  expect(screen.getByText('P')).toBeTruthy()
   fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' })
   await settle()
   expect(f.invoke).toHaveBeenCalledWith('settings.open', expect.objectContaining({ modal: null }))
   expect(f.store.getSnapshot().open).toBe(false)
+})
+
+it('leaves arrow keys to an input method while it composes', () => {
+  const f = fixture([row('a', 'Alpha'), row('b', 'Beta')])
+  act(() => { f.store.actions.open() })
+  const input = screen.getByRole('combobox')
+  fireEvent.keyDown(input, { key: 'ArrowDown', isComposing: true })
+  expect(screen.getAllByRole('option')[0]?.getAttribute('aria-selected')).toBe('true')
 })
 
 it('moves the selection with the arrow keys and runs the highlighted command', async () => {
@@ -79,6 +88,26 @@ it('lists a command registered after the palette opened', () => {
   expect(screen.getAllByRole('option')).toHaveLength(1)
   act(() => { f.catalog.set([...f.catalog.getSnapshot(), row('terminal.new', 'New terminal')]) })
   expect(screen.getAllByRole('option')).toHaveLength(2)
+})
+
+it('scrolls the selected row, wraps upward, and ignores arrows and Enter without matches', async () => {
+  const scrollIntoView = vi.fn()
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+  try {
+    const f = fixture([row('a', 'Alpha'), row('b', 'Beta')])
+    act(() => { f.store.actions.open() })
+    const input = screen.getByRole('combobox')
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(screen.getAllByRole('option')[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(scrollIntoView).toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'nope' } })
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await settle()
+    expect(f.invoke).not.toHaveBeenCalled()
+  } finally {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+  }
 })
 
 it('removes the blocked-reason toast after its hold', async () => {
