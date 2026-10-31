@@ -35,7 +35,7 @@ function mount(preference: ThemePreference = 'system', entries: readonly ThemeGa
   const store = createAppearanceSectionStore().create()
   store.actions.sync(preference, entries, { text: 14, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, {
     scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
-  }, 0)
+  }, [], 0)
   const setTheme = vi.fn()
   const props: AppearanceRowComponentProps = {
     useStore: bindSnapshotSelector(store),
@@ -100,7 +100,7 @@ describe('AppearanceRow', () => {
     act(() => {
       b.store.actions.sync('graph-glass', GALLERY, { text: 14, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, {
         scheme: 'light', canvas: '#ffffff', accent: '#ff6900',
-      }, 1)
+      }, [], 1)
     })
     expect(pressed(/^Graph Paper Glass$/)).toBe('true')
     expect(pressed(/^Dark$/)).toBe('false')

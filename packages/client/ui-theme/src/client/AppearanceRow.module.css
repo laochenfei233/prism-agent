@@ -251,7 +251,7 @@
 .fern .previewAccent {
   width: 10px;
   height: 10px;
-  border-radius: 50% 0 50% 50%;
+  border-radius: 5px 0 5px 5px;
   transform: rotate(45deg);
 }
 

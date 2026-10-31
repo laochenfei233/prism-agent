@@ -29,6 +29,9 @@ export const CUSTOM_CANVAS_FIELD = 'customCanvas'
 /** Field carrying the custom theme's accent color. */
 export const CUSTOM_ACCENT_FIELD = 'customAccent'
 
+/** Field carrying the saved custom-theme presets. */
+export const CUSTOM_PRESETS_FIELD = 'customPresets'
+
 /** Field carrying the conversation content font size. */
 export const FONT_SIZE_FIELD = 'fontSize'
 
@@ -52,6 +55,33 @@ export const DEFAULT_CUSTOM_CANVAS = '#ffffff'
 
 /** Accent color of the custom theme when the settings document has none. */
 export const DEFAULT_CUSTOM_ACCENT = '#ff6900'
+
+/** Largest number of saved custom-theme presets. */
+export const CUSTOM_PRESETS_MAX = 16
+
+/** Largest accepted preset name length, in code points. */
+export const CUSTOM_PRESET_NAME_MAX = 24
+
+/**
+ * Count one string's code points (spread-based counting trips the no-misused-spread rule).
+ * @param value - the string to measure.
+ * @returns the number of Unicode code points.
+ */
+export function codePointLength(value: string): number {
+  return Array.from(value).length
+}
+
+/** One saved custom theme: a display name plus the three synthesis inputs. */
+export interface CustomThemePreset {
+  /** Display name, unique among the saved presets. */
+  name: string
+  /** Base palette the preset synthesizes over. */
+  scheme: ThemeColorScheme
+  /** Canvas color (`#rrggbb`). */
+  canvas: string
+  /** Accent color (`#rrggbb`). */
+  accent: string
+}
 
 /** Hex color accepted for custom theme colors: `#rgb` or `#rrggbb`. */
 export const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
@@ -199,6 +229,8 @@ export interface ThemeSettings {
   customCanvas: string
   /** Accent color of the synthesized custom theme (`#rgb`/`#rrggbb`). */
   customAccent: string
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: CustomThemePreset[]
 }
 
 /**
@@ -265,6 +297,12 @@ export const ThemeSettingsSchema: z<ThemeSettings> = z.object({
   [CUSTOM_SCHEME_FIELD]: z.union([...BUILTIN_SCHEMES]).default(DEFAULT_CUSTOM_SCHEME),
   [CUSTOM_CANVAS_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS),
   [CUSTOM_ACCENT_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT),
+  [CUSTOM_PRESETS_FIELD]: z.array(z.object({
+    name: z.string().pattern(/\S/),
+    scheme: z.union([...BUILTIN_SCHEMES]),
+    canvas: z.string().pattern(HEX_COLOR_PATTERN),
+    accent: z.string().pattern(HEX_COLOR_PATTERN),
+  })).default([]),
 })
 
 /** CSS Fonts generic and system family keywords, which must stay unquoted. */

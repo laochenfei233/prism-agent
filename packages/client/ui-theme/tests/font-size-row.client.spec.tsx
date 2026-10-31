@@ -23,7 +23,7 @@ const COPY: Record<string, string> = {
 function mount(fontSize = 14, role: FontRole = 'text') {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createAppearanceSectionStore().create()
-  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13, [role]: fontSize }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 0)
+  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13, [role]: fontSize }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 0)
   const setFontSize = vi.fn()
   const props: FontSizeRowComponentProps = {
     useStore: bindSnapshotSelector(store),
@@ -55,7 +55,7 @@ describe('FontSizeRow', () => {
     expect(b.setFontSize).toHaveBeenCalledWith(15)
     // No store write yet: the display is unchanged.
     expect(screen.getByText('14')).toBeDefined()
-    act(() => { b.store.actions.sync('system', [], { text: 15, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 1) })
+    act(() => { b.store.actions.sync('system', [], { text: 15, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 1) })
     expect(screen.getByText('15')).toBeDefined()
     fireEvent.click(arrow('Decrease font size'))
     expect(b.setFontSize).toHaveBeenCalledWith(14)
@@ -65,7 +65,7 @@ describe('FontSizeRow', () => {
     const b = mount(21)
     fireEvent.click(arrow('Increase font size'))
     expect(b.setFontSize).toHaveBeenCalledWith(22)
-    act(() => { b.store.actions.sync('system', [], { text: 22, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 1) })
+    act(() => { b.store.actions.sync('system', [], { text: 22, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 1) })
     expect(screen.getByText('22')).toBeDefined()
     expect(arrow('Increase font size').disabled).toBe(true)
     expect(arrow('Decrease font size').disabled).toBe(false)
@@ -73,7 +73,7 @@ describe('FontSizeRow', () => {
     const c = mount(11)
     fireEvent.click(arrow('Decrease font size'))
     expect(c.setFontSize).toHaveBeenCalledWith(10)
-    act(() => { c.store.actions.sync('system', [], { text: 10, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 1) })
+    act(() => { c.store.actions.sync('system', [], { text: 10, code: 11, terminal: 13 }, { text: '', code: '', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 1) })
     expect(screen.getByText('10')).toBeDefined()
     expect(arrow('Increase font size').disabled).toBe(false)
     expect(arrow('Decrease font size').disabled).toBe(true)

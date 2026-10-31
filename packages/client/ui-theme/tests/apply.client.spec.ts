@@ -34,7 +34,7 @@ async function bench(isLoopback = true) {
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
   ctx.provide('locale', locale)
-  const section: Record<string, unknown> = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900' }
+  const section: Record<string, unknown> = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13, textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }
   const namespace = () => ({
     ns: THEME_SETTINGS_NAMESPACE,
     schema: ThemeSettingsSchema.toJSON(),
@@ -163,7 +163,7 @@ describe('ui-theme apply', () => {
   it('adopts all durable font sizes together after a refused batch settles', async () => {
     const host = stubConfigForm<ThemeSettings>()
     const section: ThemeSettings = { preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
-      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900' }
+      textFontFamily: '', codeFontFamily: '', terminalFontFamily: '', customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [] }
     host.publish({ status: 'ready', value: section, revision: 1, writable: true })
     const { theme, keyboard } = await keyboardTheme(host)
     const write = Promise.withResolvers<boolean>()
@@ -353,6 +353,32 @@ describe('ui-theme apply', () => {
         { op: 'set', path: ['customCanvas'], value: '#112233' },
         { op: 'set', path: ['customAccent'], value: '#00ff00' },
         { op: 'set', path: ['preference'], value: 'custom' },
+      ], 0)
+    })
+  })
+
+  it('routes the preset face writes into settings writes and the snapshot', async () => {
+    const b = await bench()
+    declareSections(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const theme = b.ctx.get('theme') as ThemeRuntime
+    const { instance, face } = faceOf(b.slots)
+
+    face.saveCustomPreset('Navy')
+    expect(theme.getTheme().customPresets).toEqual([
+      { name: 'Navy', scheme: 'light', canvas: '#ffffff', accent: '#ff6900' },
+    ])
+    expect(instance.getSnapshot().customPresets).toEqual(theme.getTheme().customPresets)
+    await vi.waitFor(() => {
+      expect(b.mutate).toHaveBeenLastCalledWith(THEME_SETTINGS_NAMESPACE, [
+        { op: 'set', path: ['customPresets'], value: [{ name: 'Navy', scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }] },
+      ], 0)
+    })
+    face.deleteCustomPreset('Navy')
+    expect(theme.getTheme().customPresets).toEqual([])
+    await vi.waitFor(() => {
+      expect(b.mutate).toHaveBeenLastCalledWith(THEME_SETTINGS_NAMESPACE, [
+        { op: 'set', path: ['customPresets'], value: [] },
       ], 0)
     })
   })

@@ -20,7 +20,7 @@ const COPY: Record<string, string> = {
 
 function mount(kind: FontRole = 'code', code = '') {
   const store = createAppearanceSectionStore().create()
-  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code, terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 0)
+  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code, terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 0)
   const setFontFamily = vi.fn()
   const props: FontFamilyRowComponentProps = {
     useStore: bindSnapshotSelector(store),
@@ -79,9 +79,9 @@ describe('FontFamilyRow', () => {
     expect(b.setFontFamily).toHaveBeenCalledWith('')
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Code font' }), { key: 'a' })
     expect(b.setFontFamily).toHaveBeenCalledOnce()
-    act(() => { b.store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Hack"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 1) })
+    act(() => { b.store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Hack"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 1) })
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Code font' }).value).toBe('"Hack"')
-    act(() => { b.store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Stale"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 1) })
+    act(() => { b.store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Stale"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 1) })
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Code font' }).value).toBe('"Hack"')
   })
 })

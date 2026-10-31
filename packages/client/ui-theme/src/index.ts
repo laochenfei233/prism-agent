@@ -2,7 +2,7 @@
 import type {} from '@deepseek-ai/dsh-settings'
 
 import type { Volatile } from '@deepseek-ai/cordis'
-import type { ThemePreference } from './theme-settings.ts'
+import type { CustomThemePreset, ThemePreference } from './theme-settings.ts'
 import z from '@deepseek-ai/schemastery'
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -41,6 +41,8 @@ export interface Config {
   customCanvas: Volatile<string>
   /** Accent color of the custom theme (`#rgb`/`#rrggbb`). */
   customAccent: Volatile<string>
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: Volatile<CustomThemePreset[]>
 }
 
 /** Live theme and typography preferences. */
@@ -55,6 +57,12 @@ export const Config = z.object({
   customScheme: z.union(['light', 'dark']).default(DEFAULT_CUSTOM_SCHEME).volatile(),
   customCanvas: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS).volatile(),
   customAccent: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT).volatile(),
+  customPresets: z.array(z.object({
+    name: z.string().pattern(/\S/),
+    scheme: z.union(['light', 'dark']),
+    canvas: z.string().pattern(HEX_COLOR_PATTERN),
+    accent: z.string().pattern(HEX_COLOR_PATTERN),
+  })).default([]).volatile(),
 })
 
 /** Supply the current palette before browser plugins start.

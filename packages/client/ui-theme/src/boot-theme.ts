@@ -111,7 +111,7 @@ export function bootThemeInjections(
   preference: ThemePreference = DEFAULT_PREFERENCE,
   fontSizes: FontSizes = DEFAULT_FONT_SIZES,
   fontFamilies: FontFamilies = { text: '', code: '', terminal: '' },
-  custom: BootCustomPalette | undefined = undefined,
+  custom?: BootCustomPalette,
 ): IndexInjection[] {
   return [
     { kind: 'style', text: bootThemeStyle(preference, custom) },

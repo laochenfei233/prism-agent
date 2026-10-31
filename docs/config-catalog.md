@@ -680,10 +680,27 @@ export interface Config {
   customCanvas: Volatile<string>
   /** Accent color of the custom theme (`#rgb`/`#rrggbb`). */
   customAccent: Volatile<string>
+  /** Saved custom-theme presets, unique by name. */
+  customPresets: Volatile<CustomThemePreset[]>
 }
 
 /** Theme preference persisted by the product Appearance gallery. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
+
+/** One saved custom theme: a display name plus the three synthesis inputs. */
+export interface CustomThemePreset {
+  /** Display name, unique among the saved presets. */
+  name: string
+  /** Base palette the preset synthesizes over. */
+  scheme: ThemeColorScheme
+  /** Canvas color (`#rrggbb`). */
+  canvas: string
+  /** Accent color (`#rrggbb`). */
+  accent: string
+}
+
+/** Palette mode one theme builds on. */
+export type ThemeColorScheme = typeof BUILTIN_SCHEMES[number]
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
 

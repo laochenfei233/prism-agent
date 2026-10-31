@@ -12,6 +12,7 @@ const settings = (overrides: Partial<ThemeSettings>): ThemeSettings => ({
   preference: 'system', fontSize: 14, codeFontSize: 11, terminalFontSize: 13,
   textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
   customScheme: DEFAULT_CUSTOM_SCHEME, customCanvas: DEFAULT_CUSTOM_CANVAS, customAccent: DEFAULT_CUSTOM_ACCENT,
+  customPresets: [],
   ...overrides,
 })
 

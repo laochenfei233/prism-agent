@@ -22,7 +22,7 @@ const COPY: Record<string, string> = {
 
 function mount() {
   const store = createAppearanceSectionStore().create()
-  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, 0)
+  store.actions.sync('system', [], { text: 14, code: 11, terminal: 13 }, { text: '', code: '"Iosevka"', terminal: '' }, { scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }, [], 0)
   const setFontFamily = vi.fn()
   const setFontSize = vi.fn()
   const props: FontSettingsGroupProps = {
