@@ -144,7 +144,11 @@ function PresetField({ presets, nameLabel, placeholder, saveLabel, deleteLabel, 
             placeholder={placeholder}
             aria-label={placeholder}
             onChange={(event) => { setName(event.target.value) }}
-            onKeyDown={(event) => { if (event.key === 'Enter' && savable) save() }}
+            onKeyDown={(event) => {
+              // Some IMEs report composition only through keyCode 229.
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+              if (event.key === 'Enter' && savable) save()
+            }}
           />
           <button type="button" className={css.saveButton} disabled={!savable} onClick={save}>{saveLabel}</button>
         </div>
@@ -160,7 +164,7 @@ function PresetField({ presets, nameLabel, placeholder, saveLabel, deleteLabel, 
                 <button
                   type="button"
                   className={css.chipDelete}
-                  aria-label={deleteLabel.replace('{name}', preset.name)}
+                  aria-label={deleteLabel.replace('{name}', () => preset.name)}
                   onClick={() => { onDelete(preset.name) }}
                 >×</button>
               </span>

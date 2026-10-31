@@ -357,6 +357,32 @@ describe('ui-theme apply', () => {
     })
   })
 
+  it('routes the preset face writes into settings writes and the snapshot', async () => {
+    const b = await bench()
+    declareSections(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const theme = b.ctx.get('theme') as ThemeRuntime
+    const { instance, face } = faceOf(b.slots)
+
+    face.saveCustomPreset('Navy')
+    expect(theme.getTheme().customPresets).toEqual([
+      { name: 'Navy', scheme: 'light', canvas: '#ffffff', accent: '#ff6900' },
+    ])
+    expect(instance.getSnapshot().customPresets).toEqual(theme.getTheme().customPresets)
+    await vi.waitFor(() => {
+      expect(b.mutate).toHaveBeenLastCalledWith(THEME_SETTINGS_NAMESPACE, [
+        { op: 'set', path: ['customPresets'], value: [{ name: 'Navy', scheme: 'light', canvas: '#ffffff', accent: '#ff6900' }] },
+      ], 0)
+    })
+    face.deleteCustomPreset('Navy')
+    expect(theme.getTheme().customPresets).toEqual([])
+    await vi.waitFor(() => {
+      expect(b.mutate).toHaveBeenLastCalledWith(THEME_SETTINGS_NAMESPACE, [
+        { op: 'set', path: ['customPresets'], value: [] },
+      ], 0)
+    })
+  })
+
   it('projects font snapshots into the section store and routes group writes by role', async () => {
     const b = await bench()
     declareSections(b.slots)

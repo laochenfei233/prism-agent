@@ -58,7 +58,7 @@ export const Config = z.object({
   customCanvas: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS).volatile(),
   customAccent: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT).volatile(),
   customPresets: z.array(z.object({
-    name: z.string(),
+    name: z.string().pattern(/\S/),
     scheme: z.union(['light', 'dark']),
     canvas: z.string().pattern(HEX_COLOR_PATTERN),
     accent: z.string().pattern(HEX_COLOR_PATTERN),

@@ -289,7 +289,7 @@ export const ThemeSettingsSchema: z<ThemeSettings> = z.object({
   [CUSTOM_CANVAS_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_CANVAS),
   [CUSTOM_ACCENT_FIELD]: z.string().pattern(HEX_COLOR_PATTERN).default(DEFAULT_CUSTOM_ACCENT),
   [CUSTOM_PRESETS_FIELD]: z.array(z.object({
-    name: z.string(),
+    name: z.string().pattern(/\S/),
     scheme: z.union([...BUILTIN_SCHEMES]),
     canvas: z.string().pattern(HEX_COLOR_PATTERN),
     accent: z.string().pattern(HEX_COLOR_PATTERN),

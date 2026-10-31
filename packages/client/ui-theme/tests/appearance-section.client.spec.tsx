@@ -153,16 +153,39 @@ describe('AppearanceSection', () => {
     expect(input.value).toBe('')
   })
 
-  it('disables save for overlong names and, at the cap, for a new name', () => {
-    mount('system', DEFAULT_CUSTOM, [
-      { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#00ff00' },
-    ])
+  it('disables save for overlong names, at the cap for new names, and skips IME Enter', () => {
+    const b = mount('system', DEFAULT_CUSTOM, Array.from({ length: 16 }, (_, index) => ({
+      name: `Preset ${index}`, scheme: 'light' as const, canvas: '#ffffff', accent: '#ff6900',
+    })))
     const input = document.querySelector('input[type="text"][aria-label="Name the current colors"]') as HTMLInputElement
     const save = screen.getByRole('button', { name: 'Save' })
     fireEvent.change(input, { target: { value: 'x'.repeat(25) } })
     expect(save).toHaveProperty('disabled', true)
-    fireEvent.change(input, { target: { value: 'Navy' } })
+    // Enter on a non-savable name does nothing.
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(b.saveCustomPreset).not.toHaveBeenCalled()
+    // At the cap: a new name is refused, an existing name still replaces.
+    fireEvent.change(input, { target: { value: 'New name' } })
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(input, { target: { value: 'Preset 3' } })
     expect(save).toHaveProperty('disabled', false)
+    // IME composition Enter and the keyCode-229 form never save.
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    const composing = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    Object.defineProperty(composing, 'keyCode', { value: 229 })
+    input.dispatchEvent(composing)
+    expect(b.saveCustomPreset).not.toHaveBeenCalled()
+  })
+
+  it('saves on Enter with a savable name and the accent swatches commit', () => {
+    const b = mount()
+    const input = document.querySelector('input[type="text"][aria-label="Name the current colors"]') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Navy' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(b.saveCustomPreset).toHaveBeenCalledWith('Navy')
+    expect(input.value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Accent #3f6b4a' }))
+    expect(b.setCustom).toHaveBeenCalledWith({ accent: '#3f6b4a' })
   })
 
   it('applies a chip through setCustom and deletes it through the × button', () => {

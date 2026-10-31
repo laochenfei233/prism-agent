@@ -502,19 +502,23 @@ describe('ThemeRuntime', () => {
     it('trims the name, replaces an existing entry in place, and no-ops on identical saves', () => {
       const { theme, events, host } = make()
       theme.saveCustomPreset('  Ink  ')
-      expect(theme.getTheme().customPresets.map(preset => preset.name)).toEqual(['Ink'])
+      theme.setCustom({ canvas: '#112233' })
+      theme.saveCustomPreset('Navy')
+      expect(theme.getTheme().customPresets.map(preset => preset.name)).toEqual(['Ink', 'Navy'])
       const afterFirst = events.length
       theme.setCustom({ canvas: '#000000' })
       theme.saveCustomPreset('Ink')
       expect(theme.getTheme().customPresets).toEqual([
         { name: 'Ink', scheme: 'light', canvas: '#000000', accent: '#ff6900' },
+        { name: 'Navy', scheme: 'light', canvas: '#112233', accent: '#ff6900' },
       ])
       const afterSecond = events.length
       theme.saveCustomPreset('Ink')
-      expect(theme.getTheme().customPresets).toHaveLength(1)
+      expect(theme.getTheme().customPresets).toHaveLength(2)
       expect(events.length).toBe(afterSecond)
       expect(afterSecond).toBeGreaterThan(afterFirst)
-      expect(host.set).toHaveBeenCalledTimes(2)
+      // Ink save, Navy save, Ink replace — the identical re-save writes nothing.
+      expect(host.set).toHaveBeenCalledTimes(3)
     })
 
     it('throws on an empty or overlong name and writes nothing', () => {
