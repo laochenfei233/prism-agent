@@ -18,6 +18,7 @@ import { applyCatalogOverride, BUILTIN_CATALOG, resolveCatalogUrls, type Catalog
 import { downloadFile } from './download.ts'
 import { LocalModelsError } from './errors.ts'
 import { BgeEngine } from './engines/bge.ts'
+import { HyMtEngine } from './engines/hymt.ts'
 import { PaddleOcrSidecar } from './engines/paddleocr.ts'
 import { RapidOcrEngine } from './engines/rapidocr.ts'
 import { ModelRegistry, type FamilyRecord, type FileRecord, type RegistryDocument } from './registry.ts'
@@ -157,6 +158,12 @@ export class PrismLocalModelsService {
         ? { ok: true, detail: text.slice(0, 120) }
         : { ok: false, error: 'the probe image produced no text' }
     }
+    if (modelId === 'hy-mt-1.5') {
+      const translation = await this.translate('今天天气很好，适合出门散步。', { to: 'en' })
+      return translation.length > 0
+        ? { ok: true, detail: translation.slice(0, 120) }
+        : { ok: false, error: 'the probe translation came back empty' }
+    }
     throw new LocalModelsError('not-implemented', `probe ${modelId} arrives with its inference task`)
   }
 
@@ -181,9 +188,27 @@ export class PrismLocalModelsService {
   }
 
   /** Capability entry point for translation through HY-MT1.5. */
-  async translate(_text: string, _opts: { readonly to: string; readonly from?: string }): Promise<string> {
+  async translate(text: string, opts: { readonly to: string; readonly from?: string }): Promise<string> {
     await this.init
-    throw new LocalModelsError('not-implemented', 'translation arrives with the HY-MT task')
+    const record = this.document.families['hy-mt-1.5']
+    if (record?.status !== 'ready' || record.variantId === undefined) {
+      throw new LocalModelsError('not-installed', 'install the HY-MT1.5 model from the Models page card first')
+    }
+    const cached = this.engines.get('hy-mt-1.5')
+    let engine: HyMtEngine
+    if (cached?.variantId === record.variantId && cached.engine instanceof HyMtEngine) {
+      engine = cached.engine
+    } else {
+      const stale = this.engines.get('hy-mt-1.5')
+      if (stale !== undefined) {
+        this.engines.delete('hy-mt-1.5')
+        stale.engine.dispose()
+      }
+      const variant = this.requireVariant('hy-mt-1.5', record.variantId)
+      engine = await HyMtEngine.open(this.modelsRoot, record.variantId, { device: variant.device })
+      this.engines.set('hy-mt-1.5', { variantId: record.variantId, engine })
+    }
+    return engine.translate(text, { to: opts.to })
   }
 
   /** Cancel every in-flight download and release engines; sidecars arrive with their tasks. */
