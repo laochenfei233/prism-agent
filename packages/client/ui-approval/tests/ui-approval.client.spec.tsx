@@ -423,6 +423,9 @@ describe('ApprovalPanel', () => {
     const group = screen.getByRole('group', { name: 'Approval details' })
     const [reject, allow] = [...document.querySelectorAll<HTMLElement>('[data-approval-actions] button')]
     group.focus()
+    fireEvent.keyDown(group, { key: 'ArrowLeft', code: 'ArrowLeft' })
+    expect(document.activeElement).toBe(allow)
+    group.focus()
     fireEvent.keyDown(group, { key: 'ArrowRight', code: 'ArrowRight' })
     expect(document.activeElement).toBe(reject)
     fireEvent.keyDown(reject as HTMLElement, { key: 'ArrowRight', code: 'ArrowRight' })

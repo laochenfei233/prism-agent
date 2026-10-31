@@ -70,13 +70,13 @@ The handler ignores input-method composition and events from controls inside a r
 
 | Command | Owner | Desktop macOS / Windows | Desktop Linux | Web Windows / macOS |
 |---|---|---|---|---|
-| `commands.open` | `ui-shortcuts` | `Mod+Shift+P` | `Mod+Shift+P` | `Mod+Alt+P` |
+| `commands.open` | `ui-shortcuts` | `Mod+Shift+P` | `Mod+Shift+P` | `Mod+Alt+C` |
 | `focus.cycle` | `ui-layout` | `F6` | unbound | `Mod+Alt+F6` |
 | `focus.cycleReverse` | `ui-layout` | `Shift+F6` | unbound | `Mod+Alt+Shift+F6` |
 | `focus.composer` | `ui-conversation` | `Mod+L` | `Mod+L` | `Mod+Alt+L` |
 | Tree arrows, `Home`/`End`, `Enter` | `ui-workspace` | local DOM keys, not a binding | same | same |
 
-Every default must pass `bindingIssue` and, for Web, `isWebBindingAllowed` at registration. A bare `F6` is rejected wherever the modifier rule applies, so it is declared for macOS and Windows Desktop only, where Desktop input accepts any complete combination; Ctrl+Alt+F6 stays off Linux Desktop because it collides with virtual-console switching. Web Linux is omitted because its admitted set is three specific combinations, and unbound is a legal declaration. Web follows the house rule that a default without Alt uses `Mod+Alt`. No new default overlaps an existing command or a fixed action.
+Every default must pass `bindingIssue` and, for Web, `isWebBindingAllowed` at registration. A bare `F6` is rejected wherever the modifier rule applies, so it is declared for macOS and Windows Desktop only, where Desktop input accepts any complete combination; Ctrl+Alt+F6 stays off Linux Desktop because it collides with virtual-console switching. Web Linux is omitted because its admitted set is three specific combinations, and unbound is a legal declaration. Web follows the house rule that a default without Alt uses `Mod+Alt`; `Ctrl+Shift+P` opens a private window in Firefox, and `Mod+Alt+P` belongs to `workspace.files` while `Mod+Alt+K` belongs to `session.search`, so the palette takes `Mod+Alt+C`. No new default overlaps an existing command or a fixed action.
 
 ### [S2.6] Phase 2 backlog (out of scope here)
 
@@ -95,7 +95,7 @@ New fork-owned files under `packages/client` carry the `PRISM-DIVERGENCE` marker
 
 Tests: a palette spec (filter by label and alias, run, blocked reason, close and focus return), a cycle spec (order, wrap, missing landmark), a composer-focus spec, a tree-navigation spec (arrows, `Home`/`End`, `Enter`, roving tab index), and a question spec (option movement, question advance, dismissal). Verification runs `pnpm run test:gui`, then `DSH_SNAPSHOT=replay pnpm run test:web` because the change is product-visible.
 
-Delivered evidence: `pnpm run typecheck` passes all five gates; the seven touched packages run 93 files and 1800 tests green; `CommandPalette.tsx` covers 100% of statements, branches, functions, and lines, and the built `packages/client/ui-shortcuts/lib/client.js` contains `commands.open`. Two branch arms remain uncovered (`ApprovalPanel`'s backward arrow from outside the action row and `AnimatedRows`'s non-Element event target), and `DSH_SNAPSHOT=replay pnpm run test:web` builds but its browser replay does not start on this machine.
+Delivered evidence: `pnpm run typecheck` passes all five gates; the seven touched packages run 93 files and 1800 tests green; `CommandPalette.tsx`, `ApprovalPanel.tsx`, and `AnimatedRows.tsx` reach 100% of statements, branches, functions, and lines. `DSH_SNAPSHOT=replay` on the two shortcut browser files runs 11 tests: the shortcut-dialog goldens were refreshed for the four new rows and 10 pass. That lane caught a defect no unit spec could see — `commands.open` and `workspace.files` both claimed `Mod+Alt+P` on Web, `register()` rejected the pair, and `ui-sidebar-files` never mounted — so the palette's Web default is `Mod+Alt+C`. The eleventh test compares a committed golden that embeds the workspace path with POSIX separators against this Windows host, which renders backslashes.
 
 ### [S2.8] Questions and approvals on the keyboard
 
@@ -129,9 +129,9 @@ The dividing rule is ownership, not importance: an application action is a comma
 - [x] T5: Register `focus.cycle`/`focus.cycleReverse` in `ui-layout` over the landmarks. (depends: T4, covers: S2.2)
 - [x] T6: Register `focus.composer` in `ui-conversation`. (depends: T4, covers: S2.3)
 - [x] T7: Add tree arrow navigation and the roving tab index in `ui-workspace`. (depends: T1, covers: S2.4)
-- [ ] T8: Write the five specs named in [S2.7]. (depends: T3, T5, T6, T7, T10, covers: S2.7)
-- [ ] T9: Update the affected package READMEs and the Web client subsystem page. (depends: T5, T6, T7, T10, covers: S2.7)
-- [ ] T10: Answer a pending question from the keyboard — option movement, question advance, confirm, and dismissal — and contribute its fixed rows to the reference. (depends: T1, covers: S2.8, S2.9)
+- [x] T8: Write the five specs named in [S2.7]. (depends: T3, T5, T6, T7, T10, covers: S2.7)
+- [x] T9: Update the affected package READMEs and the Web client subsystem page. (depends: T5, T6, T7, T10, covers: S2.7)
+- [x] T10: Answer a pending question from the keyboard — option movement, question advance, confirm, and dismissal — and keep its keys local to the card as [S2.9] states. (depends: T1, covers: S2.8, S2.9)
 - [ ] T11: Record the bilingual pair with `pnpm run verify-translation-pairing --write docs/compose/spec/keyboard-control.md`, then run the gates: `pnpm run test:gui`, `DSH_SNAPSHOT=replay pnpm run test:web`, `pnpm run typecheck`, `pnpm run lint`, `pnpm run doc-sync`. (depends: T8, T9, T10)
 
 ## [S4] Acceptance
@@ -145,4 +145,4 @@ The dividing rule is ownership, not importance: an application action is a comma
 - [ ] With focus on a session tree row, arrows move between rows, `Home`/`End` reach the first and last row, and `Enter` opens the focused session; Tab enters and leaves the tree once, not once per row.
 - [ ] In a pending question, `ArrowUp`/`ArrowDown`/`Home`/`End` move the option selection, `Enter` confirms the question, `Tab` and `Shift+Tab` move between questions, and `Esc` dismisses through the same path as Cancel; the answer the agent receives is unchanged.
 - [ ] Every new command appears in the `⌘/` reference with its keycaps and can be rebound in Settings; the fixed composer, stop, and approval actions appear there read-only; en and zh copy both exist.
-- [ ] `pnpm run test:gui` and `DSH_SNAPSHOT=replay pnpm run test:web` pass, and no existing default binding changed.
+- [ ] `pnpm run test:gui` and `DSH_SNAPSHOT=replay pnpm run test:web` pass, and no existing default binding changed. The full browser lane is red on this Windows host for suites this change does not touch, and one committed path golden is POSIX-only.

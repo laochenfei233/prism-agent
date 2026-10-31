@@ -70,13 +70,13 @@ commits: 13707d2897..<head>（交付时回填）
 
 | 命令 | 所有者 | 桌面 macOS / Windows | 桌面 Linux | Web Windows / macOS |
 |---|---|---|---|---|
-| `commands.open` | `ui-shortcuts` | `Mod+Shift+P` | `Mod+Shift+P` | `Mod+Alt+P` |
+| `commands.open` | `ui-shortcuts` | `Mod+Shift+P` | `Mod+Shift+P` | `Mod+Alt+C` |
 | `focus.cycle` | `ui-layout` | `F6` | 未绑定 | `Mod+Alt+F6` |
 | `focus.cycleReverse` | `ui-layout` | `Shift+F6` | 未绑定 | `Mod+Alt+Shift+F6` |
 | `focus.composer` | `ui-conversation` | `Mod+L` | `Mod+L` | `Mod+Alt+L` |
 | 树方向键、`Home`/`End`、`Enter` | `ui-workspace` | 本地 DOM 按键，不是绑定 | 同左 | 同左 |
 
-每个默认键位在注册时都要通过 `bindingIssue`，Web 还要通过 `isWebBindingAllowed`。裸 `F6` 在任何适用修饰键规则的场合都会被拒绝，因此只声明给 macOS 与 Windows 桌面——桌面输入接受任何完整组合；Linux 桌面不使用 Ctrl+Alt+F6，因为它会与虚拟控制台切换冲突。Web Linux 不声明默认值，因为其可接受集合只有三个具体组合，而"未绑定"是合法声明。Web 遵循"不带 Alt 的默认键位改用 `Mod+Alt`"这条既有规则。新默认键位不与任何现有命令或固定动作重叠。
+每个默认键位在注册时都要通过 `bindingIssue`，Web 还要通过 `isWebBindingAllowed`。裸 `F6` 在任何适用修饰键规则的场合都会被拒绝，因此只声明给 macOS 与 Windows 桌面——桌面输入接受任何完整组合；Linux 桌面不使用 Ctrl+Alt+F6，因为它会与虚拟控制台切换冲突。Web Linux 不声明默认值，因为其可接受集合只有三个具体组合，而"未绑定"是合法声明。Web 遵循"不带 Alt 的默认键位改用 `Mod+Alt`"这条既有规则；Ctrl+Shift+P 在 Firefox 会打开隐私窗口，`Mod+Alt+P` 属于 `workspace.files`，`Mod+Alt+K` 属于 `session.search`，因此命令面板改用 `Mod+Alt+C`。新默认键位不与任何现有命令或固定动作重叠。
 
 ### [S2.6] Phase 2 backlog (out of scope here)
 
@@ -95,7 +95,7 @@ commits: 13707d2897..<head>（交付时回填）
 
 测试：面板 spec（按标签与别名过滤、执行、拒绝原因、关闭与焦点归还）、循环 spec（顺序、环绕、缺少地标）、输入框聚焦 spec、树导航 spec（方向键、`Home`/`End`、`Enter`、roving tab index）、提问 spec（选项移动、题目前进、取消）。验证先跑 `pnpm run test:gui`，再跑 `DSH_SNAPSHOT=replay pnpm run test:web`，因为这是产品可见变更。
 
-已交付的证据：`pnpm run typecheck` 五项门禁全部通过；七个改动包共 93 个文件、1800 项测试全绿；`CommandPalette.tsx` 的语句、分支、函数、行覆盖率均为 100%，构建产物 `packages/client/ui-shortcuts/lib/client.js` 中含 `commands.open`。仍有两处分支臂未覆盖（`ApprovalPanel` 从动作行之外按反方向键、`AnimatedRows` 的事件目标不是 Element），且 `DSH_SNAPSHOT=replay pnpm run test:web` 在本机构建成功但浏览器回放无法启动。
+已交付的证据：`pnpm run typecheck` 五项门禁全部通过；七个改动包共 93 个文件、1800 项测试全绿；`CommandPalette.tsx`、`ApprovalPanel.tsx`、`AnimatedRows.tsx` 的语句、分支、函数、行覆盖率均为 100%。`DSH_SNAPSHOT=replay` 跑两个快捷键浏览器文件共 11 项：为四行新命令刷新快捷键对话框基准后 10 项通过。这条通道抓到了单元 spec 看不见的缺陷——`commands.open` 与 `workspace.files` 在 Web 上同时声明 `Mod+Alt+P`，`register()` 拒绝该组合，`ui-sidebar-files` 因此从未挂载——所以命令面板的 Web 默认键位是 `Mod+Alt+C`。第 11 项比较的是把工作区路径按 POSIX 分隔符写死的基准，本机 Windows 渲染反斜杠。
 
 ### [S2.8] Questions and approvals on the keyboard
 
@@ -129,9 +129,9 @@ commits: 13707d2897..<head>（交付时回填）
 - [x] T5：在 `ui-layout` 注册基于地标的 `focus.cycle`/`focus.cycleReverse`。（depends: T4, covers: S2.2）
 - [x] T6：在 `ui-conversation` 注册 `focus.composer`。（depends: T4, covers: S2.3）
 - [x] T7：在 `ui-workspace` 增加树方向键导航与 roving tab index。（depends: T1, covers: S2.4）
-- [ ] T8：编写 [S2.7] 列出的五个 spec。（depends: T3, T5, T6, T7, T10, covers: S2.7）
-- [ ] T9：更新受影响的包 README 与 Web 客户端子系统页。（depends: T5, T6, T7, T10, covers: S2.7）
-- [ ] T10：让待答提问可以用键盘回答——选项移动、题目前进、确认与取消——并把它的固定行加入参考表。（depends: T1, covers: S2.8, S2.9）
+- [x] T8：编写 [S2.7] 列出的五个 spec。（depends: T3, T5, T6, T7, T10, covers: S2.7）
+- [x] T9：更新受影响的包 README 与 Web 客户端子系统页。（depends: T5, T6, T7, T10, covers: S2.7）
+- [x] T10：让待答提问可以用键盘回答——选项移动、题目前进、确认与取消——并按 [S2.9] 所述把按键留在卡片本地。（depends: T1, covers: S2.8, S2.9）
 - [ ] T11：用 `pnpm run verify-translation-pairing --write docs/compose/spec/keyboard-control.md` 记录双语配对，然后跑检查：`pnpm run test:gui`、`DSH_SNAPSHOT=replay pnpm run test:web`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run doc-sync`。（depends: T8, T9, T10）
 
 ## [S4] Acceptance
@@ -145,4 +145,4 @@ commits: 13707d2897..<head>（交付时回填）
 - [ ] 焦点在会话树行上时，方向键在行之间移动，`Home`/`End` 到首尾行，`Enter` 打开当前会话；Tab 只进出树一次，而不是每行一次。
 - [ ] 待答提问里，`ArrowUp`/`ArrowDown`/`Home`/`End` 移动选项，`Enter` 确认当前题，`Tab`/`Shift+Tab` 在多题之间前进或后退，`Esc` 走与"取消"相同的路径关闭；模型收到的回答不变。
 - [ ] 每个新命令都出现在 `⌘/` 参考表中并显示键帽，且能在设置里改键；输入、停止与审批的固定动作在参考表中只读显示；中英文文案都存在。
-- [ ] `pnpm run test:gui` 与 `DSH_SNAPSHOT=replay pnpm run test:web` 通过，且没有任何既有默认键位被改动。
+- [ ] `pnpm run test:gui` 与 `DSH_SNAPSHOT=replay pnpm run test:web` 通过，且没有任何既有默认键位被改动。完整浏览器通道在本机 Windows 上对本次未触碰的套件是红的，另有一份路径基准只按 POSIX 分隔符记录。

@@ -10,6 +10,9 @@
         - button "Edit shortcut for Open keyboard shortcuts"
         - text: Open keyboard shortcuts ⌘ /
       - listitem:
+        - button "Edit shortcut for Command palette"
+        - text: Command palette ⌥ ⌘ C
+      - listitem:
         - button "Edit shortcut for New Session"
         - text: New Session ⌥ ⌘ N
       - listitem:
@@ -54,6 +57,15 @@
       - listitem:
         - button "Edit shortcut for Close current page or window"
         - text: Close current page or window ⌥ ⌘ W
+      - listitem:
+        - button "Edit shortcut for Focus the composer"
+        - text: Focus the composer ⌥ ⌘ L
+      - listitem:
+        - button "Edit shortcut for Focus next region"
+        - text: Focus next region ⌥ ⌘ F6
+      - listitem:
+        - button "Edit shortcut for Focus previous region"
+        - text: Focus previous region ⌥ ⇧ ⌘ F6
   - region "Message input":
     - heading "Message input" [level=3]
     - list:

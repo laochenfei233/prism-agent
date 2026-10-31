@@ -173,6 +173,11 @@ describe('AnimatedRows', () => {
     const tree = screen.getByRole('tree')
     const [first, second, third] = [...tree.querySelectorAll<HTMLElement>('[role="treeitem"]')]
     tree.focus()
+    fireEvent.keyDown(tree, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(third)
+    tree.focus()
+    fireEvent.keyDown(tree, { key: 'ArrowDown', ctrlKey: true })
+    expect(document.activeElement).toBe(tree)
     fireEvent.keyDown(tree, { key: 'ArrowDown' })
     expect(document.activeElement).toBe(first)
     fireEvent.keyDown(first as HTMLElement, { key: 'ArrowDown' })
