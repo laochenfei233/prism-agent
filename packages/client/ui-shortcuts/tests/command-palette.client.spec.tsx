@@ -81,6 +81,15 @@ it('lists a command registered after the palette opened', () => {
   expect(screen.getAllByRole('option')).toHaveLength(2)
 })
 
+it('runs the command a row click points at', async () => {
+  const f = fixture([row('session.new', 'New session'), row('settings.open', 'Open settings')])
+  act(() => { f.store.actions.open() })
+  fireEvent.click(screen.getAllByRole('option')[1] as HTMLElement)
+  await settle()
+  expect(f.invoke).toHaveBeenCalledWith('settings.open', expect.anything())
+  expect(f.store.getSnapshot().open).toBe(false)
+})
+
 it('reports an empty result and shows unbound commands without keycaps', () => {
   const f = fixture([row('session.new', 'New session', [], [])])
   act(() => { f.store.actions.open() })
