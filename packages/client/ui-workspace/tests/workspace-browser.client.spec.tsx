@@ -14,7 +14,9 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import type { DirectoryFlowOwnerProps, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
+import type {
+  DirectoryFlowOwnerProps, SessionRowPendingOwnerProps, WorkspaceBrowserProps,
+} from '../src/client/contract/slots.ts'
 import { createWorkspaceShortcutControls } from '../src/client/shortcuts.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
@@ -810,6 +812,70 @@ describe('WorkspaceBrowser', () => {
     expectVisible(12)
     fireEvent.click(screen.getByRole('button', { name: '收起' }))
     expectVisible(8)
+  })
+
+  it('renders the pending seat as a second line only while a row holds an interaction', () => {
+    const item = summary('session-1', 5)
+    const status = (pendingInteraction: SessionPendingInteraction | undefined) =>
+      hook<SessionStatusSnapshot>(new Map([[item.id, {
+        running: false, pendingInteraction, completionUnread: false,
+      }]]))
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: object) =>
+      name === 'sidebar.workspaces.session.pending'
+        ? <button type="button" data-testid="pending-seat">{(owner as SessionRowPendingOwnerProps).sessionId}</button>
+        : null
+    const b = mount({
+      useSessions: hook(sessionState([item])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [item.id])])),
+      renderSlot,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.queryByTestId('pending-seat')).toBeNull()
+
+    rerender(b, {
+      useSessionStatus: status({ key: 'approval:1', kind: 'approval', sessionId: item.id } as SessionPendingInteraction),
+    })
+    const row = document.querySelector<HTMLElement>(`[data-row-key="session:${item.id}"]`)
+    if (row === null) throw new Error('session row missing')
+    expect(within(row).getByTestId('pending-seat').textContent).toBe('session-1')
+
+    // A question owns its own composer UI and fills no seat here: the line is
+    // rendered but stays childless, which is what its stylesheet keys on to
+    // keep the row at one line.
+    rerender(b, {
+      useSessionStatus: status({ key: 'question:1', kind: 'question', sessionId: item.id } as SessionPendingInteraction),
+      renderSlot: () => null,
+    })
+    const questionRow = document.querySelector<HTMLElement>(`[data-row-key="session:${item.id}"]`)
+    if (questionRow === null) throw new Error('session row missing')
+    const line = [...questionRow.children].find(child => child.tagName === 'DIV')
+    expect(line?.childNodes).toHaveLength(0)
+
+    rerender(b, { useSessionStatus: status(undefined) })
+    expect(screen.queryByTestId('pending-seat')).toBeNull()
+  })
+
+  it('gives the pending seat the title the row displays, never an empty one', () => {
+    const untitled = summary('session-2', 5, { title: '', displayTitle: '' })
+    const titles: string[] = []
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: object) => {
+      if (name === 'sidebar.workspaces.session.pending') {
+        titles.push((owner as SessionRowPendingOwnerProps).displayTitle)
+      }
+      return null
+    }
+    mount({
+      useSessions: hook(sessionState([untitled])),
+      useSessionStatus: hook<SessionStatusSnapshot>(new Map([[untitled.id, {
+        running: false,
+        pendingInteraction: { key: 'approval:2', kind: 'approval', sessionId: untitled.id } as SessionPendingInteraction,
+        completionUnread: false,
+      }]])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [untitled.id])])),
+      renderSlot,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(titles).toEqual([t('session.untitled')])
   })
 
   it('keeps the raised row count, not the Session, when a new Session pushes it down', () => {

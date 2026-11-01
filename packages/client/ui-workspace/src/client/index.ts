@@ -13,8 +13,9 @@
  * with its own behavior, plus the dialogs and the row-action notice into
  * `shell.overlay` (see the contract module doc). It also declares two
  * Session-row seats: the leading decoration a row renders only while its own
- * primary state is idle, and the section the row's hover card renders between
- * its relative time and its trailing status line. Export discipline:
+ * primary state is idle, the section the row's hover card renders between
+ * its relative time and its trailing status line, and the second line a row
+ * renders while it holds a pending interaction. Export discipline:
  * packages/client/AGENTS.md.
  */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
@@ -68,7 +69,8 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
 export type { StartSessionOptions, UiWorkspace } from './navigation.ts'
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
-  MenuOpenState, RowToast, SessionRenameTarget, SessionRowOwnerProps, UseMenuOpenState, WorkspaceBrowserInjected,
+  MenuOpenState, RowToast, SessionRenameTarget, SessionRowOwnerProps, SessionRowPendingOwnerProps,
+  UseMenuOpenState, WorkspaceBrowserInjected,
   SessionRowScheduleOwnerProps,
   WorkspaceBrowserProps,
   WorkspacePickerInjected, WorkspacePickerProps,
@@ -350,6 +352,7 @@ export function apply(ctx: Context): void {
           kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: menuOpenStateFactory, shortcuts: ctx.shortcuts.catalog } },
         },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
+        'sidebar.workspaces.session.pending': { kind: 'list', scope: 'root' },
         'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
       },

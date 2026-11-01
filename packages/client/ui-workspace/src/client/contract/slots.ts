@@ -33,11 +33,11 @@
  * client plugin's action lands beside them by `order` and needs nothing from
  * the browser beyond the row identity.
  *
- * The browser entry additionally declares two `list` seats per Session row
- * (`sidebar.session.row.leading` / `sidebar.session.row.hover`) for ambient
- * row decorations. Both take the row's Session identity and nothing else: a
- * session-scoped seat would force a Session binding, which would activate and
- * retain every listed Session.
+ * The browser entry additionally declares three `list` seats per Session row
+ * (`sidebar.session.row.leading` / `sidebar.session.row.hover`, and the second
+ * line `sidebar.workspaces.session.pending`). All take the row's Session
+ * identity and nothing else: a session-scoped seat would force a Session
+ * binding, which would activate and retain every listed Session.
  */
 import type {
   HostObservable, InjectFace, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, SlotHookFactory,
@@ -80,6 +80,18 @@ export interface SessionRowOwnerProps {
   /** Session the row shows. */
   sessionId: SessionId
   /** Row display title: persisted title, or empty when the Session has none. */
+  displayTitle: string
+}
+
+/**
+ * Owner share of one Session row's pending line. The title here is the row's
+ * displayed title, including the localized fallback an untitled Session gets,
+ * because the occupant names that Session in its own copy.
+ */
+export interface SessionRowPendingOwnerProps {
+  /** Session the row shows. */
+  sessionId: SessionId
+  /** Row title as the row displays it, never empty. */
   displayTitle: string
 }
 
@@ -189,6 +201,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * handling to keep the row from opening.
      */
     'sidebar.workspaces.session.row.action': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
+    /**
+     * The second line of one Session row, rendered while that row holds a
+     * pending interaction. The browser declares and renders the seat for every
+     * interaction kind and names no domain type; the package that owns the
+     * wait registers the occupant, which reads its own request from the
+     * Session status hook and answers it from the row. A row without a pending
+     * interaction renders no line, so the seat costs no height while nothing
+     * waits.
+     */
+    'sidebar.workspaces.session.pending': { kind: 'list'; scope: 'root'; owner: SessionRowPendingOwnerProps }
   }
 }
 
@@ -493,6 +515,7 @@ export type WorkspaceBrowserProps =
     | 'sidebar.workspaces.directoryFlow'
     | 'sidebar.workspaces.session.menu.item'
     | 'sidebar.workspaces.session.row.action'
+    | 'sidebar.workspaces.session.pending'
     | 'sidebar.session.row.leading'
     | 'sidebar.session.row.hover'
   >

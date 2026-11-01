@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
 /** `approval` namespace dictionaries. */
 
 /** Simplified Chinese dictionary and key-set source of truth. */
@@ -7,6 +8,8 @@ export const zh = {
   escalation: '工具 {toolName} 请求越权执行',
   reject: '拒绝',
   allowOnce: '允许一次',
+  'rejectFor': '拒绝：{title}',
+  'allowOnceFor': '允许一次：{title}',
 } satisfies Record<string, string>
 
 /** Approval dictionary key union. */
@@ -19,4 +22,6 @@ export const en = {
   escalation: 'Tool {toolName} requests privileged execution',
   reject: 'Reject',
   allowOnce: 'Allow once',
+  'rejectFor': 'Reject for {title}',
+  'allowOnceFor': 'Allow once for {title}',
 } satisfies Record<ApprovalKey, string>
