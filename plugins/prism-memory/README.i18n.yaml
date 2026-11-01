@@ -6,8 +6,8 @@
   en: a25e7c50091049d3
   zh: bb184595a41eabb1
 /prism-prism-memory/summary:
-  en: 233088c93ea62828
-  zh: b8d68e0b907409f4
+  en: 4249293ed3f6d7fd
+  zh: 80a45043b208123e
 /prism-prism-memory/design-constraint-the-cached-prefix-stays-byte-stable:
   en: bae113ec8558ed3e
   zh: 9ddeb3cb43c2cb6b
@@ -18,11 +18,11 @@
   en: ab357ea99798b43b
   zh: 15fb3215ef5ab026
 /prism-prism-memory/use-this-package/the-operator-command:
-  en: 5cd1e88821a1f781
-  zh: 51429fcb48e213b1
+  en: 5e1cacfc7a9a60fa
+  zh: 601ce358780ea746
 /prism-prism-memory/use-this-package/the-memory-page:
-  en: 4a42b79a61629dea
-  zh: 752124370ced7cb7
+  en: a505b26406144753
+  zh: d80c9df97dd08d43
 /prism-prism-memory/the-layer-axis:
   en: 67ea7a7767f57f37
   zh: 885d94b05237f654
@@ -81,8 +81,8 @@
   en: c291171f2907e0c2
   zh: 8703ca2f9355331f
 /prism-prism-memory/known-limitations-and-deferred-work:
-  en: 516f0716d48a3271
-  zh: 86f7face82e97c4b
+  en: 47a676bcde43a5c6
+  zh: 806c4be891153367
 /prism-prism-memory/installation:
   en: 69521c4de892670f
   zh: c2565d8a06956085

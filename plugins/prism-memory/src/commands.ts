@@ -32,6 +32,7 @@ const USAGE = [
   '  review [limit]             The review inbox: records held back until approved',
   '  approve <id> [note]        Promote one pending record to active',
   '  reject <id> [reason]       Archive one pending record',
+  '  forget <id> [reason]       Retire one claim so it stops being recalled',
   '  show <id>                  One record with its attribution and supersede chain',
   '  restore <id> [reason]      Roll a record back to current',
   '  conversations [limit]      Browse the corpus by originating conversation',
@@ -137,10 +138,9 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
     }
 
     case 'search': {
-      // An empty query lists the most recent claims, exactly as memory_search does.
-      const rows = rest === ''
-        ? memory.list(invocation.agent, { limit: RECENT_LIMIT })
-        : memory.search(rest, invocation.agent, { limit: RECENT_LIMIT }).map(hit => hit.record)
+      // An empty query ranks every eligible claim with no terms, and the ranker
+      // orders that newest first — the same answer memory_search gives.
+      const rows = memory.search(rest, invocation.agent, { limit: RECENT_LIMIT }).map(hit => hit.record)
       if (rows.length === 0) {
         return {
           kind: 'success',
@@ -149,6 +149,12 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
       }
       const heading = rest === '' ? 'Most recent claims, newest first:' : `${rows.length} match(es), best first:`
       return { kind: 'success', text: [heading, ...rows.map(line)].join('\n') }
+    }
+
+    case 'forget': {
+      const { first, tail } = firstAndRest(rest)
+      if (first === '') return { kind: 'error', text: USAGE }
+      return { kind: 'success', text: `Retired, retained for audit:\n${line(await memory.forget(first, tail, invocation.agent))}` }
     }
 
     case 'review': {

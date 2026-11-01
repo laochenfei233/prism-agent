@@ -1,6 +1,7 @@
-# Prism memory bundle patch. Three rows: the durable service (domain, prompt
-# protocol, cache-safe tail recall), the model-facing tool registrant, and the
-# operator command registrant.
+# Prism memory bundle patch. Four rows: the durable service (domain, prompt
+# protocol, cache-safe tail recall), the model-facing tool registrant, the
+# operator command registrant, and the browser route row the memory page reads
+# and writes through.
 #
 # Retrieval, injection, hygiene, governance, distillation, consolidation, and
 # import bounds are stated here rather than defaulted in code so a deployment can

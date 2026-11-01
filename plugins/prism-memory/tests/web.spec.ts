@@ -7,7 +7,7 @@
  * receives over HTTP — not about a service method behind it.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import { createAgent, mountMemory } from './fixtures/harness.ts'
@@ -184,6 +184,34 @@ describe('the memory routes', () => {
     expect(await refusal('/api/prism-memory/search', { query: 42 })).toBe('prism-memory/invalid-request')
     expect(await refusal('/api/prism-memory/review', { id: 'mem_missing', decision: 'approve' }))
       .toBe('PRISM_MEMORY_NOT_FOUND')
+  })
+
+  it('hands out the review queue oldest first and leaves retired claims out of the live list', async () => {
+    const ctx = await boot({ requireApproval: true })
+    const agent = await createAgent(ctx, 'queue')
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'))
+      const first = await ctx.prismMemory.remember({ text: 'the first claim waiting for a decision' }, agent)
+      vi.setSystemTime(new Date('2026-10-02T00:00:00.000Z'))
+      const second = await ctx.prismMemory.remember({ text: 'the second claim waiting for a decision' }, agent)
+
+      const queued = await post<MemoryOverview>('/api/prism-memory/overview')
+      if (!queued.ok) throw new Error('the overview route answered a failure')
+      expect(queued.value.pending.map(row => row.id)).toEqual([first.record.id, second.record.id])
+      expect(queued.value.recent).toEqual([])
+
+      // Approving one makes it part of the live corpus; the other keeps waiting.
+      await post('/api/prism-memory/review', { id: first.record.id, decision: 'approve' })
+      vi.setSystemTime(new Date('2026-10-03T00:00:00.000Z'))
+      const settled = await post<MemoryOverview>('/api/prism-memory/overview')
+      if (!settled.ok) throw new Error('the overview route answered a failure')
+      expect(settled.value.pending.map(row => row.id)).toEqual([second.record.id])
+      expect(settled.value.recent.map(row => row.id)).toEqual([first.record.id])
+      expect(settled.value.counts.byStatus).toEqual({ pending: 1, active: 1 })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('projects a row without the fields the page does not render', async () => {

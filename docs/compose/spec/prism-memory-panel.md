@@ -36,14 +36,14 @@ The private `require` is split into a scope-taking wrapper and a `requireIn(id, 
 
 ### S2.2 Four routes on Connection's shared API channel
 
-A new Host row `@prism/prism-memory/web` registers exact Fetch routes under `/api/prism-memory` through `ctx.connection.fetch.register`, the same mechanism other feature packages use. Each route takes one JSON body, validates it with zod, and answers one envelope: `{ ok: true, value }` or `{ ok: false, error: { code, message } }` at HTTP 400.
+A new Host row `@prism/prism-memory/web` registers exact Fetch routes under `/api/prism-memory` through `ctx.connection.fetch.register`, the same mechanism other feature packages use. The three routes that carry a body validate it with zod; `overview` reads none. Every route answers one envelope: `{ ok: true, value }` or `{ ok: false, error: { code, message } }` at HTTP 400.
 
-    POST /api/prism-memory/overview  -> { total, byStatus, byLayer, pending, recent }
+    POST /api/prism-memory/overview  -> { counts: { total, byStatus, byLayer }, pending, recent }
     POST /api/prism-memory/search    -> { rows }
     POST /api/prism-memory/remember  -> { row, outcome, duplicates }
     POST /api/prism-memory/review    -> { row }
 
-`overview` answers one round trip for the page's initial state: counts computed over the whole store, the review inbox, and the most recent claim of each layer. Row caps live in this row, not in the service, so the read stays whole and the transport decides how much of it crosses the wire.
+`overview` answers one round trip for the page's initial state: counts computed over the whole store, the head of the pending queue with the oldest decision first, and the newest live claims. Row caps live in this row, not in the service, so the read stays whole and the transport decides how much of it crosses the wire.
 
 ### S2.3 The browser half
 
@@ -51,13 +51,13 @@ The plugin gains a browser entry that reproduces the shell's dynamic-bundle cont
 
 The page shows the counts, a search field, an add form, the review inbox with approve and reject, and the record list, with loading, empty, and failed states. Controls come from the shared `@deepseek-ai/dsh-client-ui-primitives` baseline; the page owns a stylesheet string, because an out-of-tree bundle has no CSS pipeline, and consumes the shell's `--dsw-*` tokens so it follows the active theme. Copy lives in one locale namespace registered under `prismMemory.panel`.
 
-### S2.4 Two human subcommands
+### S2.4 Three human subcommands
 
-`/memory remember <text>` stores the operator's own claim with `origin: 'operator'` and prints the id it landed on; `/memory search <query>` renders the ranked lines `memory_search` would render, narrowed to the invoking session's scope. Both are thin adapters over existing service methods, and both cost no tool schema.
+`/memory remember <text>` stores the operator's own claim with `origin: 'operator'` and prints the id it landed on; `/memory search <query>` renders the ranked lines `memory_search` would render, narrowed to the invoking session's scope; `/memory forget <id> [reason]` retires one live claim, so a person can both add and retract without a model turn. All three are thin adapters over existing service methods, and none costs a tool schema.
 
 ### S2.5 The model surface does not move
 
-The panel and the two subcommands add no tool definition, no system-prompt bytes, and no injected frame. The five tool schemas, the protocol section, and the tail rule stay exactly as they are, so `tests/cache-safety.spec.ts` keeps holding without an edit to it.
+The panel and the three subcommands add no tool definition, no system-prompt bytes, and no injected frame. The five tool schemas, the protocol section, and the tail rule stay exactly as they are, so `tests/cache-safety.spec.ts` keeps holding without an edit to it.
 
 ### S2.6 Deliberately not taken from dsh-mnemon
 
@@ -70,15 +70,15 @@ The panel and the two subcommands add no tool definition, no system-prompt bytes
 
 ## [S3] Scope
 
-- In scope: the four operator service methods, the browser routes and their wire contract, the browser half and its build and manifest changes, the two `/memory` subcommands, the model-facing documentation, and the tests for all of it.
+- In scope: the four operator service methods, the browser routes and their wire contract, the browser half and its build and manifest changes, the three `/memory` subcommands, the model-facing documentation, and the tests for all of it.
 - Out of scope: any change to the record schema, the retrieval model, the injection frame, the tool surface, the protocol text, the import layouts, and the consolidation passes.
 
 ## Tasks
 
 - [ ] T1: Add the four operator methods to the service with a shared `requireIn`, and cover them in `tests/service.spec.ts` (depends: none)
-- [ ] T2: Add `src/web-contract.ts` and the `src/web.ts` route row, wire the row into `cordis.patch.yml`, and cover it with a Loader composition spec (depends: T1)
+- [ ] T2: Add `src/web-contract.ts`, `src/routes.ts`, and the `src/web.ts` route row, wire the row into `cordis.patch.yml`, and cover it with a Loader composition spec (depends: T1)
 - [ ] T3: Add the browser half: manifest and `dsh.client`, the two tsconfig faces, the tsdown client bundle, the locale dictionary, the request client, the page and styles, the glyph, and the registration (depends: T2)
-- [ ] T4: Add `/memory remember` and `/memory search`, and a spec that drives `/memory` end to end through the real command runtime (depends: T1)
+- [ ] T4: Add `/memory remember`, `/memory search`, and `/memory forget`, and a spec that drives `/memory` end to end through the real command runtime (depends: T1)
 - [ ] T5: Update `README.md`, `README.zh.md`, and the pairing record; update the design note in `preview/` where it states the command and panel surfaces (depends: T3, T4)
 - [ ] T6: Run the package typecheck for both faces, the suites, the build, and the smoke script in the worktree (depends: T3, T4, T5)
 - [ ] T7: Independent review of the complete change, then finalize this document (depends: T6)
@@ -87,7 +87,9 @@ The panel and the two subcommands add no tool definition, no system-prompt bytes
 
 - [ ] `/memory remember <text>` stores one claim with origin `operator` in the caller's default scope, and prints its id.
 - [ ] `/memory search <query>` renders ranked lines carrying layer, kind, scope, date, and originating session, and an empty query lists the most recent claims.
+- [ ] `/memory forget <id>` retires a live claim the person wrote, so a human can both add and retract without a model turn.
 - [ ] A caller with no session can read project- and conversation-scoped records and can approve or reject one, which `visible` and `approve` cannot do today.
+- [ ] The review inbox hands out the head of the pending queue, oldest decision first.
 - [ ] The four routes answer their envelope, reject an invalid body with an error code, and never throw out of the route.
 - [ ] The web row activates over a real web server and connection through the Loader, and stays pending in a profile that composes neither.
 - [ ] The page registers into `sidebar.panellist` and `main`, and renders counts, search results, review actions, the add form, and the three states.

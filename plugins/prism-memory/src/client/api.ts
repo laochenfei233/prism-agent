@@ -2,11 +2,18 @@
  * Browser client for the memory routes: one typed request per operation, with
  * every response narrowed at this wire boundary before the page renders it.
  *
- * Requests are document-relative so a host mount prefix keeps working.
+ * Paths come from the shared route module, so the Host's registrations and these
+ * requests cannot drift apart.
  *
  * @module @prism/prism-memory/client/api
  */
 
+import {
+  MEMORY_OVERVIEW_PATH,
+  MEMORY_REMEMBER_PATH,
+  MEMORY_REVIEW_PATH,
+  MEMORY_SEARCH_PATH,
+} from '../routes.ts'
 import type {
   MemoryOverview,
   MemoryReviewValue,
@@ -14,9 +21,6 @@ import type {
   MemoryRowsValue,
   MemoryRememberValue,
 } from '../web-contract.ts'
-
-/** Path prefix below `/api` every request of this client addresses. */
-const BASE = 'api/prism-memory'
 
 /** Capabilities the page's apply closure provides. */
 export interface MemoryPanelFace {
@@ -115,7 +119,7 @@ function isReviewValue(value: unknown): value is MemoryReviewValue {
 async function post<T>(route: string, body: unknown, decode: (value: unknown) => T | null): Promise<T> {
   let payload: unknown
   try {
-    const response = await fetch(`${BASE}/${route}`, {
+    const response = await fetch(route, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -149,11 +153,11 @@ async function post<T>(route: string, body: unknown, decode: (value: unknown) =>
  */
 export function createMemoryApi(): MemoryPanelFace {
   return {
-    load: () => post('overview', {}, value => isOverview(value) ? value : null),
-    search: query => post('search', { query }, value => isRows(value) ? value.rows : null),
-    remember: (text, layer) => post('remember', { text, layer }, value => isRememberValue(value) ? value : null),
+    load: () => post(MEMORY_OVERVIEW_PATH, {}, value => isOverview(value) ? value : null),
+    search: query => post(MEMORY_SEARCH_PATH, { query }, value => isRows(value) ? value.rows : null),
+    remember: (text, layer) => post(MEMORY_REMEMBER_PATH, { text, layer }, value => isRememberValue(value) ? value : null),
     review: async (id, decision) => {
-      const settled = await post('review', { id, decision }, value => isReviewValue(value) ? value : null)
+      const settled = await post(MEMORY_REVIEW_PATH, { id, decision }, value => isReviewValue(value) ? value : null)
       return settled.row
     },
   }

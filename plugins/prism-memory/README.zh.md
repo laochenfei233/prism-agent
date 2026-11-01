@@ -12,7 +12,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 1. **缓存前缀永不被改写。** 见下文。
 2. **主张按三条彼此独立的轴归档** —— 主张讲的是谁的事（`layer`）、它是什么类型的陈述（`kind`）、谁能看见它（`scope`）—— 而层决定一条主张是先被声明还是被提及后才引用。
-3. **治理是人的界面。** 批准、拒绝、恢复、过期、整理、导入与导出都是 `/memory` 子命令，其中前四项也是 Web 记忆页上的按钮 —— 都不是工具，因此模型无法自行提升自己的主张，而确实位于前缀中的 5 个工具 schema 保持固定。
+3. **治理是人的界面。** 批准、拒绝、恢复、过期、整理、导入与导出都是 `/memory` 子命令，其中前两项也是 Web 记忆页上的按钮 —— 都不是工具，因此模型无法自行提升自己的主张，而确实位于前缀中的 5 个工具 schema 保持固定。
 4. **记忆同时来自三类写入方**：模型调用工具、一个轮次在收尾时被读取（无需额外模型调用），以及另一个工具已经为此用户写下的记忆文件。
 
 ## 设计约束：缓存前缀保持字节稳定
@@ -67,6 +67,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `/memory review [limit]` | 待审收件箱：被拦下等待批准的记录 |
 | `/memory approve <id> [note]` | 把一条待审记录提升为 active |
 | `/memory reject <id> [reason]` | 归档一条待审记录 |
+| `/memory forget <id> [reason]` | 退役一条仍生效的主张，使其不再被召回；记录被保留 |
 | `/memory show <id>` | 一条记录，带溯源、日期、标签、印证与其 supersede 链 |
 | `/memory restore <id> [reason]` | 把一条记录回滚为 current |
 | `/memory conversations [limit]` | 按来源会话浏览语料 |
@@ -78,9 +79,11 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ### 记忆页
 
-`@prism/prism-memory/web` 在 `/api/prism-memory` 下注册四条精确 Fetch 路由 —— `overview`、`search`、`remember` 与 `review` —— 各回答一个 `{ ok, value }` 信封，请求体由 zod 校验。浏览器侧把它们渲染成侧边栏里的一个页面：整库计数、关键词搜索、新增表单、带通过与驳回的待审收件箱，以及最新的主张。
+`@prism/prism-memory/web` 在 `/api/prism-memory` 下注册四条精确 Fetch 路由 —— `overview`、`search`、`remember` 与 `review` —— 各回答一个 `{ ok, value }` 信封。带请求体的三条用 zod 校验请求体；`overview` 不读请求体。浏览器侧把它们渲染成侧边栏里的一个页面：整库计数、关键词搜索、新增表单、带通过与驳回的待审收件箱，以及仍生效的主张。
 
 页面没有调用会话，因此它通过服务的运维面来读写与结算 —— `operatorRecords`、`operatorSearch`、`operatorApprove` 与 `operatorReject`，它们都不按作用域收窄。每一行都渲染自己的作用域，让收窄在做决定的地方可见。面向模型的调用方不变：工具传自己的 agent，`/memory` 传自己的会话，两者仍然被它们过滤。
+
+页面存下的主张是 `global`，因为没有会话可以用来推导 project 或 conversation 作用域 —— 因此在那里新增的一条 `user` 或 `rule` 主张会在每个会话的第一轮被声明。退役它是 `/memory forget <id>`，这也是退役一条仍生效主张的唯一人用路径。
 
 该行声明了 `webServer`，因此没有组合 Web 服务器的 profile 会让它保持 pending，而不是加载失败。浏览器包是一个 module-loader 闭包，把 React 与共享 primitives 作为基线模块请求，而不是再内联一份副本。
 
@@ -325,7 +328,7 @@ token 影响：无。页面通过自己的路由读写，而它所结算的东�
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 174 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -352,8 +355,10 @@ node scripts/smoke.mjs                                                        # 
 - **语料常驻内存。** 每条记录都驻留在该域的同步状态中，受 `maxRecords` 限制，但不受字节数限制。
 - **`hits` 只计显式打开**，因此复用加权是弱信号。沉淀刻意不碰它。
 - **维护与整理巡检没有被调度。** 它们跑在轮次路径上和运维命令上；希望它们在固定时刻跑的部署，需要一条指向 `/memory maintain apply` 或 `/memory dream apply` 的 schedule 配置行。
-- **页面只新增与结算，不编辑。** 改写一条主张是带 `supersedes` 的 `memory_remember`，驳回一条仍生效的记录是 `memory_forget` 或 `/memory reject`；面板两个都不提供，因为在面板上做的编辑没有审计故事。
+- **页面只新增与结算，不编辑。** 改写一条主张是带 `supersedes` 的 `memory_remember`，退役一条仍生效的记录是 `/memory forget <id>`；面板两个都不提供，因为在面板上做的编辑没有审计故事。
 - **页面的 overview 在每次写入后读取整个库。** 它受 `maxRecords` 约束，对本存储所面向的语料规模是正确的；接近该上限的存储会想先做分页读取。
+- **四个运维方法是公开且不收窄的服务方法。** 没有任何面向模型的调用方能到达它们，而 `maintain`、`dream`、`importMemories`、`exportMarkdown` 本来就是整库操作，因此这不引入新的权限类别 —— 但任何注入 `prismMemory` 的插件都能读到整库，而类型除了名字之外没有表达这一点。
+- **页面没有组件规格。** 该包在仓库之外，那里没有可渲染它的 jsdom 与 React 安装，因此它的行为只由路由规格、请求客户端规格，以及加载该包并执行其 `apply` 的 smoke 覆盖。
 - **面向模型的会话工具不在本 bundle 中。** `session-search.patch.yml` 打开持久的 `sessionQuery` 索引，但挂载 `@deepseek-ai/dsh-tool-session-query` 是部署的决定，因为该包并非每套 Harness 安装的一部分。没有那一行，模型仍能通过 `memory_search` 的溯源到达一条主张的来源会话，但它没有直接读取会话历史的工具。
 - **导入布局按 id 硬编码。** 新增一个工具意味着往 `IMPORT_SOURCES` 加一条；自定义布局没有配置格式。
 

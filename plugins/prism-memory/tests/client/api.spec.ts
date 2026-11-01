@@ -64,11 +64,11 @@ const row = {
 }
 
 describe('the browser request client', () => {
-  it('addresses this plugin routes, relative to the host mount', async () => {
+  it('addresses the absolute route the host registers', async () => {
     const sent: Sent[] = []
     stubFetch({ ok: true, value: { counts: { total: 0, byStatus: {}, byLayer: {} }, pending: [], recent: [] } }, sent)
     await createMemoryApi().load()
-    expect(sent[0]?.url).toBe('api/prism-memory/overview')
+    expect(sent[0]?.url).toBe('/api/prism-memory/overview')
   })
 
   it('sends the query and answers the rows it decoded', async () => {

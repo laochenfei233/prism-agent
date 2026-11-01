@@ -36,14 +36,14 @@ Scope 权威不变：每个模型侧工具、每个 `/memory` 子命令继续传
 
 ### S2.2 Connection 共享 API 通道上的四条路由
 
-新的一行 Host 插件 `@prism/prism-memory/web` 通过 `ctx.connection.fetch.register` 在 `/api/prism-memory` 下注册精确 Fetch 路由，与其他功能包用的是同一套机制。每条路由接收一个 JSON 体，用 zod 校验，并且只回答一种信封：`{ ok: true, value }` 或 `{ ok: false, error: { code, message } }`，后者为 HTTP 400。
+新的一行 Host 插件 `@prism/prism-memory/web` 通过 `ctx.connection.fetch.register` 在 `/api/prism-memory` 下注册精确 Fetch 路由，与其他功能包用的是同一套机制。带请求体的三条用 zod 校验请求体；`overview` 不读请求体。每条路由只回答一种信封：`{ ok: true, value }` 或 `{ ok: false, error: { code, message } }`，后者为 HTTP 400。
 
-    POST /api/prism-memory/overview  -> { total, byStatus, byLayer, pending, recent }
+    POST /api/prism-memory/overview  -> { counts: { total, byStatus, byLayer }, pending, recent }
     POST /api/prism-memory/search    -> { rows }
     POST /api/prism-memory/remember  -> { row, outcome, duplicates }
     POST /api/prism-memory/review    -> { row }
 
-`overview` 一次往返给出页面的初始状态：整库算出的计数、审阅收件箱、以及每一层最近的一条。行数上限住在这条行里而不在服务里，所以读取仍是整库读取，由传输层决定有多少内容过线。
+`overview` 一次往返给出页面的初始状态：整库算出的计数、待审队列的头部（最早的决定在前）、以及最新的仍生效主张。行数上限住在这条行里而不在服务里，所以读取仍是整库读取，由传输层决定有多少内容过线。
 
 ### S2.3 浏览器侧
 
@@ -51,13 +51,13 @@ Scope 权威不变：每个模型侧工具、每个 `/memory` 子命令继续传
 
 页面显示计数、搜索框、新增表单、带通过和驳回的审阅收件箱，以及记录列表，并具备加载中、空、失败三种状态。控件来自共享的 `@deepseek-ai/dsh-client-ui-primitives` 基线；样式表是页面内的字符串，因为仓库外的包没有 CSS 流水线，并消费 shell 的 `--dsw-*` token 以跟随当前主题。文案集中在一个 locale 命名空间，注册名 `prismMemory.panel`。
 
-### S2.4 两个人的子命令
+### S2.4 三个人用的子命令
 
-`/memory remember <text>` 以 `origin: 'operator'` 存下操作者自己的断言，并打印它落到的 id；`/memory search <query>` 渲染与 `memory_search` 相同的排序行，窄化到发起会话的 scope。两者都是既有服务方法的薄适配，都不花任何工具 schema。
+`/memory remember <text>` 以 `origin: 'operator'` 存下操作者自己的断言，并打印它落到的 id；`/memory search <query>` 渲染与 `memory_search` 相同的排序行，窄化到发起会话的 scope；`/memory forget <id> [reason]` 退役一条仍生效的主张，因此人既能新增也能撤回，都不花模型的一轮。三者都是既有服务方法的薄适配，都不花任何工具 schema。
 
 ### S2.5 模型侧一动不动
 
-面板与两个子命令不新增任何工具定义、不新增任何系统提示字节、不新增任何注入帧。五个工具 schema、协议段、尾部注入规则都保持原样，`tests/cache-safety.spec.ts` 因此无需改动继续成立。
+面板与三个子命令不新增任何工具定义、不新增任何系统提示字节、不新增任何注入帧。五个工具 schema、协议段、尾部注入规则都保持原样，`tests/cache-safety.spec.ts` 因此无需改动继续成立。
 
 ### S2.6 明确不采纳的 dsh-mnemon 部分
 
@@ -70,15 +70,15 @@ Scope 权威不变：每个模型侧工具、每个 `/memory` 子命令继续传
 
 ## [S3] Scope
 
-- 范围内：四个服务侧人用方法、浏览器路由及其线上契约、浏览器侧与其构建和清单改动、两个 `/memory` 子命令、面向模型的文档，以及它们的测试。
+- 范围内：四个服务侧人用方法、浏览器路由及其线上契约、浏览器侧与其构建和清单改动、三个 `/memory` 子命令、面向模型的文档，以及它们的测试。
 - 范围外：任何对记录 schema、检索模型、注入帧、工具面、协议文本、导入布局、整理流程的改动。
 
 ## Tasks
 
 - [ ] T1: 给服务加四个 operator 方法与共用的 `requireIn`，并在 `tests/service.spec.ts` 覆盖（依赖：无）
-- [ ] T2: 加 `src/web-contract.ts` 与 `src/web.ts` 路由行，把该行接进 `cordis.patch.yml`，并用 Loader 组装的 spec 覆盖（依赖：T1）
+- [ ] T2: 加 `src/web-contract.ts`、`src/routes.ts` 与 `src/web.ts` 路由行，把该行接进 `cordis.patch.yml`，并用 Loader 组装的 spec 覆盖（依赖：T1）
 - [ ] T3: 加浏览器侧：清单与 `dsh.client`、两个 tsconfig 面、tsdown 客户端包、locale 字典、请求客户端、页面与样式、图标、注册（依赖：T2）
-- [ ] T4: 加 `/memory remember` 与 `/memory search`，并加一个通过真实命令运行时端到端驱动 `/memory` 的 spec（依赖：T1）
+- [ ] T4: 加 `/memory remember`、`/memory search` 与 `/memory forget`，并加一个通过真实命令运行时端到端驱动 `/memory` 的 spec（依赖：T1）
 - [ ] T5: 更新 `README.md`、`README.zh.md` 与配对记录；更新 `preview/` 里陈述命令与面板面的设计说明（依赖：T3、T4）
 - [ ] T6: 在 worktree 里跑本包两个面的 typecheck、全部 suite、构建与 smoke 脚本（依赖：T3、T4、T5）
 - [ ] T7: 对整个改动做独立评审，然后定稿本文档（依赖：T6）
@@ -87,7 +87,9 @@ Scope 权威不变：每个模型侧工具、每个 `/memory` 子命令继续传
 
 - [ ] `/memory remember <text>` 以 origin `operator` 在调用方默认 scope 存下一条断言，并打印其 id。
 - [ ] `/memory search <query>` 渲染带层、种类、scope、日期与来源会话的排序行，空查询列出最近的断言。
+- [ ] `/memory forget <id>` 退役一条人自己写下的仍生效主张，因此人既能新增也能撤回，都不花模型的一轮。
 - [ ] 没有会话的调用方可以读到 project 与 conversation scope 的记录，也可以通过或驳回其中一条——今天 `visible` 与 `approve` 做不到。
+- [ ] 审阅收件箱交出待审队列的头部，最早的决定在前。
 - [ ] 四条路由各自回答信封，非法请求体以错误码拒绝，且路由内永不抛出。
 - [ ] 该 web 行通过 Loader 在真实 web server 与 connection 上激活，并在两者都没有的 profile 里保持 pending。
 - [ ] 页面注册进 `sidebar.panellist` 与 `main`，并渲染计数、搜索结果、审阅动作、新增表单与三种状态。

@@ -12,7 +12,7 @@ Four things distinguish it from the usual "inject memory into the system prompt"
 
 1. **The cached prefix is never rewritten.** See below.
 2. **Claims are filed on three independent axes** — what the claim is about (`layer`), what sort of statement it is (`kind`), and who may see it (`scope`) — and the layer decides whether a claim is stated before it is mentioned.
-3. **Governance is a human surface.** Approving, rejecting, restoring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first four, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
+3. **Governance is a human surface.** Approving, rejecting, restoring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first two, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
 4. **Memory arrives from three producers at once**: the model calling a tool, a turn being read as it closes (no extra model call), and the memory files another tool already wrote for this user.
 
 ## Design constraint: the cached prefix stays byte-stable
@@ -67,6 +67,7 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory review [limit]` | The review inbox: records held back until approved |
 | `/memory approve <id> [note]` | Promote one pending record to active |
 | `/memory reject <id> [reason]` | Archive one pending record |
+| `/memory forget <id> [reason]` | Retire one live claim so it stops being recalled; the record is retained |
 | `/memory show <id>` | One record with attribution, dates, tags, corroboration, and its supersede chain |
 | `/memory restore <id> [reason]` | Roll a record back to current |
 | `/memory conversations [limit]` | Browse the corpus by originating conversation |
@@ -78,9 +79,11 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 
 ### The memory page
 
-`@prism/prism-memory/web` registers four exact Fetch routes under `/api/prism-memory` — `overview`, `search`, `remember`, and `review` — each answering one `{ ok, value }` envelope with zod-validated bodies. The browser half renders them as one panel in the sidebar: counts over the store, a keyword search, an add form, the review inbox with approve and reject, and the newest claims.
+`@prism/prism-memory/web` registers four exact Fetch routes under `/api/prism-memory` — `overview`, `search`, `remember`, and `review` — each answering one `{ ok, value }` envelope. The three that carry a body validate it with zod; `overview` reads none. The browser half renders them as one panel in the sidebar: counts over the store, a keyword search, an add form, the review inbox with approve and reject, and the live claims.
 
 A page has no calling session, so it reads and settles through the service's operator surface — `operatorRecords`, `operatorSearch`, `operatorApprove`, and `operatorReject`, none of them narrowed by scope. Every row renders its own scope, so the narrowing stays visible where the decision is made. Model-facing callers are unchanged: a tool passes its agent and `/memory` passes its session, and both are still filtered by them.
+
+A claim the page stores is `global`, because there is no session to derive a project or conversation scope from — so a `user` or `rule` claim added there is stated on every session's first turn. Retiring it is `/memory forget <id>`, which is also the one human retraction for a live claim.
 
 The row declares `webServer`, so a profile that composes no Web server leaves it pending rather than failing to load. The browser bundle is one module-loader closure that requests React and the shared primitives as baseline modules instead of inlining a second copy of either.
 
@@ -325,7 +328,7 @@ Token effect: none. The page reads and writes through its own routes, and what i
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 174 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -352,8 +355,10 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **The corpus is held in memory.** Every record is resident in the domain's synchronous state, bounded by `maxRecords` but not by bytes.
 - **`hits` counts explicit opens only**, so reuse weighting is a weak signal. Distillation deliberately does not touch it.
 - **The maintenance and consolidation passes are not scheduled.** They run on the turn path and on operator command; a deployment that wants them at a fixed hour needs a schedule row pointing at `/memory maintain apply` or `/memory dream apply`.
-- **The page adds and settles; it does not edit.** Rewriting a claim is `memory_remember` with `supersedes`, and rejecting a live record is `memory_forget` or `/memory reject`; the panel offers neither, so an edit made there would have no audit story.
+- **The page adds and settles; it does not edit.** Rewriting a claim is `memory_remember` with `supersedes`, and retiring a live record is `/memory forget <id>`; the panel offers neither, so an edit made there would have no audit story.
 - **The page's overview reads the whole store on each write.** That is bounded by `maxRecords` and correct for the corpus sizes this store is designed for; a store near that cap would want a paged read first.
+- **The four operator methods are un-narrowed public service methods.** No model-facing caller can reach them, and `maintain`, `dream`, `importMemories`, and `exportMarkdown` were already whole-store, so this adds no new authority class — but any plugin that injects `prismMemory` can read the whole corpus, and the type does not say so beyond the name.
+- **The page has no component spec.** The bundle is out of tree, where no jsdom or React install exists to render it, so its behavior is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.
 - **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s attribution, but it has no tool that reads session history directly.
 - **Import layouts are hardcoded by id.** Adding a tool means adding an entry to `IMPORT_SOURCES`; there is no configuration format for a custom layout.
 

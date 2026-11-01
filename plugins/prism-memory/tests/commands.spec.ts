@@ -107,6 +107,30 @@ describe('the /memory command', () => {
     expect(ctx.prismMemory.all()).toEqual([])
   })
 
+  it('retires a claim the same person wrote, without asking the model', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'forget')
+    await run(ctx, agent, '/memory remember the nightly job runs at 02:00')
+    const stored = ctx.prismMemory.all()[0]
+    if (stored === undefined) throw new Error('the claim was not stored')
+
+    const retired = await run(ctx, agent, `/memory forget ${stored.id} wrong time`)
+    expect(retired.kind).toBe('success')
+    expect(retired.text).toContain('Retired, retained for audit:')
+    expect(ctx.prismMemory.all()[0]?.status).toBe('archived')
+
+    // A retired claim keeps its record and stops being recalled.
+    expect(ctx.prismMemory.search('nightly', agent)).toEqual([])
+  })
+
+  it('refuses a forget with no id', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'forget-empty')
+    const refused = await run(ctx, agent, '/memory forget')
+    expect(refused.kind).toBe('error')
+    expect(refused.text).toContain('Usage: /memory <subcommand>')
+  })
+
   it('keeps the pre-existing status report as the default subcommand', async () => {
     const ctx = await boot()
     const agent = await createAgent(ctx, 'status')

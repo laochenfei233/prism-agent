@@ -126,14 +126,17 @@ browser.apply({
       callback()
     },
     register: (options) => {
-      registered.push(options.name)
+      registered.push(options)
       return () => {}
     },
   },
 })
 assert.deepEqual(injected, ['sidebar.panellist', 'main'], 'the browser half waits on both slot declarations')
-assert.deepEqual(registered, ['sidebar.panellist', 'main'], 'the browser half registers both contributions')
-assert.equal(browser.PANEL_ID, 'memory', 'the panel id is the one the sidebar selects')
+assert.deepEqual(
+  registered.map(options => `${options.name}:${options.id ?? options.key}`),
+  ['sidebar.panellist:memory', 'main:memory'],
+  'the browser half registers one glyph and one page under the same panel id',
+)
 const [namespace, dicts] = [...dictionaries.entries()][0]
 assert.equal(namespace, 'prismMemory.panel', 'the page owns one locale namespace')
 assert.deepEqual(

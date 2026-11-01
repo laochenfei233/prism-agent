@@ -131,7 +131,7 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
         <p className="pm-counts">
           {t('counts', {
             total: counts?.total ?? 0,
-            pending: overview?.pending.length ?? 0,
+            pending: counts?.byStatus.pending ?? 0,
             layers: Object.keys(counts?.byLayer ?? {}).length,
           })}
         </p>

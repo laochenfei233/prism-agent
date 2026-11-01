@@ -15,7 +15,7 @@ import { MemoryPanel } from './MemoryPanel.tsx'
 import { MemoryPanelIcon } from './MemoryPanelIcon.tsx'
 
 /** The id shared by the sidebar entry and the main panel it opens. */
-export const PANEL_ID = 'memory'
+const PANEL_ID = 'memory'
 
 /** Services the two registrations need. */
 export const inject = ['slots', 'locale']

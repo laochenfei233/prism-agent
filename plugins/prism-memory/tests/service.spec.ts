@@ -429,6 +429,20 @@ describe('the operator surface', () => {
     expect(ctx.prismMemory.operatorSearch('release branch').map(hit => hit.record.id)).toEqual([stored.record.id])
   })
 
+  it('reads a conversation claim no other session may address', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'operator-conversation')
+    const other = await createAgent(ctx, 'operator-conversation-other')
+    const stored = await ctx.prismMemory.remember({
+      text: 'this conversation settled on option B',
+      scope: 'conversation',
+    }, agent)
+
+    expect(ctx.prismMemory.visible(other)).toEqual([])
+    expect(ctx.prismMemory.visible(undefined)).toEqual([])
+    expect(ctx.prismMemory.operatorRecords().map(record => record.id)).toContain(stored.record.id)
+  })
+
   it('settles a pending claim from a caller with no session, refusing the scoped path', async () => {
     const ctx = await boot({ requireApproval: true })
     const agent = await createAgent(ctx, 'operator-settles', 'C:/work/operator')

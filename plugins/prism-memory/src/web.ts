@@ -1,22 +1,13 @@
 /**
- * Browser-facing memory operations: exact Fetch routes under Connection's
- * shared `/api` channel, behind one JSON envelope.
+ * Browser-facing memory operations: one exact Fetch route per operation on
+ * Connection's shared `/api` channel, each answering one JSON envelope.
  *
- * Routes rather than a channel: a plugin-registered RPC channel is created
- * through `HostConnectionService`'s own context, which does not inject
- * `webServer`, so `ctx.connection.rpc.handle()` throws at load. The exact
- * Fetch-route registry has no such dependency.
- *
- * `webServer` is declared because Connection's registries read services through
- * the CALLER's context: `HostConnectionService.fetch` is a getter, and Cordis
- * invokes a service getter with `this.ctx` rebound to the reader, so anything
- * that registry touches resolves against this plugin's `inject` set. Declaring
- * it also keeps the row pending — rather than failing — in a profile that
- * composes no web server, which is the same profile that composes no browser.
- *
- * Every route reads and writes through the service's operator surface, which
- * has no calling session: a page governs the whole corpus rather than one
- * session's slice.
+ * Every route reads and writes through the service's operator surface, which has
+ * no calling session: a page governs the whole corpus rather than one session's
+ * slice. `webServer` is declared alongside `connection` because Connection's
+ * route registry reads services through the caller's context; declaring it also
+ * leaves this row pending, rather than failing, in a profile that composes no
+ * web server.
  *
  * @module @prism/prism-memory/web
  */
@@ -30,7 +21,13 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { MemoryRecord } from './domain.ts'
 import { layerOf, MEMORY_LAYERS } from './layers.ts'
-import { MEMORY_KINDS } from './memory.ts'
+import { isLive, MEMORY_KINDS } from './memory.ts'
+import {
+  MEMORY_OVERVIEW_PATH,
+  MEMORY_REMEMBER_PATH,
+  MEMORY_REVIEW_PATH,
+  MEMORY_SEARCH_PATH,
+} from './routes.ts'
 import { PrismMemoryError, type PrismMemoryService } from './service.ts'
 import type {
   MemoryCounts,
@@ -48,13 +45,10 @@ export const name = 'prism-memory-web'
 /** Registries and services this row contributes to. */
 export const inject = ['prismMemory', 'connection', 'webServer'] as const
 
-/** Path prefix every route of this plugin owns below Connection's `/api` channel. */
-const BASE = '/api/prism-memory'
-
-/** Newest claims the page's initial paint lists. */
+/** Newest live claims the page's initial paint lists. */
 const RECENT_LIMIT = 100
 
-/** Pending claims the review inbox shows before the page asks for more. */
+/** Pending claims the review inbox shows at the head of the queue. */
 const PENDING_LIMIT = 50
 
 /** One literal search body. */
@@ -96,19 +90,19 @@ export function apply(ctx: Context): void {
     )
   }
 
-  route('overview', `${BASE}/overview`, () => Promise.resolve(ok(overviewOf(memory))))
+  route('overview', MEMORY_OVERVIEW_PATH, () => Promise.resolve(ok(overviewOf(memory))))
 
-  route('search', `${BASE}/search`, json((body) => {
+  route('search', MEMORY_SEARCH_PATH, json((body) => {
     const { query, limit } = searchBody.parse(body)
     const rows = query.trim() === ''
       ? memory.operatorRecords()
-        .filter(record => record.status === 'active')
+        .filter(record => isLive(record, Date.now()))
         .slice(0, limit ?? RECENT_LIMIT)
       : memory.operatorSearch(query, limit === undefined ? {} : { limit }).map(hit => hit.record)
     return Promise.resolve(ok<MemoryRowsValue>({ rows: rows.map(rowOf) }))
   }))
 
-  route('remember', `${BASE}/remember`, json(async (body) => {
+  route('remember', MEMORY_REMEMBER_PATH, json(async (body) => {
     const parsed = rememberBody.parse(body)
     const result = await memory.remember({
       text: parsed.text,
@@ -124,7 +118,7 @@ export function apply(ctx: Context): void {
     return ok(value)
   }))
 
-  route('review', `${BASE}/review`, json(async (body) => {
+  route('review', MEMORY_REVIEW_PATH, json(async (body) => {
     const { id, decision, note } = reviewBody.parse(body)
     const record = decision === 'approve'
       ? await memory.operatorApprove(id, note)
@@ -148,12 +142,17 @@ function overviewOf(memory: PrismMemoryService): MemoryOverview {
   }
   return {
     counts,
-    // Newest first is the stored order; a queue hands out the oldest decision first.
-    pending: records.filter(record => record.status === 'pending').slice(-PENDING_LIMIT).map(rowOf),
-    // The inbox above shows what is waiting; this list shows the corpus the
-    // model can actually recall today, so the two never repeat one record.
+    // The queue head is the oldest decision, so the person settles in the order
+    // the claims arrived rather than in the order they happen to be newest.
+    pending: records
+      .filter(record => record.status === 'pending')
+      .slice(-PENDING_LIMIT)
+      .reverse()
+      .map(rowOf),
+    // The live corpus, matching what injection and search can reach: the inbox
+    // above shows what is still waiting, so the two never repeat one record.
     recent: records
-      .filter(record => record.status === 'active')
+      .filter(record => isLive(record, Date.now()))
       .slice(0, RECENT_LIMIT)
       .map(rowOf),
   }
