@@ -58,6 +58,15 @@ export interface SessionPersistenceSnapshot {
   readonly eventCount?: number
   /** Physical artifact byte size, when the backend can provide it cheaply (JSONL); otherwise absent. */
   readonly sizeBytes?: number
+  /**
+   * Time the stored artifact last changed, in Unix epoch milliseconds, when the
+   * backend can provide it cheaply (JSONL); otherwise absent.
+   *
+   * A write only advances it, so it is a conservative bound on a session's
+   * last activity: a consumer selecting inactive sessions can select one late
+   * but never one whose log changed after the time it compares against.
+   */
+  readonly updatedAt?: number
 }
 
 /** Options for {@link SessionPersistence.create}. */
