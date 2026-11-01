@@ -1,10 +1,10 @@
 {
   // Out of tree and self-contained: host services are typed structurally (see
-  // src/host-context.d.ts and src/client/externals.d.ts), so typecheck needs no
-  // built workspace artifacts. The one exception is the battery of shared
-  // controls: `ui-primitives` is a shell-seeded module-table row this bundle
-  // loads at runtime, so its published declarations are borrowed from the
-  // checkout's built output (the `prism-memory` arrangement).
+  // src/host-context.d.ts and src/client/externals.d.ts). The one workspace
+  // edge is `ui-primitives`, whose declarations are borrowed from the
+  // checkout's BUILT output — run `pnpm run build` there first, as
+  // `prism-memory` documents; an unbuilt checkout fails this typecheck with a
+  // missing module rather than a type error.
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],

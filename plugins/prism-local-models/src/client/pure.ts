@@ -23,7 +23,7 @@ export function progressPercent(progress: ModelProgress): number | undefined {
   return Math.min(100, Math.round(progress.done / progress.total * 100))
 }
 
-/** Progress suffix: percent when the total is known, the item label otherwise. */
+/** Progress suffix: a byte download's percentage, the current step label otherwise. */
 export function progressText(progress: ModelProgress): string {
   const percent = progressPercent(progress)
   return percent === undefined ? ` ${progress.label}` : ` ${percent}%`

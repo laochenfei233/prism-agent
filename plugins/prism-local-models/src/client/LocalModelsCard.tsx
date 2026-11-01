@@ -59,6 +59,9 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
   const [probes, setProbes] = useState<Record<string, { running: boolean } | undefined>>({})
   const [selections, setSelections] = useState<Record<string, string | undefined>>({})
   const [removal, setRemoval] = useState<ModelFamilyView | undefined>(undefined)
+  const [removing, setRemoving] = useState(false)
+  const [removeFailure, setRemoveFailure] = useState('')
+  const [failure, setFailure] = useState('')
 
   const refresh = useCallback((): void => {
     void fetchCatalog().then(catalog => {
@@ -82,10 +85,28 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
   }, [busy, refresh])
 
   const act = useCallback((run: () => Promise<unknown>): void => {
-    void run().then(refresh).catch((_error: RouteError) => {
+    setFailure('')
+    void run().then(refresh).catch((error: RouteError) => {
+      setFailure(error.message)
       refresh()
     })
   }, [refresh])
+
+  const confirmRemoval = (): void => {
+    if (removal === undefined || removing) return
+    setRemoving(true)
+    setRemoveFailure('')
+    void postRemove(removal.id)
+      .then(() => {
+        setRemoving(false)
+        setRemoval(undefined)
+        refresh()
+      })
+      .catch((error: RouteError) => {
+        setRemoving(false)
+        setRemoveFailure(error.message)
+      })
+  }
 
   return (
     <section className="lmm">
@@ -94,6 +115,7 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
       <p className="lmm-intro">{t('intro')}</p>
       {modelsRoot !== '' && <p className="lmm-path" title={modelsRoot}>{t('path')}: {modelsRoot}</p>}
       {loadError !== '' && <p className="lmm-message" data-tone="error">{t('load.error', { error: loadError })}</p>}
+      {failure !== '' && <p className="lmm-message" data-tone="error">{t('action.failed', { error: failure })}</p>}
       <ul className="lmm-rows">
         {families.map(family => (
           <FamilyCard
@@ -127,22 +149,25 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
         title={t('remove.title', { model: removal?.displayName ?? '' })}
         closeLabel={t('action.close')}
         description={t('remove.confirm')}
-        onClose={() => setRemoval(undefined)}
+        onClose={() => { if (!removing) setRemoval(undefined) }}
         footer={(
           <>
-            <Button data-modal-autofocus onClick={() => setRemoval(undefined)}>{t('action.cancel')}</Button>
+            <Button variant="outline" data-modal-autofocus disabled={removing} onClick={() => setRemoval(undefined)}>
+              {t('action.cancel')}
+            </Button>
             <Button
               variant="outline"
               className="lmm-danger"
-              onClick={() => {
-                if (removal === undefined) return
-                act(() => postRemove(removal.id))
-                setRemoval(undefined)
-              }}
+              disabled={removing}
+              onClick={confirmRemoval}
             >{t('action.remove')}</Button>
           </>
         )}
-      />
+      >
+        {removeFailure !== '' && (
+          <p className="lmm-message" data-tone="error">{t('action.failed', { error: removeFailure })}</p>
+        )}
+      </Modal>
     </section>
   )
 }
@@ -225,7 +250,7 @@ function FamilyCard(props: {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
-          aria-label={status}
+          aria-label={t('progress.label', { model: family.displayName })}
         >
           <div className="lmm-fill" style={{ width: `${percent}%` }} />
         </div>
@@ -233,7 +258,7 @@ function FamilyCard(props: {
       {family.status === 'error' && family.error !== undefined
         && <p className="lmm-message" data-tone="error">{family.error}</p>}
       {family.probe !== undefined && (
-        <p className="lmm-message" data-tone={family.probe.ok ? 'ok' : 'error'}>
+        <p className="lmm-message" data-tone={family.probe.ok ? undefined : 'error'}>
           {family.probe.ok
             ? t('probe.ok', { detail: family.probe.detail ?? '' })
             : t('probe.fail', { error: family.probe.error ?? '' })}
