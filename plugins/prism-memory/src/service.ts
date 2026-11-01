@@ -135,6 +135,14 @@ const SEARCH_STATUSES = ['active', 'pending'] as const
 /** The status an automatically written claim may take: never a third state. */
 export const ADMISSION_STATUSES = ['pending', 'active'] as const
 
+/**
+ * Admission of a caller with no session. The operator surfaces — the Web memory
+ * page and, through it, the person using it — govern the whole corpus rather
+ * than one session's slice, so nothing is filtered out. Every other caller
+ * derives its admission from the session it runs in.
+ */
+const WHOLE_STORE: MemoryAdmission = { cwd: null, sessionId: null, isEligible: () => true }
+
 /** One status an automatic write may use. */
 export type AdmissionStatus = (typeof ADMISSION_STATUSES)[number]
 
@@ -454,6 +462,11 @@ async function writeAtomically(path: string, content: string): Promise<void> {
   await rename(temporary, path)
 }
 
+/** Order records newest first, ties broken by id so the order stays total. */
+function newestFirst(left: MemoryRecord, right: MemoryRecord): number {
+  return right.createdAt - left.createdAt || (left.id < right.id ? -1 : 1)
+}
+
 /** Every text block of one derived message. */
 function messageText(message: Message): string {
   const parts: string[] = []
@@ -661,8 +674,24 @@ export class PrismMemoryService extends Service {
    * @returns the caller-visible corpus.
    */
   visible(agent: Agent | undefined): MemoryRecord[] {
-    const admission = this.admission(agent)
+    return this.visibleIn(this.admission(agent))
+  }
+
+  /** Every record one admission admits. */
+  private visibleIn(admission: MemoryAdmission): MemoryRecord[] {
     return this.all().filter(record => admission.isEligible(record))
+  }
+
+  /**
+   * Every stored record, newest first, for the operator surface.
+   *
+   * A Web page belongs to no session: it governs the whole corpus a person owns
+   * rather than one session's slice, so no scope narrows this read. Every record
+   * renders its own scope, so the narrowing stays visible where it matters.
+   * @returns every stored record, newest first.
+   */
+  operatorRecords(): MemoryRecord[] {
+    return this.all().sort(newestFirst)
   }
 
   /** Recalled ids already injected into one session. */
@@ -974,14 +1003,34 @@ export class PrismMemoryService extends Service {
     agent: Agent | undefined,
     options: { readonly limit?: number, readonly sessionId?: string } = {},
   ): MemoryHit[] {
+    return this.rankIn(query, this.admission(agent), options)
+  }
+
+  /**
+   * Rank the whole corpus against a literal query, for the operator surface.
+   *
+   * The retrieval model and the admitted statuses are {@link search}'s; only the
+   * scope narrow differs, because this caller has no session to derive one from.
+   * @param query - Literal query text.
+   * @param options - Optional result cap.
+   * @returns ranked hits.
+   */
+  operatorSearch(query: string, options: { readonly limit?: number } = {}): MemoryHit[] {
+    return this.rankIn(query, WHOLE_STORE, options)
+  }
+
+  /** Shared body of the two searches: one retrieval model, one caller narrow. */
+  private rankIn(
+    query: string,
+    admission: MemoryAdmission,
+    options: { readonly limit?: number, readonly sessionId?: string },
+  ): MemoryHit[] {
     const cap = this.config.searchLimit.get()
     const requested = options.limit ?? cap
     const limit = Math.min(Math.max(1, Math.trunc(requested)), cap)
-    const statuses = SEARCH_STATUSES
-    const admission = this.admission(agent)
     return rankRecords(this.all(), query, {
       isEligible: admission.isEligible,
-      statuses,
+      statuses: SEARCH_STATUSES,
       limit,
       ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
     })
@@ -1034,7 +1083,7 @@ export class PrismMemoryService extends Service {
     const limit = options.limit ?? 50
     return this.visible(agent)
       .filter(record => statuses.includes(record.status))
-      .sort((left, right) => right.createdAt - left.createdAt || (left.id < right.id ? -1 : 1))
+      .sort(newestFirst)
       .slice(0, limit)
   }
 
@@ -1162,7 +1211,7 @@ export class PrismMemoryService extends Service {
    * @returns the promoted record.
    */
   approve(id: string, note: string | undefined, agent: Agent | undefined): Promise<MemoryRecord> {
-    return this.settleReview(id, 'active', note, agent)
+    return this.settleReview(id, 'active', note, this.admission(agent))
   }
 
   /**
@@ -1173,7 +1222,27 @@ export class PrismMemoryService extends Service {
    * @returns the archived record.
    */
   reject(id: string, reason: string | undefined, agent: Agent | undefined): Promise<MemoryRecord> {
-    return this.settleReview(id, 'archived', reason, agent)
+    return this.settleReview(id, 'archived', reason, this.admission(agent))
+  }
+
+  /**
+   * Promote one pending record from the operator surface, which has no session.
+   * @param id - Opaque memory id.
+   * @param note - Optional operator note.
+   * @returns the promoted record.
+   */
+  operatorApprove(id: string, note?: string): Promise<MemoryRecord> {
+    return this.settleReview(id, 'active', note, WHOLE_STORE)
+  }
+
+  /**
+   * Reject one pending record from the operator surface, which has no session.
+   * @param id - Opaque memory id.
+   * @param reason - Optional operator note.
+   * @returns the archived record.
+   */
+  operatorReject(id: string, reason?: string): Promise<MemoryRecord> {
+    return this.settleReview(id, 'archived', reason, WHOLE_STORE)
   }
 
   /** Shared body of approve and reject: both require a pending record. */
@@ -1181,9 +1250,9 @@ export class PrismMemoryService extends Service {
     id: string,
     status: 'active' | 'archived',
     note: string | undefined,
-    agent: Agent | undefined,
+    admission: MemoryAdmission,
   ): Promise<MemoryRecord> {
-    const target = this.require(id, agent)
+    const target = this.requireIn(id, admission)
     if (target.status !== 'pending') {
       throw new PrismMemoryError(
         `memory ${id} is ${target.status}, not pending, so there is no review to settle`,
@@ -1669,11 +1738,16 @@ export class PrismMemoryService extends Service {
 
   /** Resolve one id the caller may act on, returning the record or failing with the reason it cannot. */
   private require(id: string, agent: Agent | undefined): MemoryRecord {
+    return this.requireIn(id, this.admission(agent))
+  }
+
+  /** One record one admission admits. */
+  private requireIn(id: string, admission: MemoryAdmission): MemoryRecord {
     const record = this.records.get(id)
     if (record === undefined) {
       throw new PrismMemoryError(`unknown memory id: ${id}`, 'PRISM_MEMORY_NOT_FOUND')
     }
-    if (!this.admission(agent).isEligible(record)) {
+    if (!admission.isEligible(record)) {
       throw new PrismMemoryError(`memory ${id} is outside the caller's scope`, 'PRISM_MEMORY_OUT_OF_SCOPE')
     }
     return record

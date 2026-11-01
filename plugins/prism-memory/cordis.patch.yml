@@ -98,3 +98,9 @@
     # command costs no tool schema.
     - id: command-prism-memory
       name: '@prism/prism-memory/commands'
+
+    # The browser routes the memory page reads and writes through. The row
+    # declares the web server, so a profile that composes no Web server leaves
+    # it pending instead of failing to load.
+    - id: prism-memory-web
+      name: '@prism/prism-memory/web'

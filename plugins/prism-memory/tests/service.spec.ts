@@ -410,3 +410,53 @@ describe('the Markdown mirror', () => {
     expect(await readFile(join(dir, 'memory.md'), 'utf8')).toContain('the domain stays at version 1')
   })
 })
+
+describe('the operator surface', () => {
+  it('reads and searches a project claim no session at all may address', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'operator-reads', 'C:/work/operator')
+    const stored = await ctx.prismMemory.remember({
+      text: 'the release branch is release/2026-02',
+      scope: 'project',
+    }, agent)
+
+    // A caller with no session is admitted to the global scope only, which is
+    // what a browser page would see if it reused the session-facing reads.
+    expect(ctx.prismMemory.visible(undefined)).toEqual([])
+    expect(ctx.prismMemory.search('release branch', undefined)).toEqual([])
+
+    expect(ctx.prismMemory.operatorRecords().map(record => record.id)).toEqual([stored.record.id])
+    expect(ctx.prismMemory.operatorSearch('release branch').map(hit => hit.record.id)).toEqual([stored.record.id])
+  })
+
+  it('settles a pending claim from a caller with no session, refusing the scoped path', async () => {
+    const ctx = await boot({ requireApproval: true })
+    const agent = await createAgent(ctx, 'operator-settles', 'C:/work/operator')
+    const stored = await ctx.prismMemory.remember({
+      text: 'the release branch is release/2026-02',
+      scope: 'project',
+    }, agent)
+    expect(stored.record.status).toBe('pending')
+
+    const refused = await errorOf(ctx.prismMemory.approve(stored.record.id, 'looks right', undefined))
+    expect(refused.code).toBe('PRISM_MEMORY_OUT_OF_SCOPE')
+
+    const approved = await ctx.prismMemory.operatorApprove(stored.record.id, 'looks right')
+    expect(approved.status).toBe('active')
+    expect(approved.reviewNote).toBe('looks right')
+  })
+
+  it('archives a rejected claim and keeps it readable afterwards', async () => {
+    const ctx = await boot({ requireApproval: true })
+    const agent = await createAgent(ctx, 'operator-rejects')
+    const stored = await ctx.prismMemory.remember({ text: 'the nightly job runs at 02:00' }, agent)
+
+    const rejected = await ctx.prismMemory.operatorReject(stored.record.id, 'wrong time')
+    expect(rejected.status).toBe('archived')
+    expect(rejected.invalidAt).not.toBeNull()
+
+    // Rejection is a status, not a deletion: the record stays in the operator
+    // read so a person can see what was turned down.
+    expect(ctx.prismMemory.operatorRecords().map(record => record.id)).toEqual([stored.record.id])
+  })
+})
