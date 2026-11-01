@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for session-autoarchive.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/session-autoarchive.md
+/:
+  en: 7f2c20447c7e3f0c
+  zh: 7f2c20447c7e3f0c
+/auto-archive-idle-sessions:
+  en: e14efa4814c14ae2
+  zh: c76d6f648e49bd24
+/auto-archive-idle-sessions/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/auto-archive-idle-sessions/s1-problem:
+  en: d4e8f4b28a25cc86
+  zh: 1b624e2e9fb701e0
+/auto-archive-idle-sessions/s2-design:
+  en: c595b8a4c4468c5e
+  zh: 164239625a209084
+/auto-archive-idle-sessions/s3-scope:
+  en: 45a117dd8463301a
+  zh: 5078eb9e53a608b4
+/auto-archive-idle-sessions/tasks:
+  en: 2aeec5344d3d21cf
+  zh: e18d136484bf74f0
+/auto-archive-idle-sessions/s4-acceptance:
+  en: 1c2770e9d2bb5006
+  zh: 510ee066c385ca40
+/auto-archive-idle-sessions/delivery-notes:
+  en: 0785ada4658fc21b
+  zh: 4cc433c30bcd4f38

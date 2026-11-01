@@ -319,10 +319,19 @@ interface SessionPersistenceSnapshot {
   readonly eventCount?: number
   /** Physical artifact byte size, when the backend can provide it cheaply (JSONL); otherwise absent. */
   readonly sizeBytes?: number
+  /**
+   * Time the stored artifact last changed, in Unix epoch milliseconds, when the
+   * backend can provide it cheaply (JSONL); otherwise absent.
+   *
+   * A write only advances it, so it is a conservative bound on a session's
+   * last activity: a consumer selecting inactive sessions can select one late
+   * but never one whose log changed after the time it compares against.
+   */
+  readonly updatedAt?: number
 }
 ```
 
-可选的 `eventCount`/`sizeBytes` 字段仍是供明确需要它们的 consumer 使用的低成本 backend observation。Session 列表不借助这两个字段打开冷日志，只读取 header 与经过 identity 校验的 projection cache hint，因此 cache 或 Session format 升级不会把启动变成 body scan。
+可选的 `eventCount`/`sizeBytes`/`updatedAt` 字段仍是供明确需要它们的 consumer 使用的低成本 backend observation。Session 列表不借助这些字段打开冷日志，只读取 header 与经过 identity 校验的 projection cache hint，因此 cache 或 Session format 升级不会把启动变成 body scan。
 
 ## 后端
 

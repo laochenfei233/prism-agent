@@ -1,0 +1,32 @@
+{
+  // The bundle is out of tree, so it borrows the checkout's packages instead of
+  // declaring workspace dependencies. These `paths` entries replace the base map
+  // (an extending config does not merge `paths`) and point at the checkout's
+  // BUILT declarations, which is how the repository's own packages consume each
+  // other through project references. Everything those declarations import
+  // resolves through the checkout's node_modules. Run `pnpm run build` in the
+  // checkout first.
+  //
+  // The plugin keeps every `@deepseek-ai/*` import external at build time (the
+  // profile supplies them, exactly as the sibling `plugins/prism-memory` does),
+  // so these entries exist for type checking only.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "paths": {
+      "vitest": ["../../node_modules/vitest"],
+      "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-timer": ["../../vendor/timer/lib/types/index.d.ts"],
+      "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-persistence": ["../../packages/session/session-persistence/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-workspace": ["../../packages/workspace/workspace/lib/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

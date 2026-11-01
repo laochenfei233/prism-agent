@@ -1515,6 +1515,14 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     expect((await ctx.sessionPersistence.list()).find(s => s.header.id === m.id)?.sizeBytes).toBe(size)
   })
 
+  it('stat and list carry the artifact write time so callers can age a stored session', async () => {
+    const m = meta('written', '/work')
+    await writeLog(ctx.sessionPersistence, m, oneTurnLog())
+    const writeTime = Number((await stat(rawLogPath(root, '/work', m.id), { bigint: true })).mtimeNs / 1_000_000n)
+    expect((await ctx.sessionPersistence.stat(m.id))?.updatedAt).toBe(writeTime)
+    expect((await ctx.sessionPersistence.list()).find(s => s.header.id === m.id)?.updatedAt).toBe(writeTime)
+  })
+
   it('binds revisions to the physical artifact identity', async () => {
     const m = meta('revision-source')
     await writeLog(ctx.sessionPersistence, m, oneTurnLog())

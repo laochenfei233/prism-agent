@@ -319,10 +319,19 @@ interface SessionPersistenceSnapshot {
   readonly eventCount?: number
   /** Physical artifact byte size, when the backend can provide it cheaply (JSONL); otherwise absent. */
   readonly sizeBytes?: number
+  /**
+   * Time the stored artifact last changed, in Unix epoch milliseconds, when the
+   * backend can provide it cheaply (JSONL); otherwise absent.
+   *
+   * A write only advances it, so it is a conservative bound on a session's
+   * last activity: a consumer selecting inactive sessions can select one late
+   * but never one whose log changed after the time it compares against.
+   */
+  readonly updatedAt?: number
 }
 ```
 
-The optional `eventCount`/`sizeBytes` fields remain cheap backend observations for consumers that explicitly need them. Session listing does not use either field to open cold logs: it reads headers plus identity-checked projection-cache hints only, so a cache or Session-format upgrade never turns startup into a body scan.
+The optional `eventCount`/`sizeBytes`/`updatedAt` fields remain cheap backend observations for consumers that explicitly need them. Session listing does not use them to open cold logs: it reads headers plus identity-checked projection-cache hints only, so a cache or Session-format upgrade never turns startup into a body scan.
 
 ## The backend
 
