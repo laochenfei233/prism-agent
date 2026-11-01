@@ -8,7 +8,9 @@ import { historicalSchemaRegion } from './historical-schema-region.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const blockedTerm = 'prove' + 'nance'
-const excludedPrefixes = ['vendor/', '.agents/notes/archived/'] as const
+// Pinned upstream copies keep their source wording: vendor pins Cordis, and
+// the imported aegis method pack owns its own docs, rewritten on every sync.
+const excludedPrefixes = ['vendor/', '.agents/notes/archived/', 'plugins/aegis/'] as const
 
 /** One blocked term occurrence in a tracked path or text line. */
 export interface ConcreteTermViolation {
