@@ -106,7 +106,7 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
             "insert:\n  - id: dsh-plugin\n    name: dsh-plugin\n",
         )?;
     }
-    if !bundle_layers.is_empty() {
+    if !bundle_layers.is_empty() || profile_bundles(&profile).iter().any(|bundle| is_retired_local_bundle(bundle)) {
         ensure_profile_bundles(&profile, &bundle_layers)?;
     }
     if win_present {
@@ -218,6 +218,19 @@ fn ensure_local_bundles(home: &Path, runtime_plugins: &Path) -> Result<Vec<Strin
     Ok(names)
 }
 
+/// Local bundles this shell seeded into profiles and no longer ships.
+///
+/// Removing a plugin from the runtime also has to remove the profile bundle
+/// entry that names it, because the loader fails hard on a name it cannot
+/// resolve. Only retired local bundles are listed here: plugin-center installs
+/// write their own names into the same array.
+const RETIRED_LOCAL_BUNDLES: &[&str] = &["dsh-tauri"];
+
+/// Whether one profile bundle entry names a retired local bundle.
+fn is_retired_local_bundle(name: &str) -> bool {
+    RETIRED_LOCAL_BUNDLES.contains(&name)
+}
+
 /// Select bundled local packages as profile bundle layers without disturbing
 /// the profile's existing bundle order.
 fn ensure_profile_bundles(profile: &Path, names: &[String]) -> Result<(), String> {
@@ -248,6 +261,14 @@ fn ensure_profile_bundles(profile: &Path, names: &[String]) -> Result<(), String
             bundles.push(serde_json::Value::String(name.clone()));
         }
     }
+    // A bundle this shell seeded earlier and no longer ships has to leave the
+    // list: the loader fails hard on a name it cannot resolve, and nothing else
+    // prunes the array because plugin-center installs write their own names
+    // here.
+    bundles.retain(|entry| match entry.as_str() {
+        Some(name) => !is_retired_local_bundle(name),
+        None => true,
+    });
     let rendered = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(&path, format!("{rendered}\n")).map_err(|e| e.to_string())
 }

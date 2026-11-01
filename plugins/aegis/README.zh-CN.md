@@ -10,8 +10,8 @@
         <img src="https://badgen.net/github/release/GanyuanRan/Aegis?label=Latest%20Release" /></a>
     <a href="https://github.com/GanyuanRan/Aegis" alt="GitHub Stars">
         <img src="https://img.shields.io/github/stars/GanyuanRan/Aegis?style=flat&label=Stars" /></a>
-    <a href="https://gitcode.com/m0_67899281/Aegis" alt="AtomGit Stars">
-        <img src="https://gitcode.com/m0_67899281/Aegis/star/badge.svg" alt="AtomGit Stars" /></a>
+    <a href="https://atomgit.com/GanyuanRan/Aegis" alt="AtomGit Stars">
+        <img src="https://atomgit.com/GanyuanRan/Aegis/star/badge.svg" alt="AtomGit Stars" /></a>
     <a href="https://olud.ai/project/ganyuanran-aegis.html" alt="Aegis on olud.ai">
         <img src="https://olud.ai/badge.php?tool=ganyuanran-aegis" alt="Aegis on olud.ai" /></a>
 </p>
@@ -56,11 +56,24 @@ Aegis 是一套方法包，让 AI 编程 agent 像有工程纪律的人一样干
   移除，技术债不再悄悄累积。
 - **简单任务保持简单。** 平凡请求留在 fast-path，只有任务真正需要时才展开
   仪式。
+- **UI/UX 规则按需加载。** [UI/UX 治理](skills/ui-ux-governance/SKILL.md)把项目
+  设计依据、用户总负担和体验验证接入设计、实现、评审与交付。
 - **一套方法包，多宿主通用。** Codex、Claude Code、OpenCode、Kimi 等
   skill-aware 宿主体验一致。
 
-> 上面的数字来自下方冻结 benchmark 的有界建议性证据，不构成普遍质量或完成
-> 权威声明。
+> 上面的数字来自 Aegis 2.7.6（2026-08-11）的有界建议性证据，
+> 不是对本次发布的测量，也不构成普遍质量或完成权威声明。
+> 请查看[完整基准与证据限制](#实测-agentic-benchmark)。
+
+## 极简安装
+
+第一次使用？最快路径是把下面这段话交给你的 agent，完整安装与验证流程就在其中。
+
+把下面这段话交给你的 AI 编程 Agent：
+
+```text
+请阅读 https://github.com/GanyuanRan/Aegis，识别我当前使用的 AI 编程宿主，并按对应宿主说明全局安装 Aegis。如果宿主是官方 DeepSeek Harness（`dsh`），必须把全局/极简安装分流为原生 profile plugin 安装：`dsh plugin --profile <profile> add "git+https://github.com/GanyuanRan/Aegis.git"`；除非 plugin manager 不可用且我明确同意 compatibility mode，否则不要静默改用 direct-child 兼容路径。如果需要重启或重新加载宿主，请明确告诉我；然后从已安装的 Aegis method-pack 根目录运行完整安装验证。不要在目标项目目录中运行 doctor 命令。先定位 `<aegis-method-pack-root>`，再运行 `cd <aegis-method-pack-root> && python scripts/aegis-doctor.py --write-config --json`。只有当 JSON 输出包含 `"ok": true`、`"workspaceSupport": "available"` 和 `"configStatus": "configured"` 时，才把安装视为完成；如果宿主有单独的 skill discovery 目录，也要额外用 `--discovery-root <path>` 验证它指向当前版本；如果宿主说明声明了 skill 目录名前缀，也同时传 `--discovery-name-prefix <prefix>`。还必须完成对应宿主说明中的原生激活与自动入口验证；当宿主提供 plugin、hook 或 session-start bootstrap 时，仅通过文件发现或通用 doctor 检查不能视为安装完成。
+```
 
 ## 实测 Agentic Benchmark
 
@@ -71,15 +84,21 @@ Aegis 是一套方法包，让 AI 编程 agent 像有工程纪律的人一样干
 
 [脱敏 JSON](benchmarks/results/gpt-5-6-sol-xhigh-extended-20260811-v2-7-6.json) · [中文表格](benchmarks/results/gpt-5-6-sol-xhigh-extended-20260811-v2-7-6.zh-CN.md) · [English table](benchmarks/results/gpt-5-6-sol-xhigh-extended-20260811-v2-7-6.en.md) · [方法说明](docs/current/AEGIS_AGENTIC_BENCHMARK_BASELINE.md)
 
-## 极简安装
+较新的 [Aegis 2.10.8 matrix-v7 standard 快照](benchmarks/results/gpt-5-6-sol-xhigh-standard-20260925-v2-10-8.zh-CN.md)
+覆盖 22 个案例，每个案例在两组各有一次观察。它与上方 extended 快照使用不同的
+运行 profile，也没有测量本次发布中的改动。
 
-第一次使用？最快路径是把下面这段话交给你的 agent，完整安装与验证流程就在其中。
+## 体验 Aegis 方法在运行时中的应用
 
-把下面这段话交给你的 AI 编程 Agent：
+[Autoloom](https://github.com/GanyuanRan/Autoloom) 是我们开发的 AI 编程桌面
+客户端，将 Aegis 的变更必要性分析、复杂度治理和交付审查融入开发执行，帮助
+你减少反复提醒，让变更有依据、交付有证据。
 
-```text
-请阅读 https://github.com/GanyuanRan/Aegis，识别我当前使用的 AI 编程宿主，并按对应宿主说明全局安装 Aegis。如果宿主是官方 DeepSeek Harness（`dsh`），必须把全局/极简安装分流为原生 profile plugin 安装：`dsh plugin --profile <profile> add "git+https://github.com/GanyuanRan/Aegis.git"`；除非 plugin manager 不可用且我明确同意 compatibility mode，否则不要静默改用 direct-child 兼容路径。如果需要重启或重新加载宿主，请明确告诉我；然后从已安装的 Aegis method-pack 根目录运行完整安装验证。不要在目标项目目录中运行 doctor 命令。先定位 `<aegis-method-pack-root>`，再运行 `cd <aegis-method-pack-root> && python scripts/aegis-doctor.py --write-config --json`。只有当 JSON 输出包含 `"ok": true`、`"workspaceSupport": "available"` 和 `"configStatus": "configured"` 时，才把安装视为完成；如果宿主有单独的 skill discovery 目录，也要额外用 `--discovery-root <path>` 验证它指向当前版本；如果宿主说明声明了 skill 目录名前缀，也同时传 `--discovery-name-prefix <prefix>`。还必须完成对应宿主说明中的原生活化与自动入口验证；当宿主提供 plugin、hook 或 session-start bootstrap 时，仅通过文件发现或通用 doctor 检查不能视为安装完成。
-```
+当前提供 **Windows x64 Alpha**。客户端免费，自选模型，模型调用费用由供应商
+另行收取。
+
+**[了解 Autoloom](https://github.com/GanyuanRan/Autoloom) ·
+[下载 Alpha](https://github.com/GanyuanRan/Autoloom/releases)**
 
 ## 更新 Aegis
 
@@ -141,7 +160,7 @@ Aegis 保留多宿主、plugin-installable 的分发目标。
 | `Codex`, `OpenCode` | 当前 method-pack 范围内已有 fresh evidence | [Codex](docs/README.codex.md), [OpenCode](docs/README.opencode.md) |
 | `Claude Code`, `CodeBuddy`, `DeepSeek-TUI`, `DeepSeek Harness`, `Trae`, `GitHub Copilot`, `Qoder`, `Kimi Code CLI`, `ZCode`, `Grok Build` | 已有安装说明；release-level fresh host smoke 仍待补证 | [Claude Code](docs/README.claude-code.md), [CodeBuddy](docs/README.codebuddy.md), [DeepSeek-TUI](docs/README.deepseek-tui.md), [DeepSeek Harness](docs/README.deepseek-harness.md), [Trae](docs/README.trae.md), [GitHub Copilot](docs/README.copilot.md), [Qoder](docs/README.qoder.md), [Kimi Code CLI](docs/README.kimi-code.md), [ZCode](docs/README.zcode.md), [Grok Build](docs/README.grok-build.md) |
 | `CC GUI (JetBrains IDEA)` | Claude Code / OpenAI-GPT 通道的 IDE 插件层结构性支持；release-level fresh host smoke 仍待补证 | [CC GUI](docs/README.cc-gui.md) |
-| `Antigravity CLI`, `Antigravity IDE`, `Antigravity App` | `Antigravity CLI` 是当前主动 closeout 目标；`IDE/App` 仍是结构性目标，release-level fresh host smoke 仍待补证 | [Antigravity](docs/README.antigravity.md) |
+| `Antigravity CLI`, `Antigravity IDE`, `Antigravity App` | `Antigravity CLI` 已有安装与结构性发现证据；真机 Aegis skill 加载、任务路由及会话刷新仍待验证；`IDE/App` 仍是结构性目标 | [Antigravity](docs/README.antigravity.md) |
 | `Pi CLI`, `OMP`, `OpenClaw`, `Hermes Agent` | 结构性 Agent Skills / `SKILL.md` skill-host 适配；release-level fresh host smoke 仍待补证 | [Pi CLI](docs/README.pi.md), [OMP](docs/README.omp.md), [OpenClaw](docs/README.openclaw.md), [Hermes Agent](docs/README.hermes-agent.md) |
 | `Gemini CLI` | 已退役；Aegis 不再分发或验证 Gemini CLI 适配器 | [兼容性矩阵](docs/current/AEGIS_HOST_COMPATIBILITY_MATRIX_SNAPSHOT.md) |
 
@@ -223,6 +242,20 @@ bash tests/e2e/layer1-fast-check.sh --host-profile none
 - 反馈与讨论：[GitHub Discussions](https://github.com/GanyuanRan/Aegis/discussions) · [Issues](https://github.com/GanyuanRan/Aegis/issues) · [LINUX DO](https://linux.do/t/topic/2108966/20) · [DEV.to](https://dev.to/_879c5a0279451d52e43c3/aegis-a-method-pack-for-more-reliable-ai-coding-agents-1gfm)
 - 扩展 Aegis：使用 aegis:writing-skills 写自己的 skill；参见[工作流指南](docs/current/AEGIS_WORKFLOW_GUIDE_ZH.md)。
 - 关注发布：[RELEASE-NOTES.md](RELEASE-NOTES.md) · [Releases](https://github.com/GanyuanRan/Aegis/releases)
+
+## Aegis 与 Autoloom
+
+- **Aegis** 是我们的开源方法包，适合希望继续使用现有 AI 编程工具、引入工程
+  方法的用户。它保持独立使用和多宿主支持，不要求安装 Autoloom。
+- **[Autoloom](https://github.com/GanyuanRan/Autoloom)** 是我们的独立桌面产品，
+  适合希望在编程运行时中体验 Aegis 核心方法的用户。客户端源码暂未公开；
+  下载、版本能力与反馈由 Autoloom 仓库维护。
+
+Autoloom 承接 runtime core 方向，Aegis 保持方法包边界。本页 benchmark 衡量
+的是 Aegis，不代表 Autoloom 的性能证据。详细边界见
+[产品关系说明](docs/current/AEGIS_PRODUCT_BASELINE.md#current-product-relationship-autoloom)。
+也欢迎带一个范围明确的真实任务体验 Autoloom，并
+[分享使用反馈](https://github.com/GanyuanRan/Autoloom/issues)。
 
 ## 与 Superpowers 的关系
 

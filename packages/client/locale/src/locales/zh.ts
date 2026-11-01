@@ -31,7 +31,7 @@ export const zh = {
   'collapse': '收起',
   'expand': '展开',
   'back': '返回',
-  'brand.localBuild': 'Prism Agent 本地构建',
+  'brand.localBuild': 'Prism Agent',
   'workspace.defaultName': '默认工作区',
   'unknown': '未知',
   'none': '无',

@@ -26,12 +26,13 @@ benefit from it. Do not force it onto a short answer or one-command check.
 
 Choose exactly one state carrier:
 
-- use a durable `work/` record for medium+ work that actually crosses sessions,
-  needs handoff, or requires resumable state;
+- within this continuation workflow, use a durable `work/` record for
+  medium/high work, or for work of any complexity that actually crosses
+  sessions, needs handoff, or requires resumable state;
 - otherwise keep one inline checkpoint.
 
 Multi-step, todo-driven, possible-compaction, and subagent use do not force
-durable records by themselves. Do not create both carriers or a record per
+durable records for low-complexity work by themselves. Do not create both carriers or a record per
 slice.
 
 ## Required Artifacts
@@ -123,17 +124,36 @@ When patch-shape/ripple triage, an H-class finding, or a bounded compatibility
 mitigation fired, a locally green result does not clear the direction. Retain
 `PatchShape`, `CanonicalOwner`, `UpwardDrillSignal`, latest outcome, and one
 bounded evidence ref; do not copy raw logs or full diffs. If no fresh evidence
-exists, the state is `needs-verification` or `partial`.
+exists, the state is `needs-verification` or `partial`. For repairs or
+optimization, retain the causal scope, evidence references, unresolved
+influences that could change the solution, and verification coverage in the
+same checkpoint. Compression must not turn one confirmed cause into a complete
+root claim or erase counterevidence; recheck these unknowns before resuming
+retained changes. Do not add a parallel causal record.
 
 ## Resume Protocol
 
 Resume in this order:
 
 1. Read original intent, parent plan/goal, latest checkpoint and resume hint.
+   Reconcile current user instructions: continuation, amendment, pause, or
+   replacement. Preserve outstanding deliverables; update authorized scope
+   before treating a valid amendment as drift. Internal milestones are not
+   substitutes for the user's delivered result.
 2. Re-read required baseline refs and relevant active `CONTEXT.md` language.
 3. Read the `Execution Readiness View` when present.
 4. Compare checkpoint branch/HEAD, completed commits, evidence refs, and claims
    with the current worktree.
+   Treat inherited completion claims as unverified until the worktree confirms
+   them. Correct contradictions in the checkpoint, disclose them in the final
+   report, and do not republish stale claims as current.
+   Preserve the claim's subject, scope and resume-time state; distinguish that
+   from later repair and from historical execution you cannot verify. One
+   accurate correction may cover related claims. The record must adopt it,
+   without elsewhere denying it or assigning it to another scope. A reviewer's
+   classification is contestable: if material disagreement remains unresolved
+   after checking evidence, retain `needs-verification` without forcing assent.
+   If evidence resolves it, retain the supported conclusion and verify normally.
 5. Compare the active slice against intent lock, scope fence, baseline lock,
    compatibility/retirement boundary, tests, reviews, and non-goals.
 6. Re-run the drift decision, then name the next smallest authorized action.
@@ -172,5 +192,6 @@ verified evidence and advisory judgment, not authoritative completion.
 
 Report naturally and omit empty structures. Keep these semantic slots visible:
 `Aegis Visibility`; current todo/active/completed/next; baseline usage decision;
-readiness state when present; fresh evidence; retry/convergence state when
+readiness state when present; fresh evidence; inherited-claim corrections when
+a resumed record overstated its state; retry/convergence state when
 relevant; drift decision; risk/unknown; and the next smallest safe action.
