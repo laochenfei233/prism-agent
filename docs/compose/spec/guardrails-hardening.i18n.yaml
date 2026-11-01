@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for guardrails-hardening.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/guardrails-hardening.md
+/:
+  en: bc7baf4b722e6ae1
+  zh: bc7baf4b722e6ae1
+/guardrails-hardening:
+  en: dbf56df908b52cf8
+  zh: 9f7a54eaf14eb17f
+/guardrails-hardening/report:
+  en: a6fa14a9c2b5ecd4
+  zh: 9ee41f31dfdb248c
+/guardrails-hardening/s1-problem:
+  en: 5da3dba2e22c4bfe
+  zh: c1be1961a5843d3a
+/guardrails-hardening/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/guardrails-hardening/s2-design/s2-1-sensitive-read-denial:
+  en: 26e961c8f78f3805
+  zh: f21f985991cee31c
+/guardrails-hardening/s2-design/s2-2-dangerous-command-denial:
+  en: 34cbcb7c2165ca1a
+  zh: 94c3c93aeffea56d
+/guardrails-hardening/s2-design/s2-3-status-command:
+  en: 82773ffcf5781799
+  zh: 28ec8c70f004d0d4
+/guardrails-hardening/s2-design/s2-4-configuration-validation:
+  en: a7bd24bda5978609
+  zh: 4bc8ac1417e5cbfb
+/guardrails-hardening/s2-design/s2-5-documentation:
+  en: d8396b146da3010d
+  zh: b80704648b948241
+/guardrails-hardening/s3-scope:
+  en: d679678e8baf819c
+  zh: e94b06b6fbdba2d7
+/guardrails-hardening/tasks:
+  en: 6062d55baed12b51
+  zh: 619adad853690602
+/guardrails-hardening/s4-acceptance:
+  en: afb1a8a971de73b6
+  zh: d4bd88a5ae0de821

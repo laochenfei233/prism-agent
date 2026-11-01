@@ -9,8 +9,8 @@
 # policy the bundle was written for, not a set of built-in fallbacks. A key that
 # is present but unusable fails plugin load rather than silently disabling a rail.
 #
-# `writeTools` and `routingContract.readOnlyTools` name DeepSeek Harness's own
-# tool set (`packages/fs/tool-fs`, `packages/fs/tool-fs-search`,
+# `writeTools`, `readTools`, and `routingContract.readOnlyTools` name DeepSeek
+# Harness's own tool set (`packages/fs/tool-fs`, `packages/fs/tool-fs-search`,
 # `packages/shell/tool-bash`, `packages/shell/tool-pwsh`). A profile whose tools
 # differ edits these names; nothing else in the bundle assumes them.
 - insert:
@@ -20,6 +20,7 @@
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
         maxStepsPerTurn: 200
+        unfinishedTodoContinuations: 3
         skillInvocationGuidance: true
         writeTools:
           - { tool: write, pathArgument: file_path, contentArgument: content }
@@ -31,3 +32,40 @@
           readOnlyTools: [read, read_image, glob, grep]
         verificationGate:
           verifyTools: [bash, pwsh]
+        readTools:
+          - { tool: read, pathArgument: file_path }
+          - { tool: read_image, pathArgument: file_path }
+          - { tool: grep, pathArgument: path }
+        # `credentials` is deliberately absent: the match is per path segment, so
+        # it would also refuse this repository's own `packages/credentials/…` and
+        # `docs/subsystems/credentials.md`. `.aws` already covers the file the
+        # segment was meant for.
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519]
+        commandGuard:
+          tools:
+            - { tool: bash, commandArgument: command }
+            - { tool: pwsh, commandArgument: command }
+          deny:
+            - pattern: 'git\s+push\b[^\n]*(--force\b|\s-f\b)'
+              reason: rewrites a remote branch history others may already have
+            - pattern: 'git\s+reset\s+--hard\b'
+              reason: discards uncommitted work that cannot be recovered
+            - pattern: '\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r'
+              reason: deletes a directory tree irreversibly
+
+    # The Ponytail mode itself: one system-prompt section carrying the level and
+    # the slash commands the skill set used to describe. Mounted from the bundle
+    # patch rather than a preset, so every agent mode reads the same section and
+    # every profile gets the same commands; `level: off` silences it without
+    # unmounting the row.
+    #
+    # A session under a coding preset, or one that opens this many steps, runs
+    # at lite on its own. Add a deployment's own preset ids to
+    # `autoCodingPresets`; `/ponytail auto|full|lite|ultra|off` still wins for
+    # the session that issued it.
+    - id: prism-guardrails-ponytail
+      name: 'prism-guardrails/ponytail'
+      config:
+        level: full
+        autoCodingPresets: [standard, ptc]
+        autoLongTaskSteps: 20

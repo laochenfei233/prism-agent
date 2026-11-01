@@ -21,13 +21,22 @@
  *   allows sends the next new path to approval, so one turn's blast radius is
  *   priced rather than discovered in the diff.
  * - **Marker discipline** — Ponytail marks every deliberate shortcut with a
- *   `ponytail:` comment naming its ceiling and upgrade path; a marker without
- *   an upgrade path is refused before it is written.
+ *   `shortcut:` comment (older code says `ponytail:`) naming its ceiling and
+ *   upgrade path; a marker without an upgrade path is refused before it is
+ *   written.
  * - **Dependency changes** — a write to a dependency manifest goes to
  *   approval, so adding a library is a priced decision rather than a line in
  *   a diff.
  * - **Verification gate** — a turn that wrote files and ran no verification is
  *   sent back for its evidence before it can stop.
+ * - **Unfinished-todo gate** — a turn whose own todo list still holds pending or
+ *   in-progress items is sent back to finish them before it can stop.
+ * - **Sensitive reads** — a read of a path the deployment treats as credential
+ *   material is refused, because the content would land in the session log.
+ * - **Command guard** — a shell call whose text matches a guarded pattern goes
+ *   to approval, so a force-push or a recursive delete is priced before it runs.
+ *
+ * `/guardrails` reports which of these a running deployment has armed.
  *
  * The configuration surface, each rail's exact behavior, and the DeepSeek
  * Harness capability each one replaces are in the package README.
@@ -37,12 +46,16 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type { CommandResult } from '@deepseek-ai/dsh-commands'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
 import type { PostToolDecision, PreToolDecision } from '@deepseek-ai/dsh-tools'
+import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import { resolveConfig } from './config.ts'
+import { PONYTAIL_MARKER } from './marker.ts'
 import type { Config, ResolvedConfig, ResolvedWriteTool } from './config.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -72,11 +85,11 @@ export const SKILL_TOOL = 'skill'
  */
 export const FAST_PATH_DECLARATION = 'Route: fast-path'
 
-/** The comment prefix Ponytail markers carry, so prose mentioning the convention is not a marker. */
-const PONYTAIL_MARKER = /(?:#|\/\/|\/\*|\*)\s*ponytail:/u
-
 /** The session event that ends a compaction, after which the model no longer holds its routing decision. */
 const COMPACTION_END = 'compaction/end'
+
+/** How many unfinished todo items one continuation message names before summarizing the rest. */
+const MAX_REPORTED_TODOS = 5
 
 /** One agent's consecutive-repeat chain: the last tracked call's identity and its run length. */
 interface RepeatChain {
@@ -127,6 +140,10 @@ export function apply(ctx: Context, config: Config = {}): void {
   installPonytailMarkerDiscipline(ctx, resolved)
   installDependencyApproval(ctx, resolved)
   installVerificationGate(ctx, resolved, turns)
+  installUnfinishedTodoGate(ctx, resolved)
+  installSensitiveReadDenial(ctx, resolved)
+  installCommandGuard(ctx, resolved)
+  installStatusCommand(ctx, resolved)
 }
 
 /**
@@ -353,12 +370,13 @@ function installWriteBudget(ctx: Context, resolved: ResolvedConfig, turns: TurnR
 }
 
 /**
- * Refuse a written `ponytail:` marker that names no upgrade path.
+ * Refuse a written `shortcut:` marker that names no upgrade path.
  *
- * The method pack's convention is `ponytail: <ceiling>, <upgrade path>`, and
- * its own debt report tags a marker with no trigger as the one that silently
- * rots. Refusing the write is the only point where the fix is free: after the
- * file lands, the marker is a debt entry nobody reads.
+ * The method pack's convention is `shortcut: <ceiling>, <upgrade path>`
+ * (older code says `ponytail:`), and its own debt report tags a marker with no
+ * trigger as the one that silently rots. Refusing the write is the only point
+ * where the fix is free: after the file lands, the marker is a debt entry
+ * nobody reads.
  *
  * Only comment-prefixed markers are read, so prose that merely mentions the
  * convention — this file's own JSDoc included — is not a marker.
@@ -377,9 +395,9 @@ function installPonytailMarkerDiscipline(ctx: Context, resolved: ResolvedConfig)
     if (marker === undefined) return next()
     return Promise.resolve({
       kind: 'deny',
-      reason: `\`${written.path}\` writes a \`ponytail:\` marker with no upgrade path: ${JSON.stringify(marker)}. `
-        + 'The convention is `ponytail: <ceiling>, <upgrade path>`; name the limit and the trigger that would '
-        + 'revisit it, or delete the marker.',
+      reason: `\`${written.path}\` writes a \`shortcut:\` marker with no upgrade path: ${JSON.stringify(marker)}. `
+        + 'The convention is `shortcut: <ceiling>, <upgrade path>` (older code says `ponytail:`); name the limit '
+        + 'and the trigger that would revisit it, or delete the marker.',
     })
   })
 }
@@ -456,6 +474,66 @@ function installVerificationGate(ctx: Context, resolved: ResolvedConfig, turns: 
       source: { kind: 'prism-guardrails', form: 'instructions' },
     }))
   })
+}
+
+/**
+ * Send a turn back to its own todo list before it stops with work left on it.
+ *
+ * The list is the plan the model wrote for itself, so a stop that leaves items
+ * `pending` or `in_progress` is the turn ending mid-plan — the shape a long
+ * implementation run keeps producing when it reports progress instead of
+ * finishing. The stop boundary has no veto, so the rail uses the loop's own
+ * continuation path: steering there makes the loop observe pending input and
+ * run another step.
+ *
+ * The latest snapshot is read from the session log, so a resumed or forked
+ * session is judged by the list it actually has. `unfinishedTodoContinuations`
+ * bounds the steers per turn, so a model that keeps stopping reaches its budget
+ * and the next stop boundary is left alone: the worst case is that many extra
+ * steps, not a loop.
+ */
+function installUnfinishedTodoGate(ctx: Context, resolved: ResolvedConfig): void {
+  const limit = resolved.unfinishedTodoContinuations
+  if (limit === undefined) return
+  const records = new WeakMap<Agent, { turn: number; steered: number }>()
+
+  ctx.on('agent/turn-stopping', ({ agent, turn }) => {
+    const previous = records.get(agent)
+    const record = previous !== undefined && previous.turn === turn ? previous : { turn, steered: 0 }
+    records.set(agent, record)
+    if (record.steered >= limit) return
+    const unfinished = unfinishedTodos(agent)
+    if (unfinished.length === 0) return
+    record.steered += 1
+    const shown = unfinished.slice(0, MAX_REPORTED_TODOS).map(item => `"${item.content}"`).join(', ')
+    const rest = unfinished.length - Math.min(unfinished.length, MAX_REPORTED_TODOS)
+    agent.steer(createUserMessage({
+      content: [{
+        type: 'text',
+        text: `Your todo list still has ${String(unfinished.length)} unfinished item(s): ${shown}`
+          + `${rest > 0 ? ` and ${String(rest)} more` : ''}. Continue with the next one, and rewrite the list when `
+          + 'an item is no longer needed. Report the work as complete only when every item is completed or removed '
+          + 'with its reason; if an item is blocked on a human decision, say which decision and why.',
+      }],
+      source: { kind: 'prism-guardrails', form: 'instructions' },
+    }))
+  })
+}
+
+/**
+ * The items the agent's own todo list still has open.
+ *
+ * The latest `todo/write` snapshot wins, matching the log's whole-value rule; a
+ * session that never wrote a list has nothing this rail can enforce.
+ */
+function unfinishedTodos(agent: Agent): readonly TodoItem[] {
+  const events = agent.session.snapshotEvents()
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event === undefined) continue
+    if (event.type === 'todo/write') return event.data.todos.filter(item => item.status !== 'completed')
+  }
+  return []
 }
 
 /**
@@ -536,8 +614,8 @@ function writtenPathOf(
 }
 
 /**
- * The first comment-prefixed `ponytail:` marker whose text names no upgrade
- * path.
+ * The first comment-prefixed `shortcut:` or `ponytail:` marker whose text
+ * names no upgrade path.
  *
  * @param content - the text the call would write.
  * @returns the offending marker's text, or `undefined` when every marker names
@@ -624,4 +702,157 @@ function sortJsonValue(value: unknown): unknown {
     return sorted
   }
   return value
+}
+
+/**
+ * Refuse a read of a path the deployment treats as credential material.
+ *
+ * `deny` rather than `ask`: the read would write the secret into the session
+ * log, and no later approval removes it from there. The alternative the model
+ * needs — ask the user for the value — never needs the file's contents, so
+ * there is nothing for an approval to price.
+ *
+ * The rail matches the path the call names, not the file it resolves to, so a
+ * symlink or a relative detour around a guarded directory is not covered.
+ */
+function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig): void {
+  const readTools = resolved.readTools
+  const segments = resolved.sensitivePaths
+  if (readTools === undefined || segments === undefined) return
+
+  ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
+    const pathArgument = readTools.get(exec.name)
+    if (pathArgument === undefined) return next()
+    const path = stringArgument(exec.arguments, pathArgument)
+    if (path === undefined) return next()
+    const matched = sensitiveSegment(path, segments)
+    if (matched === undefined) return next()
+    return Promise.resolve({
+      kind: 'deny',
+      reason: `\`${exec.name}\` targets ${JSON.stringify(path)}, which this deployment treats as credential `
+        + `material (matched ${JSON.stringify(matched)}); reading it would write the secret into the session log `
+        + 'permanently. Ask the user for the specific value if it is needed.',
+    })
+  })
+}
+
+/**
+ * The configured segment a path names, when it names one.
+ *
+ * A segment matches by equality or by a dotted extension of the configured
+ * name, so `.env.local` is guarded by `.env` while `environment.ts` is not.
+ *
+ * @param path - a path as a tool call wrote it, under either separator.
+ * @param segments - the configured credential segments.
+ * @returns the configured segment the path names, or `undefined`.
+ */
+function sensitiveSegment(path: string, segments: readonly string[]): string | undefined {
+  for (const segment of path.split(/[\\/]/u)) {
+    const written = segment.toLowerCase()
+    for (const name of segments) {
+      const wanted = name.toLowerCase()
+      if (written === wanted || written.startsWith(`${wanted}.`)) return name
+    }
+  }
+  return undefined
+}
+
+/**
+ * Send a shell call whose text matches a guarded pattern to approval.
+ *
+ * `ask` rather than `deny`: deleting a build directory or force-pushing a
+ * personal branch is sometimes exactly the intended action, and only a human
+ * can tell that from the accident. With no approval channel the fail-closed
+ * approval ladder denies the call, which is the intended unattended outcome.
+ *
+ * `shortcut:` the pattern sees the raw command text, so `bash -c "…"` is still
+ * matched, but quoting or variable tricks evade it; upgrade to a shell parser
+ * when a consumer needs wrapper-proof matching.
+ */
+function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
+  const guard = resolved.commandGuard
+  if (guard === undefined) return
+
+  ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
+    const commandArgument = guard.tools.get(exec.name)
+    if (commandArgument === undefined) return next()
+    const command = stringArgument(exec.arguments, commandArgument)
+    if (command === undefined) return next()
+    for (const rule of guard.rules) {
+      if (!rule.pattern.test(command)) continue
+      return Promise.resolve({
+        kind: 'ask',
+        reason: `\`${exec.name}\` would run a command this deployment guards (matched \`${rule.source}\`): `
+          + `${rule.reason}; approve only if the command is intended`,
+      })
+    }
+    return next()
+  })
+}
+
+/**
+ * Register `/guardrails`, which reports which rails the deployment has armed.
+ *
+ * The `commands` service mounts independently of this bundle and may appear
+ * after it, so the registration waits for the service instead of reading the
+ * store once at apply time. A profile with no commands service keeps every rail
+ * and loses only the report.
+ */
+function installStatusCommand(ctx: Context, resolved: ResolvedConfig): void {
+  ctx.inject(['commands'], (scope: Context) => {
+    scope.effect(() => scope.commands.register({
+      definitionId: CommandDefinitionId('prism-guardrails/status'),
+      name: 'guardrails',
+      description: 'Report which guardrail rails this deployment has armed',
+      handler: (): CommandResult => ({ kind: 'success', text: describeRails(resolved) }),
+    }), 'prism-guardrails.status')
+  })
+}
+
+/**
+ * The status report: a count, then one line per rail with its configured value
+ * or `off`.
+ *
+ * @param resolved - the validated configuration the running deployment uses.
+ * @returns the text a `/guardrails` invocation prints.
+ */
+function describeRails(resolved: ResolvedConfig): string {
+  const rails: readonly (readonly [string, string | undefined])[] = [
+    ['plan-mode denial', listed(resolved.planDeniedTools)],
+    ['repeat approval', resolved.repeatAskAfter === undefined
+      ? undefined
+      : `after ${String(resolved.repeatAskAfter)} identical calls`],
+    ['turn budget', resolved.maxStepsPerTurn === undefined
+      ? undefined
+      : `${String(resolved.maxStepsPerTurn)} steps`],
+    ['unfinished todos', resolved.unfinishedTodoContinuations === undefined
+      ? undefined
+      : `${String(resolved.unfinishedTodoContinuations)} continuations`],
+    ['skill guidance', resolved.skillInvocationGuidance ? 'on' : undefined],
+    ['write budget', resolved.maxWrittenFilesPerTurn === undefined
+      ? undefined
+      : `${String(resolved.maxWrittenFilesPerTurn)} distinct files`],
+    ['ponytail markers', resolved.requirePonytailUpgradePaths ? 'on' : undefined],
+    ['dependency manifests', listed(resolved.dependencyManifests)],
+    ['routing contract', listed(resolved.routingContract)],
+    ['verification gate', listed(resolved.verificationGate)],
+    ['sensitive reads', resolved.sensitivePaths?.join(', ')],
+    ['command guard', resolved.commandGuard === undefined
+      ? undefined
+      : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
+  ]
+  const armed = rails.filter(([, detail]) => detail !== undefined).length
+  return [`Guardrails: ${String(armed)} of ${String(rails.length)} rails armed.`]
+    .concat(rails.map(([name, detail]) => `${name}: ${detail ?? 'off'}`))
+    .join('\n')
+}
+
+/**
+ * A configured name set as one report value.
+ *
+ * @param names - the set a rail resolved, or `undefined` when the rail is off.
+ * @returns the names joined for the report, or `undefined` when the rail is off.
+ */
+function listed(names: ReadonlySet<string> | undefined): string | undefined {
+  return names === undefined ? undefined : [...names].join(', ')
 }
