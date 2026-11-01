@@ -10,7 +10,9 @@ export const NS = 'prism-local-models.card'
 /** Every key the plugin's dictionaries define. */
 export type LocalModelsLocaleKey =
   | 'title'
+  | 'intro'
   | 'path'
+  | 'variant.label'
   | 'kind.ocr'
   | 'kind.translation'
   | 'kind.embedding'
@@ -25,9 +27,11 @@ export type LocalModelsLocaleKey =
   | 'action.cancel'
   | 'action.remove'
   | 'action.probe'
+  | 'action.close'
   | 'probe.running'
   | 'probe.ok'
   | 'probe.fail'
+  | 'remove.title'
   | 'remove.confirm'
   | 'load.error'
   | 'note.ocr'
@@ -35,7 +39,9 @@ export type LocalModelsLocaleKey =
 /** English copy. */
 export const en: Record<LocalModelsLocaleKey, string> = {
   title: 'Local models',
+  intro: 'Models Prism runs itself for OCR, translation, and embeddings. They are not chat providers.',
   path: 'Models directory',
+  'variant.label': 'Version of {model}',
   'kind.ocr': 'OCR',
   'kind.translation': 'Translation',
   'kind.embedding': 'Embedding',
@@ -50,9 +56,11 @@ export const en: Record<LocalModelsLocaleKey, string> = {
   'action.cancel': 'Cancel',
   'action.remove': 'Remove',
   'action.probe': 'Test',
-  'probe.running': 'Test running',
+  'action.close': 'Close',
+  'probe.running': 'Testing',
   'probe.ok': 'Test passed: {detail}',
   'probe.fail': 'Test failed: {error}',
+  'remove.title': 'Remove {model}',
   'remove.confirm': 'Remove the installed model files from the models directory?',
   'load.error': 'The local-model service did not answer: {error}',
   'note.ocr': 'RapidOCR is the default OCR engine; PaddleOCR requires a Python environment.',
@@ -61,7 +69,9 @@ export const en: Record<LocalModelsLocaleKey, string> = {
 /** Chinese copy. */
 export const zh: Record<LocalModelsLocaleKey, string> = {
   title: '本地模型',
+  intro: 'Prism 自用的 OCR、翻译与向量模型，不属于对话模型。',
   path: '模型目录',
+  'variant.label': '{model} 的版本',
   'kind.ocr': 'OCR',
   'kind.translation': '翻译',
   'kind.embedding': '向量',
@@ -76,9 +86,11 @@ export const zh: Record<LocalModelsLocaleKey, string> = {
   'action.cancel': '取消',
   'action.remove': '删除',
   'action.probe': '检测',
+  'action.close': '关闭',
   'probe.running': '检测中',
   'probe.ok': '检测通过：{detail}',
   'probe.fail': '检测失败：{error}',
+  'remove.title': '删除 {model}',
   'remove.confirm': '从模型目录删除已安装的模型文件？',
   'load.error': '本地模型服务未响应：{error}',
   'note.ocr': 'RapidOCR 为默认 OCR 引擎；PaddleOCR 需要 Python 环境。',

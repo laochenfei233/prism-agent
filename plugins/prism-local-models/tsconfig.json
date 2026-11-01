@@ -1,7 +1,10 @@
 {
   // Out of tree and self-contained: host services are typed structurally (see
   // src/host-context.d.ts and src/client/externals.d.ts), so typecheck needs no
-  // built workspace artifacts and no tsconfig paths facade.
+  // built workspace artifacts. The one exception is the battery of shared
+  // controls: `ui-primitives` is a shell-seeded module-table row this bundle
+  // loads at runtime, so its published declarations are borrowed from the
+  // checkout's built output (the `prism-memory` arrangement).
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],
@@ -17,7 +20,10 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }
