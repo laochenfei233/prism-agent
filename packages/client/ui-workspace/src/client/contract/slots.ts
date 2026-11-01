@@ -83,6 +83,18 @@ export interface SessionRowOwnerProps {
   displayTitle: string
 }
 
+/**
+ * Owner share of one Session row's pending line. The title here is the row's
+ * displayed title, including the localized fallback an untitled Session gets,
+ * because the occupant names that Session in its own copy.
+ */
+export interface SessionRowPendingOwnerProps {
+  /** Session the row shows. */
+  sessionId: SessionId
+  /** Row title as the row displays it, never empty. */
+  displayTitle: string
+}
+
 /** The row menu's open state as its owner holds it: the `useState` pair. */
 export type MenuOpenState = readonly [open: boolean, setOpen: (open: boolean) => void]
 
@@ -198,7 +210,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * interaction renders no line, so the seat costs no height while nothing
      * waits.
      */
-    'sidebar.workspaces.session.pending': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
+    'sidebar.workspaces.session.pending': { kind: 'list'; scope: 'root'; owner: SessionRowPendingOwnerProps }
   }
 }
 

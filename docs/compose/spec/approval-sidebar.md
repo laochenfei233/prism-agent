@@ -118,13 +118,13 @@ The import of approval copy stays in ui-approval's namespace; ui-workspace adds 
 
 ## [S5] Upstream divergence
 
-This checkout imports upstream as one baseline commit, so a later upstream import replaces these files wholesale instead of merging with them. Every divergent site below carries a `PRISM-DIVERGENCE` comment, so `rg PRISM-DIVERGENCE` finds them without reading this section.
+This checkout imports upstream as one baseline commit, so a later upstream import replaces these files wholesale instead of merging with them. Every source file below carries a `PRISM-DIVERGENCE` comment, so `rg PRISM-DIVERGENCE` finds them without reading this section; the two package manifests and the tsconfig reference are named here because they carry no comment syntax.
 
 | File | Divergent site | What a replay must keep |
 | --- | --- | --- |
 | `packages/client/ui-workspace/src/client/contract/slots.ts` | the `sidebar.workspaces.session.pending` declaration and its doc | the slot, its owner type, and the domain-neutral occupancy rule |
 | `packages/client/ui-workspace/src/client/index.ts` | the declared child in the `sidebar.workspaces` registration | the seat declaration beside the row's two existing list seats |
-| `packages/client/ui-workspace/src/client/rows/Rows.tsx` | the pending line inside `SessionNodeItem` | the second line, its gate, and the pending-row class |
+| `packages/client/ui-workspace/src/client/rows/Rows.tsx` | the pending line inside `SessionNodeItem` | the second line, its gate, and the displayed title it hands the occupant |
 | `packages/client/ui-workspace/src/client/rows/Rows.module.css` | the pending-row and pending-line rules | the two-line layout and its collapse |
 | `packages/client/ui-approval/src/client/index.ts` | the second slot registration and the shared `approvalInjected` factory | the occupant registration, its `id`, and one reason resolver for both presentations |
 | `packages/client/ui-approval/package.json`, `packages/client/ui-approval/tsconfig.json` | the `@deepseek-ai/dsh-client-ui-workspace` devDependency, its `dsh.client.inject` row, and the project reference | all three wiring lines; JSON and tsconfig references carry no comment syntax, so a replay reads them here |

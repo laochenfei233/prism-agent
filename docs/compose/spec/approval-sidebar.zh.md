@@ -118,13 +118,13 @@ commits: c22ec9f0b9..d3206c01c9
 
 ## [S5] 上游分歧
 
-本检出把上游作为一个基线提交整体导入，因此之后的上游导入会整文件替换而不是合并这些文件。下列每个分歧点都带 `PRISM-DIVERGENCE` 注释，`rg PRISM-DIVERGENCE` 无需读本节即可列出它们。
+本检出把上游作为一个基线提交整体导入，因此之后的上游导入会整文件替换而不是合并这些文件。下列每个源文件都带 `PRISM-DIVERGENCE` 注释，`rg PRISM-DIVERGENCE` 无需读本节即可列出它们；两个包的 manifest 与 tsconfig 引用在此点名，因为它们没有注释语法。
 
 | 文件 | 分歧点 | 重放必须保留的内容 |
 | --- | --- | --- |
 | `packages/client/ui-workspace/src/client/contract/slots.ts` | `sidebar.workspaces.session.pending` 声明及其文档 | 该 slot、它的 owner 类型与域无关的占用规则 |
 | `packages/client/ui-workspace/src/client/index.ts` | `sidebar.workspaces` 注册项里的子 slot 声明 | 与行内已有的两个 list 座位并列的该座位声明 |
-| `packages/client/ui-workspace/src/client/rows/Rows.tsx` | `SessionNodeItem` 内的待审批行 | 第二行、它的条件与待审批行类 |
+| `packages/client/ui-workspace/src/client/rows/Rows.tsx` | `SessionNodeItem` 内的待审批行 | 第二行、它的条件，以及交给占位组件的显示标题 |
 | `packages/client/ui-workspace/src/client/rows/Rows.module.css` | 待审批行与待审批行的样式规则 | 两行布局及其收起 |
 | `packages/client/ui-approval/src/client/index.ts` | 第二个 slot 注册与共用的 `approvalInjected` 工厂 | 占位组件注册、它的 `id`，以及两处呈现共用同一个理由解析器 |
 | `packages/client/ui-approval/package.json`、`packages/client/ui-approval/tsconfig.json` | `@deepseek-ai/dsh-client-ui-workspace` devDependency、它的 `dsh.client.inject` 行与项目引用 | 这三处接线；JSON 与 tsconfig references 没有注释语法，因此重放按本节执行 |
