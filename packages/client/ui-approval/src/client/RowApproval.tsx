@@ -45,7 +45,9 @@ function RowApprovalLine({ pending, summary, displayTitle, t }: {
   return (
     <div className={css.line} data-row-approval={pending.toolName} aria-busy={answered}>
       <span className={css.summary} title={summary}>{summary}</span>
-      <span className={css.actions}>
+      {/* Answering must not also open the Session: the row itself is a
+          click target, so the decisions keep their clicks out of it. */}
+      <span className={css.actions} onClick={(event) => { event.stopPropagation() }}>
         <Button
           variant="outline"
           size="sm"

@@ -80,6 +80,17 @@ describe('RowApproval', () => {
     expect(view.container.innerHTML).toBe('')
   })
 
+  it('keeps a decision click out of the row that contains it', async () => {
+    const pending = new PendingApproval(id('s1'), { toolName: 'write', reason: 'Write notes.txt' })
+    const openRow = vi.fn()
+    render(<div onClick={openRow}><RowApproval {...rowProps(pending)} /></div>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once for Notes session' }))
+
+    expect(openRow).not.toHaveBeenCalled()
+    await expect(pending.result).resolves.toBe('allowed-once')
+  })
+
   it('answers the pending request from the row and locks both decisions', async () => {
     const pending = new PendingApproval(id('s1'), { toolName: 'write', reason: 'Write notes.txt' })
     render(<RowApproval {...rowProps(pending)} />)

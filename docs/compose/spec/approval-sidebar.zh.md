@@ -12,17 +12,17 @@ commits: c22ec9f0b9..aaa43b9043
 
 ## Report
 
-**已构建** — 审批请求现在有第二处呈现，就在会话列表里。`ui-workspace` 声明了按行挂载的 `sidebar.workspaces.session.pending` 座位，并在任何未归档、非空白且 `pendingInteraction` 存在的会话行上把它渲染成整行宽的第二行；只有这一行会切到 `flex-wrap: wrap` 与 `height: auto`，其余行保持 32 px 单行。`ui-approval` 注册占位组件：它从 `useSessionStatus` 读取该行的请求，用 `instanceof PendingApproval` 收窄，并把请求方的一行摘要渲染在 拒绝 / 允许一次 旁边。摘要优先用本地化的 `displayReason`，其次 `reason`，再否则用工具文案；该行不重复第一行已有的 warning 橙点和「待审批」标签。两个按钮走输入框卡片原来那套结算守卫（现已抽出为 `useApprovalAnswer`），其无障碍名称包含会话标题，因此输入框卡片仍保有现有测试与快捷键依赖的那个精确的 "Allow once" 名称。在任一处作答都结算同一个 Host waterfall，另一处随之撤回。
+**已构建** — 审批请求现在有第二处呈现，就在会话列表里。`ui-workspace` 声明了按行挂载的 `sidebar.workspaces.session.pending` 座位，并在任何未归档、非空白且 `pendingInteraction` 存在的会话行上把它渲染成整行宽的第二行；只有该座位真的渲染出内容时，这一行才切到两行的 `flex-wrap` 布局，因此问题与计划评审仍保持 32 px 单行。`ui-approval` 注册占位组件：它从 `useSessionStatus` 读取该行的请求，用 `instanceof PendingApproval` 收窄，并把请求方的一行摘要渲染在 拒绝 / 允许一次 旁边。摘要优先用本地化的 `displayReason`，其次 `reason`，再否则用工具文案；该行不重复第一行已有的 warning 橙点和「待审批」标签。两个按钮走输入框卡片原来那套结算守卫（现已抽出为 `useApprovalAnswer`），点击不会冒到行上，无障碍名称包含会话标题，因此输入框卡片仍保有现有测试与快捷键依赖的那个精确的 "Allow once" 名称。在任一处作答都结算同一个 Host waterfall，另一处随之撤回。
 
-**验证** — `node ./node_modules/vitest/vitest.mjs run packages/client/ui-approval packages/client/ui-workspace` 通过 15 个文件、518 个测试，其中包含 `RowApproval` 的 8 个新用例与新增的行内座位用例。`pnpm run typecheck` 五项门禁全部通过（host 编译器、host 聚合、Host Typert、client 编译器、client 聚合）。`DSH_SNAPSHOT=replay node ./node_modules/vitest/vitest.mjs run --config vitest.web.config.ts apps/web/tests/built-boot.expected.e2e.ts` 在重新构建的插件产物上通过 2 个测试，其中新增断言证明组装后的侧栏行显示 fixture 审批的摘要、给出两个带会话名的决定，并在输入框卡片作答后失去该行。`pnpm run test:gui` 报告 11008 通过，8 个套件与 6 个测试失败；把这些改动 stash 掉的同一分支上，同样这些套件与其中 5 个测试以相同方式失败（第 6 个是同一个 `connection` 套件的第二个变体），因此它们属于 PRE-EXISTING。`pnpm exec tsx scripts/run-oxlint.ts packages/client/ui-approval packages/client/ui-workspace` 在改动文件中没有报告任何问题；它剩下的一条是 `packages/client/ui-workspace/tests/apply.client.spec.ts:923` 的既有 `unbound-method`，该文件本次未改动。`pnpm run verify-translation-pairing` 报告四对改动文档一致，`pnpm run verify-client-ui-i18n` 扫描 1098 个文件通过。
+**验证** — `node ./node_modules/vitest/vitest.mjs run packages/client/ui-approval packages/client/ui-workspace` 通过 15 个文件、520 个测试，其中包含 `RowApproval` 的九个用例与行内座位用例。`pnpm run typecheck` 五项门禁全部通过（host 编译器、host 聚合、Host Typert、client 编译器、client 聚合），`pnpm run build` 八项全部通过（另含 Host bundle、Client bundle、Web build）。`DSH_SNAPSHOT=replay node ./node_modules/vitest/vitest.mjs run --config vitest.web.config.ts apps/web/tests/built-boot.expected.e2e.ts` 在重新构建的插件产物上通过 2 个测试，其中新增断言证明组装后的侧栏行显示 fixture 审批的摘要、给出两个带会话名的决定，并在输入框卡片作答后失去该行。`pnpm run verify-client-catalog` 报告重新生成的 slot 目录为最新。`pnpm run test:gui` 报告 11008 通过，8 个套件与 6 个测试失败；把这些改动 stash 掉的同一分支上，同样这些套件与其中 5 个测试以相同方式失败（第 6 个是同一个 `connection` 套件的第二个变体），因此它们属于 PRE-EXISTING。`pnpm exec tsx scripts/run-oxlint.ts packages/client/ui-approval packages/client/ui-workspace packages/extensions/cordis-client-runner` 在改动文件中没有报告任何问题；它剩下的一条是 `packages/client/ui-workspace/tests/apply.client.spec.ts:923` 的既有 `unbound-method`，该文件本次未改动。`pnpm run verify-translation-pairing` 报告四对改动文档一致，`pnpm run verify-client-ui-i18n` 扫描 1098 个文件通过。
 
 **过程记录**
 
-- 行内作答不需要任何 Host 改动：`useSessionStatus` 本来就按会话发布完整的 `PendingApproval`，`answer()` 直接结算 Remote waterfall；组装启动里的常驻 fixture 早就覆盖了未打开会话的情形。
-- 只有正在等待的行会变高，其余行维持 32 px 单行。第一行已有 warning 橙点与「待审批」尾标，第二行把宽度留给请求方的文本，而不是重复状态。
+- 行内作答不需要任何 Host 改动：`useSessionStatus` 本来就按会话发布完整的 `PendingApproval`，`answer()` 直接结算 Remote waterfall。
+- 第一次评审发现了验收条目没抓到的三个缺陷：决定按钮的点击会冒进行的打开处理；两行布局也加到了座位不渲染内容的问题与计划评审行上；待审批行把 20 px 缩进加在 content-box 宽度之外，撑出了列表。现在布局改为跟随座位实际渲染的内容（`.sessionRow:has(> .pendingLine:not(:empty))`、`.pendingLine:empty { display: none }`），该行用 `border-box`，两个决定在自己那层阻止冒泡。
+- 只有有内容的那一行会变高。第一行已有 warning 橙点与「待审批」尾标，第二行把宽度留给请求方的文本，而不是重复状态。
 - 摘要保持请求方原文。`approval/request` 刻意不带工具参数，因此结构化的目标（命令首行、文件路径、diff 规模）需要在请求及其审计事件上新增摘要字段；这一点记为限制，而不是从 reason 字符串里猜。
-- 两个实现约束出现得较晚：list slot 注册必须带 `id`；钩子若返回方法签名的成员，解构时会触发 `unbound-method`，因此守卫返回属性式函数，占位组件通过 props 对象解析文案。
-- 这个沙箱无法为工作树做全新安装（符号链接与 postinstall 都报 `spawn EPERM`），因此验证用的是把主检出 `node_modules` 以目录 junction 挂到工作树；测试运行器通过 `tsconfig.base.json` 的 paths 解析工作区包，所以编译与加载的确实是本工作树的源码。
+- 提交在仓库里的客户端 slot 目录在本特性之外早已过期（一条反馈行、DeepSeek 登录卡、命令面板），因此重新生成会把那些漂移一并折入；`verify-client-catalog` 比对整个文件，无法只手工补一条。
 
 ## [S1] 问题
 
@@ -36,7 +36,7 @@ commits: c22ec9f0b9..aaa43b9043
 
 `ui-approval` 为它所拥有的会话应答转发来的 `approval/request` waterfall，并通过 `uiSession.registerPendingInteraction` 发布一个 `PendingApproval`。全局标准钩子 `useSessionStatus` 以 `SessionStatus.pendingInteraction` 按会话暴露该值，而 `WorkspaceBrowser` 已经选择整张状态表，所以行内的占位组件不必打开会话就能读到那次请求。作答调用 `PendingApproval.answer`（`allowed-once` 或 `rejected`），它结算 Remote waterfall；不涉及任何 Host 调用、存储改动或新的会话事件。
 
-投递不依赖会话是否已打开。组装启动测试里的常驻 fixture 就为一个未打开的会话渲染 `Waiting for approval`，并在进入该会话后应答它的审批（`apps/web/tests/built-boot.expected.e2e.ts`）。
+投递不依赖会话是否已打开：每行的占位组件读取 `SessionStatus.pendingInteraction`，`ui-session` 为客户端持有的每个会话发布该值。组装启动 fixture 为一个未打开的会话同时带了问题与审批；按既有优先级，行先报问题，等问题答完后测试再断言审批的摘要、两个决定，以及作答后二者消失（`apps/web/tests/built-boot.expected.e2e.ts`）。
 
 请求携带 `toolName`、可选的 `reason`、可选的本地化 `displayReason` 和 `callId`；它刻意不带工具参数（[approval.md](../../subsystems/approval.zh.md)）。因此一行摘要只能来自 `reason` 与 `displayReason`。
 
@@ -64,7 +64,7 @@ commits: c22ec9f0b9..aaa43b9043
 
 ### S2.4 布局
 
-只有座位被占用时，会话行才变成两行。浏览器为有待处理交互的行加一个类，该类把该行切到 `flex-wrap: wrap` 与 `height: auto; min-height: 32px`；待审批行取 `flex: 0 0 100%`，并对齐标题的缩进。其余行保持当前的 32 px 单行，未占用的座位不渲染任何行。
+只有座位真的渲染出内容时，会话行才变成两行，样式表直接读 DOM 判定：`.sessionRow:has(> .pendingLine:not(:empty))` 把该行切到 `flex-wrap: wrap` 与 `height: auto; min-height: 32px`，而 `.pendingLine:empty { display: none }` 让未占用的座位不占高度。因此问题与计划评审保持 32 px 单行——它们自己的交互界面在输入框里，不在这里注册占位组件。该行取 `flex: 0 0 100%`、`box-sizing: border-box` 与标题的缩进，不会把行撑出列表的滚动裁剪。
 
 ### S2.5 文案与无障碍
 
@@ -79,10 +79,10 @@ commits: c22ec9f0b9..aaa43b9043
 
 ### S2.7 测试与快照
 
-- `ui-approval` 组件规格：占位组件渲染摘要并通过 `answer` 作答；结算进行中按钮禁用，失败后恢复；会话持有其他交互类型时什么都不渲染。
-- `ui-workspace` 组件规格：座位只为有待处理交互的行渲染，行类跟随同一事实。
-- 组装输出：`apps/web/tests/built-boot.expected.e2e.ts` 里的常驻审批与侧栏快照预期会新增这一行；录制输出只在新增行就是预期差异处更新。
-- `pnpm run test:gui` 覆盖客户端套件；`DSH_SNAPSHOT=replay pnpm run test:web` 覆盖组装输出。
+- `ui-approval` 组件规格：占位组件渲染摘要并通过 `answer` 作答；结算进行中按钮禁用，失败后恢复；决定按钮的点击不会冒到包含它的行；会话持有其他交互类型时什么都不渲染。
+- `ui-workspace` 组件规格：座位只为有待处理交互的行渲染。其样式表规格断言行只在有待审批内容时变高、空行不占高度，且该行留在行盒内。
+- 组装输出：`apps/web/tests/built-boot.expected.e2e.ts` 里的常驻审批会新增这一行，录制输出只在该处变化。
+- `pnpm run test:gui` 覆盖客户端套件；对 `apps/web/tests/built-boot.expected.e2e.ts` 跑 `DSH_SNAPSHOT=replay` 覆盖组装输出。
 
 ## [S3] 范围
 
@@ -127,6 +127,7 @@ commits: c22ec9f0b9..aaa43b9043
 | `packages/client/ui-workspace/src/client/rows/Rows.tsx` | `SessionNodeItem` 内的待审批行 | 第二行、它的条件与待审批行类 |
 | `packages/client/ui-workspace/src/client/rows/Rows.module.css` | 待审批行与待审批行的样式规则 | 两行布局及其收起 |
 | `packages/client/ui-approval/src/client/index.ts` | 第二个 slot 注册与共用的 `approvalInjected` 工厂 | 占位组件注册、它的 `id`，以及两处呈现共用同一个理由解析器 |
+| `packages/client/ui-approval/package.json`、`packages/client/ui-approval/tsconfig.json` | `@deepseek-ai/dsh-client-ui-workspace` devDependency、它的 `dsh.client.inject` 行与项目引用 | 这三处接线；JSON 与 tsconfig references 没有注释语法，因此重放按本节执行 |
 | `packages/client/ui-approval/src/client/RowApproval.tsx` | 行内占位组件 | 摘要的回退顺序与 `displayReason` 的解析 |
 | `packages/client/ui-approval/src/client/RowApproval.module.css` | 行、摘要与动作区规则 | 单行摘要与右对齐的两个决定 |
 | `packages/client/ui-approval/src/client/use-approval-answer.ts` | 共用的作答守卫 | 每个请求只作答一次，以及结算失败后的恢复 |

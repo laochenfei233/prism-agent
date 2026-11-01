@@ -653,7 +653,7 @@ export function SessionNodeItem({
       data-row-key={`session:${node.id}`}
       className={clsx(
         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
-        row.archived && css.archived, pending && css.withPending,
+        row.archived && css.archived,
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
@@ -754,10 +754,12 @@ export function SessionNodeItem({
         </span>
       )}
       {/* The second line takes the full row width, so the title, time, and
-          action cells keep the first line to themselves while it renders. */}
+          action cells keep the first line to themselves while it renders. An
+          unoccupied seat leaves this line empty, and the stylesheet collapses
+          it so the row keeps its single-line height. */}
       {pending && (
         <div className={css.pendingLine}>
-          {renderSlot('sidebar.workspaces.session.pending', { sessionId: node.id, displayTitle: row.title })}
+          {renderSlot('sidebar.workspaces.session.pending', { sessionId: node.id, displayTitle: title })}
         </div>
       )}
       {!row.blank && (
