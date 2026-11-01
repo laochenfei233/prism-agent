@@ -477,8 +477,9 @@ class JsonlSessionPersistence extends SessionPersistence {
    * Observe one stored session without reading its event log.
    * @param id - the stored session to observe.
    * @param options - optional cancellation.
-   * @returns the snapshot (`sizeBytes` carries the physical artifact size), or
-   *   `undefined` when the session does not exist.
+   * @returns the snapshot (`sizeBytes` carries the physical artifact size,
+   *   `updatedAt` its last-write time), or `undefined` when the session does
+   *   not exist.
    */
   async stat(
     id: SessionId,
@@ -504,6 +505,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           ? SessionPersistenceRevision(`${fileRevision(identity)}:${await this.historicalCorpusRevision(options?.signal)}`)
           : fileRevision(identity),
         sizeBytes: Number(identity.size),
+        updatedAt: Number(identity.mtimeNs / 1_000_000n),
       }
     } catch (error: unknown) {
       options?.signal?.throwIfAborted()
@@ -552,6 +554,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           ? SessionPersistenceRevision(`${fileRevision(identity)}:${corpusRevision}`)
           : fileRevision(identity),
         sizeBytes: Number(identity.size),
+        updatedAt: Number(identity.mtimeNs / 1_000_000n),
       })
     }
     for (const [id, entry] of pending) {

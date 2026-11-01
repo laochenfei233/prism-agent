@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for prism-memory-panel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-memory-panel.md
+/:
+  en: 37d580f338a114d6
+  zh: 37d580f338a114d6
+/prism-memory-operator-surface:
+  en: c25202a17b1d89b9
+  zh: 5ed2a055e6310dab
+/prism-memory-operator-surface/report:
+  en: a7353eeffe54765d
+  zh: cfc515e4a7e988e5
+/prism-memory-operator-surface/s1-problem:
+  en: 8924652ba19ae8a1
+  zh: b65dfc45a53b8a4b
+/prism-memory-operator-surface/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/prism-memory-operator-surface/s2-design/s2-1-operator-reads-and-review-settlement-in-the-service:
+  en: 3cb1b63216ca35fe
+  zh: cb8a56003eae5a3a
+/prism-memory-operator-surface/s2-design/s2-2-four-routes-on-connection-s-shared-api-channel:
+  en: 3f79d530827bf1b8
+  zh: 8dbe9e59d088de49
+/prism-memory-operator-surface/s2-design/s2-3-the-browser-half:
+  en: 2143111b505df304
+  zh: fb3df6631d0b3123
+/prism-memory-operator-surface/s2-design/s2-4-three-human-subcommands:
+  en: 9b8010f882c1cbda
+  zh: b36396ba476c9ba2
+/prism-memory-operator-surface/s2-design/s2-5-the-model-surface-does-not-move:
+  en: fd9afae54183bf98
+  zh: b6074f3d80a8ed44
+/prism-memory-operator-surface/s2-design/s2-6-deliberately-not-taken-from-dsh-mnemon:
+  en: 9eef3eeebb009a58
+  zh: 0d5c9156cb5d5e85
+/prism-memory-operator-surface/s3-scope:
+  en: 253c24b91671b25a
+  zh: c07e2bb164dc22cd
+/prism-memory-operator-surface/tasks:
+  en: 49dad1933661b228
+  zh: 25b066dcbee50097
+/prism-memory-operator-surface/s4-acceptance:
+  en: e434c38e6065abf6
+  zh: 7c402ccfb7abb6e3

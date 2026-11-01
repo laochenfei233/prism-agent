@@ -4,6 +4,8 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import CommandRuntime from '@deepseek-ai/dsh-commands'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
@@ -51,6 +53,16 @@ async function skillHarness(config: Config): Promise<Context> {
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SkillRegistry)
+  await ctx.plugin(Guardrails, config)
+  return ctx
+}
+
+/** Boot the core spine, the bundle, and the real command runtime. */
+async function commandHarness(config: Config): Promise<Context> {
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(CommandRuntime)
   await ctx.plugin(Guardrails, config)
   return ctx
 }
@@ -103,6 +115,7 @@ describe('configuration validation', () => {
       planDeniedTools: undefined,
       repeatAskAfter: undefined,
       maxStepsPerTurn: undefined,
+      unfinishedTodoContinuations: undefined,
       skillInvocationGuidance: true,
       writeTools: undefined,
       maxWrittenFilesPerTurn: undefined,
@@ -110,6 +123,9 @@ describe('configuration validation', () => {
       dependencyManifests: undefined,
       routingContract: undefined,
       verificationGate: undefined,
+      readTools: undefined,
+      sensitivePaths: undefined,
+      commandGuard: undefined,
     })
   })
 
@@ -118,6 +134,7 @@ describe('configuration validation', () => {
       planDeniedTools: ['write', 'edit'],
       repeatAskAfter: 5,
       maxStepsPerTurn: 20,
+      unfinishedTodoContinuations: 2,
       skillInvocationGuidance: false,
       writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }],
       maxWrittenFilesPerTurn: 4,
@@ -125,10 +142,17 @@ describe('configuration validation', () => {
       dependencyManifests: ['package.json'],
       routingContract: { readOnlyTools: ['read'] },
       verificationGate: { verifyTools: ['bash'] },
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env', '.ssh'],
+      commandGuard: {
+        tools: [{ tool: 'bash', commandArgument: 'command' }],
+        deny: [{ pattern: 'git\\s+push\\s+--force', reason: 'rewrites remote history' }],
+      },
     })
     expect([...(resolved.planDeniedTools ?? [])]).toEqual(['write', 'edit'])
     expect(resolved.repeatAskAfter).toBe(5)
     expect(resolved.maxStepsPerTurn).toBe(20)
+    expect(resolved.unfinishedTodoContinuations).toBe(2)
     expect(resolved.skillInvocationGuidance).toBe(false)
     expect(resolved.writeTools?.get('write')).toEqual({ pathArgument: 'path', contentArgument: 'content' })
     expect(resolved.maxWrittenFilesPerTurn).toBe(4)
@@ -136,6 +160,10 @@ describe('configuration validation', () => {
     expect([...(resolved.dependencyManifests ?? [])]).toEqual(['package.json'])
     expect([...(resolved.routingContract ?? [])]).toEqual(['read'])
     expect([...(resolved.verificationGate ?? [])]).toEqual(['bash'])
+    expect(resolved.readTools?.get('read')).toBe('file_path')
+    expect(resolved.sensitivePaths).toEqual(['.env', '.ssh'])
+    expect(resolved.commandGuard?.tools.get('bash')).toBe('command')
+    expect(resolved.commandGuard?.rules[0]?.pattern.test('GIT PUSH --FORCE origin main')).toBe(true)
   })
 
   it('treats repeatAskAfter 0 as the off switch rather than a threshold', () => {
@@ -144,6 +172,10 @@ describe('configuration validation', () => {
 
   it('treats maxWrittenFilesPerTurn 0 as the off switch rather than a budget', () => {
     expect(resolveConfig({ maxWrittenFilesPerTurn: 0 }).maxWrittenFilesPerTurn).toBeUndefined()
+  })
+
+  it('treats unfinishedTodoContinuations 0 as the off switch rather than a count', () => {
+    expect(resolveConfig({ unfinishedTodoContinuations: 0 }).unfinishedTodoContinuations).toBeUndefined()
   })
 
   it.each([
@@ -157,6 +189,8 @@ describe('configuration validation', () => {
     ['a single-call repeat threshold', { repeatAskAfter: 1 }, 'one call is not a loop'],
     ['a zero step budget', { maxStepsPerTurn: 0 }, 'integer >= 1'],
     ['a fractional step budget', { maxStepsPerTurn: 2.5 }, 'integer >= 1'],
+    ['a negative todo-continuation count', { unfinishedTodoContinuations: -1 }, 'integer >= 0'],
+    ['a fractional todo-continuation count', { unfinishedTodoContinuations: 1.5 }, 'integer >= 0'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
     ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
@@ -176,6 +210,21 @@ describe('configuration validation', () => {
     ['a non-object verification gate', { verificationGate: ['bash'] }, 'must be an object'],
     ['an empty verify list', { verificationGate: { verifyTools: [] } }, 'non-empty array of tool names'],
     ['an unknown verification-gate key', { verificationGate: { verify: ['bash'] } }, 'unknown verificationGate key'],
+    ['a non-array read list', { readTools: 'read' }, 'must be an array'],
+    ['an empty read list', { readTools: [] }, 'must not be empty'],
+    ['a read entry naming no path argument', { readTools: [{ tool: 'read' }] }, 'must name its pathArgument'],
+    ['a duplicated read tool', { readTools: [{ tool: 'read', pathArgument: 'f' }, { tool: 'read', pathArgument: 'g' }] }, 'names "read" twice'],
+    ['an unknown read entry key', { readTools: [{ tool: 'read', pathArgument: 'f', content: 'x' }] }, 'unknown readTools key'],
+    ['an empty sensitive list', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: [] }, 'must not be empty'],
+    ['a blank sensitive segment', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: [''] }, 'non-empty path segments'],
+    ['a duplicated sensitive segment', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: ['.env', '.env'] }, 'names ".env" twice'],
+    ['a non-object command guard', { commandGuard: ['bash'] }, 'must be an object'],
+    ['an unknown command-guard key', { commandGuard: { tools: [], denys: [] } }, 'unknown commandGuard key'],
+    ['an empty command-tool list', { commandGuard: { tools: [], deny: [{ pattern: 'x', reason: 'y' }] } }, 'non-empty array of'],
+    ['a command tool naming no argument', { commandGuard: { tools: [{ tool: 'bash' }], deny: [{ pattern: 'x', reason: 'y' }] } }, 'must name its commandArgument'],
+    ['an empty command-pattern list', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [] } }, 'must be a non-empty array'],
+    ['a command pattern naming no reason', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: 'x' }] } }, 'must name a reason'],
+    ['an unparsable command pattern', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: '(', reason: 'y' }] } }, 'is not a regular expression'],
   ])('rejects %s', (_label, config, message) => {
     expect(() => resolveConfig(config as Config)).toThrow(message)
   })
@@ -187,6 +236,10 @@ describe('configuration validation', () => {
     ['the verification gate', { verificationGate: { verifyTools: ['bash'] } }],
   ])('refuses to load %s without the writing tools it reads', (_label, config) => {
     expect(() => resolveConfig(config as Config)).toThrow('name writeTools as well')
+  })
+
+  it('refuses the sensitive-read rail without the tools it reads', () => {
+    expect(() => resolveConfig({ sensitivePaths: ['.env'] })).toThrow('name readTools as well')
   })
 
   it('refuses the marker rail when no write tool names its text argument', () => {
@@ -834,6 +887,33 @@ describe('ponytail marker discipline', () => {
     expect(runs).toEqual(['write'])
   })
 
+  it('applies the upgrade-path rule to the current shortcut: marker too', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-shortcut-bare')
+
+    const refused = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// shortcut: global lock\n',
+    })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('no upgrade path')
+    expect(runs).toEqual([])
+  })
+
+  it('accepts a shortcut: marker naming its ceiling and upgrade path', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-shortcut-complete')
+
+    const allowed = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// shortcut: global lock, per-account locks if throughput matters\n',
+    })
+    expect(allowed.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+
   it('ignores prose that mentions the convention without a comment prefix', async () => {
     const ctx = await harness(CONFIG)
     const runs: string[] = []
@@ -968,5 +1048,329 @@ describe('verification gate', () => {
 
     expect(runs).toEqual([])
     expect(adapter.requests).toHaveLength(1)
+  })
+})
+
+describe('unfinished-todo gate', () => {
+  /** Boot a harness on one continuation budget, with the agent's list already written. */
+  async function todoHarness(
+    session: string,
+    todos: readonly { content: string; status: 'pending' | 'in_progress' | 'completed' }[],
+    responses: StreamChunk[][],
+    continuations = 1,
+  ): Promise<{ ctx: Context; agent: Agent; runs: string[]; adapter: MockAdapter }> {
+    const ctx = await harness({ unfinishedTodoContinuations: continuations })
+    const runs: string[] = []
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await newAgent(ctx, session)
+    agent.session.append('todo/write', { todos: [...todos] })
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, runs, adapter }
+  }
+
+  /** The text the model was sent in one request, across every content block. */
+  function requestText(request: GenerateOptions): string {
+    return request.messages
+      .map(message => message.content.map(block => block.type === 'text' ? block.text : '').join(''))
+      .join('\n')
+  }
+
+  it('sends a turn back to the items its own list still has open', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-unfinished', [
+      { content: 'T1 wire the store', status: 'in_progress' },
+      { content: 'T2 add the panel', status: 'pending' },
+    ], [textResponse('phase one done'), toolCallResponse('c1', 'probe', { i: 1 }), textResponse('done')])
+
+    await userTurn(ctx, agent, 'implement it')
+
+    const steered = adapter.requests[1]
+    if (steered === undefined) throw new Error('the second request carries the continuation')
+    expect(runs).toEqual(['probe'])
+    expect(adapter.requests).toHaveLength(3)
+    expect(requestText(steered)).toContain('still has 2 unfinished item(s)')
+    expect(requestText(steered)).toContain('T1 wire the store')
+  })
+
+  it('stops a turn whose list is finished', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-finished', [
+      { content: 'T1 wire the store', status: 'completed' },
+    ], [textResponse('done')])
+
+    await userTurn(ctx, agent, 'implement it')
+
+    expect(runs).toEqual([])
+    expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('stops steering after the configured number of continuations', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-bounded', [
+      { content: 'T1 wire the store', status: 'pending' },
+    ], [textResponse('one'), textResponse('two'), textResponse('three')], 2)
+
+    await userTurn(ctx, agent, 'implement it')
+
+    expect(runs).toEqual([])
+    expect(adapter.requests).toHaveLength(3)
+  })
+})
+
+describe('sensitive-read denial', () => {
+  /** The sensitive-path rail as a deployment names it: one reading tool, three segments. */
+  const guarded: Config = {
+    readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+    sensitivePaths: ['.env', '.ssh', '.aws'],
+  }
+
+  it('refuses a credential directory entry and never runs the tool', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-aws'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '/home/u/.aws/credentials' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".aws"')
+    expect(runs).toEqual([])
+  })
+
+  it('refuses a credential path and never runs the tool', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '/home/u/.ssh/id_rsa' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('/home/u/.ssh/id_rsa')
+    expect(textOf(denied)).toContain('credential material (matched ".ssh")')
+    expect(textOf(denied)).toContain('Ask the user for the specific value')
+    expect(runs).toEqual([])
+  })
+
+  it('refuses a dotted extension of a guarded name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-dotenv'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: 'C:\\work\\.env.local' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".env"')
+    expect(runs).toEqual([])
+  })
+
+  it('leaves an ordinary source file alone', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-source'), { provider: 'mock', model: 'mock' })
+
+    for (const filePath of ['src/environment.ts', 'src/index.ts']) {
+      const allowed = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+        arguments: { file_path: filePath }, agent,
+      })
+      expect(allowed.isError).toBe(false)
+    }
+    expect(runs).toEqual(['read', 'read'])
+  })
+
+  it('leaves the repository\'s own credentials package alone', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-package'), { provider: 'mock', model: 'mock' })
+
+    // A `credentials` segment in the shipped list would refuse both of these.
+    for (const filePath of ['packages/credentials/credentials/src/index.ts', 'docs/subsystems/credentials.md']) {
+      const allowed = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+        arguments: { file_path: filePath }, agent,
+      })
+      expect(allowed.isError).toBe(false)
+    }
+    expect(runs).toEqual(['read', 'read'])
+  })
+
+  it('refuses a credential path that is spelled in upper case', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-upper'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: 'C:\\Users\\U\\.SSH\\ID_RSA' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".ssh"')
+    expect(runs).toEqual([])
+  })
+
+  it('ignores a tool the deployment did not name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('grep', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-other-tool'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'grep',
+      arguments: { path: '/home/u/.ssh/id_rsa' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['grep'])
+  })
+})
+
+describe('command guard', () => {
+  /** The command rail as a deployment names it: one shell tool, one guarded pattern. */
+  const guarded: Config = {
+    commandGuard: {
+      tools: [{ tool: 'bash', commandArgument: 'command' }],
+      deny: [{
+        pattern: 'git\\s+push\\b[^\\n]*(--force\\b|\\s-f\\b)',
+        reason: 'rewrites a remote branch history others may already have',
+      }],
+    },
+  }
+
+  it('sends a matching command to approval, which denies with no channel', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-guarded'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'git push --force origin main' }, agent,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('would run a command this deployment guards')
+    expect(textOf(result)).toContain('rewrites a remote branch history')
+    expect(runs).toEqual([])
+  })
+
+  it('matches a guarded command inside a wrapper', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-wrapped'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'bash -c "git push --force origin main"' }, agent,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(runs).toEqual([])
+  })
+
+  it('runs a command that matches no guarded pattern', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-allowed'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'git status --short' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['bash'])
+  })
+
+  it('ignores a tool the deployment did not name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('pwsh', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-other-tool'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'pwsh',
+      arguments: { command: 'git push --force origin main' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['pwsh'])
+  })
+})
+
+describe('/guardrails status', () => {
+  it('reports every rail with its configured value', async () => {
+    const ctx = await commandHarness({
+      maxStepsPerTurn: 20,
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    const agent = await ctx.agentLoop.create(SessionId('status'), { provider: 'mock', model: 'mock' })
+
+    const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+    const text = execution?.result.text ?? ''
+
+    expect(text).toContain('Guardrails: 3 of 12 rails armed.')
+    expect(text.split('\n')).toEqual([
+      'Guardrails: 3 of 12 rails armed.',
+      'plan-mode denial: off',
+      'repeat approval: off',
+      'turn budget: 20 steps',
+      'unfinished todos: off',
+      'skill guidance: on',
+      'write budget: off',
+      'ponytail markers: off',
+      'dependency manifests: off',
+      'routing contract: off',
+      'verification gate: off',
+      'sensitive reads: .env',
+      'command guard: off',
+    ])
+  })
+
+  it('registers even when the command runtime mounts after the bundle', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(Guardrails, { maxStepsPerTurn: 20 })
+    await ctx.plugin(CommandRuntime)
+
+    const agent = await ctx.agentLoop.create(SessionId('status-late-commands'), { provider: 'mock', model: 'mock' })
+    const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+
+    expect(execution?.result.text).toContain('turn budget: 20 steps')
+  })
+
+  it('enforces every rail when the deployment mounts no command runtime', async () => {
+    const ctx = await harness({
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    expect(ctx.get('commands')).toBeUndefined()
+
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('status-no-commands'), { provider: 'mock', model: 'mock' })
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '.env' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(runs).toEqual([])
   })
 })

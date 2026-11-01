@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，自动沉淀与整理，从其他工具的记忆文件导入，以及一份确定性的 Markdown 镜像。
+Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，一个 Web 记忆页，自动沉淀与整理，从其他工具的记忆文件导入，以及一份确定性的 Markdown 镜像。
 
 ## 概述
 
@@ -12,7 +12,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 1. **缓存前缀永不被改写。** 见下文。
 2. **主张按三条彼此独立的轴归档** —— 主张讲的是谁的事（`layer`）、它是什么类型的陈述（`kind`）、谁能看见它（`scope`）—— 而层决定一条主张是先被声明还是被提及后才引用。
-3. **治理是人的界面。** 批准、拒绝、恢复、过期、整理、导入与导出都是 `/memory` 子命令而不是工具，因此模型无法自行提升自己的主张，而确实位于前缀中的 5 个工具 schema 保持固定。
+3. **治理是人的界面。** 批准、拒绝、恢复、退役、过期、整理、导入与导出都是 `/memory` 子命令，其中前两项也是 Web 记忆页上的按钮 —— 都不是工具，因此模型无法自行提升自己的主张，而确实位于前缀中的 5 个工具 schema 保持固定。
 4. **记忆同时来自三类写入方**：模型调用工具、一个轮次在收尾时被读取（无需额外模型调用），以及另一个工具已经为此用户写下的记忆文件。
 
 ## 设计约束：缓存前缀保持字节稳定
@@ -25,7 +25,8 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 - 无话可说时完全不输出，因此一次准入的轮次与「未装本插件」的构建产出的轮次字节相同；
 - 同样的命中渲染出同样的字节（全序排序、固定外框、无生成时间戳，日期而非时刻），因此未变的语料不会造成虚假未命中；
 - 从不重复注入会话已经收到的记录，由 `prismMemory` 会话投影从插件自己记录的消息折叠而来；
-- 保持工具面为 5 个定义，并在治理命令挂载时新增**零**个 schema。
+- 保持工具面为 5 个定义，并在治理命令挂载时新增**零**个 schema；
+- 让记忆页待在模型路径之外：它的路由与面板既不新增提示词文本，也不新增工具 schema，也不新增注入帧。
 
 其中两项是部署决定，而出厂默认取的是该主张的强形式。`orientationEnabled` **关闭**，因为问候是唯一会在「本轮没有记忆支撑」时仍然开口的贡献：关掉它，空语料不改变任何字节；打开它应当是一次决定，而不是安装本插件带来的副作用。`identityLayers` **开启**，但在语料中出现落在这些层上的记录之前是惰性的 —— 而在分层轴存在之前写入的记录永远不会落在那些层上，因此升级后的存储注入的正是它原先注入的内容。
 
@@ -39,6 +40,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 - name: '@prism/prism-memory'
 - name: '@prism/prism-memory/tools'
 - name: '@prism/prism-memory/commands'
+- name: '@prism/prism-memory/web'
 ```
 
 ### 工具
@@ -60,9 +62,12 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | 子命令 | 效果 |
 |---|---|
 | `/memory status` | 按状态、作用域、层与 kind 计数（无参数时也是默认行为） |
-| `/memory review [limit]` | 待审收件箱：被拦下等待批准的记录 |
+| `/memory remember <text>` | 存下你自己的一条主张，不花模型的一轮；打印它落到的 id |
+| `/memory search <query>` | 带层、kind、作用域与来源会话的排序主张；空查询列出最近的记忆 |
+| `/memory review [limit]` | 待审收件箱：被拦下等待批准的记录，新的在前 |
 | `/memory approve <id> [note]` | 把一条待审记录提升为 active |
 | `/memory reject <id> [reason]` | 归档一条待审记录 |
+| `/memory forget <id> [reason]` | 退役一条仍生效的主张，使其不再被召回；记录被保留 |
 | `/memory show <id>` | 一条记录，带溯源、日期、标签、印证与其 supersede 链 |
 | `/memory restore <id> [reason]` | 把一条记录回滚为 current |
 | `/memory conversations [limit]` | 按来源会话浏览语料 |
@@ -71,6 +76,16 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `/memory journal [limit]` | 整理日志与每日反思 |
 | `/memory import [apply] [sources]` | 读取其他工具的记忆文件；除非给出 `apply`，否则为空跑 |
 | `/memory export [dir]` | 写出 Markdown 镜像及其 JSON 索引 |
+
+### 记忆页
+
+`@prism/prism-memory/web` 在 `/api/prism-memory` 下注册四条精确 Fetch 路由 —— `overview`、`search`、`remember` 与 `review` —— 各回答一个 `{ ok, value }` 信封。带请求体的三条用 zod 校验请求体；`overview` 不读请求体。浏览器侧把它们渲染成侧边栏里的一个页面：整库计数、关键词搜索、新增表单、带通过与驳回且最早的决定在前的待审收件箱，以及仍生效的主张。
+
+页面没有调用会话，因此它通过服务的运维面来读写与结算 —— `operatorRecords`、`operatorSearch`、`operatorApprove` 与 `operatorReject`，它们都不按作用域收窄。每一行都渲染自己的作用域，让收窄在做决定的地方可见。面向模型的调用方不变：工具传自己运行所在的 agent，`/memory` 传被调用时所在的 agent，两者仍然被它们过滤。
+
+页面存下的主张是 `global`，因为没有会话可以用来推导 project 或 conversation 作用域 —— 因此在那里新增的一条 `user` 或 `rule` 主张会在每个会话的第一轮被声明。退役它是 `/memory forget <id>`，这也是退役一条仍生效主张的唯一人用路径。
+
+该行声明了 `webServer`，因此没有组合 Web 服务器的 profile 会让它保持 pending，而不是加载失败。浏览器包是一个 module-loader 闭包，把 React 与共享 primitives 作为基线模块请求，而不是再内联一份副本。
 
 ## 分层轴
 
@@ -103,7 +118,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ## 自动记忆
 
-有三类写入方无需工具调用即可写入。它们都不能把未复核的主张送到模型面前：沉淀与导入默认落 `pending`，而 pending 从不注入，只能由 `/memory approve` 或 `/memory reject` 定夺。
+有三类写入方无需工具调用即可写入。它们都不能把未复核的主张送到模型面前：沉淀与导入默认落 `pending`，而 pending 从不注入，只能由 `/memory approve` 或 `/memory reject` 复核。
 
 ### 沉淀：在轮次自己的路径上
 
@@ -140,7 +155,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ## 治理与库卫生
 
-- **待审收件箱。** 在 `requireApproval` 下，或对任何低于 `pendingBelowConfidence` 的写入，主张都以 `pending` 存储。注入与搜索可见性是两个独立的决定：一条 pending 记录从不注入、也从不计为在库，但 `memory_search` 会返回它 —— 在**每一种**配置下，包括 `requireApproval` —— 因此模型总能找到它自己写过的主张，无论它当时带什么置信度。定夺它的只有 `/memory approve` 或 `/memory reject`，两者模型都无法调用。
+- **待审收件箱。** 在 `requireApproval` 下，或对任何低于 `pendingBelowConfidence` 的写入，主张都以 `pending` 存储。注入与搜索可见性是两个独立的决定：一条 pending 记录从不注入、也从不计为在库，但 `memory_search` 会返回它 —— 在**每一种**配置下，包括 `requireApproval` —— 因此模型总能找到它自己写过的主张，无论它当时带什么置信度。定夺审阅的只有 `/memory approve` 或 `/memory reject`，两者模型都无法调用；`/memory forget <id>` 会把交给它的任意一条主张归档，包括 pending 的，但不记录审阅决定。
 - **双时间记录。** 每条记录带 `validAt` 与 `invalidAt`。supersede、过期、合并与遗忘都走失效而不是删除，因此旧答案保持可审计，而只有当前主张会注入。
 - **回滚。** `/memory restore` 重新激活一条记录并归档一个在库的后继者，把回滚记录在后继者的证据里。
 - **维护。** `/memory maintain` 报告它将要做什么，在 `apply` 之前不写任何东西：超过期限的在库记录被归档，达到或高于 `dedupeJaccard` 的近似重复被合并进读者会保留的那条记录（更高置信度，其次更新），存储达到容量时已归档记录被淘汰，以及无法再解析的 supersede 链被上报。
@@ -304,13 +319,18 @@ memory_open when the exact record matters.
 
 沉淀与整理写入记录且不追加任何消息，因此在触发它们的那个轮次里对模型不可见。它们写下的内容之后会通过召回或通过工具变得可见，与任何其他记录一样。对触发轮次的 token 影响：无。
 
+### 记忆页
+
+token 影响：无。页面通过自己的路由读写，而它所结算的东西 —— 一条被批准或存下的主张 —— 只会经由本就存在的注入与检索路径到达模型。KV 缓存影响：无，因为这条路径上没有任何东西属于一次请求。
+
 ## 验证
 
 ```sh
-node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit   # src and tests against the checkout's declarations
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts # 146 specs over the real services
-node ../../node_modules/.bin/tsdown --config tsdown.config.ts           # emit lib/
-node scripts/smoke.mjs                                                  # artifact plane
+node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
+node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
+node scripts/smoke.mjs                                                        # artifact plane
 ```
 
 这些规格驱动的是生产服务 —— 带 SQLite 后端的 storage hub、domain 设施、会话存储、系统提示词注册表、会话投影注册表、工具运行时与 agent loop —— 因此一条关于记忆的断言就是一条关于模型看到什么的断言。
@@ -318,6 +338,10 @@ node scripts/smoke.mjs                                                  # artifa
 `tests/cache-safety.spec.ts` 是本包核心主张的测试套件：未命中的轮次不添加消息，命中的轮次在未动过的前缀之后恰好追加一条消息，该块对固定语料是确定性的，已投递的记录绝不重复，该块遵守它的字符预算，5 个工具 schema 在多次读取之间字节稳定，以及挂载治理命令不新增 schema。
 
 `tests/automatic.spec.ts` 是自动那一半的测试套件：一个轮次自身的文本在无模型调用的情况下被沉淀并拦下待审，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，矛盾被上报且两条主张都存活，常驻记忆无需关键词命中即到达，到期日会浮现，以及一次导入把一个工作区文件读成 project 作用域的主张而不重复它已经读过的东西。
+
+`tests/commands.spec.ts` 是运维命令面的测试套件：每个用例把一行 `/memory` 打进真实的命令运行时并读取结算后的结果，因此一次什么都没存下的 `remember`、一次渲染错行的 `search`，或一个不再被解析的子命令都会在那里失败。
+
+`tests/web.spec.ts` 与 `tests/web-composition.host.spec.ts` 是浏览器路由的测试套件：前者通过路由注册时的那个对象驱动每条路由，断言信封、请求体校验与它背后的运维面；后者用真实 Loader 在真实 web 服务器与 Connection 之上启动该行，并断言在没有两者的 profile 里它保持 pending —— 而不是失败。`tests/client/api.spec.ts` 覆盖浏览器请求客户端自己的解码，包括宿主答了它读不懂的东西这一情形。
 
 ## 已知限制与延期工作
 
@@ -331,8 +355,10 @@ node scripts/smoke.mjs                                                  # artifa
 - **语料常驻内存。** 每条记录都驻留在该域的同步状态中，受 `maxRecords` 限制，但不受字节数限制。
 - **`hits` 只计显式打开**，因此复用加权是弱信号。沉淀刻意不碰它。
 - **维护与整理巡检没有被调度。** 它们跑在轮次路径上和运维命令上；希望它们在固定时刻跑的部署，需要一条指向 `/memory maintain apply` 或 `/memory dream apply` 的 schedule 配置行。
-- **命令面是被间接覆盖的。** `/memory` 是服务方法之上的一层薄适配器，而规格直接驱动那些方法；规格尚未端到端驱动一次组装后的命令调用。
-- **没有待审收件箱 UI。** 收件箱就是 `/memory review` 命令；Web 宿主没有专门的页面。
+- **页面只新增与结算，不编辑。** 改写一条主张是带 `supersedes` 的 `memory_remember`，退役一条仍生效的记录是 `/memory forget <id>`；面板两个都不提供，因为在面板上做的编辑没有审计故事。
+- **页面的 overview 在每次写入后读取整个库。** 它受 `maxRecords` 约束，对本存储所面向的语料规模是正确的；接近该上限的存储会想先做分页读取。
+- **四个运维方法是公开且不收窄的服务方法。** 没有任何面向模型的调用方能到达它们，而 `maintain`、`dream`、`importMemories`、`exportMarkdown` 本来就是整库操作，因此这不引入新的权限类别 —— 但任何注入 `prismMemory` 的插件都能读到整库，而类型除了名字之外没有表达这一点。
+- **页面没有组件规格。** 该包不自带 React 运行时，插件的 Vitest 配置也没有设置 jsdom 环境，因此页面只由路由规格、请求客户端规格，以及加载该包并执行其 `apply` 的 smoke 覆盖。
 - **面向模型的会话工具不在本 bundle 中。** `session-search.patch.yml` 打开持久的 `sessionQuery` 索引，但挂载 `@deepseek-ai/dsh-tool-session-query` 是部署的决定，因为该包并非每套 Harness 安装的一部分。没有那一行，模型仍能通过 `memory_search` 的溯源到达一条主张的来源会话，但它没有直接读取会话历史的工具。
 - **导入布局按 id 硬编码。** 新增一个工具意味着往 `IMPORT_SOURCES` 加一条；自定义布局没有配置格式。
 

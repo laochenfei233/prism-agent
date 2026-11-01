@@ -22,9 +22,6 @@ export default defineConfig({
     // These suites drive real Cordis services in one process; forks keep Node's
     // CJS lexer away from worker threads, matching the repository runner.
     pool: 'forks',
-    setupFiles: [
-      '../../scripts/test-proxy-environment.ts',
-      '../../scripts/test-invariants.ts',
-    ],
+    setupFiles: ['../../scripts/test-proxy-environment.ts'],
   },
 })
