@@ -649,6 +649,27 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-sidebar-documentpreview -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-ui-sidebar-git -->
+<a id="deepseek-aidsh-client-ui-sidebar-git"></a>
+
+## `@deepseek-ai/dsh-client-ui-sidebar-git`
+
+- `inject`: `connection` · `sessions` · `subprocess`
+- `source`: [`packages/client/ui-sidebar-git/src/index.ts:22`](../packages/client/ui-sidebar-git/src/index.ts)
+
+```ts config-catalog
+/** Command and message bounds. Invalid values fail plugin load. */
+export interface Config {
+  /** Milliseconds one git command may run before it is terminated. */
+  timeoutMs: number
+  /** Bytes of git output retained per command. */
+  outputMaxBytes: number
+  /** Bytes a commit message may occupy, counted as UTF-8. */
+  maxMessageBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-sidebar-git -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
 <a id="deepseek-aidsh-client-ui-theme"></a>
 
@@ -1550,7 +1571,7 @@ export interface Config {
 
 - `inject`: `sandboxPolicy`
 - `refs`: [`LocalConfig`](#deepseek-aidsh-fs-local)
-- `source`: [`packages/fs/fs-sandbox/src/index.ts:45`](../packages/fs/fs-sandbox/src/index.ts)
+- `source`: [`packages/fs/fs-sandbox/src/index.ts:46`](../packages/fs/fs-sandbox/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -1713,7 +1734,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-frontend-static`
 
 - `inject`: `webServer` · `connection`
-- `source`: [`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
+- `source`: [`packages/host/frontend-static/src/index.ts:31`](../packages/host/frontend-static/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the dist anchor. */
@@ -4719,7 +4740,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-workspace-changes`
 
 - `inject`: `subprocess` · `fs`
-- `source`: [`packages/deliverables/workspace-changes/src/index.ts:34`](../packages/deliverables/workspace-changes/src/index.ts)
+- `source`: [`packages/deliverables/workspace-changes/src/index.ts:36`](../packages/deliverables/workspace-changes/src/index.ts)
 
 ```ts config-catalog
 /** Snapshot, capture, and comparison bounds. Invalid values fail plugin load. */

@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-sidebar-git/README.md
+/:
+  en: bcad15019b25f9e8
+  zh: 9f091c8840f72a6c
+/deepseek-ai-dsh-client-ui-sidebar-git:
+  en: a5d1d55f822ac7df
+  zh: 921578520d2b32c9
+/deepseek-ai-dsh-client-ui-sidebar-git/summary:
+  en: d98b7abc9330f9a8
+  zh: 8ebd842762c4881e
+/deepseek-ai-dsh-client-ui-sidebar-git/table-of-contents:
+  en: fc93dfa27f13c568
+  zh: 49ed2c06061bbb89
+/deepseek-ai-dsh-client-ui-sidebar-git/what-it-registers:
+  en: bd4850275316e60c
+  zh: 28e76301ce3a5f38
+/deepseek-ai-dsh-client-ui-sidebar-git/routes:
+  en: 9bed2bcf1f4eb23a
+  zh: f1411041a4951397
+/deepseek-ai-dsh-client-ui-sidebar-git/the-panel:
+  en: f816f357d57ee1f4
+  zh: 0cb268f0e6845849
+/deepseek-ai-dsh-client-ui-sidebar-git/model-experience:
+  en: 0d6017c7417bb81a
+  zh: 74b1b52a1b58890d
+/deepseek-ai-dsh-client-ui-sidebar-git/model-experience/kv-cache-effect:
+  en: d2cb539ea2103db8
+  zh: 89b6fc72ba32443e
+/deepseek-ai-dsh-client-ui-sidebar-git/known-limitations-and-deferred-work:
+  en: f062bd4480b12f25
+  zh: b3f1c18c74791d79

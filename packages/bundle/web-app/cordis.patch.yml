@@ -347,6 +347,10 @@
     # The right Sidebar's workspace file tree tab type.
     - id: ui-sidebar-files
       name: '@deepseek-ai/dsh-client-ui-sidebar-files'
+    # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A15.
+    # The right Sidebar's git workbench: status, comparisons, staging, and commit.
+    - id: ui-sidebar-git
+      name: '@deepseek-ai/dsh-client-ui-sidebar-git'
 
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
