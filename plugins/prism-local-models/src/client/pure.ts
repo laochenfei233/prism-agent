@@ -13,10 +13,18 @@ export function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-/** Progress suffix: percent when the total is known, the item label otherwise. */
+/**
+ * Download completion as a whole percentage.
+ * @param progress - the family's reported progress.
+ * @returns 0–100 while a byte download has a known total, otherwise undefined.
+ */
+export function progressPercent(progress: ModelProgress): number | undefined {
+  if (progress.phase !== 'download' || progress.total === undefined || progress.total <= 0) return undefined
+  return Math.min(100, Math.round(progress.done / progress.total * 100))
+}
+
+/** Progress suffix: a byte download's percentage, the current step label otherwise. */
 export function progressText(progress: ModelProgress): string {
-  if (progress.phase === 'download' && progress.total !== undefined && progress.total > 0) {
-    return ` ${Math.min(100, Math.round(progress.done / progress.total * 100))}%`
-  }
-  return ` ${progress.label}`
+  const percent = progressPercent(progress)
+  return percent === undefined ? ` ${progress.label}` : ` ${percent}%`
 }

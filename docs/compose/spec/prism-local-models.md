@@ -1,9 +1,9 @@
 ---
 feature: prism-local-models
 status: delivered
-updated: 2026-10-31
-branch: feat/prism-local-models
-commits: f879732059..8048f7d1fb
+updated: 2026-11-01
+branch: feat/local-models-ui
+commits: 0e365ad595..4c8dc6ba46
 ---
 
 # Prism Local Models
@@ -14,9 +14,13 @@ English | [中文](prism-local-models.zh.md)
 
 **What was built** — `plugins/prism-local-models` (`@prism/prism-local-models`), a dual-face out-of-tree plugin that puts four local capability models under the Prism data directory and manages them from the settings Models page through the page's own `settings.models.footer` seat; `packages/` and `apps/` are untouched. The node half owns the catalog (pinned upstream files with sizes and sha256), a durable registry with integrity caching and manual-placement detection, verified downloads with cancel, npm/pip runtime provisioning, and four engines: RapidOCR (`@gutenye/ocr-node`), a PaddleOCR Python sidecar, HY-MT1.5 through `node-llama-cpp`, and BGE through transformers.js. It claims `ctx.prismLocalModels` with `embed`/`ocr`/`translate` plus the install lifecycle, and serves `/api/local-models/*`. The browser half renders the footer card: kind chips, variant selectors with device and size, live progress, and install/cancel/remove/probe actions, zh/en throughout.
 
+The footer was then rebuilt on the page's own settings material (S2.9): one R20 settings card per family with a lifecycle dot, a kind `Tag`, the shared compact controls, a determinate download bar, and an in-app removal dialog. Controls come from `ui-primitives` through the shell module table and the card's layout lives in a `<style>` string, the `prism-memory` arrangement.
+
 **Verification** — plugin `tsc --noEmit` clean; vitest 30/30 (catalog pins and override rejection, registry roundtrip/corruption/integrity classes, download lifecycle against a real local HTTP origin: install, checksum failure, cancel, busy, manual placement, variant-switch cleanup, provision plans and marker, capability guards, locale parity, pure helpers); two-face tsdown build and `pnpm run build:artifacts` pass; scoped `verify-translation-pairing` consistent for both pairs. Live on this machine: RapidOCR probe recognized the rendered probe image ("PRISM LOCAL OCR"); BGE produced 2x512-dim L2-normalized embeddings with probe `512 dims`; HY-MT1.5 translated the probe sentence through the official Q4_K_M GGUF; a `dsh web --patch` boot served the plugin's client bundle and the rendered Models page showed the local-models card (screenshot). Not executed here: the PaddleOCR pip provisioning with a real interpreter, and cuda variants on real GPU hardware (fail-loud probes implemented and unit-reviewed).
 
-**Journey log** — The Models page already declares its extension seats (`slot-contract.ts` says "without editing it"), so the injection needed zero core edits. The HF tree API's `oid` is a git sha1 for xet-stored files; `paths-info` returns the true LFS sha256, pinning multi-GB hashes without downloading. RapidOCR pivoted from loose pinned files to the `@gutenye/ocr-models` npm bundle, which ships the full PP-OCRv4 set including cls and dict. Out-of-tree bundles resolve from the profile context (`$DSH_HOME/profiles/node_modules`), not the repo — the dev smoke needs the junction there, exactly what the desktop shell does at runtime. Cordis context claims go through `ctx.provide`; a bare property set throws "without provide", and the pinned cordis declaration omits `provide`, so a local interface widening carries the type.
+**Restyle verification** — plugin `tsc --noEmit` clean; vitest 33/33 with the added `progressPercent` cases; the two-face tsdown build keeps `ui-primitives` external; the spec pair re-recorded. The rendered card was checked in the running app on the Models page, in light and dark, across idle, ready, downloading, provisioning, and error states and the removal dialog, with a page-local `fetch` stub supplying the states the installed catalog does not reach. The last visual pass predates the review round's token and copy fixes; that round changed CSS values and copy, plus the dialog flow, which now copies the page's own delete dialog (await, stay open on failure, disabled while pending).
+
+**Journey log** — The Models page already declares its extension seats (`slot-contract.ts` says "without editing it"), so the injection needed zero core edits. The HF tree API's `oid` is a git sha1 for xet-stored files; `paths-info` returns the true LFS sha256, pinning multi-GB hashes without downloading. RapidOCR pivoted from loose pinned files to the `@gutenye/ocr-models` npm bundle, which ships the full PP-OCRv4 set including cls and dict. Out-of-tree bundles resolve from the profile context (`$DSH_HOME/profiles/node_modules`), not the repo — the dev smoke needs the junction there, exactly what the desktop shell does at runtime. Cordis context claims go through `ctx.provide`; a bare property set throws "without provide", and the pinned cordis declaration omits `provide`, so a local interface widening carries the type. The removal dialog portals to `document.body`, so its destructive style is a globally named `button.lmm-danger` rule rather than one scoped under the card; `Button` ships no danger variant, and rebinding the `--dsw-alias-button-primary-*` fill the way `PluginManagerPage` does would have turned the row's quiet text action into a filled button.
 ## [S1] Problem
 
 The settings Models page manages remote LLM providers only. The capability models Prism itself needs — OCR over images, machine translation, RAG embeddings — have no home: no install location, no lifecycle management, no capability entry point for future features. These models should live inside Prism's data directory, be installed and managed where model management already lives (the Models page), and expose typed capabilities (`embed`, `ocr`, `translate`) that Prism features can call.
@@ -63,7 +67,15 @@ Exact Fetch routes registered through `connection.fetch.register` under `/api/lo
 
 ### S2.8 Browser half: the Models-page card
 
-The client half injects `['slots', 'locale']`, registers a `settings.models.footer` list entry, and renders one "本地模型 / Local models" card: a header with the models root path, and one row per family showing the name, a kind chip (OCR / 翻译 / 向量), a variant selector fed from the catalog, size, status or download progress, and 安装 / 取消 / 删除 / 检测 actions with their results; an OCR note states that RapidOCR is the default engine and PaddleOCR requires a Python environment. All copy routes through `ctx.locale` with merged zh/en dictionaries (structural stand-ins, consistent with `prism-about`); styling reuses app theme tokens.
+The client half injects `['slots', 'locale']`, registers a `settings.models.footer` list entry, and renders one "本地模型 / Local models" block: the models root path, and one entry per family showing the name, a kind chip (OCR / 翻译 / 向量), a variant selector fed from the catalog, size, status or download progress, and 安装 / 取消 / 删除 / 检测 actions with their results; an OCR note states that RapidOCR is the default engine and PaddleOCR requires a Python environment. All copy routes through `ctx.locale` with merged zh/en dictionaries (structural stand-ins, consistent with `prism-about`). S2.9 owns how the block looks.
+
+### S2.9 Card presentation
+
+The footer reads as a second block of the Models page rather than a loose list: a section heading, one sentence saying these models serve Prism's own OCR, translation, and embedding work rather than chat, and the models root path.
+
+Each family is its own settings card — the `--dsw-alias-settings-card-fill` / `-stroke` material at R20 with a 12×14 inset, as the provider cards above use — carrying the family name at 14/22 weight 500, its kind as a `Tag`, and a head-row status cluster of `StateDot` plus copy. The body pairs the variant selector (H32, R12, `--dsw-alias-border-l4`, the shared chevron) with the actions the state allows: 安装 while missing, 取消 while busy, 检测 and 删除 once ready. A known download total adds a determinate bar under the body while the status copy keeps the percentage; provisioning reports its step label instead. Failures and probe results sit under the body in the error or success color. Removal confirms in the shared `Modal` — family name as title, the existing question as description, 取消 focused first — because a native `confirm()` is the one surface that ignores the app theme.
+
+Controls come from `@deepseek-ai/dsh-client-ui-primitives` through the shell module table, as `prism-memory` does; the card's own layout is a `<style>` string because the out-of-tree bundle has no CSS pipeline. Every color is a `--dsw-alias-*` token of the page around it.
 
 ## [S3] Scope
 
@@ -82,6 +94,7 @@ The client half injects `['slots', 'locale']`, registers a `settings.models.foot
 - [x] T8: browser-half footer card, variant selector, status polling, zh/en locale dictionaries (covers: S2.8)
 - [x] T9: unit tests — catalog validation and override rejection, registry state machine and manual placement, download lifecycle against a local origin, provisioning command planning, pure UI logic, locale key parity (covers: S2.2, S2.3, S2.5, S2.7, S2.8)
 - [x] T10: README en/zh, spec pair + pairing record, verification — build both faces, typecheck, focused tests, boot a web profile with the plugin, screenshot the Models page card (covers: S4)
+- [x] T11: restyle the footer card to the Models-page settings material with `ui-primitives` controls, a status cluster, a download bar, and an in-app removal dialog (covers: S2.9)
 
 ## [S4] Acceptance
 
@@ -92,3 +105,4 @@ The client half injects `['slots', 'locale']`, registers a `settings.models.foot
 - HY-MT1.5 `probe` translates a fixed zh→en sentence through the installed GGUF.
 - `cancel` stops a download and removes its temp file; `remove` deletes the variant directory; manually placed complete files are detected and verified on the next scan.
 - Unit tests pass; typecheck and the two-face build pass; `verify-translation-pairing` passes for the spec pair; README exists in en and zh.
+- The card renders as settings cards matching the Models page material in both themes: lifecycle dots, a determinate download bar, and an in-app removal dialog, with no unstyled control or native `confirm()` left.
