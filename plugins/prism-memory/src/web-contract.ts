@@ -53,7 +53,7 @@ export interface MemoryOverview {
   readonly counts: MemoryCounts
   /** The review inbox: the head of the pending queue, the oldest decision first. */
   readonly pending: readonly MemoryRow[]
-  /** The newest live claims, matching what injection and search can reach. */
+  /** The newest live claims, matching what injection can reach. */
   readonly recent: readonly MemoryRow[]
 }
 
@@ -61,7 +61,7 @@ export interface MemoryOverview {
 export interface MemorySearchBody {
   /** Literal query text; empty lists the most recent claims. */
   readonly query: string
-  /** Requested result cap; the ranked branch is bounded by the deployment's `searchLimit`, the empty query by the page's own cap. */
+  /** Requested result cap. A ranked query is additionally bounded by the deployment's `searchLimit`; the empty query is bounded only by this value, which defaults to the page's own cap. */
   readonly limit?: number
 }
 

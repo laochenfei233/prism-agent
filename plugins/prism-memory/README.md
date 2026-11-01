@@ -12,7 +12,7 @@ Four things distinguish it from the usual "inject memory into the system prompt"
 
 1. **The cached prefix is never rewritten.** See below.
 2. **Claims are filed on three independent axes** — what the claim is about (`layer`), what sort of statement it is (`kind`), and who may see it (`scope`) — and the layer decides whether a claim is stated before it is mentioned.
-3. **Governance is a human surface.** Approving, rejecting, restoring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first two, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
+3. **Governance is a human surface.** Approving, rejecting, restoring, retiring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first two, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
 4. **Memory arrives from three producers at once**: the model calling a tool, a turn being read as it closes (no extra model call), and the memory files another tool already wrote for this user.
 
 ## Design constraint: the cached prefix stays byte-stable
@@ -64,7 +64,7 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory status` | Counts by status, scope, layer, and kind (also the default with no argument) |
 | `/memory remember <text>` | Store one claim of your own, with no model turn; prints the id it landed on |
 | `/memory search <query>` | Ranked claims with layer, kind, scope, and originating session; an empty query lists the most recent |
-| `/memory review [limit]` | The review inbox: records held back until approved |
+| `/memory review [limit]` | The review inbox: records held back until approved, newest first |
 | `/memory approve <id> [note]` | Promote one pending record to active |
 | `/memory reject <id> [reason]` | Archive one pending record |
 | `/memory forget <id> [reason]` | Retire one live claim so it stops being recalled; the record is retained |
@@ -79,11 +79,11 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 
 ### The memory page
 
-`@prism/prism-memory/web` registers four exact Fetch routes under `/api/prism-memory` — `overview`, `search`, `remember`, and `review` — each answering one `{ ok, value }` envelope. The three that carry a body validate it with zod; `overview` reads none. The browser half renders them as one panel in the sidebar: counts over the store, a keyword search, an add form, the review inbox with approve and reject, and the live claims.
+`@prism/prism-memory/web` registers four exact Fetch routes under `/api/prism-memory` — `overview`, `search`, `remember`, and `review` — each answering one `{ ok, value }` envelope. The three that carry a body validate it with zod; `overview` reads none. The browser half renders them as one panel in the sidebar: counts over the store, a keyword search, an add form, the review inbox with approve and reject handed out oldest decision first, and the live claims.
 
-A page has no calling session, so it reads and settles through the service's operator surface — `operatorRecords`, `operatorSearch`, `operatorApprove`, and `operatorReject`, none of them narrowed by scope. Every row renders its own scope, so the narrowing stays visible where the decision is made. Model-facing callers are unchanged: a tool passes its agent and `/memory` passes its session, and both are still filtered by them.
+A page has no calling session, so it reads and settles through the service's operator surface — `operatorRecords`, `operatorSearch`, `operatorApprove`, and `operatorReject`, none of them narrowed by scope. Every row renders its own scope, so the narrowing stays visible where the decision is made. Model-facing callers are unchanged: a tool passes the agent it runs in and `/memory` passes the one it was invoked from, and both are still filtered by them.
 
-A claim the page stores is `global`, because there is no session to derive a project or conversation scope from — so a `user` or `rule` claim added there is stated on every session's first turn. Retiring it is `/memory forget <id>`, which is also the one human retraction for a live claim.
+A claim the page stores is `global`, because there is no session to derive a project or conversation scope from — so a `user` or `rule` claim added there is stated on every session's first turn. Retiring it is `/memory forget <id>`, the only human retraction for a live claim.
 
 The row declares `webServer`, so a profile that composes no Web server leaves it pending rather than failing to load. The browser bundle is one module-loader closure that requests React and the shared primitives as baseline modules instead of inlining a second copy of either.
 
@@ -118,7 +118,7 @@ The score is normalized by the square root of the query's own term weight. The s
 
 ## Automatic memory
 
-Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is settled only by `/memory approve` or `/memory reject`.
+Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is reviewed only by `/memory approve` or `/memory reject`.
 
 ### Distillation, on the turn's own path
 
@@ -155,7 +155,7 @@ A claim the corpus already holds is counted as skipped rather than stored again 
 
 ## Governance and library hygiene
 
-- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling it is only `/memory approve` or `/memory reject`, neither of which the model can call.
+- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling the review is only `/memory approve` or `/memory reject`, neither of which the model can call; `/memory forget <id>` archives any claim it is given, a pending one included, without recording a review decision.
 - **Two-time records.** Every record carries `validAt` and `invalidAt`. Superseding, expiring, merging, and forgetting all invalidate rather than delete, so an old answer stays auditable while only the current claim injects.
 - **Rollback.** `/memory restore` re-activates a record and archives a live successor, recording the rollback in the successor's evidence.
 - **Maintenance.** `/memory maintain` reports what it would do and writes nothing until `apply`: live records past their deadline are archived, near-duplicates at or above `dedupeJaccard` are merged into the record a reader would keep (higher confidence, then newer), archived records are evicted when the store is at capacity, and supersede links that no longer resolve are reported.
@@ -358,7 +358,7 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **The page adds and settles; it does not edit.** Rewriting a claim is `memory_remember` with `supersedes`, and retiring a live record is `/memory forget <id>`; the panel offers neither, so an edit made there would have no audit story.
 - **The page's overview reads the whole store on each write.** That is bounded by `maxRecords` and correct for the corpus sizes this store is designed for; a store near that cap would want a paged read first.
 - **The four operator methods are un-narrowed public service methods.** No model-facing caller can reach them, and `maintain`, `dream`, `importMemories`, and `exportMarkdown` were already whole-store, so this adds no new authority class — but any plugin that injects `prismMemory` can read the whole corpus, and the type does not say so beyond the name.
-- **The page has no component spec.** The bundle is out of tree, where no jsdom or React install exists to render it, so its behavior is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.
+- **The page has no component spec.** The bundle declares no React runtime of its own and the plugin's Vitest config sets no jsdom environment, so the page is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.
 - **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s attribution, but it has no tool that reads session history directly.
 - **Import layouts are hardcoded by id.** Adding a tool means adding an entry to `IMPORT_SOURCES`; there is no configuration format for a custom layout.
 

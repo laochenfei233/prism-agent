@@ -111,7 +111,7 @@ function isReviewValue(value: unknown): value is MemoryReviewValue {
 
 /**
  * Send one route request and narrow its answer.
- * @param route - route name below the plugin's prefix.
+ * @param route - absolute path of one memory route, from the shared routes module.
  * @param body - JSON request body.
  * @param decode - narrows the envelope's value, or answers null when it cannot.
  * @returns the narrowed value.

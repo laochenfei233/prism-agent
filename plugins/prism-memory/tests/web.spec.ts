@@ -189,7 +189,9 @@ describe('the memory routes', () => {
   it('hands out the review queue oldest first and leaves retired claims out of the live list', async () => {
     const ctx = await boot({ requireApproval: true })
     const agent = await createAgent(ctx, 'queue')
-    vi.useFakeTimers()
+    // Only `Date` is faked: a fully faked clock would hang the storage write if
+    // it ever scheduled a timer, instead of failing where the order is wrong.
+    vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'))
       const first = await ctx.prismMemory.remember({ text: 'the first claim waiting for a decision' }, agent)

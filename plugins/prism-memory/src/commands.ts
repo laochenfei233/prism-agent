@@ -43,9 +43,6 @@ const USAGE = [
   '  export [dir]               Write the Markdown mirror and its JSON index',
 ].join('\n')
 
-/** Claims one search or recent listing shows before the reader narrows the query. */
-const RECENT_LIMIT = 20
-
 /** One parsed invocation: the subcommand and its remaining arguments. */
 interface ParsedCommand {
   /** Lowercase subcommand, or an empty string when none was given. */
@@ -139,8 +136,9 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
 
     case 'search': {
       // An empty query ranks every eligible claim with no terms, and the ranker
-      // orders that newest first — the same answer memory_search gives.
-      const rows = memory.search(rest, invocation.agent, { limit: RECENT_LIMIT }).map(hit => hit.record)
+      // orders that newest first — the same answer memory_search gives, under
+      // the same deployment cap.
+      const rows = memory.search(rest, invocation.agent).map(hit => hit.record)
       if (rows.length === 0) {
         return {
           kind: 'success',
