@@ -74,6 +74,8 @@ class FakeWeb extends Service {
     body: { kind: 'html'; content: string }
   }> {
     this.fetched.push(request.url)
+    // The shipped fetch provider refuses the cross-origin hop of an engine wrapper.
+    if (request.url.includes('/link?')) throw new Error('cross-origin redirect blocked')
     return { url: request.url, statusCode: 200, body: { kind: 'html', content: PAGE } }
   }
 }
@@ -138,6 +140,22 @@ describe('host composition', () => {
     const web = ctx.get('web') as FakeWeb
     const result = await web.providers.get('prism-search')?.search({ query: 'deepseek', maxResults: 5 })
     expect(result?.sources.map(source => source.url)).toEqual(['https://example.org/one', 'https://example.org/two'])
+  })
+
+  it('resolves an engine wrapper through its own redirect, then reads it through the seam', async () => {
+    const wrapperPage = '<a href="http://www.baidu.com/link?url=abc">Wrapped Baidu Result</a><p>baidu excerpt</p>'
+    globalThis.fetch = async (url) => (String(url).includes('/link?')
+      ? new Response('', { status: 302, headers: { location: 'https://example.org/resolved' } })
+      : new Response(wrapperPage, { status: 200, headers: { 'content-type': 'text/html' } }))
+    const ctx = new Context()
+    await ctx.plugin(FakeWeb)
+    await ctx.plugin({ name, inject, apply }, configOf({ rerankProvider: '', rerankModel: '' }))
+
+    const web = ctx.get('web') as FakeWeb
+    const result = await web.providers.get('prism-search')?.search({ query: 'deepseek', maxResults: 5 })
+    expect(result?.sources[0]?.url).toBe('https://example.org/resolved')
+    expect(result?.sources[0]?.snippet).toContain('Full page body text.')
+    expect(web.fetched).toContain('https://example.org/resolved')
   })
 
   it('removes the provider when the plugin fiber disposes', async () => {

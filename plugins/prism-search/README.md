@@ -26,7 +26,10 @@ Chinese engine parameters and `zh.wikipedia.org`; other queries use English.
 3. The top `fetchTopN` results are fetched concurrently through the deployment's
    fetch provider (so its address and redirect policy applies) and their readable
    page text replaces the engine excerpt; the final URL after redirects replaces
-   the engine's link wrapper.
+   the engine's link wrapper. A wrapper from Baidu, Sogou, or 360 that the fetch
+   provider refuses (cross-origin) is resolved first by asking that engine's own
+   redirect endpoint where it points — a request that never leaves the engine
+   host — and the destination is then read through the same provider.
 4. When a model is configured, the top `maxRerankCandidates` results go to it as
    one auxiliary call that returns a JSON order; the fused order survives when
    the call or its answer is unusable.
@@ -93,5 +96,4 @@ pnpm smoke        # built artifact: registration plus one stubbed search
   so the auxiliary request is not logged as an event. Its prompt is a pure
   function of the logged `web_search` arguments, the logged sources, and this
   package's fixed template, so it stays reconstructable from the Session log.
-- **Baidu, Sogou, and 360 wrapper links** resolve to the destination only after
-  the page fetch succeeds; without it the source URL stays the engine wrapper.
+- **Baidu, Sogou, and 360 wrapper links** resolve to the destination only when the engine's own redirect endpoint answers with a `Location`; otherwise the source URL stays the engine wrapper and the engine excerpt is kept.

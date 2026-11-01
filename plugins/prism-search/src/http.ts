@@ -11,9 +11,6 @@ export const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) App
 /** Default body cap for one engine response. */
 export const DEFAULT_ENGINE_MAX_BYTES = 2_000_000
 
-/** Default body cap for one fetched page. */
-export const DEFAULT_PAGE_MAX_BYTES = 4_000_000
-
 /** One outbound request. */
 export interface HttpRequest {
   /** Absolute request URL. */
@@ -26,6 +23,8 @@ export interface HttpRequest {
   readonly headers?: Readonly<Record<string, string>>
   /** Body cap in bytes. */
   readonly maxBytes?: number
+  /** Whether the client follows redirects; `manual` exposes the `location` header instead. */
+  readonly redirect?: 'follow' | 'manual'
   /** Cancellation for this request, already carrying its timeout. */
   readonly signal?: AbortSignal
 }
@@ -40,6 +39,8 @@ export interface HttpResponse {
   readonly contentType: string
   /** Decoded body, capped at the request's byte bound. */
   readonly text: string
+  /** `location` header of an unfollowed redirect, as the server sent it. */
+  readonly location?: string
 }
 
 /**
@@ -51,7 +52,7 @@ export interface HttpResponse {
 export async function httpRequest(request: HttpRequest): Promise<HttpResponse> {
   const response = await fetch(request.url, {
     method: request.method ?? 'GET',
-    redirect: 'follow',
+    redirect: request.redirect ?? 'follow',
     headers: {
       'user-agent': BROWSER_USER_AGENT,
       'accept': 'text/html,application/xhtml+xml,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.5',
@@ -69,6 +70,7 @@ export async function httpRequest(request: HttpRequest): Promise<HttpResponse> {
     status: response.status,
     contentType: (response.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? '',
     text,
+    ...(response.headers.get('location') ?? '') === '' ? {} : { location: response.headers.get('location') ?? '' },
   }
 }
 

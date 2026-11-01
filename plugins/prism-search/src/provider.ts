@@ -136,7 +136,7 @@ export class PrismSearchProvider {
       )
     }
 
-    const enriched = dedupeByUrl(await this.enrich(fused, options, signal, request.maxResults))
+    const enriched = dedupeByUrl(await this.enrich(fused, options, signal))
     throwIfAborted(signal)
     const ordered = await this.order(query, enriched, options, signal)
     throwIfAborted(signal)
@@ -184,12 +184,8 @@ export class PrismSearchProvider {
     hits: readonly RankedHit[],
     options: PrismSearchOptions,
     signal: AbortSignal | undefined,
-    maxResults: number | undefined,
   ): Promise<RankedHit[]> {
-    // The caller never sees more than its own bound, so pages beyond it are
-    // fetched only when the ordering model could lift them into view.
-    const visibleBound = maxResults === undefined ? hits.length : Math.max(0, maxResults)
-    const count = Math.min(Math.max(0, options.fetchTopN), hits.length, visibleBound)
+    const count = Math.min(Math.max(0, options.fetchTopN), hits.length)
     if (count === 0) return [...hits]
     const head = hits.slice(0, count)
     const tail = hits.slice(count)
