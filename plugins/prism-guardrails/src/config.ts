@@ -14,6 +14,8 @@
  * @module prism-guardrails/config
  */
 
+import { createHash } from 'node:crypto'
+
 /**
  * One deployment tool that writes file content.
  *
@@ -105,8 +107,20 @@ export interface VerificationGateConfig {
   readonly verifyTools: readonly string[]
 }
 
+/**
+ * How the rails' decisions are applied.
+ *
+ * `observe` records what a rail would have refused, or sent to approval, and
+ * lets the call through: it is how a deployment reads a rail's reach before
+ * arming it. It downgrades `deny` and `ask` only — a steer is a request to
+ * finish work, not a refusal, so observing never weakens it.
+ */
+export type Mode = 'enforce' | 'observe'
+
 /** Raw configuration as written in a profile patch row. */
 export interface Config {
+  /** How `deny` and `ask` decisions are applied; defaults to `enforce`. */
+  readonly mode?: Mode
   /** Global tool names refused while plan mode is in force; omit to disable this rail. */
   readonly planDeniedTools?: readonly string[]
   /**
@@ -154,6 +168,7 @@ export interface ResolvedWriteTool {
 
 /** Configuration after load-time validation. `undefined` means the rail is off. */
 export interface ResolvedConfig {
+  readonly mode: Mode
   readonly planDeniedTools: ReadonlySet<string> | undefined
   readonly repeatAskAfter: number | undefined
   readonly maxStepsPerTurn: number | undefined
@@ -172,6 +187,7 @@ export interface ResolvedConfig {
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
 const KNOWN_KEYS: ReadonlySet<string> = new Set([
+  'mode',
   'planDeniedTools',
   'repeatAskAfter',
   'maxStepsPerTurn',
@@ -255,6 +271,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
   }
 
   return {
+    mode: resolveMode(config.mode),
     planDeniedTools: resolveDeniedTools(config.planDeniedTools),
     repeatAskAfter: resolveRepeatAskAfter(config.repeatAskAfter),
     maxStepsPerTurn: resolveMaxStepsPerTurn(config.maxStepsPerTurn),
@@ -277,6 +294,56 @@ function hasContentArgument(writeTools: ReadonlyMap<string, ResolvedWriteTool> |
   if (writeTools === undefined) return false
   for (const tool of writeTools.values()) if (tool.contentArgument !== undefined) return true
   return false
+}
+
+/**
+ * Check the decision mode.
+ *
+ * Both values are valid deployments, so the bundle supplies its own default
+ * rather than requiring the key: an absent `mode` keeps the pre-observe
+ * behavior that every existing profile already has.
+ */
+function resolveMode(value: Mode | undefined): Mode {
+  if (value === undefined) return 'enforce'
+  if (value !== 'enforce' && value !== 'observe') {
+    throw new Error(`prism-guardrails: mode must be "enforce" or "observe", received ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
+/**
+ * The identity of one deployment's rail configuration.
+ *
+ * It covers the settings a rail decision reads and nothing else, so a
+ * conversation about a refusal can name the configuration that produced it.
+ *
+ * `mode` is normalized through the resolved value, so writing the default
+ * explicitly hashes the same as omitting it. An edit that changes no behavior —
+ * `repeatAskAfter: 0` against an omitted key — still moves the version, which
+ * costs a report line rather than a wrong decision.
+ *
+ * @param config - the deployment's raw rail configuration.
+ * @param mode - the resolved mode, which defaults an omitted key.
+ * @returns the first eight hex characters of the configuration's digest.
+ */
+export function configVersion(config: Config, mode: Mode): string {
+  return createHash('sha256').update(JSON.stringify(sortKeys({ ...config, mode }))).digest('hex').slice(0, 8)
+}
+
+/**
+ * Deep key-sort of a configuration value, so two writings that differ only in
+ * property order hash alike.
+ *
+ * @param value - any value from the deployment's configuration.
+ * @returns the same value with every object's keys in sorted order.
+ */
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys)
+  if (value === null || typeof value !== 'object') return value
+  const record = value as Record<string, unknown>
+  const sorted: Record<string, unknown> = {}
+  for (const key of Object.keys(record).sort()) sorted[key] = sortKeys(record[key])
+  return sorted
 }
 
 /** Check the plan-mode denial list; an empty list has no meaning, so it is an error rather than "off". */

@@ -36,7 +36,10 @@
  * - **Command guard** — a shell call whose text matches a guarded pattern goes
  *   to approval, so a force-push or a recursive delete is priced before it runs.
  *
- * `/guardrails` reports which of these a running deployment has armed.
+ * `/guardrails` reports which of these a running deployment has armed, the mode
+ * it decides in, and what an `observe` run has seen: under `observe` every rail
+ * decides as it would under `enforce`, records the decision, and lets the call
+ * through, so a deployment can read a rail's reach before arming it.
  *
  * The configuration surface, each rail's exact behavior, and the DeepSeek
  * Harness capability each one replaces are in the package README.
@@ -54,9 +57,11 @@ import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
 import type { PostToolDecision, PreToolDecision } from '@deepseek-ai/dsh-tools'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
-import { resolveConfig } from './config.ts'
+import { configVersion, resolveConfig } from './config.ts'
+import { createLedger } from './decision.ts'
 import { PONYTAIL_MARKER } from './marker.ts'
-import type { Config, ResolvedConfig, ResolvedWriteTool } from './config.ts'
+import type { Config, Mode, ResolvedConfig, ResolvedWriteTool } from './config.ts'
+import type { Decision, DecisionLedger, DecisionOutcome } from './decision.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -90,6 +95,12 @@ const COMPACTION_END = 'compaction/end'
 
 /** How many unfinished todo items one continuation message names before summarizing the rest. */
 const MAX_REPORTED_TODOS = 5
+
+/** How many recorded decisions the status report lists. */
+const MAX_REPORTED_DECISIONS = 10
+
+/** How much of one decision's subject the status report shows. */
+const MAX_REPORTED_SUBJECT = 60
 
 /** One agent's consecutive-repeat chain: the last tracked call's identity and its run length. */
 interface RepeatChain {
@@ -128,22 +139,76 @@ interface TurnRecords {
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = resolveConfig(config)
-  installPlanModeDenial(ctx, resolved)
-  installRepeatApproval(ctx, resolved)
-  installTurnBudget(ctx, resolved)
-  installSkillInvocationGuidance(ctx, resolved)
-  installRoutingContract(ctx, resolved)
+  const ledger = createLedger()
+  const version = configVersion(config, resolved.mode)
+  installPlanModeDenial(ctx, resolved, ledger)
+  installRepeatApproval(ctx, resolved, ledger)
+  installTurnBudget(ctx, resolved, ledger)
+  installSkillInvocationGuidance(ctx, resolved, ledger)
+  installRoutingContract(ctx, resolved, ledger)
   const turns = resolved.maxWrittenFilesPerTurn === undefined && resolved.verificationGate === undefined
     ? undefined
     : installTurnRecords(ctx, resolved)
-  installWriteBudget(ctx, resolved, turns)
-  installPonytailMarkerDiscipline(ctx, resolved)
-  installDependencyApproval(ctx, resolved)
-  installVerificationGate(ctx, resolved, turns)
-  installUnfinishedTodoGate(ctx, resolved)
-  installSensitiveReadDenial(ctx, resolved)
-  installCommandGuard(ctx, resolved)
-  installStatusCommand(ctx, resolved)
+  installWriteBudget(ctx, resolved, turns, ledger)
+  installPonytailMarkerDiscipline(ctx, resolved, ledger)
+  installDependencyApproval(ctx, resolved, ledger)
+  installVerificationGate(ctx, resolved, turns, ledger)
+  installUnfinishedTodoGate(ctx, resolved, ledger)
+  installSensitiveReadDenial(ctx, resolved, ledger)
+  installCommandGuard(ctx, resolved, ledger)
+  installStatusCommand(ctx, resolved, ledger, version)
+}
+
+/**
+ * Record a rail's decision and apply it, unless the deployment is observing.
+ *
+ * `observe` records what `enforce` would have done and delegates instead, so the
+ * only behavior it changes is whether a refusal is returned. A `steer` does not
+ * come through here: observing must not switch off the rails that send a turn
+ * back for evidence.
+ *
+ * @param ledger - the session's decision record.
+ * @param mode - how to apply the decision.
+ * @param agent - the agent whose session is deciding.
+ * @param rail - the rail's report name.
+ * @param subject - what the rail judged.
+ * @param decision - the refusal or approval to apply in `enforce` mode.
+ * @param next - the waterfall's continue, which observing delegates to.
+ * @returns the decision in `enforce` mode, and the delegated outcome in `observe`.
+ */
+function decide(
+  ledger: DecisionLedger,
+  mode: Mode,
+  agent: Agent | undefined,
+  rail: string,
+  subject: string,
+  decision: RailRefusal,
+  next: () => Promise<PreToolDecision>,
+): Promise<PreToolDecision> {
+  ledger.record(agent, { rail, outcome: mode === 'observe' ? 'observed' : decision.kind, subject })
+  return mode === 'observe' ? next() : Promise.resolve(decision)
+}
+
+/** A decision a rail applies to one tool call: the two kinds `observe` can downgrade. */
+type RailRefusal = Extract<PreToolDecision, { kind: 'deny' } | { kind: 'ask' }>
+
+/**
+ * Record one rail decision outside the pre-execute waterfall.
+ *
+ * @param ledger - the session's decision record.
+ * @param agent - the agent whose session is deciding.
+ * @param rail - the rail's report name.
+ * @param subject - what the rail judged.
+ * @param outcome - what the rail did.
+ */
+function note(
+  ledger: DecisionLedger,
+  agent: Agent | undefined,
+  rail: string,
+  subject: string,
+  outcome: DecisionOutcome,
+): void {
+  ledger.record(agent, { rail, outcome, subject })
 }
 
 /**
@@ -159,8 +224,11 @@ export function apply(ctx: Context, config: Config = {}): void {
  * for the next accepted step already refuses. A deployment without the
  * plan-mode service keeps its tools unrestricted; the rail has no state of its
  * own to invent.
+ *
+ * Observing records the refusal and returns `undefined`, which the guard reads
+ * as permission.
  */
-function installPlanModeDenial(ctx: Context, resolved: ResolvedConfig): void {
+function installPlanModeDenial(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const denied = resolved.planDeniedTools
   if (denied === undefined) return
   ctx.tools.guard((exec) => {
@@ -170,8 +238,10 @@ function installPlanModeDenial(ctx: Context, resolved: ResolvedConfig): void {
     if (planMode === undefined) return undefined
     const state = planMode.get(agent)
     if (!(state.pending ?? state.active)) return undefined
-    return `plan mode is active: \`${exec.name}\` is not executed until the plan is approved; `
+    const reason = `plan mode is active: \`${exec.name}\` is not executed until the plan is approved; `
       + 'present the plan with exit_plan_mode or leave with /plan off'
+    note(ledger, agent, 'plan-mode denial', exec.name, resolved.mode === 'observe' ? 'observed' : 'deny')
+    return resolved.mode === 'observe' ? undefined : reason
   })
 }
 
@@ -190,7 +260,7 @@ function installPlanModeDenial(ctx: Context, resolved: ResolvedConfig): void {
  * human can tell them apart. With no approval channel the fail-closed approval
  * ladder denies the call, which is the intended unattended outcome.
  */
-function installRepeatApproval(ctx: Context, resolved: ResolvedConfig): void {
+function installRepeatApproval(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const limit = resolved.repeatAskAfter
   if (limit === undefined) return
   const chains = new WeakMap<Agent, RepeatChain>()
@@ -202,11 +272,11 @@ function installRepeatApproval(ctx: Context, resolved: ResolvedConfig): void {
     const key = callKey(exec.name, exec.arguments)
     const reached = chain !== undefined && chain.key === key ? chain.count + 1 : 1
     if (reached <= limit) return next()
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, agent, 'repeat approval', exec.name, {
       kind: 'ask',
       reason: `\`${exec.name}\` has now been called ${String(reached - 1)} times in a row with identical `
         + 'arguments and made no progress; approve only if repeating it is still the right action',
-    })
+    }, next)
   })
 
   ctx.on('tools/post-execute', async (exec, _result, next): Promise<PostToolDecision> => {
@@ -231,13 +301,17 @@ function installRepeatApproval(ctx: Context, resolved: ResolvedConfig): void {
  * The judge is the step number the loop already carries in the pre-step
  * payload, so retries, rejected steps, resume, and fork are all correct with no
  * counter to keep, advance, or reset. The model never sees a rejected step, so
- * the log line is the only record of why the turn stopped.
+ * the log line and the ledger row are the only record of why the turn stopped.
+ * Observing skips both the refusal and the log line, which would otherwise say a
+ * step was not opened when it was.
  */
-function installTurnBudget(ctx: Context, resolved: ResolvedConfig): void {
+function installTurnBudget(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const limit = resolved.maxStepsPerTurn
   if (limit === undefined) return
-  ctx.on('agent/pre-step', ({ turn, step }, next): Promise<PreStepDecision> => {
+  ctx.on('agent/pre-step', ({ agent, turn, step }, next): Promise<PreStepDecision> => {
     if (step <= limit) return next()
+    note(ledger, agent, 'turn budget', `step ${String(step)}`, resolved.mode === 'observe' ? 'observed' : 'deny')
+    if (resolved.mode === 'observe') return next()
     ctx.logger.warn(`prism-guardrails: turn ${String(turn)} reached the ${String(limit)}-step budget; `
       + `step ${String(step)} was not opened`)
     return Promise.resolve({ kind: 'reject' })
@@ -254,7 +328,7 @@ function installTurnBudget(ctx: Context, resolved: ResolvedConfig): void {
  * inventing one would be wrong. A deployment without the skill service, or a
  * call that names no skill, delegates unchanged.
  */
-function installSkillInvocationGuidance(ctx: Context, resolved: ResolvedConfig): void {
+function installSkillInvocationGuidance(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   if (!resolved.skillInvocationGuidance) return
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
     const agent = exec.agent
@@ -268,10 +342,10 @@ function installSkillInvocationGuidance(ctx: Context, resolved: ResolvedConfig):
     if (summary === undefined) return next()
     const { modelInvocable, userInvocable } = summary.invocation
     if (modelInvocable || !userInvocable) return next()
-    return {
+    return decide(ledger, resolved.mode, agent, 'skill guidance', requested, {
       kind: 'deny',
       reason: `skill "${requested}" is user-invoked only: ask the user to type /${requested} in their next message`,
-    }
+    }, next)
   })
 }
 
@@ -292,7 +366,7 @@ function installSkillInvocationGuidance(ctx: Context, resolved: ResolvedConfig):
  * the session. The record is dropped when compaction ends, because the model's
  * next request no longer carries the decision it once made.
  */
-function installRoutingContract(ctx: Context, resolved: ResolvedConfig): void {
+function installRoutingContract(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const readOnlyTools = resolved.routingContract
   if (readOnlyTools === undefined) return
   const records = new Map<string, RoutingRecord>()
@@ -307,12 +381,12 @@ function installRoutingContract(ctx: Context, resolved: ResolvedConfig): void {
       records.set(sessionId, { routed: true })
       return next()
     }
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, agent, 'routing contract', exec.name, {
       kind: 'deny',
       reason: `the routing contract is not satisfied: \`${exec.name}\` is the first non-readonly call of this `
         + `session. Load the task's skill with the \`${SKILL_TOOL}\` tool, or declare \`${FAST_PATH_DECLARATION}\` `
         + 'with a one-line reason, then repeat this call.',
-    })
+    }, next)
   })
 
   ctx.on('session/event', (session, event) => {
@@ -346,7 +420,12 @@ function installRoutingContract(ctx: Context, resolved: ResolvedConfig): void {
  * working directory, which this rail would then own; the ceiling is recorded in
  * the README instead.
  */
-function installWriteBudget(ctx: Context, resolved: ResolvedConfig, turns: TurnRecords | undefined): void {
+function installWriteBudget(
+  ctx: Context,
+  resolved: ResolvedConfig,
+  turns: TurnRecords | undefined,
+  ledger: DecisionLedger,
+): void {
   const limit = resolved.maxWrittenFilesPerTurn
   const writeTools = resolved.writeTools
   if (limit === undefined || writeTools === undefined || turns === undefined) return
@@ -360,12 +439,12 @@ function installWriteBudget(ctx: Context, resolved: ResolvedConfig, turns: TurnR
     if (record.writtenPaths.has(written.path)) return next()
     const reached = record.writtenPaths.size + 1
     if (reached <= limit) return next()
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, agent, 'write budget', written.path, {
       kind: 'ask',
       reason: `this turn has already written ${String(record.writtenPaths.size)} distinct files and \`${exec.name}\` `
         + `would make \`${written.path}\` the ${String(reached)}th, beyond the ${String(limit)} the deployment allows; `
         + 'approve only if the wider change is intended',
-    })
+    }, next)
   })
 }
 
@@ -381,7 +460,7 @@ function installWriteBudget(ctx: Context, resolved: ResolvedConfig, turns: TurnR
  * Only comment-prefixed markers are read, so prose that merely mentions the
  * convention — this file's own JSDoc included — is not a marker.
  */
-function installPonytailMarkerDiscipline(ctx: Context, resolved: ResolvedConfig): void {
+function installPonytailMarkerDiscipline(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   if (!resolved.requirePonytailUpgradePaths) return
   const writeTools = resolved.writeTools
   if (writeTools === undefined) return
@@ -393,12 +472,12 @@ function installPonytailMarkerDiscipline(ctx: Context, resolved: ResolvedConfig)
     if (content === undefined) return next()
     const marker = markerWithoutUpgradePath(content)
     if (marker === undefined) return next()
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, exec.agent, 'ponytail markers', written.path, {
       kind: 'deny',
       reason: `\`${written.path}\` writes a \`shortcut:\` marker with no upgrade path: ${JSON.stringify(marker)}. `
         + 'The convention is `shortcut: <ceiling>, <upgrade path>` (older code says `ponytail:`); name the limit '
         + 'and the trigger that would revisit it, or delete the marker.',
-    })
+    }, next)
   })
 }
 
@@ -410,7 +489,7 @@ function installPonytailMarkerDiscipline(ctx: Context, resolved: ResolvedConfig)
  * that ordering is actually spent. Pricing the write puts the choice in front
  * of a human at the only moment the alternative is still cheap.
  */
-function installDependencyApproval(ctx: Context, resolved: ResolvedConfig): void {
+function installDependencyApproval(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const manifests = resolved.dependencyManifests
   const writeTools = resolved.writeTools
   if (manifests === undefined || writeTools === undefined) return
@@ -420,12 +499,12 @@ function installDependencyApproval(ctx: Context, resolved: ResolvedConfig): void
     if (written === undefined) return next()
     const name = baseName(written.path)
     if (!manifests.has(name)) return next()
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, exec.agent, 'dependency manifests', written.path, {
       kind: 'ask',
       reason: `\`${exec.name}\` changes the dependency manifest \`${written.path}\`; approve only if the new `
         + 'dependency is genuinely needed rather than already covered by the standard library, the platform, or '
         + 'a library this project already depends on',
-    })
+    }, next)
   })
 }
 
@@ -445,7 +524,12 @@ function installDependencyApproval(ctx: Context, resolved: ResolvedConfig): void
  * report of a failing check is exactly the outcome this gate exists to make
  * possible.
  */
-function installVerificationGate(ctx: Context, resolved: ResolvedConfig, turns: TurnRecords | undefined): void {
+function installVerificationGate(
+  ctx: Context,
+  resolved: ResolvedConfig,
+  turns: TurnRecords | undefined,
+  ledger: DecisionLedger,
+): void {
   const verifyTools = resolved.verificationGate
   if (verifyTools === undefined || turns === undefined) return
 
@@ -463,6 +547,7 @@ function installVerificationGate(ctx: Context, resolved: ResolvedConfig, turns: 
     if (record.verified || record.steered) return
     record.steered = true
     const files = [...record.writtenPaths].join(', ')
+    note(ledger, agent, 'verification gate', files, 'steer')
     agent.steer(createUserMessage({
       content: [{
         type: 'text',
@@ -492,7 +577,7 @@ function installVerificationGate(ctx: Context, resolved: ResolvedConfig, turns: 
  * and the next stop boundary is left alone: the worst case is that many extra
  * steps, not a loop.
  */
-function installUnfinishedTodoGate(ctx: Context, resolved: ResolvedConfig): void {
+function installUnfinishedTodoGate(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const limit = resolved.unfinishedTodoContinuations
   if (limit === undefined) return
   const records = new WeakMap<Agent, { turn: number; steered: number }>()
@@ -505,6 +590,7 @@ function installUnfinishedTodoGate(ctx: Context, resolved: ResolvedConfig): void
     const unfinished = unfinishedTodos(agent)
     if (unfinished.length === 0) return
     record.steered += 1
+    note(ledger, agent, 'unfinished todos', `${String(unfinished.length)} item(s)`, 'steer')
     const shown = unfinished.slice(0, MAX_REPORTED_TODOS).map(item => `"${item.content}"`).join(', ')
     const rest = unfinished.length - Math.min(unfinished.length, MAX_REPORTED_TODOS)
     agent.steer(createUserMessage({
@@ -715,7 +801,7 @@ function sortJsonValue(value: unknown): unknown {
  * The rail matches the path the call names, not the file it resolves to, so a
  * symlink or a relative detour around a guarded directory is not covered.
  */
-function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig): void {
+function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const readTools = resolved.readTools
   const segments = resolved.sensitivePaths
   if (readTools === undefined || segments === undefined) return
@@ -727,12 +813,12 @@ function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig): voi
     if (path === undefined) return next()
     const matched = sensitiveSegment(path, segments)
     if (matched === undefined) return next()
-    return Promise.resolve({
+    return decide(ledger, resolved.mode, exec.agent, 'sensitive reads', path, {
       kind: 'deny',
       reason: `\`${exec.name}\` targets ${JSON.stringify(path)}, which this deployment treats as credential `
         + `material (matched ${JSON.stringify(matched)}); reading it would write the secret into the session log `
         + 'permanently. Ask the user for the specific value if it is needed.',
-    })
+    }, next)
   })
 }
 
@@ -769,7 +855,7 @@ function sensitiveSegment(path: string, segments: readonly string[]): string | u
  * matched, but quoting or variable tricks evade it; upgrade to a shell parser
  * when a consumer needs wrapper-proof matching.
  */
-function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
+function installCommandGuard(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const guard = resolved.commandGuard
   if (guard === undefined) return
 
@@ -780,11 +866,11 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
     if (command === undefined) return next()
     for (const rule of guard.rules) {
       if (!rule.pattern.test(command)) continue
-      return Promise.resolve({
+      return decide(ledger, resolved.mode, exec.agent, 'command guard', command, {
         kind: 'ask',
         reason: `\`${exec.name}\` would run a command this deployment guards (matched \`${rule.source}\`): `
           + `${rule.reason}; approve only if the command is intended`,
-      })
+      }, next)
     }
     return next()
   })
@@ -798,25 +884,38 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
  * store once at apply time. A profile with no commands service keeps every rail
  * and loses only the report.
  */
-function installStatusCommand(ctx: Context, resolved: ResolvedConfig): void {
+function installStatusCommand(
+  ctx: Context,
+  resolved: ResolvedConfig,
+  ledger: DecisionLedger,
+  version: string,
+): void {
   ctx.inject(['commands'], (scope: Context) => {
     scope.effect(() => scope.commands.register({
       definitionId: CommandDefinitionId('prism-guardrails/status'),
       name: 'guardrails',
       description: 'Report which guardrail rails this deployment has armed',
-      handler: (): CommandResult => ({ kind: 'success', text: describeRails(resolved) }),
+      handler: (invocation): CommandResult => ({
+        kind: 'success',
+        text: describeRails(resolved, ledger.list(invocation.agent), version),
+      }),
     }), 'prism-guardrails.status')
   })
 }
 
 /**
- * The status report: a count, then one line per rail with its configured value
- * or `off`.
+ * The status report: a count with the mode and configuration version, one line
+ * per rail with its configured value or `off`, and the session's decisions.
+ *
+ * The mode sits on the first line because observing is a weaker deployment, and
+ * a report that hid it would be read as protection it is not.
  *
  * @param resolved - the validated configuration the running deployment uses.
+ * @param decisions - the session's recorded decisions, oldest first.
+ * @param version - the configuration version those decisions were made under.
  * @returns the text a `/guardrails` invocation prints.
  */
-function describeRails(resolved: ResolvedConfig): string {
+function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[], version: string): string {
   const rails: readonly (readonly [string, string | undefined])[] = [
     ['plan-mode denial', listed(resolved.planDeniedTools)],
     ['repeat approval', resolved.repeatAskAfter === undefined
@@ -842,9 +941,51 @@ function describeRails(resolved: ResolvedConfig): string {
       : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
-  return [`Guardrails: ${String(armed)} of ${String(rails.length)} rails armed.`]
+  // An observing deployment is not protected, so its first line says so before
+  // it says anything else: a reader who takes this report for protection is
+  // worse off than with no rails at all.
+  const lines = [resolved.mode === 'observe'
+    ? `Guardrails: OBSERVE MODE — ${String(armed)} of ${String(rails.length)} rails armed, `
+      + `nothing is refused (config ${version}).`
+    : `Guardrails: ${String(armed)} of ${String(rails.length)} rails armed (mode: enforce, config ${version}).`]
     .concat(rails.map(([name, detail]) => `${name}: ${detail ?? 'off'}`))
-    .join('\n')
+  // The decisions block earns its space only where the ledger carries something
+  // the model could not already see, which is the observe run itself: `observed`
+  // is the only outcome that mode writes.
+  if (resolved.mode === 'observe') lines.push(...describeDecisions(decisions))
+  return lines.join('\n')
+}
+
+/**
+ * The decisions block: a count, then the `observe` records the mode produced.
+ *
+ * Only `observed` rows are listed. An enforced `deny` is text the model read, and
+ * an enforced `ask` is a decision the approver made, so neither tells an operator
+ * what they do not already know; the rows that matter are the calls a rail would
+ * have stopped and did not.
+ *
+ * @param decisions - the session's recorded decisions, oldest first.
+ * @returns the block's lines.
+ */
+function describeDecisions(decisions: readonly Decision[]): readonly string[] {
+  const observed = decisions.filter(decision => decision.outcome === 'observed')
+  const lines = [`decisions this session: ${String(decisions.length)} (${String(observed.length)} observed)`]
+  for (const decision of observed.slice(-MAX_REPORTED_DECISIONS)) {
+    lines.push(`  observed  ${decision.rail}  ${subjectForReport(decision.subject)}`)
+  }
+  return lines
+}
+
+/**
+ * One decision's subject, shortened for a report line.
+ *
+ * @param subject - the tool name, path, or command a rail judged.
+ * @returns the subject, truncated on a code-point boundary with an ellipsis.
+ */
+function subjectForReport(subject: string): string {
+  const points = [...subject.replaceAll('\n', ' ')]
+  return points.length <= MAX_REPORTED_SUBJECT ? points.join('')
+    : `${points.slice(0, MAX_REPORTED_SUBJECT - 1).join('')}…`
 }
 
 /**
