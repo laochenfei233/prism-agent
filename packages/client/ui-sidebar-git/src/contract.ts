@@ -1,10 +1,9 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * The records the Git workbench exchanges with its Host routes, the routes
  * themselves, and the checks that keep a decoded answer untrusted until it
  * matches what this plugin serves.
  */
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-
 /** Authenticated GET route answering one Session's repository status. */
 export const GIT_STATUS_PATH = '/api/git.status'
 
@@ -148,7 +147,7 @@ export function isGitDiff(value: unknown): value is GitDiff {
  * @param sessionId - viewed Session.
  * @returns document-relative status route.
  */
-export function gitStatusUrl(sessionId: SessionId): string {
+export function gitStatusUrl(sessionId: string): string {
   return `${GIT_STATUS_ROUTE}?${new URLSearchParams({ sessionId })}`
 }
 
@@ -159,6 +158,6 @@ export function gitStatusUrl(sessionId: SessionId): string {
  * @param side - which comparison to read.
  * @returns document-relative comparison route.
  */
-export function gitDiffUrl(sessionId: SessionId, path: string, side: GitSide): string {
+export function gitDiffUrl(sessionId: string, path: string, side: GitSide): string {
   return `${GIT_DIFF_ROUTE}?${new URLSearchParams({ sessionId, path, side })}`
 }

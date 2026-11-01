@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * Git workbench, Host half: registers the status, comparison, stage, unstage,
  * and commit routes the right-Sidebar panel reads. The browser half ships via

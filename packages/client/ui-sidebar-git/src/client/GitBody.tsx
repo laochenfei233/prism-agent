@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * The Git workbench's body: the branch bar, the staged, unstaged, and
  * untracked sections, the open comparison, and the commit box.
@@ -10,20 +11,38 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button, IconBranchOutlineRegular, IconRefreshOutlineRegular, Tooltip, hunkRows } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { BoundActions } from '@deepseek-ai/dsh-client-store'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { SidebarRightTabActions } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { GitDiff, GitFileEntry, GitHunk, GitSide, GitStatus } from '../contract.ts'
 import type { GitFace } from './face.ts'
 import type {} from './locales.ts'
-import type { GitSelection, GitTabState, createGitStore } from './store.ts'
+import type { GitSelection, GitState, GitTabState, createGitStore } from './store.ts'
 import css from './GitBody.module.css'
 
-/** The body's composed props: the tab it draws, its store, its face, and its copy. */
-export type GitBodyProps =
-  & PropsRuntime<'sidebar.right.pane.tab'>
-  & PropsStore<ReturnType<typeof createGitStore>>
-  & GitFace
-  & PropsLocale<'sidebarGit'>
+/** The tab facts the body reads; a structural slice of what the slot seat supplies. */
+export interface GitBodyTab {
+  readonly id: TabId
+  readonly title: string
+  readonly signal: AbortSignal
+  readonly actions: Pick<SidebarRightTabActions, 'bindCommands'>
+}
+
+/**
+ * The body's props, narrowed to the members it reads so a test can supply them
+ * directly: the tab seat hook, the store pair, the face, and copy.
+ */
+export interface GitBodyProps extends GitFace {
+  /** The framework's tab seat for this body. */
+  useTabInfo: () => { tab: GitBodyTab }
+  /** The framework's store selector. */
+  useStore: <T>(select: (state: GitState) => T) => T
+  /** The framework's action set for the declared store. */
+  actions: BoundActions<ReturnType<typeof createGitStore>>
+  /** Namespace-bound translate. */
+  t: TranslateNS<'sidebarGit'>
+}
 
 /**
  * Split the repository's entries into the three sections the panel draws.
@@ -66,7 +85,7 @@ function DiffView({ diff, t }: { diff: GitDiff; t: GitBodyProps['t'] }): ReactNo
       <div key={at} className={css.hunk}>
         <div className={css.hunkHeader}>{hunkHeader(hunk)}</div>
         {hunkRows(hunk).map((row, line) => (
-          <div key={line} className={clsx(css.line, css[row.kind])}>
+          <div key={line} className={clsx(css.line, css[row.kind])} data-diff-kind={row.kind}>
             <span className={css.lineNo}>{row.old ?? ''}</span>
             <span className={css.lineNo}>{row.new ?? ''}</span>
             <span className={css.text}>{row.text}</span>

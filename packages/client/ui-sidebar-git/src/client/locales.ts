@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * `sidebarGit` namespace dictionaries, and the namespace's declaration.
  *

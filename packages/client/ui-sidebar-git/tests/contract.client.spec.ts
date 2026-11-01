@@ -10,6 +10,7 @@ describe('wire validators', () => {
   it('accepts a repository status and rejects every malformed field', () => {
     expect(isGitStatus({ available: true, repo: true, root: '/repo', branch: 'main', ahead: 1, behind: 0, entries: [ENTRY] })).toBe(true)
     expect(isGitStatus({ available: false, repo: false, entries: [] })).toBe(true)
+    expect(isGitStatus({ available: true, repo: true, entries: [{ path: 'a', index: 'R', worktree: ' ', origPath: 'old' }] })).toBe(true)
     for (const value of [
       null, [], 'status', {},
       { available: 'yes', repo: true, entries: [] },
@@ -22,6 +23,7 @@ describe('wire validators', () => {
       { available: true, repo: true, entries: [{ path: 'a', index: 'MM', worktree: 'M' }] },
       { available: true, repo: true, entries: [{ path: 'a', index: ' ', worktree: 'M', origPath: 1 }] },
       { available: true, repo: true, entries: 'nope' },
+      { available: true, repo: true, entries: [1] },
     ]) expect(isGitStatus(value)).toBe(false)
   })
 
@@ -35,6 +37,7 @@ describe('wire validators', () => {
       { kind: 'text', path: 'a', hunks: [{ oldStart: -1, oldLines: 1, newStart: 1, newLines: 1, lines: [] }] },
       { kind: 'text', path: 'a', hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ['x'] }] },
       { kind: 'text', path: 'a', hunks: 'no' },
+      { kind: 'text', path: 'a', hunks: [1] },
       { kind: 'other', path: 'a' },
     ]) expect(isGitDiff(value)).toBe(false)
   })

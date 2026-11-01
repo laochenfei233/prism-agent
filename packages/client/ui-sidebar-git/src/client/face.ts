@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * The panel's asynchronous half: it reads the repository status and one
  * comparison, runs the index mutations and the commit, and writes every
@@ -10,7 +11,6 @@
  */
 import type { BoundActions } from '@deepseek-ai/dsh-client-store'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
   GIT_COMMIT_ROUTE, GIT_STAGE_ROUTE, GIT_UNSTAGE_ROUTE, gitDiffUrl, gitStatusUrl, isGitDiff, isGitStatus,
   type GitDiff, type GitFileEntry, type GitSide, type GitStatus,
@@ -67,7 +67,7 @@ async function decode<T>(response: Response, valid: (value: unknown) => value is
  * @param signal - request lifetime.
  * @returns the status.
  */
-export async function readStatus(fetchImpl: GitFetch, sessionId: SessionId, signal: AbortSignal): Promise<GitStatus> {
+export async function readStatus(fetchImpl: GitFetch, sessionId: string, signal: AbortSignal): Promise<GitStatus> {
   return decode(await fetchImpl(gitStatusUrl(sessionId), { signal }), isGitStatus)
 }
 
@@ -81,7 +81,7 @@ export async function readStatus(fetchImpl: GitFetch, sessionId: SessionId, sign
  * @returns the comparison.
  */
 export async function readDiff(
-  fetchImpl: GitFetch, sessionId: SessionId, path: string, side: GitSide, signal: AbortSignal,
+  fetchImpl: GitFetch, sessionId: string, path: string, side: GitSide, signal: AbortSignal,
 ): Promise<GitDiff> {
   return decode(await fetchImpl(gitDiffUrl(sessionId, path, side), { signal }), isGitDiff)
 }
@@ -96,7 +96,7 @@ export async function readDiff(
  * @returns the status after the mutation.
  */
 export async function postPaths(
-  fetchImpl: GitFetch, route: string, sessionId: SessionId, paths: readonly string[], signal: AbortSignal,
+  fetchImpl: GitFetch, route: string, sessionId: string, paths: readonly string[], signal: AbortSignal,
 ): Promise<GitStatus> {
   return decode(await fetchImpl(route, {
     method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, paths }),
@@ -112,7 +112,7 @@ export async function postPaths(
  * @returns the status after the commit.
  */
 export async function postCommit(
-  fetchImpl: GitFetch, sessionId: SessionId, message: string, signal: AbortSignal,
+  fetchImpl: GitFetch, sessionId: string, message: string, signal: AbortSignal,
 ): Promise<GitStatus> {
   return decode(await fetchImpl(GIT_COMMIT_ROUTE, {
     method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, message }),
@@ -136,7 +136,7 @@ export interface GitFace {
 }
 
 /** The injected face, bound by the framework to the tab's Session and the store's actions. */
-export type GitInjected = (sessionId: SessionId, actions: BoundActions<ReturnType<typeof createGitStore>>) => GitFace
+export type GitInjected = (sessionId: string, actions: BoundActions<ReturnType<typeof createGitStore>>) => GitFace
 
 /**
  * Build the face factory.
@@ -153,19 +153,22 @@ export function createGitFace(fetchImpl: GitFetch): GitInjected {
       reads.set(tabId, next)
       return next
     }
-    const messageOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
+    // Every rejection below comes from a GitRefusal or a fetch TypeError, both Errors.
+    const messageOf = (error: Error): string => error.message
     const load = (tabId: TabId, signal: AbortSignal): void => {
+      if (signal.aborted) return
       const generation = bump(statusReads, tabId)
       actions.loading(tabId)
       void readStatus(fetchImpl, sessionId, signal).then((status) => {
         if (signal.aborted || statusReads.get(tabId) !== generation) return
         actions.loaded(tabId, status)
-      }, (error: unknown) => {
+      }, (error: Error) => {
         if (signal.aborted || statusReads.get(tabId) !== generation) return
         actions.failed(tabId, messageOf(error))
       })
     }
     const open = (tabId: TabId, entry: GitFileEntry, signal: AbortSignal): void => {
+      if (signal.aborted) return
       const side: GitSide = entry.index !== ' ' && entry.index !== '?' ? 'index' : 'worktree'
       actions.select(tabId, { path: entry.path, side })
       const generation = bump(diffReads, tabId)
@@ -173,7 +176,7 @@ export function createGitFace(fetchImpl: GitFetch): GitInjected {
       void readDiff(fetchImpl, sessionId, entry.path, side, signal).then((diff) => {
         if (signal.aborted || diffReads.get(tabId) !== generation) return
         actions.diffLoaded(tabId, diff)
-      }, (error: unknown) => {
+      }, (error: Error) => {
         if (signal.aborted || diffReads.get(tabId) !== generation) return
         actions.diffFailed(tabId, messageOf(error))
       })
@@ -183,7 +186,7 @@ export function createGitFace(fetchImpl: GitFetch): GitInjected {
       void request.then((status) => {
         if (signal.aborted || statusReads.get(tabId) !== generation) return
         actions.loaded(tabId, status)
-      }, (error: unknown) => {
+      }, (error: Error) => {
         if (signal.aborted || statusReads.get(tabId) !== generation) return
         actions.actionFailed(tabId, messageOf(error))
       })
@@ -193,19 +196,22 @@ export function createGitFace(fetchImpl: GitFetch): GitInjected {
       open,
       close: (tabId) => { actions.deselect(tabId) },
       stage: (tabId, path, signal) => {
+        if (signal.aborted) return
         mutate(tabId, postPaths(fetchImpl, GIT_STAGE_ROUTE, sessionId, [path], signal), signal)
       },
       unstage: (tabId, path, signal) => {
+        if (signal.aborted) return
         mutate(tabId, postPaths(fetchImpl, GIT_UNSTAGE_ROUTE, sessionId, [path], signal), signal)
       },
       commit: (tabId, message, signal) => {
+        if (signal.aborted) return
         const generation = bump(statusReads, tabId)
         actions.committing(tabId, true)
         void postCommit(fetchImpl, sessionId, message, signal).then((status) => {
           if (signal.aborted || statusReads.get(tabId) !== generation) return
           actions.loaded(tabId, status)
           actions.committed(tabId)
-        }, (error: unknown) => {
+        }, (error: Error) => {
           if (signal.aborted || statusReads.get(tabId) !== generation) return
           actions.commitFailed(tabId, messageOf(error))
         })

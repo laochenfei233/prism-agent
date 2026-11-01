@@ -7,11 +7,15 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { GitRunner } from '@deepseek-ai/dsh-workspace-changes'
 import type { GitRunResult } from '@deepseek-ai/dsh-workspace-changes'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
 import {
   commitStaged, GitCommandError, locateRepository, parseHunks, parseStatus, readFileDiff,
   readRepositoryStatus, repositoryPath, stagePaths, unstagePaths, type GitCommandRunner,
 } from '../src/git-command.ts'
+
+// Every git command is a child process here; a loaded Windows host needs well over the default five seconds.
+vi.setConfig({ testTimeout: 60_000 })
 
 const cleanups: Array<() => Promise<unknown>> = []
 const signal = new AbortController().signal
@@ -74,8 +78,10 @@ describe('parseStatus', () => {
     ])
   })
 
-  it('ignores empty and truncated fields', () => {
+  it('ignores empty and truncated fields, and a rename whose source field is missing', () => {
     expect(parseStatus('\0x\0')).toEqual([])
+    expect(parseStatus('R  c.txt\0')).toEqual([{ index: 'R', worktree: ' ', path: 'c.txt' }])
+    expect(parseStatus('R  c.txt\0\0')).toEqual([{ index: 'R', worktree: ' ', path: 'c.txt' }])
   })
 })
 
@@ -127,6 +133,10 @@ describe('locateRepository', () => {
     const outside = await mkdtemp(join(tmpdir(), 'ui-sidebar-git-plain-'))
     cleanups.push(() => rm(outside, { recursive: true, force: true }))
     expect(await locateRepository(instance, outside, signal)).toBeNull()
+  })
+
+  it('reports an empty top-level answer as no repository', async () => {
+    expect(await locateRepository(scripted({ stdout: '\n' }), '/repo', signal)).toBeNull()
   })
 
   it('throws a GitCommandError for any other failure', async () => {
@@ -194,7 +204,7 @@ describe('index mutations', () => {
     expect((await readRepositoryStatus(instance, dir, signal)).entries).toEqual([{ index: 'A', worktree: ' ', path: 'b.txt' }])
     await unstagePaths(instance, dir, ['b.txt'], signal)
     expect((await readRepositoryStatus(instance, dir, signal)).entries).toEqual([{ index: '?', worktree: '?', path: 'b.txt' }])
-  })
+  }, 30_000)
 
   it('unstages through git rm --cached while HEAD is unborn', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'ui-sidebar-git-unborn-'))
@@ -205,7 +215,7 @@ describe('index mutations', () => {
     await stagePaths(instance, dir, ['first.txt'], signal)
     await unstagePaths(instance, dir, ['first.txt'], signal)
     expect((await readRepositoryStatus(instance, dir, signal)).entries).toEqual([{ index: '?', worktree: '?', path: 'first.txt' }])
-  })
+  }, 30_000)
 
   it('commits the staged content', async () => {
     const { dir, git: instance } = await repository()
@@ -213,6 +223,11 @@ describe('index mutations', () => {
     await stagePaths(instance, dir, ['c.txt'], signal)
     await commitStaged(instance, dir, 'add c', signal)
     expect((await readRepositoryStatus(instance, dir, signal)).entries).toEqual([])
+  }, 30_000)
+
+  it('unstages through the fallback when the reset cannot resolve HEAD', async () => {
+    const git = scripted({ exitCode: 1, stderr: 'fatal: ambiguous argument HEAD' }, { exitCode: 0, stdout: '' })
+    await expect(unstagePaths(git, '/repo', ['a'], signal)).resolves.toBeUndefined()
   })
 
   it('reports each failing command as a GitCommandError', async () => {

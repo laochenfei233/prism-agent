@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * The Git workbench's Host routes, inside Connection's authentication fence:
  * one Session's repository status, one file's comparison, and the three index
@@ -350,7 +351,8 @@ export function registerGitRoutes(host: GitRouteHost, config: GitRoutesConfig): 
           signal: AbortSignal.any([request.signal, lifetime.signal]),
         }))
         pending.add(task)
-        void task.then(() => { pending.delete(task) }, () => { pending.delete(task) })
+        // Every handler ends in a catch, so a route task settles by resolving; teardown awaits allSettled regardless.
+        void task.then(() => { pending.delete(task) })
         return task
       },
     })

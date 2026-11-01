@@ -7,9 +7,15 @@ import { Context } from '@deepseek-ai/cordis'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
 import { GIT_COMMIT_PATH, GIT_DIFF_PATH, GIT_STAGE_PATH, GIT_STATUS_PATH, GIT_UNSTAGE_PATH } from '../src/contract.ts'
+import { GitCommandError } from '../src/git-command.ts'
+import { failure, registerGitRoutes, type GitOperations, type GitRouteHost, type GitRouteRegistration } from '../src/git-routes.ts'
 import { apply, type Config } from '../src/index.ts'
+
+// Every git command is a child process here; a loaded Windows host needs well over the default five seconds.
+vi.setConfig({ testTimeout: 60_000 })
 
 const cleanups: Array<() => Promise<unknown>> = []
 afterEach(async () => {
@@ -148,6 +154,16 @@ describe('git index routes', () => {
     expect(await staged.json()).toMatchObject({ entries: [{ index: 'A', worktree: ' ', path: 'b.txt' }] })
     const unstaged = await call(GIT_UNSTAGE_PATH, post({ sessionId: 'owner', paths: ['b.txt'] }))
     expect(await unstaged.json()).toMatchObject({ entries: [{ index: '?', worktree: '?', path: 'b.txt' }] })
+  }, 30_000)
+
+  it('rejects malformed unstage and commit bodies before touching the repository', async () => {
+    const { call } = await fixture({ repo: true })
+    // A body that is not JSON at all, then JSON that is not an object.
+    expect((await call(GIT_UNSTAGE_PATH, post('not json'))).status).toBe(400)
+    expect((await call(GIT_UNSTAGE_PATH, post([]))).status).toBe(400)
+    // An object without usable paths.
+    expect((await call(GIT_UNSTAGE_PATH, post({ sessionId: 'owner' }))).status).toBe(400)
+    expect((await call(GIT_COMMIT_PATH, post('not json'))).status).toBe(400)
   })
 
   it('rejects malformed bodies, unknown Sessions, escapes, and absent repositories', async () => {
@@ -173,7 +189,7 @@ describe('git index routes', () => {
     const refused = await call(GIT_COMMIT_PATH, post({ sessionId: 'owner', message: 'nothing' }))
     expect(refused.status).toBe(422)
     expect((await refused.json() as { error: string }).error).toContain('git commit failed')
-  })
+  }, 30_000)
 
   it('rejects a missing message, an oversized message, an unknown Session, and an absent repository', async () => {
     const { call } = await fixture({ repo: true })
@@ -194,12 +210,42 @@ describe('git route registration', () => {
     expect((await call('/api/git.unknown')).status).toBe(404)
   })
 
-  it('rejects a non-positive bound at load', async () => {
-    const ctx = new Context()
-    cleanups.push(() => ctx.fiber.dispose())
-    await expect(ctx.plugin({
-      inject: ['connection', 'sessions', 'subprocess'],
-      apply: (scope) => { apply(scope, { ...CONFIG, timeoutMs: 0 }) },
-    })).rejects.toThrow('positive integer timeoutMs')
+  it('rejects a non-positive bound before registering anything', () => {
+    expect(() => { apply(new Context(), { ...CONFIG, timeoutMs: 0 }) }).toThrow('positive integer timeoutMs')
+  })
+})
+
+describe('git route failures', () => {
+  it('maps a git refusal to 422 and any other failure to 500', () => {
+    expect(failure(new GitCommandError('git add', 'locked')).status).toBe(422)
+    expect(failure(new Error('boom')).status).toBe(500)
+    expect(failure('boom').status).toBe(500)
+  })
+
+  it('answers every failing route in the form the panel shows and stops reading after disposal', async () => {
+    const routes = new Map<string, GitRouteRegistration>()
+    const disposers: Array<() => Promise<void>> = []
+    const host: GitRouteHost = {
+      effect: (dispose) => { disposers.push(dispose()) },
+      cwdOf: () => '/work',
+      operations: async () => ({
+        locate: async () => '/repo',
+        status: async () => { throw new GitCommandError('git status', 'status failed') },
+        diff: async () => { throw new GitCommandError('git diff', 'diff failed') },
+        stage: async () => { throw new GitCommandError('git add', 'stage failed') },
+        unstage: async () => { throw new Error('unstage exploded') },
+        commit: async () => { throw new GitCommandError('git commit', 'commit failed') },
+      } satisfies GitOperations),
+      register: (route) => { routes.set(route.path, route) },
+    }
+    registerGitRoutes(host, CONFIG)
+    const call = async (path: string, query = '', init?: RequestInit): Promise<Response> =>
+      routes.get(path)!.fetch(new Request(`http://localhost${path}${query}`, init))
+    expect((await call(GIT_STATUS_PATH, '?sessionId=owner')).status).toBe(422)
+    expect((await call(GIT_DIFF_PATH, '?sessionId=owner&path=a.txt&side=worktree')).status).toBe(422)
+    expect((await call(GIT_STAGE_PATH, '', post({ sessionId: 'owner', paths: ['a.txt'] }))).status).toBe(422)
+    expect((await call(GIT_UNSTAGE_PATH, '', post({ sessionId: 'owner', paths: ['a.txt'] }))).status).toBe(500)
+    expect((await call(GIT_COMMIT_PATH, '', post({ sessionId: 'owner', message: 'm' }))).status).toBe(422)
+    for (const dispose of disposers) await dispose()
   })
 })

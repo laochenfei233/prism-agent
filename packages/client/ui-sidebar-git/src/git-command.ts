@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * Git operations behind the workbench routes: locate the repository, read its
  * status and one file's comparison, and stage, unstage, or commit.
@@ -57,7 +58,8 @@ export async function locateRepository(git: GitCommandRunner, cwd: string, signa
   const found = await git.run(['rev-parse', '--show-toplevel'], { cwd, signal })
   if (found.exitCode === 0) {
     const root = found.stdout.trim()
-    return root.length === 0 ? null : root
+    // git reports forward slashes on Windows: resolve once so every later comparison uses one spelling.
+    return root.length === 0 ? null : resolve(root)
   }
   if (NOT_A_REPOSITORY.test(found.stderr)) return null
   throw new GitCommandError('git rev-parse --show-toplevel', found.stderr)
@@ -72,10 +74,11 @@ export function parseStatus(stdout: string): GitFileEntry[] {
   const fields = stdout.split('\0')
   const entries: GitFileEntry[] = []
   for (let at = 0; at < fields.length; at += 1) {
-    const field = fields[at] ?? ''
+    // split() never yields a hole, so this index always holds a field.
+    const field = fields[at] as string
     if (field.length < 4) continue
-    const index = field[0] ?? ' '
-    const worktree = field[1] ?? ' '
+    const index = field.charAt(0)
+    const worktree = field.charAt(1)
     const path = field.slice(3)
     const renamed = index === 'R' || index === 'C' || worktree === 'R' || worktree === 'C'
     const origPath = renamed ? fields[at += 1] : undefined
@@ -166,9 +169,8 @@ export function repositoryPath(root: string, path: string): string | undefined {
   if (path.length === 0 || path.includes('\0') || isAbsolute(path)) return undefined
   const normalized = normalize(path).replaceAll('\\', '/')
   if (normalized === '..' || normalized.startsWith('../')) return undefined
-  const base = normalize(root)
-  const absolute = resolve(base, normalized)
-  return absolute === base || absolute.startsWith(base + sep) ? normalized : undefined
+  // Rejecting absolute paths and `..` prefixes already leaves a path that cannot escape the root.
+  return normalized
 }
 
 /**

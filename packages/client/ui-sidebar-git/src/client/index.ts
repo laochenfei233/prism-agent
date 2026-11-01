@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * Browser half: register `git` as a right-Sidebar tab type.
  *
@@ -7,6 +8,7 @@
  * The Host half that serves the routes lives in `src/index.ts`.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { GIT_ID, gitDefinition } from './definition.tsx'
 import { createGitFace, type GitFetch } from './face.ts'

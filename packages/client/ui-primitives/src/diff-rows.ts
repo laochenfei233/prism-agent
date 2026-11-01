@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /** Line numbering for unified-diff hunks, shared by every comparison view in the product. */
 
 /**

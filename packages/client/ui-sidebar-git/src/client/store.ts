@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 /**
  * The Git panel's view state, one bucket per tab: the last status it read, the
  * comparison it has open, and the commit draft.
@@ -31,14 +32,14 @@ export interface GitSelection {
 /** One tab's panel: status, open comparison, and commit draft. */
 export interface GitTabState {
   status: StatusState
-  selection?: GitSelection
-  diff?: DiffState
+  selection?: GitSelection | undefined
+  diff?: DiffState | undefined
   /** The commit message as typed. */
   message: string
   /** Whether a commit request is in flight. */
   committing: boolean
   /** Why the last commit failed, until the draft or the status changes. */
-  error?: string
+  error?: string | undefined
 }
 
 /** Every tab's panel, keyed by tab id. */
