@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-local-models.md
 /:
-  en: 3eb5aa6f1c0b0cba
-  zh: 3eb5aa6f1c0b0cba
+  en: ecd3505cb556e708
+  zh: ecd3505cb556e708
 /prism-local-models:
   en: 6a2f00c69a818ca6
   zh: 5384c2cefb958711
 /prism-local-models/report:
-  en: 036ca947d944f463
-  zh: a79a285527cd6e5d
+  en: 156e835d970b1c0e
+  zh: a5b1a5d03612e61a
 /prism-local-models/s1-problem:
   en: e7c372073814698a
   zh: d123768bf94d5d0f
@@ -39,14 +39,17 @@
   en: d4c2385486480fbe
   zh: 89d21ed45597d542
 /prism-local-models/s2-design/s2-8-browser-half-the-models-page-card:
-  en: 04e89ef45dccff66
-  zh: 6e534b025dd045a0
+  en: 692a926bcf11cc5b
+  zh: c678003c6a13cfdc
+/prism-local-models/s2-design/s2-9-card-presentation:
+  en: dc17a8b23f62be86
+  zh: 4c1060db4398049d
 /prism-local-models/s3-scope:
   en: adf2f420d67f69c7
   zh: 42eb96b6387f113b
 /prism-local-models/tasks:
-  en: d7e8ae0d81839b39
-  zh: e9bb302e3aceb0ca
+  en: abbda1f8c642f8a0
+  zh: 3561826de90f3c78
 /prism-local-models/s4-acceptance:
-  en: 735fcd5d89577c1b
-  zh: 7d59442368f160cd
+  en: c328f7ab88bf3cac
+  zh: ccef8bd6ac5746a9

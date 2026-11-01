@@ -1,9 +1,9 @@
 ---
 feature: prism-local-models
 status: delivered
-updated: 2026-10-31
-branch: feat/prism-local-models
-commits: f879732059..8048f7d1fb
+updated: 2026-11-01
+branch: feat/local-models-ui
+commits: 0e365ad595..4c8dc6ba46
 ---
 
 # Prism 本地模型
@@ -14,9 +14,13 @@ commits: f879732059..8048f7d1fb
 
 **What was built** —— `plugins/prism-local-models`（`@prism/prism-local-models`），一个双面树外插件，把四个本地能力模型放进 Prism 数据目录，并经模型页自带的 `settings.models.footer` 扩展座在设置模型页内管理；`packages/` 与 `apps/` 零改动。node 半负责目录清单（钉死上游文件、大小与 sha256）、带完整性缓存与手动放置检出的持久注册表、带取消的校验下载、npm/pip 运行时供给，以及四个引擎：RapidOCR（`@gutenye/ocr-node`）、PaddleOCR Python sidecar、经 `node-llama-cpp` 的 HY-MT1.5、经 transformers.js 的 BGE。它以 `ctx.prismLocalModels` 认领 `embed`/`ocr`/`translate` 与安装生命周期，并服务 `/api/local-models/*`。浏览器半渲染 footer 卡片：类别徽标、带设备与大小的变体选择器、实时进度、安装/取消/删除/检测操作，全程 zh/en。
 
+该 footer 随后按模型页自身的设置材质重做（S2.9）：每个家族一张 R20 设置卡片，含生命周期圆点、类别 `Tag`、共享紧凑控件、确定进度条与应用内删除对话框。控件经 shell 模块表取自 `ui-primitives`，卡片布局存放在 `<style>` 字符串里，即 `prism-memory` 的做法。
+
 **Verification** —— 插件 `tsc --noEmit` 干净；vitest 30/30（目录钉死与 override 拒绝、注册表往返/损坏/完整性分类、对真实本地 HTTP 源的下载生命周期：安装、校验失败、取消、忙、手动放置、变体切换清理、供给命令与标记、能力守卫、locale 键位配对、纯函数）；tsdown 双面构建与 `pnpm run build:artifacts` 通过；scoped `verify-translation-pairing` 两对一致。本机实测：RapidOCR probe 识别渲染的探针图（"PRISM LOCAL OCR"）；BGE 产出 2×512 维 L2 归一化向量、probe `512 dims`；HY-MT1.5 经官方 Q4_K_M GGUF 翻译探针句；`dsh web --patch` 启动后 boot 清单含插件 client bundle，渲染出的模型页出现本地模型卡片（有截图）。本机未执行：带真实解释器的 PaddleOCR pip 供给，以及真实 GPU 上的 cuda 变体（fail-loud probe 已实现并经单元审查）。
 
-**Journey log** —— 模型页本就声明了自己的扩展座（`slot-contract.ts` 写明 "without editing it"），注入因此零核心改动。HF tree API 的 `oid` 对 xet 存储文件是 git sha1；`paths-info` 返回真正的 LFS sha256，多 GB 哈希免下载钉死。RapidOCR 从零散钉文件转向 `@gutenye/ocr-models` npm 包——整套 PP-OCRv4（含 cls 与字典）随包附带。树外包从 profile 上下文（`$DSH_HOME/profiles/node_modules`）解析而非仓库——开发冒烟需要在那里做 junction，正是桌面壳运行时所做的。Cordis 上下文认领必须走 `ctx.provide`，裸属性赋值抛 "without provide"，而钉死的 cordis 声明缺 `provide`，类型由本地接口拓宽补上。
+**重做验证** —— 插件 `tsc --noEmit` 干净；vitest 33/33，含新增的 `progressPercent` 用例；tsdown 双面构建保持 `ui-primitives` 为外部依赖；spec 对已重新记录。渲染结果在运行中的应用里核对：模型页浅色与深色两种主题下的闲置、就绪、下载中、配置中、失败五种状态，以及删除对话框，其中当前目录供不出的状态由页面内 `fetch` 桩提供。最后一次视觉核对发生在审查轮之前；该轮只改了 CSS 取值与文案，加上与模型页自身删除对话框对齐的交互流程（await、失败时不关闭、进行中禁用）。
+
+**Journey log** —— 模型页本就声明了自己的扩展座（`slot-contract.ts` 写明 "without editing it"），注入因此零核心改动。HF tree API 的 `oid` 对 xet 存储文件是 git sha1；`paths-info` 返回真正的 LFS sha256，多 GB 哈希免下载钉死。RapidOCR 从零散钉文件转向 `@gutenye/ocr-models` npm 包——整套 PP-OCRv4（含 cls 与字典）随包附带。树外包从 profile 上下文（`$DSH_HOME/profiles/node_modules`）解析而非仓库——开发冒烟需要在那里做 junction，正是桌面壳运行时所做的。Cordis 上下文认领必须走 `ctx.provide`，裸属性赋值抛 "without provide"，而钉死的 cordis 声明缺 `provide`，类型由本地接口拓宽补上。删除对话框会 portal 到 `document.body`，因此其危险色样式只能是全局命名的 `button.lmm-danger` 规则，而非限定在卡片下的规则；`Button` 没有 danger 变体，而像 `PluginManagerPage` 那样重绑 `--dsw-alias-button-primary-*` 填充会把行内安静的文字操作变成实心按钮。
 ## [S1] 问题
 
 设置里的模型页只管理远端 LLM provider。Prism 自身需要的能力模型——图片 OCR、机器翻译、RAG 向量化——没有安身之处：没有安装位置、没有生命周期管理、也没有供后续功能调用的能力入口。这些模型应当装在 Prism 的数据目录里，在本来就管理模型的地方（模型页）完成安装与管理，并以类型化能力（`embed`、`ocr`、`translate`）供 Prism 功能调用。
@@ -63,7 +67,15 @@ commits: f879732059..8048f7d1fb
 
 ### S2.8 浏览器半：模型页卡片
 
-客户端半注入 `['slots', 'locale']`，注册一个 `settings.models.footer` list 项，渲染一张"本地模型 / Local models"卡片：头部显示模型根路径，每个家族一行，展示名称、类别徽标（OCR / 翻译 / 向量）、由目录供给的变体选择器、大小、状态或下载进度，以及安装 / 取消 / 删除 / 检测按钮及其结果；一条 OCR 说明写明 RapidOCR 为默认引擎、PaddleOCR 需要 Python 环境。全部文案经 `ctx.locale` 走合并的 zh/en 字典（结构化替身，与 `prism-about` 一致）；样式复用应用主题令牌。
+客户端半注入 `['slots', 'locale']`，注册一个 `settings.models.footer` list 项，渲染一个"本地模型 / Local models"区块：模型根路径，以及每个家族一项，展示名称、类别徽标（OCR / 翻译 / 向量）、由目录供给的变体选择器、大小、状态或下载进度，以及安装 / 取消 / 删除 / 检测按钮及其结果；一条 OCR 说明写明 RapidOCR 为默认引擎、PaddleOCR 需要 Python 环境。全部文案经 `ctx.locale` 走合并的 zh/en 字典（结构化替身，与 `prism-about` 一致）。外观由 S2.9 规定。
+
+### S2.9 卡片外观
+
+该 footer 读作模型页的第二个区块而非一串散列：区块标题、一句话说明这些模型服务 Prism 自身的光学识别、翻译与向量工作而非对话，以及模型根路径。
+
+每个家族是独立的设置卡片——与上方 provider 卡片相同的 `--dsw-alias-settings-card-fill` / `-stroke` 材质、R20 圆角、12×14 内边距——承载家族名（14/22、字重 500）、以 `Tag` 呈现的类别，以及头部右侧由 `StateDot` 加文案组成的状态簇。卡体把变体选择器（H32、R12、`--dsw-alias-border-l4`、共享箭头）与该状态允许的操作并排：缺失时"安装"，进行中"取消"，就绪后"检测"与"删除"。已知下载总量时卡体下加一条确定进度条，百分比仍留在状态文案里；供给阶段改报其步骤标签。失败与 probe 结果以错误色或成功色落在卡体下方。删除在共享 `Modal` 中确认——家族名为标题、既有问句为描述、"取消"初始聚焦——因为原生 `confirm()` 是唯一无视应用主题的面。
+
+控件经 shell 模块表取自 `@deepseek-ai/dsh-client-ui-primitives`，与 `prism-memory` 一致；卡片自身布局是 `<style>` 字符串，因为仓库外 bundle 没有 CSS 管线。每个颜色都是周边页面已在用的 `--dsw-alias-*` 令牌。
 
 ## [S3] 范围
 
@@ -82,6 +94,7 @@ commits: f879732059..8048f7d1fb
 - [x] T8: 浏览器半 footer 卡片、变体选择器、状态轮询、zh/en 字典（covers: S2.8）
 - [x] T9: 单元测试——目录校验与 override 拒绝、注册表状态机与手动放置、对本地源的下载生命周期、供给命令规划、纯 UI 逻辑、locale 键位配对（covers: S2.2, S2.3, S2.5, S2.7, S2.8）
 - [x] T10: README en/zh、spec 对 + pairing 记录、验证——双面构建、typecheck、聚焦测试、带插件启动 web profile、模型页卡片截图（covers: S4）
+- [x] T11: 按模型页设置卡片材质重做 footer 卡片，改用 `ui-primitives` 控件、状态簇、下载进度条与应用内删除对话框（covers: S2.9）
 
 ## [S4] 验收
 
@@ -92,3 +105,4 @@ commits: f879732059..8048f7d1fb
 - HY-MT1.5 `probe` 经安装的 GGUF 翻译固定的中→英句子。
 - `cancel` 停止下载并清除临时文件；`remove` 删除变体目录；手动放置的完整文件在下次扫描时被检出并校验。
 - 单元测试通过；typecheck 与双面构建通过；spec 对通过 `verify-translation-pairing`；README 具备 en 与 zh。
+- 深浅两个主题下卡片都呈现为与模型页材质一致的设置卡片：生命周期圆点、确定进度条与应用内删除对话框，且不再留有未加样式的控件或原生 `confirm()`。
