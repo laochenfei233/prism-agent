@@ -1,9 +1,9 @@
 ---
 feature: prism-memory-panel
-status: in-progress
+status: delivered
 updated: 2026-11-01
 branch: feat/prism-memory-panel
-commits: c22ec9f0b9..HEAD
+commits: c22ec9f0b9..67c8302650
 ---
 
 # Prism Memory Operator Surface
@@ -12,7 +12,21 @@ English | [中文](prism-memory-panel.zh.md)
 
 ## Report
 
-_(filled at delivery)_
+**What was built.** A person can now read and write long-term memory without spending a model turn. `/memory remember <text>` stores a claim of their own, `/memory search <query>` finds one by keyword, `/memory forget <id>` retires one, and the Web host gains a memory page: counts over the whole corpus, a keyword search, an add form, the review inbox with approve and reject handed out oldest decision first, and the live claims.
+
+The page has no calling session, so it reads and settles through four new agent-less service methods — `operatorRecords`, `operatorSearch`, `operatorApprove`, `operatorReject` — behind four exact Fetch routes on Connection's shared `/api` channel, whose paths come from one shared module both faces import. Model-facing callers are untouched: a tool passes the agent it runs in and `/memory` passes the one it was invoked from, and both are still narrowed by it. The browser half is an out-of-tree module-loader closure that requests React and the shared primitives as baseline modules, so the shell keeps one copy of each, and the two compiler faces keep the DOM library out of the Host half.
+
+The model surface did not move: no tool, no prompt byte, no injected frame.
+
+**Verification.** In the worktree `plugins/prism-memory`: `tsc -p tsconfig.json --noEmit` and `tsc -p tsconfig.client.json --noEmit` both exit 0; `vitest run --config vitest.config.ts` passes 13 files and 178 tests (the baseline before this change was 9 files and 146 tests); `tsdown --config tsdown.config.ts` emits the four Host modules plus `lib/client.js`; `node scripts/smoke.mjs` passes, including a check that loads the browser bundle through a stand-in module loader, runs its `apply`, and asserts both slot registrations. `pnpm run build:artifacts` passes in the worktree, which the out-of-tree typecheck depends on. `pnpm run verify-translation-pairing` reports both the README pair and this document's pair consistent, and the repository's pre-commit hooks (translation pairing, lint on staged files, whitespace, vendor guard) pass on both commits.
+
+**Journey log.**
+
+1. The plugin's own Vitest config named `scripts/test-invariants.ts`, which the rc.4 resync deleted, so no spec could start at all. Repairing that was the first change, and it is what made the 146-test baseline measurable.
+2. An out-of-tree browser half cannot use `packages/client/tsdown.client.ts` (a workspace preset) or a CSS pipeline, so the bundle reproduces the module-loader closure by hand after `plugins/prism-about`, and the page owns a stylesheet string of shell tokens.
+3. The review turned the feature around once: the two new human write surfaces could create a claim no human surface could retire, because `/memory reject` settles only pending records and `memory_forget` is a model tool. That produced `/memory forget` and the paragraph stating that a page-added claim is `global`.
+4. Three surfaces answered "most recent" three different ways — the tool, the command, and the page. The command now makes the same `memory.search` call the tool does, and the page keeps its own live-corpus read and the queue head.
+5. The wire, the spec, and the API docs drifted from the code in four places the review caught; each is now stated once and matches what the routes do.
 
 ## [S1] Problem
 
@@ -75,23 +89,23 @@ The panel and the three subcommands add no tool definition, no system-prompt byt
 
 ## Tasks
 
-- [ ] T1: Add the four operator methods to the service with a shared `requireIn`, and cover them in `tests/service.spec.ts` (depends: none)
-- [ ] T2: Add `src/web-contract.ts`, `src/routes.ts`, and the `src/web.ts` route row, wire the row into `cordis.patch.yml`, and cover it with a Loader composition spec (depends: T1)
-- [ ] T3: Add the browser half: manifest and `dsh.client`, the two tsconfig faces, the tsdown client bundle, the locale dictionary, the request client, the page and styles, the glyph, and the registration (depends: T2)
-- [ ] T4: Add `/memory remember`, `/memory search`, and `/memory forget`, and a spec that drives `/memory` end to end through the real command runtime (depends: T1)
-- [ ] T5: Update `README.md`, `README.zh.md`, and the pairing record; update the design note in `preview/` where it states the command and panel surfaces (depends: T3, T4)
-- [ ] T6: Run the package typecheck for both faces, the suites, the build, and the smoke script in the worktree (depends: T3, T4, T5)
-- [ ] T7: Independent review of the complete change, then finalize this document (depends: T6)
+- [x] T1: Add the four operator methods to the service with a shared `requireIn`, and cover them in `tests/service.spec.ts` (depends: none)
+- [x] T2: Add `src/web-contract.ts`, `src/routes.ts`, and the `src/web.ts` route row, wire the row into `cordis.patch.yml`, and cover it with a Loader composition spec (depends: T1)
+- [x] T3: Add the browser half: manifest and `dsh.client`, the two tsconfig faces, the tsdown client bundle, the locale dictionary, the request client, the page and styles, the glyph, and the registration (depends: T2)
+- [x] T4: Add `/memory remember`, `/memory search`, and `/memory forget`, and a spec that drives `/memory` end to end through the real command runtime (depends: T1)
+- [x] T5: Update `README.md`, `README.zh.md`, and the pairing record; update the design note in `preview/` where it states the command and panel surfaces (depends: T3, T4)
+- [x] T6: Run the package typecheck for both faces, the suites, the build, and the smoke script in the worktree (depends: T3, T4, T5)
+- [x] T7: Independent review of the complete change, then finalize this document (depends: T6)
 
 ## [S4] Acceptance
 
-- [ ] `/memory remember <text>` stores one claim with origin `operator` in the caller's default scope, and prints its id.
-- [ ] `/memory search <query>` renders ranked lines carrying layer, kind, scope, date, and originating session, and an empty query lists the most recent claims.
-- [ ] `/memory forget <id>` retires a live claim the person wrote, so a human can both add and retract without a model turn.
-- [ ] A caller with no session can read project- and conversation-scoped records and can approve or reject one, which `visible` and `approve` cannot do today.
-- [ ] The review inbox hands out the head of the pending queue, oldest decision first.
-- [ ] The four routes answer their envelope, reject an invalid body with an error code, and never throw out of the route.
-- [ ] The web row activates over a real web server and connection through the Loader, and stays pending in a profile that composes neither.
-- [ ] The page registers into `sidebar.panellist` and `main`, and renders counts, search results, review actions, the add form, and the three states.
-- [ ] The five tool schemas, the protocol section, and the injected frame are byte-identical to the previous build.
-- [ ] The two typecheck faces, the package suites, the tsdown build, and `scripts/smoke.mjs` pass in the worktree.
+- [x] `/memory remember <text>` stores one claim with origin `operator` in the caller's default scope, and prints its id.
+- [x] `/memory search <query>` renders ranked lines carrying layer, kind, scope, date, and originating session, and an empty query lists the most recent claims.
+- [x] `/memory forget <id>` retires a live claim the person wrote, so a human can both add and retract without a model turn.
+- [x] A caller with no session can read project- and conversation-scoped records and can approve or reject one, which `visible` and `approve` cannot do today.
+- [x] The review inbox hands out the head of the pending queue, oldest decision first.
+- [x] The four routes answer their envelope; the three that carry a body reject an invalid one with an error code; none throws out of the route.
+- [x] The web row activates over a real web server and connection through the Loader, and stays pending in a profile that composes neither.
+- [x] The page registers into `sidebar.panellist` and `main`, and renders counts, search results, review actions, the add form, and the three states.
+- [x] The five tool schemas, the protocol section, and the injected frame are byte-identical to the previous build.
+- [x] The two typecheck faces, the package suites, the tsdown build, and `scripts/smoke.mjs` pass in the worktree.

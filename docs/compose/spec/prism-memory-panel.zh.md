@@ -1,9 +1,9 @@
 ---
 feature: prism-memory-panel
-status: in-progress
+status: delivered
 updated: 2026-11-01
 branch: feat/prism-memory-panel
-commits: c22ec9f0b9..HEAD
+commits: c22ec9f0b9..67c8302650
 ---
 
 # Prism 记忆的人工操作面
@@ -12,7 +12,21 @@ commits: c22ec9f0b9..HEAD
 
 ## Report
 
-_（交付时填写）_
+**做了什么。** 人现在不用花掉模型的一轮，就能读写长期记忆。`/memory remember <text>` 存下一条自己的主张，`/memory search <query>` 按关键词找到一条，`/memory forget <id>` 退役一条，而 Web 宿主多了一个记忆页：整库计数、关键词搜索、新增表单、最早的决定在前的待审收件箱与通过／驳回，以及仍生效的主张。
+
+页面没有调用会话，因此它通过四个新增的不带 agent 的服务方法来读写与结算 —— `operatorRecords`、`operatorSearch`、`operatorApprove`、`operatorReject` —— 背后是 Connection 共享 `/api` 通道上的四条精确 Fetch 路由，路径来自两个面共同引用的同一个模块。面向模型的调用方一字未变：工具传自己运行所在的 agent，`/memory` 传被调用时所在的 agent，两者仍然被它收窄。浏览器侧是一个仓库之外的 module-loader 闭包，把 React 与共享 primitives 作为基线模块请求，因此 shell 只保留它们的一份副本；两个编译面则让 DOM 库留在 Host 面之外。
+
+模型面一动不动：没有新工具、没有新提示词字节、没有新注入帧。
+
+**验证。** 在 worktree 的 `plugins/prism-memory` 下：`tsc -p tsconfig.json --noEmit` 与 `tsc -p tsconfig.client.json --noEmit` 都退出 0；`vitest run --config vitest.config.ts` 通过 13 个文件、178 个测试（改动前的基线是 9 个文件、146 个测试）；`tsdown --config tsdown.config.ts` 产出四个 Host 模块与 `lib/client.js`；`node scripts/smoke.mjs` 通过，其中一项经由替身 module loader 加载浏览器包、执行它的 `apply`，并断言两处 slot 注册。仓库外的 typecheck 所依赖的 `pnpm run build:artifacts` 在 worktree 里通过。`pnpm run verify-translation-pairing` 报告 README 对与本文档对都一致，仓库自带的 pre-commit 钩子（translation pairing、暂存文件 lint、行尾空白、vendor 清单守卫）在两个提交上都通过。
+
+**过程记录。**
+
+1. 插件自己的 Vitest 配置里写着 `scripts/test-invariants.ts`，而该文件已被 rc.4 resync 删除，因此一个规格都起不来。修好它是第一处改动，也正是它让 146 个测试的基线变得可测。
+2. 仓库之外的浏览器侧既用不了 `packages/client/tsdown.client.ts`（workspace 预设），也没有 CSS 流水线，因此该包按 `plugins/prism-about` 手工复刻 module-loader 闭包，页面自带一段 shell token 样式字符串。
+3. 评审把这次功能扳向了一次：两个新增的人用写入面能造出任何人的面都退不掉的记录，因为 `/memory reject` 只结算 pending，而 `memory_forget` 是模型工具。于是有了 `/memory forget`，以及「页面存下的主张是 `global`」那一段。
+4. 三个面用三种不同方式回答「最近的」—— 工具、命令与页面。命令现在调用与工具同一个 `memory.search`，页面保留自己读在库语料与队列头部。
+5. 线上契约、规格与 API 文档在四处落后于代码，评审都抓到了；现在每件事只陈述一次，且与路由的实际行为一致。
 
 ## [S1] Problem
 
@@ -75,23 +89,23 @@ Scope 权威不变：每个模型侧工具、每个 `/memory` 子命令继续传
 
 ## Tasks
 
-- [ ] T1: 给服务加四个 operator 方法与共用的 `requireIn`，并在 `tests/service.spec.ts` 覆盖（依赖：无）
-- [ ] T2: 加 `src/web-contract.ts`、`src/routes.ts` 与 `src/web.ts` 路由行，把该行接进 `cordis.patch.yml`，并用 Loader 组装的 spec 覆盖（依赖：T1）
-- [ ] T3: 加浏览器侧：清单与 `dsh.client`、两个 tsconfig 面、tsdown 客户端包、locale 字典、请求客户端、页面与样式、图标、注册（依赖：T2）
-- [ ] T4: 加 `/memory remember`、`/memory search` 与 `/memory forget`，并加一个通过真实命令运行时端到端驱动 `/memory` 的 spec（依赖：T1）
-- [ ] T5: 更新 `README.md`、`README.zh.md` 与配对记录；更新 `preview/` 里陈述命令与面板面的设计说明（依赖：T3、T4）
-- [ ] T6: 在 worktree 里跑本包两个面的 typecheck、全部 suite、构建与 smoke 脚本（依赖：T3、T4、T5）
-- [ ] T7: 对整个改动做独立评审，然后定稿本文档（依赖：T6）
+- [x] T1: 给服务加四个 operator 方法与共用的 `requireIn`，并在 `tests/service.spec.ts` 覆盖（依赖：无）
+- [x] T2: 加 `src/web-contract.ts`、`src/routes.ts` 与 `src/web.ts` 路由行，把该行接进 `cordis.patch.yml`，并用 Loader 组装的 spec 覆盖（依赖：T1）
+- [x] T3: 加浏览器侧：清单与 `dsh.client`、两个 tsconfig 面、tsdown 客户端包、locale 字典、请求客户端、页面与样式、图标、注册（依赖：T2）
+- [x] T4: 加 `/memory remember`、`/memory search` 与 `/memory forget`，并加一个通过真实命令运行时端到端驱动 `/memory` 的 spec（依赖：T1）
+- [x] T5: 更新 `README.md`、`README.zh.md` 与配对记录；更新 `preview/` 里陈述命令与面板面的设计说明（依赖：T3、T4）
+- [x] T6: 在 worktree 里跑本包两个面的 typecheck、全部 suite、构建与 smoke 脚本（依赖：T3、T4、T5）
+- [x] T7: 对整个改动做独立评审，然后定稿本文档（依赖：T6）
 
 ## [S4] Acceptance
 
-- [ ] `/memory remember <text>` 以 origin `operator` 在调用方默认 scope 存下一条断言，并打印其 id。
-- [ ] `/memory search <query>` 渲染带层、种类、scope、日期与来源会话的排序行，空查询列出最近的断言。
-- [ ] `/memory forget <id>` 退役一条人自己写下的仍生效主张，因此人既能新增也能撤回，都不花模型的一轮。
-- [ ] 没有会话的调用方可以读到 project 与 conversation scope 的记录，也可以通过或驳回其中一条——今天 `visible` 与 `approve` 做不到。
-- [ ] 审阅收件箱交出待审队列的头部，最早的决定在前。
-- [ ] 四条路由各自回答信封，非法请求体以错误码拒绝，且路由内永不抛出。
-- [ ] 该 web 行通过 Loader 在真实 web server 与 connection 上激活，并在两者都没有的 profile 里保持 pending。
-- [ ] 页面注册进 `sidebar.panellist` 与 `main`，并渲染计数、搜索结果、审阅动作、新增表单与三种状态。
-- [ ] 五个工具 schema、协议段、注入帧与前一个构建逐字节相同。
-- [ ] 两个 typecheck 面、本包 suite、tsdown 构建与 `scripts/smoke.mjs` 在 worktree 里通过。
+- [x] `/memory remember <text>` 以 origin `operator` 在调用方默认 scope 存下一条断言，并打印其 id。
+- [x] `/memory search <query>` 渲染带层、种类、scope、日期与来源会话的排序行，空查询列出最近的断言。
+- [x] `/memory forget <id>` 退役一条人自己写下的仍生效主张，因此人既能新增也能撤回，都不花模型的一轮。
+- [x] 没有会话的调用方可以读到 project 与 conversation scope 的记录，也可以通过或驳回其中一条——今天 `visible` 与 `approve` 做不到。
+- [x] 审阅收件箱交出待审队列的头部，最早的决定在前。
+- [x] 四条路由各自回答信封；带请求体的三条以错误码拒绝非法请求体；任何一条都不会从路由里抛出。
+- [x] 该 web 行通过 Loader 在真实 web server 与 connection 上激活，并在两者都没有的 profile 里保持 pending。
+- [x] 页面注册进 `sidebar.panellist` 与 `main`，并渲染计数、搜索结果、审阅动作、新增表单与三种状态。
+- [x] 五个工具 schema、协议段、注入帧与前一个构建逐字节相同。
+- [x] 两个 typecheck 面、本包 suite、tsdown 构建与 `scripts/smoke.mjs` 在 worktree 里通过。

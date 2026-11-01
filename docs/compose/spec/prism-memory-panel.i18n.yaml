@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-memory-panel.md
 /:
-  en: 2889aa19ff53a820
-  zh: 2889aa19ff53a820
+  en: 37d580f338a114d6
+  zh: 37d580f338a114d6
 /prism-memory-operator-surface:
   en: c25202a17b1d89b9
   zh: 5ed2a055e6310dab
 /prism-memory-operator-surface/report:
-  en: a97371f44846a177
-  zh: 200b4d1504f1f050
+  en: a7353eeffe54765d
+  zh: cfc515e4a7e988e5
 /prism-memory-operator-surface/s1-problem:
   en: 8924652ba19ae8a1
   zh: b65dfc45a53b8a4b
@@ -39,8 +39,8 @@
   en: 253c24b91671b25a
   zh: c07e2bb164dc22cd
 /prism-memory-operator-surface/tasks:
-  en: f6ef2c3420b88398
-  zh: 5b8fc1f71ccaf511
+  en: 49dad1933661b228
+  zh: 25b066dcbee50097
 /prism-memory-operator-surface/s4-acceptance:
-  en: 66c2bef0112edc81
-  zh: 3b6218fad9824e0d
+  en: e434c38e6065abf6
+  zh: 7c402ccfb7abb6e3
