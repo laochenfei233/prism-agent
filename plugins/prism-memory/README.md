@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, automatic distillation and consolidation, import from other tools' memory files, and a deterministic Markdown mirror.
+Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, a Web memory page, automatic distillation and consolidation, import from other tools' memory files, and a deterministic Markdown mirror.
 
 ## Summary
 
@@ -12,7 +12,7 @@ Four things distinguish it from the usual "inject memory into the system prompt"
 
 1. **The cached prefix is never rewritten.** See below.
 2. **Claims are filed on three independent axes** — what the claim is about (`layer`), what sort of statement it is (`kind`), and who may see it (`scope`) — and the layer decides whether a claim is stated before it is mentioned.
-3. **Governance is a human surface.** Approving, rejecting, restoring, expiring, consolidating, importing, and exporting are `/memory` subcommands, not tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
+3. **Governance is a human surface.** Approving, rejecting, restoring, retiring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first two, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
 4. **Memory arrives from three producers at once**: the model calling a tool, a turn being read as it closes (no extra model call), and the memory files another tool already wrote for this user.
 
 ## Design constraint: the cached prefix stays byte-stable
@@ -25,7 +25,8 @@ Every turn's request is `[system prompt][tool schemas][history]`. That whole pre
 - emits nothing at all when it has nothing to say, so an eligible turn is byte-identical to a turn from a build without this plugin;
 - renders the same hits to the same bytes (total ordering, fixed frame, no generation timestamp, and a date rather than a clock time), so an unchanged corpus cannot cause a spurious miss;
 - never re-injects a record the session already received, tracked by a `prismMemory` session projection folded from the plugin's own logged messages;
-- keeps the tool surface at five definitions, and adds **zero** schemas when the governance command mounts.
+- keeps the tool surface at five definitions, and adds **zero** schemas when the governance command mounts;
+- keeps the memory page off the model path: its routes and its panel add no prompt text, no tool schema, and no injected frame.
 
 Two of those are deployment choices, and the shipped defaults keep the strong form of the claim. `orientationEnabled` is **off**, because the orientation line is the one contribution that says something on a turn with no memory behind it: with it off, an empty corpus changes nothing, and turning it on is a decision rather than a side effect of installing the plugin. `identityLayers` is **on**, but inert until the corpus holds a record on one of those layers — and a record written before the layer axis existed never is, so an upgraded store injects exactly what it injected before.
 
@@ -39,6 +40,7 @@ Mount the bundle, then let the model call the tools. No configuration is require
 - name: '@prism/prism-memory'
 - name: '@prism/prism-memory/tools'
 - name: '@prism/prism-memory/commands'
+- name: '@prism/prism-memory/web'
 ```
 
 ### Tools
@@ -60,9 +62,12 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | Subcommand | Effect |
 |---|---|
 | `/memory status` | Counts by status, scope, layer, and kind (also the default with no argument) |
-| `/memory review [limit]` | The review inbox: records held back until approved |
+| `/memory remember <text>` | Store one claim of your own, with no model turn; prints the id it landed on |
+| `/memory search <query>` | Ranked claims with layer, kind, scope, and originating session; an empty query lists the most recent |
+| `/memory review [limit]` | The review inbox: records held back until approved, newest first |
 | `/memory approve <id> [note]` | Promote one pending record to active |
 | `/memory reject <id> [reason]` | Archive one pending record |
+| `/memory forget <id> [reason]` | Retire one live claim so it stops being recalled; the record is retained |
 | `/memory show <id>` | One record with attribution, dates, tags, corroboration, and its supersede chain |
 | `/memory restore <id> [reason]` | Roll a record back to current |
 | `/memory conversations [limit]` | Browse the corpus by originating conversation |
@@ -71,6 +76,16 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory journal [limit]` | The consolidation journal and the daily reflections |
 | `/memory import [apply] [sources]` | Read other tools' memory files; a dry run unless `apply` is given |
 | `/memory export [dir]` | Write the Markdown mirror and its JSON index |
+
+### The memory page
+
+`@prism/prism-memory/web` registers four exact Fetch routes under `/api/prism-memory` — `overview`, `search`, `remember`, and `review` — each answering one `{ ok, value }` envelope. The three that carry a body validate it with zod; `overview` reads none. The browser half renders them as one panel in the sidebar: counts over the store, a keyword search, an add form, the review inbox with approve and reject handed out oldest decision first, and the live claims.
+
+A page has no calling session, so it reads and settles through the service's operator surface — `operatorRecords`, `operatorSearch`, `operatorApprove`, and `operatorReject`, none of them narrowed by scope. Every row renders its own scope, so the narrowing stays visible where the decision is made. Model-facing callers are unchanged: a tool passes the agent it runs in and `/memory` passes the one it was invoked from, and both are still filtered by them.
+
+A claim the page stores is `global`, because there is no session to derive a project or conversation scope from — so a `user` or `rule` claim added there is stated on every session's first turn. Retiring it is `/memory forget <id>`, the only human retraction for a live claim.
+
+The row declares `webServer`, so a profile that composes no Web server leaves it pending rather than failing to load. The browser bundle is one module-loader closure that requests React and the shared primitives as baseline modules instead of inlining a second copy of either.
 
 ## The layer axis
 
@@ -103,7 +118,7 @@ The score is normalized by the square root of the query's own term weight. The s
 
 ## Automatic memory
 
-Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is settled only by `/memory approve` or `/memory reject`.
+Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is reviewed only by `/memory approve` or `/memory reject`.
 
 ### Distillation, on the turn's own path
 
@@ -140,7 +155,7 @@ A claim the corpus already holds is counted as skipped rather than stored again 
 
 ## Governance and library hygiene
 
-- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling it is only `/memory approve` or `/memory reject`, neither of which the model can call.
+- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling the review is only `/memory approve` or `/memory reject`, neither of which the model can call; `/memory forget <id>` archives any claim it is given, a pending one included, without recording a review decision.
 - **Two-time records.** Every record carries `validAt` and `invalidAt`. Superseding, expiring, merging, and forgetting all invalidate rather than delete, so an old answer stays auditable while only the current claim injects.
 - **Rollback.** `/memory restore` re-activates a record and archives a live successor, recording the rollback in the successor's evidence.
 - **Maintenance.** `/memory maintain` reports what it would do and writes nothing until `apply`: live records past their deadline are archived, near-duplicates at or above `dedupeJaccard` are merged into the record a reader would keep (higher confidence, then newer), archived records are evicted when the store is at capacity, and supersede links that no longer resolve are reported.
@@ -304,13 +319,18 @@ Sections that have nothing to contribute are omitted, so a turn carrying only a 
 
 Distillation and consolidation write records and append no message, so they are invisible to the model in the turn that triggers them. What they wrote becomes visible later, through recall or through the tools, exactly as any other record would. Token effect on the triggering turn: none.
 
+### The memory page
+
+Token effect: none. The page reads and writes through its own routes, and what it settles — an approved claim, a stored one — reaches the model only through the injection and search paths that were already there. KV-cache effect: none, because nothing on this path is part of a request.
+
 ## Verification
 
 ```sh
-node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit   # src and tests against the checkout's declarations
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts # 146 specs over the real services
-node ../../node_modules/.bin/tsdown --config tsdown.config.ts           # emit lib/
-node scripts/smoke.mjs                                                  # artifact plane
+node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
+node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
+node scripts/smoke.mjs                                                        # artifact plane
 ```
 
 The specs drive production services — the storage hub with its SQLite backend, the domain facility, the session store, the system-prompt registry, the session-projection registry, the tool runtime, and the agent loop — so an assertion about memory is an assertion about what the model sees.
@@ -318,6 +338,10 @@ The specs drive production services — the storage hub with its SQLite backend,
 `tests/cache-safety.spec.ts` is the suite for this package's central claim: an unmatched turn adds no message, a matched turn appends exactly one message after an untouched prefix, the block is deterministic for a fixed corpus, a delivered record is never repeated, the block respects its character budget, the five tool schemas are byte-stable across reads, and mounting the governance command adds no schema.
 
 `tests/automatic.spec.ts` is the suite for the automatic half: a turn's own text is distilled without a model call and parked for review, a repeated claim is not stored twice and does not inflate its reuse count, the consolidation window opens on the corpus rather than on a counter, a contradiction is reported and both claims survive, standing memory arrives without a keyword match, a due date surfaces, and an import reads a workspace file into project-scoped claims without duplicating what it already read.
+
+`tests/commands.spec.ts` is the suite for the operator command surface: every case types a `/memory` line into the real command runtime and reads the settled result, so a `remember` that stored nothing, a `search` that rendered the wrong line, or a subcommand that stopped resolving fails there.
+
+`tests/web.spec.ts` and `tests/web-composition.host.spec.ts` are the suites for the browser routes: one drives every route through the objects it registers and asserts the envelopes, the body validation, and the operator surface behind them; the other boots the row through the real Loader over a real web server and Connection, and asserts it stays pending — never failed — in a profile that composes neither. `tests/client/api.spec.ts` covers the browser request client's own decoding, including the case where the host answers something it cannot read.
 
 ## Known Limitations and Deferred Work
 
@@ -331,8 +355,10 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **The corpus is held in memory.** Every record is resident in the domain's synchronous state, bounded by `maxRecords` but not by bytes.
 - **`hits` counts explicit opens only**, so reuse weighting is a weak signal. Distillation deliberately does not touch it.
 - **The maintenance and consolidation passes are not scheduled.** They run on the turn path and on operator command; a deployment that wants them at a fixed hour needs a schedule row pointing at `/memory maintain apply` or `/memory dream apply`.
-- **The command surface is covered indirectly.** `/memory` is a thin adapter over service methods that the specs exercise directly; the specs do not yet drive a composed command invocation end to end.
-- **No review inbox UI.** The inbox is the `/memory review` command; the Web host has no dedicated page.
+- **The page adds and settles; it does not edit.** Rewriting a claim is `memory_remember` with `supersedes`, and retiring a live record is `/memory forget <id>`; the panel offers neither, so an edit made there would have no audit story.
+- **The page's overview reads the whole store on each write.** That is bounded by `maxRecords` and correct for the corpus sizes this store is designed for; a store near that cap would want a paged read first.
+- **The four operator methods are un-narrowed public service methods.** No model-facing caller can reach them, and `maintain`, `dream`, `importMemories`, and `exportMarkdown` were already whole-store, so this adds no new authority class — but any plugin that injects `prismMemory` can read the whole corpus, and the type does not say so beyond the name.
+- **The page has no component spec.** The bundle declares no React runtime of its own and the plugin's Vitest config sets no jsdom environment, so the page is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.
 - **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s attribution, but it has no tool that reads session history directly.
 - **Import layouts are hardcoded by id.** Adding a tool means adding an entry to `IMPORT_SOURCES`; there is no configuration format for a custom layout.
 

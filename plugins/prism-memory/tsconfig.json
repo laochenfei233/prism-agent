@@ -10,6 +10,10 @@
   // Unlike prism-guardrails this plugin has real runtime imports (cordis,
   // schemastery, zod, and the harness seams), so the built artifact keeps those
   // as external imports resolved from the profile.
+  //
+  // This is the Host face. `tsconfig.client.json` checks the browser half
+  // against the DOM library and the JSX transform, and the two faces stay apart
+  // so Host code cannot reach a browser global by accident.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
@@ -26,12 +30,17 @@
       "zod": ["../../packages/storage/storage-domain/node_modules/zod"],
       "vitest": ["../../node_modules/vitest"],
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-include": ["../../vendor/include/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader": ["../../vendor/loader/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent": ["../../packages/core/agent/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent-loop": ["../../packages/core/agent-loop/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent-loop-testkit": ["../../packages/test-support/agent-loop-testkit/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-connection": ["../../packages/client/connection/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-commands": ["../../packages/interaction/commands/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-commands/brand": ["../../packages/interaction/commands/lib/types/brand.d.ts"],
+      "@deepseek-ai/dsh-host-webserver": ["../../packages/host/webserver/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm": ["../../packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session-projection": ["../../packages/session/session-projection/lib/types/index.d.ts"],
@@ -42,5 +51,6 @@
       "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["src/client/**", "tests/client/**"]
 }

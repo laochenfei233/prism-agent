@@ -27,9 +27,12 @@ export const inject = ['commands', 'prismMemory'] as const
 const USAGE = [
   'Usage: /memory <subcommand>',
   '  status                     Counts by status, scope, layer, and kind (default)',
+  '  remember <text>            Store one claim of your own, without a model turn',
+  '  search <query>             Ranked claims; an empty query lists the most recent',
   '  review [limit]             The review inbox: records held back until approved',
   '  approve <id> [note]        Promote one pending record to active',
   '  reject <id> [reason]       Archive one pending record',
+  '  forget <id> [reason]       Retire one claim so it stops being recalled',
   '  show <id>                  One record with its attribution and supersede chain',
   '  restore <id> [reason]      Roll a record back to current',
   '  conversations [limit]      Browse the corpus by originating conversation',
@@ -117,6 +120,40 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
   switch (subcommand) {
     case '': return statusReport(memory, invocation)
     case 'status': return statusReport(memory, invocation)
+
+    case 'remember': {
+      if (rest === '') return { kind: 'error', text: USAGE }
+      const result = await memory.remember({ text: rest, origin: 'operator' }, invocation.agent)
+      const lines = [result.outcome === 'existing'
+        ? 'An identical claim already stood; its reuse count rose and nothing was stored twice:'
+        : 'Stored:', line(result.record)]
+      if (result.duplicates.length > 0) {
+        lines.push('Near-duplicates already held — name one as supersedes to replace it instead of adding a paraphrase:')
+        for (const duplicate of result.duplicates) lines.push(`  [${duplicate.id}] ${duplicate.text}`)
+      }
+      return { kind: 'success', text: lines.join('\n') }
+    }
+
+    case 'search': {
+      // An empty query ranks every eligible claim with no terms, and the ranker
+      // orders that newest first — the same answer memory_search gives, under
+      // the same deployment cap.
+      const rows = memory.search(rest, invocation.agent).map(hit => hit.record)
+      if (rows.length === 0) {
+        return {
+          kind: 'success',
+          text: rest === '' ? 'No memory is visible from this session.' : `No memory matched: ${rest}`,
+        }
+      }
+      const heading = rest === '' ? 'Most recent claims, newest first:' : `${rows.length} match(es), best first:`
+      return { kind: 'success', text: [heading, ...rows.map(line)].join('\n') }
+    }
+
+    case 'forget': {
+      const { first, tail } = firstAndRest(rest)
+      if (first === '') return { kind: 'error', text: USAGE }
+      return { kind: 'success', text: `Retired, retained for audit:\n${line(await memory.forget(first, tail, invocation.agent))}` }
+    }
 
     case 'review': {
       const pending = memory.review(invocation.agent, { limit: limitOf(rest === '' ? undefined : rest, 50) })

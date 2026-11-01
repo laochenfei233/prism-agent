@@ -378,13 +378,13 @@
   </p>
   <table>
     <thead>
-      <tr><th>操作</th><th>面向模型（工具，进缓存前缀）</th><th>面向人（<code>/memory</code>，零 schema）</th></tr>
+      <tr><th>操作</th><th>面向模型（工具，进缓存前缀）</th><th>面向人（<code>/memory</code> 与记忆页，零 schema）</th></tr>
     </thead>
     <tbody>
-      <tr><td>写入一条主张</td><td><code>memory_remember</code></td><td>—</td></tr>
-      <tr><td>检索 / 精读 / 退役</td><td><code>memory_search</code> · <code>memory_open</code> · <code>memory_forget</code></td><td>—</td></tr>
+      <tr><td>写入一条主张</td><td><code>memory_remember</code></td><td><code>remember</code> · 记忆页「记住」</td></tr>
+      <tr><td>检索 / 精读 / 退役</td><td><code>memory_search</code> · <code>memory_open</code> · <code>memory_forget</code></td><td><code>search</code> · <code>forget</code> · 记忆页搜索</td></tr>
       <tr><td>浏览来源会话</td><td><code>memory_conversations</code></td><td><code>conversations</code></td></tr>
-      <tr><td>审批 / 驳回待审条目</td><td>不可调用</td><td><code>review</code> · <code>approve</code> · <code>reject</code></td></tr>
+      <tr><td>审批 / 驳回待审条目</td><td>不可调用</td><td><code>review</code> · <code>approve</code> · <code>reject</code> · 记忆页按钮</td></tr>
       <tr><td>回滚到旧主张</td><td>不可调用</td><td><code>restore</code></td></tr>
       <tr><td>清扫（TTL / 合并 / 淘汰）</td><td>不可调用</td><td><code>maintain [apply]</code></td></tr>
       <tr><td>梦境整理（印证 / 主题 / 日志）</td><td>不可调用</td><td><code>dream [apply]</code> · <code>journal</code></td></tr>
@@ -395,6 +395,12 @@
   <p class="note">
     判定被放在做出判定的那个操作里：<code>memory_remember</code> 没有「跳过审批」的参数，
     <code>requireApproval</code> 下写入直接落 <code>pending</code>，而 <code>pending</code> 从不注入。
+  </p>
+  <p>
+    记忆页走的是同一条结构约束的另一半：页面没有调用会话，因此它经服务的<strong>运维面</strong>读写 ——
+    <code>operatorRecords</code>、<code>operatorSearch</code>、<code>operatorApprove</code>、<code>operatorReject</code> ——
+    这些方法不按作用域收窄，每行仍渲染自己的作用域，让收窄在做决定的地方可见。
+    面向模型的调用方一字未变：工具传自己的 agent，<code>/memory</code> 传自己的会话，两者仍然被它们过滤。
   </p>
 </section>
 
@@ -446,7 +452,8 @@
     <li><strong>语料常驻内存。</strong>受 <code>maxRecords</code> 约束，但不受字节数约束。</li>
     <li><strong><code>hits</code> 只统计显式打开</strong>，所以复用权重是弱信号；沉淀刻意不碰它。</li>
     <li><strong>维护与整理都没挂调度。</strong>它们跑在回合路径与操作者命令上；想要固定时刻执行，需要一条 schedule 行指向 <code>/memory maintain apply</code> 或 <code>/memory dream apply</code>。</li>
-    <li><strong>命令面是间接覆盖的。</strong><code>/memory</code> 是服务方法的薄适配层，规格直接覆盖了那些方法，尚未端到端驱动一次组合后的命令调用。</li>
+    <li><strong>页面只新增与结算，不编辑。</strong>改写一条主张是带 <code>supersedes</code> 的 <code>memory_remember</code>，驳回一条仍生效的记录是 <code>memory_forget</code> 或 <code>/memory reject</code>；面板两个都不提供，因为在面板上做的编辑没有审计故事。</li>
+    <li><strong>页面的 overview 在每次写入后读整库。</strong>它受 <code>maxRecords</code> 约束，对本存储面向的语料规模是正确的；接近上限的存储需要先做分页读取。</li>
     <li><strong>导入布局是按 id 硬编码的。</strong>新增一个工具意味着往 <code>IMPORT_SOURCES</code> 加一条；自定义布局没有配置格式。</li>
   </ul>
 </section>
