@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns ten **advisory** capabilities into **enforced** ones.
+An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the ten are hardenings of DeepSeek Harness's own advice. The other six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
+Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -22,6 +22,8 @@ Four of the ten are hardenings of DeepSeek Harness's own advice. The other six t
 | Dependency changes (Ponytail) | "Never add a new one for what a few lines can do" is prose | A write to a dependency manifest goes to approval |
 | Verification (Aegis) | `verification-before-completion` states the required evidence in a skill the model is asked to load | A turn that wrote files and ran no verification is sent back for its evidence before it can stop |
 | Turn completion (Compose Next) | The workflow tells the model to finish its tasks and produce delivery evidence; the loop still ends the turn whenever the model stops calling tools | A turn whose own todo list still holds open items is steered to continue before it can stop |
+| Destructive commands | Nothing parses a shell command's text, and `bash` and `pwsh` are deliberately absent from the plan-mode rail for that reason; the sandbox covers file effects, not a force-push | A command matching a configured pattern goes to approval |
+| Credential reads | `read` and `grep` are read-only tools to every other rail, and a read lands in the session log permanently | A read of a configured credential path is refused |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
 
@@ -73,8 +75,14 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `dependencyManifests` | non-empty array of distinct, non-blank file names | File names whose write goes to approval | rail off |
 | `routingContract.readOnlyTools` | non-empty array of distinct, non-blank tool names | The tools that only read; the first call to any other is the contract's trigger | rail off |
 | `verificationGate.verifyTools` | non-empty array of distinct, non-blank tool names | The tools whose completed call is accepted as verification | rail off |
+| `readTools` | non-empty array of `{ tool, pathArgument }` | The deployment's file-reading tools; required by the sensitive-read rail | required by that rail |
+| `sensitivePaths` | non-empty array of distinct, non-blank path segments | Path segments treated as credential material | rail off |
+| `commandGuard.tools` | non-empty array of `{ tool, commandArgument }` | The tools whose call carries a command line | required by that rail |
+| `commandGuard.deny` | non-empty array of `{ pattern, reason }` | Regular expressions a command is matched against, and why an approver should care | required by that rail |
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
+
+`readTools` works the same way: `{ tool: read, pathArgument: file_path }` and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's two tools that read file content by path. `read_image` takes an attachment id rather than a path, so it is not one of them.
 
 Load-time rejections, each with the message asserted by the test suite:
 
@@ -102,9 +110,19 @@ Load-time rejections, each with the message asserted by the test suite:
 | an empty `readOnlyTools` / `verifyTools` list | `… must be a non-empty array of tool names` |
 | a written-content rail without `writeTools` | `… all read written files — name writeTools as well` |
 | `requirePonytailUpgradePaths` with no `contentArgument` anywhere | `… at least one writeTools entry must name its contentArgument` |
+| `readTools` not an array, or empty | `readTools must be an array of { tool, pathArgument } entries` / `readTools must not be empty — omit the key to disable the sensitive-read rail` |
+| a read entry naming no path argument | `readTools entry "read" must name its pathArgument` |
+| a repeated read tool, or an unknown entry key | `readTools names "read" twice` / `unknown readTools key(s) …` |
+| `sensitivePaths` empty, blank, or repeated | `sensitivePaths must not be empty — omit the key to disable the sensitive-read rail`, `… entries must be non-empty path segments`, `… names ".env" twice` |
+| `sensitivePaths` without `readTools` | `sensitivePaths reads file paths — name readTools as well` |
+| `commandGuard` not an object, or an unknown key | `commandGuard must be an object { tools, deny }`, `unknown commandGuard key(s) …` |
+| an empty `tools` or `deny` list | `commandGuard.tools must be a non-empty array of { tool, commandArgument } entries`, `commandGuard.deny must be a non-empty array of { pattern, reason } entries` |
+| a command tool naming no argument | `commandGuard.tools entry "bash" must name its commandArgument` |
+| a pattern naming no reason | `commandGuard.deny entry "…" must name a reason` |
+| a pattern that does not compile | `commandGuard.deny pattern "(" is not a regular expression: …` |
 | any other top-level key | `unknown config key(s) …` |
 
-The last two rows are the bundle's cross-field rule: a rail that reads written content owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.
+The `writeTools` and `readTools` rows are the bundle's cross-field rule: a rail that reads a file owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.
 
 ## Rails
 
@@ -228,6 +246,44 @@ The list is the plan the model wrote for itself through `todo_write`, so a stop 
 
 The snapshot is read from the session log, so a resumed, forked, or compacted session is judged by the list it actually has; a session that never wrote one is left alone. `unfinishedTodoContinuations` bounds the steers per turn — a model that keeps stopping with work left reaches the budget and the next boundary is left alone, so the worst case is that many extra steps rather than a loop.
 
+### Sensitive-read denial
+
+A read of a path carrying a configured segment is refused:
+
+```
+Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as credential material (matched ".ssh"); reading it would write the secret into the session log permanently. Ask the user for the specific value if it is needed.
+```
+
+A segment matches by equality or by a dotted extension of the configured name, ignoring case, under either separator: `.env` guards `.env` and `.env.local`, and leaves `environment.ts` alone.
+
+The decision is `deny` rather than `ask`. A read lands in the session log, and no later approval removes it from there; the useful alternative — the user pastes the value — never needs the file's contents, so there is nothing for an approval to price.
+
+The rail matches the path the call names, not the file it resolves to, so a symlink or a relative detour around a guarded directory is not covered.
+
+### Command guard
+
+A shell call whose text matches a configured pattern goes to approval:
+
+```
+`bash` would run a command this deployment guards (matched `git\s+push\b[^\n]*(--force\b|\s-f\b)`): rewrites a remote branch history others may already have; approve only if the command is intended
+```
+
+Each `pattern` compiles at load and is matched case-insensitively against the raw command text, so `bash -c "git push --force"` is still caught. The decision is `ask` rather than `deny`: deleting a build directory or force-pushing a personal branch is sometimes exactly the intended action, and only a human can tell that from the accident. With no approval channel the fail-closed approval ladder refuses the call, which is the intended unattended outcome.
+
+## `/guardrails`
+
+The bundle registers one command that reports which rails the deployment actually has armed:
+
+```
+Guardrails: 12 of 12 rails armed.
+plan-mode denial: write, edit, str_replace_editor
+repeat approval: after 5 identical calls
+...
+command guard: 2 tool(s), 3 pattern(s)
+```
+
+It reads the resolved configuration, so the report cannot disagree with the rails. A deployment with no `commands` service keeps every rail and loses only the report.
+
 ## Wiring
 
 The bundle patches one row over the profile root, and `cordis.patch.yml` ships that row under the package name — the form a profile resolves once the bundle is installed or published. Both forms below were booted for real against the shipped `headless` profile.
@@ -261,6 +317,17 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           readOnlyTools: [read, read_image, glob, grep]
         verificationGate:
           verifyTools: [bash, pwsh]
+        readTools:
+          - { tool: read, pathArgument: file_path }
+          - { tool: grep, pathArgument: path }
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519, credentials]
+        commandGuard:
+          tools:
+            - { tool: bash, commandArgument: command }
+            - { tool: pwsh, commandArgument: command }
+          deny:
+            - pattern: 'git\s+push\b[^\n]*(--force\b|\s-f\b)'
+              reason: rewrites a remote branch history others may already have
 ```
 
 `tests/fixtures/cli-boot.patch.yml` is an overlay of that shape, and it drives the plan-mode rail through the product's own one-shot path:
@@ -277,7 +344,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## Build and verify
 
-The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except one — `createUserMessage`, which the verification gate needs as a value to steer the agent — so the emitted module carries exactly that one external import, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` is therefore the bundle's only peer dependency.
+The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except the two the rails need as values — `createUserMessage`, which the verification and todo gates use to steer the agent, and `CommandDefinitionId`, which every command registration needs — so the emitted module carries only those external imports, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-commands` are therefore the bundle's only peer dependencies.
 
 `tsconfig.json` resolves those types through the checkout's **built** declarations, which is how the repository's own packages consume each other — run `pnpm run build` in the checkout first. `tsdown.config.ts` keeps `@deepseek-ai/*` external, as the sibling `plugins/prism-memory` does: a bundled copy would shadow the profile's own service instances across the cross-instance identity the harness relies on.
 
@@ -285,7 +352,7 @@ The bundle borrows the checkout's packages instead of declaring workspace depend
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with one external harness import
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 93 composed unit tests
+npm test            # 119 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -309,5 +376,8 @@ Vitest needs vite's Windows real-path probe to spawn a child process, which a co
 - **`skillNameArgument`'s non-object guard is unreachable through the shipped tool set.** The registry validates a call against the tool's compiled object schema before the pre-execute waterfall, so a non-object argument list is rejected first — the test suite pins that rejection. The two lines are kept so the function stays total at a model tool-JSON boundary rather than throwing inside a listener, which would fail every call to the tool.
 - **The repeat rail has no `include`/`exclude` patterns.** `@deepseek-ai/dsh-repeat-tool-reminder` offers wildcard tool selection and this rail does not; a deployment that needs it must say so with a concrete consumer.
 - **Reasoning-streak loop governance is not implemented.** This bundle detects repetition by tool name plus arguments only. Detecting a repeated *thinking* prefix and pruning the polluted span from the request view while the log keeps the full trajectory is a separate, larger capability.
-- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools` and `repeatAskAfter: 5` come from the fork's `CAPABILITY-PLAN.md`. `maxStepsPerTurn: 200` is a runaway backstop rather than a working limit: the plan's `20` truncated 11 of the 20 turns recorded in the fork's own deployment, each after about a minute of work, and no recorded turn ever finished naturally at that ceiling. `maxWrittenFilesPerTurn: 8` and the routing contract's read-only list are this bundle's own first pass over DeepSeek Harness's tool set; a deployment that disagrees edits the row. `unfinishedTodoContinuations: 3` is sized the same way: enough to carry a turn through the progress-report stop that produced it, small enough that a model which never finishes still ends the turn.
+- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools` and `repeatAskAfter: 5` come from the fork's `CAPABILITY-PLAN.md`. `maxStepsPerTurn: 200` is a runaway backstop rather than a working limit: the plan's `20` truncated 11 of the 20 turns recorded in the fork's own deployment, each after about a minute of work, and no recorded turn ever finished naturally at that ceiling. `maxWrittenFilesPerTurn: 8` and the routing contract's read-only list are this bundle's own first pass over DeepSeek Harness's tool set; a deployment that disagrees edits the row. `unfinishedTodoContinuations: 3` is sized the same way: enough to carry a turn through the progress-report stop that produced it, small enough that a model which never finishes still ends the turn. `sensitivePaths` and the three `commandGuard` patterns are that same first pass: a short credential list and the three commands whose damage cannot be undone afterwards.
+- **The command guard reads raw text.** A pattern sees the command string, so `bash -c "git push --force"` is still caught, but quoting and variable tricks evade it, and a denial is only as good as the patterns a deployment writes. Wrapper-proof matching needs a shell parser, which no current consumer has asked for.
+- **A guarded command is priced, not judged.** `ask` means a legitimate `rm -rf` of a build directory costs one approval each time; a deployment that finds that too expensive narrows its own patterns.
+- **Segment matching over-reaches at the edges.** `id_rsa` guards `id_rsa.pub` too, and a path is matched as the call wrote it, so a symlink or a relative detour around a guarded directory is not covered.
 - **No Chinese README pair is required for `plugins/`.** The repository's translation-pairing gate already reports the sibling `plugins/dsh-agent-progress/` for a missing pair; this bundle ships the pair so it adds no failure of its own.

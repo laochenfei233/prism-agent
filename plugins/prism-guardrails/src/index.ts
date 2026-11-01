@@ -31,6 +31,12 @@
  *   sent back for its evidence before it can stop.
  * - **Unfinished-todo gate** — a turn whose own todo list still holds pending or
  *   in-progress items is sent back to finish them before it can stop.
+ * - **Sensitive reads** — a read of a path the deployment treats as credential
+ *   material is refused, because the content would land in the session log.
+ * - **Command guard** — a shell call whose text matches a guarded pattern goes
+ *   to approval, so a force-push or a recursive delete is priced before it runs.
+ *
+ * `/guardrails` reports which of these a running deployment has armed.
  *
  * The configuration surface, each rail's exact behavior, and the DeepSeek
  * Harness capability each one replaces are in the package README.
@@ -40,6 +46,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type { CommandResult, CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
@@ -133,6 +141,9 @@ export function apply(ctx: Context, config: Config = {}): void {
   installDependencyApproval(ctx, resolved)
   installVerificationGate(ctx, resolved, turns)
   installUnfinishedTodoGate(ctx, resolved)
+  installSensitiveReadDenial(ctx, resolved)
+  installCommandGuard(ctx, resolved)
+  installStatusCommand(ctx, resolved)
 }
 
 /**
@@ -691,4 +702,156 @@ function sortJsonValue(value: unknown): unknown {
     return sorted
   }
   return value
+}
+
+/**
+ * Refuse a read of a path the deployment treats as credential material.
+ *
+ * `deny` rather than `ask`: the read would write the secret into the session
+ * log, and no later approval removes it from there. The alternative the model
+ * needs — ask the user for the value — never needs the file's contents, so
+ * there is nothing for an approval to price.
+ *
+ * The rail matches the path the call names, not the file it resolves to, so a
+ * symlink or a relative detour around a guarded directory is not covered.
+ */
+function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig): void {
+  const readTools = resolved.readTools
+  const segments = resolved.sensitivePaths
+  if (readTools === undefined || segments === undefined) return
+
+  ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
+    const pathArgument = readTools.get(exec.name)
+    if (pathArgument === undefined) return next()
+    const path = stringArgument(exec.arguments, pathArgument)
+    if (path === undefined) return next()
+    const matched = sensitiveSegment(path, segments)
+    if (matched === undefined) return next()
+    return Promise.resolve({
+      kind: 'deny',
+      reason: `\`${exec.name}\` targets ${JSON.stringify(path)}, which this deployment treats as credential `
+        + `material (matched ${JSON.stringify(matched)}); reading it would write the secret into the session log `
+        + 'permanently. Ask the user for the specific value if it is needed.',
+    })
+  })
+}
+
+/**
+ * The configured segment a path names, when it names one.
+ *
+ * A segment matches by equality or by a dotted extension of the configured
+ * name, so `.env.local` is guarded by `.env` while `environment.ts` is not.
+ *
+ * @param path - a path as a tool call wrote it, under either separator.
+ * @param segments - the configured credential segments.
+ * @returns the configured segment the path names, or `undefined`.
+ */
+function sensitiveSegment(path: string, segments: readonly string[]): string | undefined {
+  for (const segment of path.split(/[\\/]/u)) {
+    const written = segment.toLowerCase()
+    for (const name of segments) {
+      const wanted = name.toLowerCase()
+      if (written === wanted || written.startsWith(`${wanted}.`)) return name
+    }
+  }
+  return undefined
+}
+
+/**
+ * Send a shell call whose text matches a guarded pattern to approval.
+ *
+ * `ask` rather than `deny`: deleting a build directory or force-pushing a
+ * personal branch is sometimes exactly the intended action, and only a human
+ * can tell that from the accident. With no approval channel the fail-closed
+ * approval ladder denies the call, which is the intended unattended outcome.
+ *
+ * `shortcut:` the pattern sees the raw command text, so `bash -c "…"` is still
+ * matched, but quoting or variable tricks evade it; upgrade to a shell parser
+ * when a consumer needs wrapper-proof matching.
+ */
+function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
+  const guard = resolved.commandGuard
+  if (guard === undefined) return
+
+  ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
+    const commandArgument = guard.tools.get(exec.name)
+    if (commandArgument === undefined) return next()
+    const command = stringArgument(exec.arguments, commandArgument)
+    if (command === undefined) return next()
+    for (const rule of guard.rules) {
+      if (!rule.pattern.test(command)) continue
+      return Promise.resolve({
+        kind: 'ask',
+        reason: `\`${exec.name}\` would run a command this deployment guards (matched \`${rule.source}\`): `
+          + `${rule.reason}; approve only if the command is intended`,
+      })
+    }
+    return next()
+  })
+}
+
+/**
+ * Register `/guardrails`, which reports which rails the deployment has armed.
+ *
+ * The `commands` service is optional: a profile without it keeps every rail and
+ * loses only the report, so this reads it through `ctx.get` instead of
+ * declaring the injection.
+ */
+function installStatusCommand(ctx: Context, resolved: ResolvedConfig): void {
+  const commands = ctx.get('commands') as CommandRuntime | undefined
+  if (commands === undefined) return
+  ctx.effect(() => commands.register({
+    definitionId: CommandDefinitionId('prism-guardrails/status'),
+    name: 'guardrails',
+    description: 'Report which guardrail rails this deployment has armed',
+    handler: (): CommandResult => ({ kind: 'success', text: describeRails(resolved) }),
+  }), 'prism-guardrails.status')
+}
+
+/**
+ * The status report: a count, then one line per rail with its configured value
+ * or `off`.
+ *
+ * @param resolved - the validated configuration the running deployment uses.
+ * @returns the text a `/guardrails` invocation prints.
+ */
+function describeRails(resolved: ResolvedConfig): string {
+  const rails: readonly (readonly [string, string | undefined])[] = [
+    ['plan-mode denial', listed(resolved.planDeniedTools)],
+    ['repeat approval', resolved.repeatAskAfter === undefined
+      ? undefined
+      : `after ${String(resolved.repeatAskAfter)} identical calls`],
+    ['turn budget', resolved.maxStepsPerTurn === undefined
+      ? undefined
+      : `${String(resolved.maxStepsPerTurn)} steps`],
+    ['unfinished todos', resolved.unfinishedTodoContinuations === undefined
+      ? undefined
+      : `${String(resolved.unfinishedTodoContinuations)} continuations`],
+    ['skill guidance', resolved.skillInvocationGuidance ? 'on' : undefined],
+    ['write budget', resolved.maxWrittenFilesPerTurn === undefined
+      ? undefined
+      : `${String(resolved.maxWrittenFilesPerTurn)} distinct files`],
+    ['ponytail markers', resolved.requirePonytailUpgradePaths ? 'on' : undefined],
+    ['dependency manifests', listed(resolved.dependencyManifests)],
+    ['routing contract', listed(resolved.routingContract)],
+    ['verification gate', listed(resolved.verificationGate)],
+    ['sensitive reads', resolved.sensitivePaths?.join(', ')],
+    ['command guard', resolved.commandGuard === undefined
+      ? undefined
+      : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
+  ]
+  const armed = rails.filter(([, detail]) => detail !== undefined).length
+  return [`Guardrails: ${String(armed)} of ${String(rails.length)} rails armed.`]
+    .concat(rails.map(([name, detail]) => `${name}: ${detail ?? 'off'}`))
+    .join('\n')
+}
+
+/**
+ * A configured name set as one report value.
+ *
+ * @param names - the set a rail resolved, or `undefined` when the rail is off.
+ * @returns the names joined for the report, or `undefined` when the rail is off.
+ */
+function listed(names: ReadonlySet<string> | undefined): string | undefined {
+  return names === undefined ? undefined : [...names].join(', ')
 }

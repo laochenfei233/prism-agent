@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把十项**建议性**能力变成**强制性**能力。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-十条之中有四条是对 DeepSeek Harness 自带建议的加固，其余六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
+十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -22,6 +22,8 @@
 | 依赖变更（Ponytail） | "几行代码能做的，绝不新增依赖"只是一句散文 | 对依赖清单的写入送交审批 |
 | 完成验证（Aegis） | `verification-before-completion` 把所需证据写在"要求模型去加载"的 skill 里 | 一轮写了文件却没跑验证时，在它能停下之前被送回补证据 |
 | 轮次完成（Compose Next） | 工作流要求模型做完自己的任务并给出交付证据；但只要模型不再调用工具，循环照样结束该轮 | 模型自己写的 todo 清单里还有未完成项时，在它能停下之前被 steer 继续 |
+| 破坏性命令 | 没有任何东西解析 shell 命令文本，`bash` 与 `pwsh` 正因此被排除在计划模式 rail 之外；沙箱管的是文件效果，管不了强推 | 命中配置模式的命令送交审批 |
+| 凭据读取 | 在其他所有 rail 眼里 `read` 与 `grep` 都是只读工具，而一次读取会永久留在会话日志里 | 读取配置的凭据路径被拒绝 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
 
@@ -73,8 +75,14 @@
 | `dependencyManifests` | 非空、互不相同、非空白的文件名数组 | 写入这些文件名时送交审批 | rail 关闭 |
 | `routingContract.readOnlyTools` | 非空、互不相同、非空白的工具名数组 | 只做读取的工具；调用其他任何工具即为契约触发点 | rail 关闭 |
 | `verificationGate.verifyTools` | 非空、互不相同、非空白的工具名数组 | 其成功调用被认可为验证的工具 | rail 关闭 |
+| `readTools` | 非空的 `{ tool, pathArgument }` 数组 | 该部署的读文件工具；敏感读取 rail 以它为前置 | 由该 rail 要求 |
+| `sensitivePaths` | 非空、互不相同、非空白的路径段数组 | 被视为凭据材料的路径段 | rail 关闭 |
+| `commandGuard.tools` | 非空的 `{ tool, commandArgument }` 数组 | 调用中携带命令行文本的工具 | 由该 rail 要求 |
+| `commandGuard.deny` | 非空的 `{ pattern, reason }` 数组 | 命令文本要匹配的正则，以及审批人需要知道的理由 | 由该 rail 要求 |
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
+
+`readTools` 同理：`{ tool: read, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取文件内容的两个工具。`read_image` 取的是附件 id 而不是路径，因此不属于其中。
 
 加载期拒绝项（每条文案都由测试套件断言）：
 
@@ -102,9 +110,19 @@
 | `readOnlyTools` / `verifyTools` 为空 | `… must be a non-empty array of tool names` |
 | 开启读写入内容的 rail 却没有 `writeTools` | `… all read written files — name writeTools as well` |
 | 开启 `requirePonytailUpgradePaths` 却没有任何 `contentArgument` | `… at least one writeTools entry must name its contentArgument` |
+| `readTools` 不是数组或为空 | `readTools must be an array of { tool, pathArgument } entries` / `readTools must not be empty — omit the key to disable the sensitive-read rail` |
+| 读取条目没有给出路径参数 | `readTools entry "read" must name its pathArgument` |
+| 重复的读工具或未知条目键 | `readTools names "read" twice` / `unknown readTools key(s) …` |
+| `sensitivePaths` 为空、空白或重复 | `sensitivePaths must not be empty — omit the key to disable the sensitive-read rail`、`… entries must be non-empty path segments`、`… names ".env" twice` |
+| 只给 `sensitivePaths` 而没有 `readTools` | `sensitivePaths reads file paths — name readTools as well` |
+| `commandGuard` 不是对象或含未知键 | `commandGuard must be an object { tools, deny }`、`unknown commandGuard key(s) …` |
+| `tools` 或 `deny` 为空 | `commandGuard.tools must be a non-empty array of { tool, commandArgument } entries`、`commandGuard.deny must be a non-empty array of { pattern, reason } entries` |
+| 命令工具条目没有给出参数名 | `commandGuard.tools entry "bash" must name its commandArgument` |
+| 模式条目没有给出理由 | `commandGuard.deny entry "…" must name a reason` |
+| 模式无法编译 | `commandGuard.deny pattern "(" is not a regular expression: …` |
 | 其他任意键 | `unknown config key(s) …` |
 
-最后两行是本 bundle 的跨字段规则：读取写入内容的 rail 自身不掌握任何工具知识，因此只开启 rail 而不声明工具的部署没有可执行的对象。这种情况在加载期就失败，而不是加载一条永不触发的 rail。
+`writeTools` 与 `readTools` 两行是本 bundle 的跨字段规则：读写文件的 rail 自身不掌握任何工具知识，因此只开启 rail 而不声明工具的部署没有可执行的对象。这种情况在加载期就失败，而不是加载一条永不触发的 rail。
 
 ## 各条 rail
 
@@ -228,6 +246,44 @@ Your todo list still has 3 unfinished item(s): "T2 make Shortcuts.invoke return 
 
 快照从会话日志读取，因此恢复、分叉或被压缩过的会话按它实际持有的清单判定；从未写过清单的会话不受影响。`unfinishedTodoContinuations` 限定每轮可被送回的次数——一直带着未完成项停下的模型用满额度后，下一个边界不再被打断，最坏情况是多花这么多步，而不是循环。
 
+### 敏感读取拒绝
+
+读取的路径带有配置的路径段时被拒绝：
+
+```
+Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as credential material (matched ".ssh"); reading it would write the secret into the session log permanently. Ask the user for the specific value if it is needed.
+```
+
+路径段按相等匹配，或按"配置名 + `.` 前缀"匹配，忽略大小写，两种分隔符都认：`.env` 能挡住 `.env` 与 `.env.local`，而放过 `environment.ts`。
+
+判定是 `deny` 而不是 `ask`。一次读取会落进会话日志，之后再怎么批准也删不掉；而模型真正需要的替代路径——请用户把值贴出来——根本不需要文件内容，也就没有什么可供审批定价。
+
+这条 rail 匹配的是调用写出来的路径，而不是它最终解析到的文件，因此符号链接或绕道相对路径不在覆盖范围内。
+
+### 命令守卫
+
+命令文本命中配置模式的 shell 调用送交审批：
+
+```
+`bash` would run a command this deployment guards (matched `git\s+push\b[^\n]*(--force\b|\s-f\b)`): rewrites a remote branch history others may already have; approve only if the command is intended
+```
+
+每个 `pattern` 在加载期编译，并忽略大小写地匹配原始命令文本，因此 `bash -c "git push --force"` 同样会被抓到。判定是 `ask` 而不是 `deny`：删掉构建目录或强推个人分支有时正是想要的动作，只有人能把它和事故区分开。没有审批通道时，fail-closed 审批阶梯会拒绝该调用，这正是无人值守时的预期结果。
+
+## `/guardrails`
+
+本 bundle 注册一条命令，报告该部署实际启用（armed）了哪些 rail：
+
+```
+Guardrails: 12 of 12 rails armed.
+plan-mode denial: write, edit, str_replace_editor
+repeat approval: after 5 identical calls
+...
+command guard: 2 tool(s), 3 pattern(s)
+```
+
+它读取的是解析后的配置，因此报告不可能与 rail 的实际状态不一致。没有 `commands` 服务的部署保有全部 rail，只失去这份报告。
+
 ## 接线
 
 本 bundle 在 profile 根之上打一行 patch，`cordis.patch.yml` 以包名形式随附这一行——即 bundle 被安装或发布后 profile 能解析的形态。下面两种形态都针对随附的 `headless` profile 真实启动过。
@@ -261,6 +317,17 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           readOnlyTools: [read, read_image, glob, grep]
         verificationGate:
           verifyTools: [bash, pwsh]
+        readTools:
+          - { tool: read, pathArgument: file_path }
+          - { tool: grep, pathArgument: path }
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519, credentials]
+        commandGuard:
+          tools:
+            - { tool: bash, commandArgument: command }
+            - { tool: pwsh, commandArgument: command }
+          deny:
+            - pattern: 'git\s+push\b[^\n]*(--force\b|\s-f\b)'
+              reason: rewrites a remote branch history others may already have
 ```
 
 `tests/fixtures/cli-boot.patch.yml` 就是这种形态的 overlay，它让计划模式 rail 走完产品自己的一次性路径：
@@ -277,7 +344,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## 构建与验证
 
-本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有一处例外——`createUserMessage`，完成验证闸门需要以值的形式用它来 steer agent——因此产物恰好携带这一个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。`@deepseek-ai/dsh-llm` 因此是本 bundle 唯一的 peer dependency。
+本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有以值形式使用的两处例外——`createUserMessage`（完成验证闸门与未完成 todo 闸门用它 steer agent）与 `CommandDefinitionId`（每次命令注册都要用）——因此产物只携带这两个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。`@deepseek-ai/dsh-llm` 与 `@deepseek-ai/dsh-commands` 因此是本 bundle 仅有的 peer dependency。
 
 `tsconfig.json` 通过检出目录的**已构建**声明解析这些类型，这也是仓库内各包互相消费的方式——请先在检出目录里跑 `pnpm run build`。`tsdown.config.ts` 让 `@deepseek-ai/*` 保持外部，与同级的 `plugins/prism-memory` 一致：打包进副本会在 harness 依赖的跨实例身份上遮蔽 profile 自己的服务实例。
 
@@ -285,7 +352,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with one external harness import
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 93 composed unit tests
+npm test            # 119 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -309,5 +376,8 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 - **`skillNameArgument` 的非对象防护在当前工具集下不可达。** 注册表会在 pre-execute waterfall 之前用工具编译后的对象 schema 校验调用，因此非对象的参数列表会先被拒绝——测试套件固定了这一拒绝行为。保留这两行是为了让函数在模型 tool-JSON 边界上保持全定义，而不是在监听器里抛错（那会让该工具的每一次调用都失败）。
 - **重复 rail 没有 `include`/`exclude` 模式。** `@deepseek-ai/dsh-repeat-tool-reminder` 提供通配符工具选择，本 rail 不提供；需要它的部署应先给出具体消费者。
 - **未实现推理链层面的循环治理。** 本 bundle 只按"工具名 + 参数"检测重复。检测重复的**推理**前缀、并把污染区间从请求视图中裁掉（日志保留完整轨迹）是另一项更大的能力。
-- **随附默认值是部署策略，不是推荐值。** `planDeniedTools` 与 `repeatAskAfter: 5` 取自本 fork 的 `CAPABILITY-PLAN.md`。`maxStepsPerTurn: 200` 是失控兜底，而不是日常工作上限：计划里的 `20` 在本 fork 自己的部署中截断了 20 个 turn 里的 11 个，每个都在约一分钟的工作后被截断，且没有任何一个 turn 是在该上限处自然结束的。`maxWrittenFilesPerTurn: 8` 与路由契约的只读列表，是本 bundle 对 DeepSeek Harness 工具集的第一次取值；不认同的部署请直接改这一行。`unfinishedTodoContinuations: 3` 同理：足够把一次"汇报进展式停下"推回工作，又不至于让永远做不完的模型一直跑下去。
+- **随附默认值是部署策略，不是推荐值。** `planDeniedTools` 与 `repeatAskAfter: 5` 取自本 fork 的 `CAPABILITY-PLAN.md`。`maxStepsPerTurn: 200` 是失控兜底，而不是日常工作上限：计划里的 `20` 在本 fork 自己的部署中截断了 20 个 turn 里的 11 个，每个都在约一分钟的工作后被截断，且没有任何一个 turn 是在该上限处自然结束的。`maxWrittenFilesPerTurn: 8` 与路由契约的只读列表，是本 bundle 对 DeepSeek Harness 工具集的第一次取值；不认同的部署请直接改这一行。`unfinishedTodoContinuations: 3` 同理：足够把一次"汇报进展式停下"推回工作，又不至于让永远做不完的模型一直跑下去。`sensitivePaths` 与三条 `commandGuard` 模式也是同一轮的取值：一份很短的凭据清单，加上三条事后无法挽回其损害的命令。
+- **命令守卫读的是原文。** 模式看到的是命令字符串，因此 `bash -c "git push --force"` 仍会被抓，但引号与变量技巧可以绕过；一条防线的好坏取决于部署写出的模式。要做到"包装即失效"的匹配需要 shell 解析器，目前没有任何消费者提出这一需求。
+- **被守卫的命令只是被"定价"，不是被"判死"。** `ask` 意味着一次正当的 `rm -rf` 构建目录每次都要一次审批；觉得太贵的部署应自己收窄模式。
+- **路径段匹配在边界上会过度命中。** `id_rsa` 也会挡住 `id_rsa.pub`；路径按调用写下的原样匹配，因此符号链接或绕道的相对路径不在覆盖范围内。
 - **`plugins/` 不要求中文 README 对照件。** 仓库的 translation-pairing 门禁已经把同级的 `plugins/dsh-agent-progress/` 报为缺少对照件；本 bundle 主动提供对照件，因此不新增失败项。

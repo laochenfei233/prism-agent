@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
 /prism-guardrails:
-  en: a240f9a14024e551
-  zh: 741d671d0eac6730
+  en: 321a89671c6168e3
+  zh: 26b36c2653420caa
 /prism-guardrails/why-this-exists:
-  en: a2fc46f14651a051
-  zh: 940a0e8a3332dbe9
+  en: 25864098178c82e1
+  zh: db107679b65c453c
 /prism-guardrails/ponytail-mode:
   en: a3a015188eef2d2b
   zh: 24954e3d6f274975
 /prism-guardrails/configuration:
-  en: 9c24ad4c1fcc74eb
-  zh: bda09ca24ca73f6f
+  en: bfb7f7a616337410
+  zh: 0a01699e2b697616
 /prism-guardrails/rails:
   en: 72f7891b97c27a02
   zh: ebcc7fab8b465344
@@ -47,12 +47,21 @@
 /prism-guardrails/rails/unfinished-todo-gate:
   en: 318e2a5ba2187af8
   zh: 6188ba0d8339ce1b
+/prism-guardrails/rails/sensitive-read-denial:
+  en: 00a65648809b7a58
+  zh: 7dd25e46e0fbf867
+/prism-guardrails/rails/command-guard:
+  en: 549affec11a149b9
+  zh: 852d92c1b6c83a98
+/prism-guardrails/guardrails:
+  en: bb95f2f1ee062f62
+  zh: 68b949d4fa57b097
 /prism-guardrails/wiring:
   en: d2545073e0cae122
   zh: b1a4060392290b3f
 /prism-guardrails/build-and-verify:
-  en: 31d5cb2dd5cb0bed
-  zh: a7ef3481f4ed0eb6
+  en: c65e21c877dee515
+  zh: e8bbea271a23f778
 /prism-guardrails/known-limitations-and-deferred-work:
-  en: 9ba180a575b0c1c4
-  zh: 2d10ffe14d747b72
+  en: d9ee5b0f3356bbee
+  zh: ab2996cd9a1c657a

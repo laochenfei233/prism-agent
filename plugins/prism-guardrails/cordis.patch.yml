@@ -9,8 +9,8 @@
 # policy the bundle was written for, not a set of built-in fallbacks. A key that
 # is present but unusable fails plugin load rather than silently disabling a rail.
 #
-# `writeTools` and `routingContract.readOnlyTools` name DeepSeek Harness's own
-# tool set (`packages/fs/tool-fs`, `packages/fs/tool-fs-search`,
+# `writeTools`, `readTools`, and `routingContract.readOnlyTools` name DeepSeek
+# Harness's own tool set (`packages/fs/tool-fs`, `packages/fs/tool-fs-search`,
 # `packages/shell/tool-bash`, `packages/shell/tool-pwsh`). A profile whose tools
 # differ edits these names; nothing else in the bundle assumes them.
 - insert:
@@ -32,6 +32,21 @@
           readOnlyTools: [read, read_image, glob, grep]
         verificationGate:
           verifyTools: [bash, pwsh]
+        readTools:
+          - { tool: read, pathArgument: file_path }
+          - { tool: grep, pathArgument: path }
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519, credentials]
+        commandGuard:
+          tools:
+            - { tool: bash, commandArgument: command }
+            - { tool: pwsh, commandArgument: command }
+          deny:
+            - pattern: 'git\s+push\b[^\n]*(--force\b|\s-f\b)'
+              reason: rewrites a remote branch history others may already have
+            - pattern: 'git\s+reset\s+--hard\b'
+              reason: discards uncommitted work that cannot be recovered
+            - pattern: '\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r'
+              reason: deletes a directory tree irreversibly
 
     # The Ponytail mode itself: one system-prompt section carrying the level and
     # the slash commands the skill set used to describe. Mounted from the bundle

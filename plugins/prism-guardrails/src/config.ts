@@ -30,6 +30,66 @@ export interface WriteTool {
   readonly contentArgument?: string
 }
 
+/**
+ * One deployment tool that reads a file's content.
+ *
+ * `pathArgument` names the tool's own argument key, so a deployment whose
+ * reading tool calls it something else is configured rather than special-cased.
+ */
+export interface ReadTool {
+  /** The tool's registered name. */
+  readonly tool: string
+  /** The argument naming the read file's path. */
+  readonly pathArgument: string
+}
+
+/** One deployment tool whose call carries a command line. */
+export interface CommandTool {
+  /** The tool's registered name. */
+  readonly tool: string
+  /** The argument carrying the command text. */
+  readonly commandArgument: string
+}
+
+/**
+ * One guarded command.
+ *
+ * `pattern` is a regular expression source matched case-insensitively against
+ * the raw command text; `reason` is what an approver reads.
+ */
+export interface CommandRule {
+  /** Regular expression source the command text is matched against. */
+  readonly pattern: string
+  /** Why this command is guarded, in terms of what it would do. */
+  readonly reason: string
+}
+
+/** Command-guard settings: which calls carry a command, and which commands are guarded. */
+export interface CommandGuardConfig {
+  /** The tools whose command text is matched. */
+  readonly tools: readonly CommandTool[]
+  /** The patterns a command is matched against. */
+  readonly deny: readonly CommandRule[]
+}
+
+/** One guarded command after load-time validation. */
+export interface ResolvedCommandRule {
+  /** The compiled pattern, matched case-insensitively. */
+  readonly pattern: RegExp
+  /** The source the deployment wrote, reported in the approval reason. */
+  readonly source: string
+  /** Why this command is guarded. */
+  readonly reason: string
+}
+
+/** The command-guard rail after load-time validation. */
+export interface ResolvedCommandGuard {
+  /** The tool name to its command argument. */
+  readonly tools: ReadonlyMap<string, string>
+  /** The patterns a command is matched against, in configuration order. */
+  readonly rules: readonly ResolvedCommandRule[]
+}
+
 /** Routing-contract settings: which calls count as leaving the read path. */
 export interface RoutingContractConfig {
   /**
@@ -78,6 +138,12 @@ export interface Config {
   readonly routingContract?: RoutingContractConfig
   /** Whether a turn that wrote without verifying is sent back for evidence; omit to disable this rail. */
   readonly verificationGate?: VerificationGateConfig
+  /** The deployment's file-reading tools, whose paths the sensitive-read rail matches. */
+  readonly readTools?: readonly ReadTool[]
+  /** Path segments treated as credential material; omit to disable the sensitive-read rail. */
+  readonly sensitivePaths?: readonly string[]
+  /** Whether a shell command matching a guarded pattern goes to approval; omit to disable this rail. */
+  readonly commandGuard?: CommandGuardConfig
 }
 
 /** One writing tool after load-time validation. */
@@ -99,6 +165,9 @@ export interface ResolvedConfig {
   readonly dependencyManifests: ReadonlySet<string> | undefined
   readonly routingContract: ReadonlySet<string> | undefined
   readonly verificationGate: ReadonlySet<string> | undefined
+  readonly readTools: ReadonlyMap<string, string> | undefined
+  readonly sensitivePaths: readonly string[] | undefined
+  readonly commandGuard: ResolvedCommandGuard | undefined
 }
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
@@ -114,6 +183,9 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'dependencyManifests',
   'routingContract',
   'verificationGate',
+  'readTools',
+  'sensitivePaths',
+  'commandGuard',
 ])
 
 /** Keys one `writeTools` entry reads. */
@@ -124,6 +196,18 @@ const ROUTING_CONTRACT_KEYS: ReadonlySet<string> = new Set(['readOnlyTools'])
 
 /** Keys `verificationGate` reads. */
 const VERIFICATION_GATE_KEYS: ReadonlySet<string> = new Set(['verifyTools'])
+
+/** Keys one `readTools` entry reads. */
+const READ_TOOL_KEYS: ReadonlySet<string> = new Set(['tool', 'pathArgument'])
+
+/** Keys `commandGuard` reads. */
+const COMMAND_GUARD_KEYS: ReadonlySet<string> = new Set(['tools', 'deny'])
+
+/** Keys one `commandGuard.tools` entry reads. */
+const COMMAND_TOOL_KEYS: ReadonlySet<string> = new Set(['tool', 'commandArgument'])
+
+/** Keys one `commandGuard.deny` entry reads. */
+const COMMAND_RULE_KEYS: ReadonlySet<string> = new Set(['pattern', 'reason'])
 
 /**
  * Validate deployment configuration.
@@ -145,6 +229,9 @@ export function resolveConfig(config: Config): ResolvedConfig {
   const dependencyManifests = resolveDependencyManifests(config.dependencyManifests)
   const routingContract = resolveRoutingContract(config.routingContract)
   const verificationGate = resolveVerificationGate(config.verificationGate)
+  const readTools = resolveReadTools(config.readTools)
+  const sensitivePaths = resolveSensitivePaths(config.sensitivePaths)
+  const commandGuard = resolveCommandGuard(config.commandGuard)
 
   // A rail that reads written content owns no tool knowledge of its own, so a
   // deployment that turns one on without the list has nothing to enforce
@@ -161,6 +248,11 @@ export function resolveConfig(config: Config): ResolvedConfig {
     throw new Error('prism-guardrails: requirePonytailUpgradePaths reads written text — at least one '
       + 'writeTools entry must name its contentArgument')
   }
+  // Same rule for the reading side: a sensitive-path list with no tool to check
+  // it against would load a rail that can never fire.
+  if (sensitivePaths !== undefined && readTools === undefined) {
+    throw new Error('prism-guardrails: sensitivePaths reads file paths — name readTools as well')
+  }
 
   return {
     planDeniedTools: resolveDeniedTools(config.planDeniedTools),
@@ -174,6 +266,9 @@ export function resolveConfig(config: Config): ResolvedConfig {
     dependencyManifests,
     routingContract,
     verificationGate,
+    readTools,
+    sensitivePaths,
+    commandGuard,
   }
 }
 
@@ -381,4 +476,157 @@ function resolveToolNameList(value: readonly string[] | undefined, label: string
     names.add(entry)
   }
   return names
+}
+
+/**
+ * Check the reading-tool list into a lookup by tool name.
+ *
+ * Keyed the same way as `writeTools` and for the same reason: every rail asks
+ * "is this call a read through this tool, and which path does it name?", and a
+ * duplicated name would make the answer depend on position.
+ */
+function resolveReadTools(value: readonly ReadTool[] | undefined): ReadonlyMap<string, string> | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    throw new Error('prism-guardrails: readTools must be an array of { tool, pathArgument } entries')
+  }
+  const tools = new Map<string, string>()
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`prism-guardrails: readTools entries must be objects, received ${JSON.stringify(entry)}`)
+    }
+    const unknown = Object.keys(entry).filter(key => !READ_TOOL_KEYS.has(key))
+    if (unknown.length > 0) {
+      throw new Error(`prism-guardrails: unknown readTools key(s) ${unknown.join(', ')} — an entry is `
+        + `{ ${[...READ_TOOL_KEYS].join(', ')} }`)
+    }
+    const tool = entry.tool
+    const pathArgument = entry.pathArgument
+    if (typeof tool !== 'string' || tool.trim() === '') {
+      throw new Error(`prism-guardrails: readTools entries must name a tool, received ${JSON.stringify(tool)}`)
+    }
+    if (typeof pathArgument !== 'string' || pathArgument.trim() === '') {
+      throw new Error(`prism-guardrails: readTools entry "${tool}" must name its pathArgument`)
+    }
+    if (tools.has(tool)) {
+      throw new Error(`prism-guardrails: readTools names "${tool}" twice`)
+    }
+    tools.set(tool, pathArgument)
+  }
+  if (tools.size === 0) {
+    throw new Error('prism-guardrails: readTools must not be empty — omit the key to disable the sensitive-read rail')
+  }
+  return tools
+}
+
+/** Check the sensitive path segments; an empty list has no meaning, so it is an error rather than "off". */
+function resolveSensitivePaths(value: readonly string[] | undefined): readonly string[] | undefined {
+  if (value === undefined) return undefined
+  // Profile YAML is outside the type system: these checks are the boundary.
+  if (!Array.isArray(value)) {
+    throw new Error('prism-guardrails: sensitivePaths must be an array of path segments')
+  }
+  if (value.length === 0) {
+    throw new Error('prism-guardrails: sensitivePaths must not be empty — omit the key to disable the sensitive-read rail')
+  }
+  const segments = new Set<string>()
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      throw new Error(`prism-guardrails: sensitivePaths entries must be non-empty path segments, received ${JSON.stringify(entry)}`)
+    }
+    if (segments.has(entry)) {
+      throw new Error(`prism-guardrails: sensitivePaths names "${entry}" twice`)
+    }
+    segments.add(entry)
+  }
+  return [...segments]
+}
+
+/**
+ * Check the command guard into its tool lookup and compiled patterns.
+ *
+ * A pattern compiles here because the refusal needs a matcher, and a pattern
+ * that cannot compile would otherwise load as a rail that never fires.
+ */
+function resolveCommandGuard(value: CommandGuardConfig | undefined): ResolvedCommandGuard | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('prism-guardrails: commandGuard must be an object { tools, deny }')
+  }
+  const unknown = Object.keys(value).filter(key => !COMMAND_GUARD_KEYS.has(key))
+  if (unknown.length > 0) {
+    throw new Error(`prism-guardrails: unknown commandGuard key(s) ${unknown.join(', ')} — it is `
+      + `{ ${[...COMMAND_GUARD_KEYS].join(', ')} }`)
+  }
+  return {
+    tools: resolveCommandTools(value.tools),
+    rules: resolveCommandRules(value.deny),
+  }
+}
+
+/** Check the command tools into a lookup by tool name. */
+function resolveCommandTools(value: readonly CommandTool[] | undefined): ReadonlyMap<string, string> {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('prism-guardrails: commandGuard.tools must be a non-empty array of '
+      + '{ tool, commandArgument } entries')
+  }
+  const tools = new Map<string, string>()
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`prism-guardrails: commandGuard.tools entries must be objects, received ${JSON.stringify(entry)}`)
+    }
+    const unknown = Object.keys(entry).filter(key => !COMMAND_TOOL_KEYS.has(key))
+    if (unknown.length > 0) {
+      throw new Error(`prism-guardrails: unknown commandGuard.tools key(s) ${unknown.join(', ')} — an entry is `
+        + `{ ${[...COMMAND_TOOL_KEYS].join(', ')} }`)
+    }
+    const tool = entry.tool
+    const commandArgument = entry.commandArgument
+    if (typeof tool !== 'string' || tool.trim() === '') {
+      throw new Error(`prism-guardrails: commandGuard.tools entries must name a tool, received ${JSON.stringify(tool)}`)
+    }
+    if (typeof commandArgument !== 'string' || commandArgument.trim() === '') {
+      throw new Error(`prism-guardrails: commandGuard.tools entry "${tool}" must name its commandArgument`)
+    }
+    if (tools.has(tool)) {
+      throw new Error(`prism-guardrails: commandGuard.tools names "${tool}" twice`)
+    }
+    tools.set(tool, commandArgument)
+  }
+  return tools
+}
+
+/** Check the guarded commands, compiling each pattern. */
+function resolveCommandRules(value: readonly CommandRule[] | undefined): readonly ResolvedCommandRule[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('prism-guardrails: commandGuard.deny must be a non-empty array of { pattern, reason } entries')
+  }
+  const rules: ResolvedCommandRule[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`prism-guardrails: commandGuard.deny entries must be objects, received ${JSON.stringify(entry)}`)
+    }
+    const unknown = Object.keys(entry).filter(key => !COMMAND_RULE_KEYS.has(key))
+    if (unknown.length > 0) {
+      throw new Error(`prism-guardrails: unknown commandGuard.deny key(s) ${unknown.join(', ')} — an entry is `
+        + `{ ${[...COMMAND_RULE_KEYS].join(', ')} }`)
+    }
+    const source = entry.pattern
+    const reason = entry.reason
+    if (typeof source !== 'string' || source.trim() === '') {
+      throw new Error(`prism-guardrails: commandGuard.deny entries must name a pattern, received ${JSON.stringify(source)}`)
+    }
+    if (typeof reason !== 'string' || reason.trim() === '') {
+      throw new Error(`prism-guardrails: commandGuard.deny entry ${JSON.stringify(source)} must name a reason`)
+    }
+    let pattern: RegExp
+    try {
+      pattern = new RegExp(source, 'i')
+    } catch (error) {
+      throw new Error(`prism-guardrails: commandGuard.deny pattern ${JSON.stringify(source)} is not a regular `
+        + `expression: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    rules.push({ pattern, source, reason })
+  }
+  return rules
 }

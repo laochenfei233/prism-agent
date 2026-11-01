@@ -4,6 +4,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import CommandRuntime from '@deepseek-ai/dsh-commands'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -52,6 +53,16 @@ async function skillHarness(config: Config): Promise<Context> {
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SkillRegistry)
+  await ctx.plugin(Guardrails, config)
+  return ctx
+}
+
+/** Boot the core spine, the bundle, and the real command runtime. */
+async function commandHarness(config: Config): Promise<Context> {
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(CommandRuntime)
   await ctx.plugin(Guardrails, config)
   return ctx
 }
@@ -128,6 +139,12 @@ describe('configuration validation', () => {
       dependencyManifests: ['package.json'],
       routingContract: { readOnlyTools: ['read'] },
       verificationGate: { verifyTools: ['bash'] },
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env', '.ssh'],
+      commandGuard: {
+        tools: [{ tool: 'bash', commandArgument: 'command' }],
+        deny: [{ pattern: 'git\\s+push\\s+--force', reason: 'rewrites remote history' }],
+      },
     })
     expect([...(resolved.planDeniedTools ?? [])]).toEqual(['write', 'edit'])
     expect(resolved.repeatAskAfter).toBe(5)
@@ -140,6 +157,10 @@ describe('configuration validation', () => {
     expect([...(resolved.dependencyManifests ?? [])]).toEqual(['package.json'])
     expect([...(resolved.routingContract ?? [])]).toEqual(['read'])
     expect([...(resolved.verificationGate ?? [])]).toEqual(['bash'])
+    expect(resolved.readTools?.get('read')).toBe('file_path')
+    expect(resolved.sensitivePaths).toEqual(['.env', '.ssh'])
+    expect(resolved.commandGuard?.tools.get('bash')).toBe('command')
+    expect(resolved.commandGuard?.rules[0]?.pattern.test('GIT PUSH --FORCE origin main')).toBe(true)
   })
 
   it('treats repeatAskAfter 0 as the off switch rather than a threshold', () => {
@@ -186,6 +207,21 @@ describe('configuration validation', () => {
     ['a non-object verification gate', { verificationGate: ['bash'] }, 'must be an object'],
     ['an empty verify list', { verificationGate: { verifyTools: [] } }, 'non-empty array of tool names'],
     ['an unknown verification-gate key', { verificationGate: { verify: ['bash'] } }, 'unknown verificationGate key'],
+    ['a non-array read list', { readTools: 'read' }, 'must be an array'],
+    ['an empty read list', { readTools: [] }, 'must not be empty'],
+    ['a read entry naming no path argument', { readTools: [{ tool: 'read' }] }, 'must name its pathArgument'],
+    ['a duplicated read tool', { readTools: [{ tool: 'read', pathArgument: 'f' }, { tool: 'read', pathArgument: 'g' }] }, 'names "read" twice'],
+    ['an unknown read entry key', { readTools: [{ tool: 'read', pathArgument: 'f', content: 'x' }] }, 'unknown readTools key'],
+    ['an empty sensitive list', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: [] }, 'must not be empty'],
+    ['a blank sensitive segment', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: [''] }, 'non-empty path segments'],
+    ['a duplicated sensitive segment', { readTools: [{ tool: 'read', pathArgument: 'f' }], sensitivePaths: ['.env', '.env'] }, 'names ".env" twice'],
+    ['a non-object command guard', { commandGuard: ['bash'] }, 'must be an object'],
+    ['an unknown command-guard key', { commandGuard: { tools: [], denys: [] } }, 'unknown commandGuard key'],
+    ['an empty command-tool list', { commandGuard: { tools: [], deny: [{ pattern: 'x', reason: 'y' }] } }, 'non-empty array of'],
+    ['a command tool naming no argument', { commandGuard: { tools: [{ tool: 'bash' }], deny: [{ pattern: 'x', reason: 'y' }] } }, 'must name its commandArgument'],
+    ['an empty command-pattern list', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [] } }, 'must be a non-empty array'],
+    ['a command pattern naming no reason', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: 'x' }] } }, 'must name a reason'],
+    ['an unparsable command pattern', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: '(', reason: 'y' }] } }, 'is not a regular expression'],
   ])('rejects %s', (_label, config, message) => {
     expect(() => resolveConfig(config as Config)).toThrow(message)
   })
@@ -197,6 +233,10 @@ describe('configuration validation', () => {
     ['the verification gate', { verificationGate: { verifyTools: ['bash'] } }],
   ])('refuses to load %s without the writing tools it reads', (_label, config) => {
     expect(() => resolveConfig(config as Config)).toThrow('name writeTools as well')
+  })
+
+  it('refuses the sensitive-read rail without the tools it reads', () => {
+    expect(() => resolveConfig({ sensitivePaths: ['.env'] })).toThrow('name readTools as well')
   })
 
   it('refuses the marker rail when no write tool names its text argument', () => {
@@ -1069,5 +1109,191 @@ describe('unfinished-todo gate', () => {
 
     expect(runs).toEqual([])
     expect(adapter.requests).toHaveLength(3)
+  })
+})
+
+describe('sensitive-read denial', () => {
+  /** The sensitive-path rail as a deployment names it: one reading tool, two segments. */
+  const guarded: Config = {
+    readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+    sensitivePaths: ['.env', '.ssh'],
+  }
+
+  it('refuses a credential path and never runs the tool', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '/home/u/.ssh/id_rsa' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('/home/u/.ssh/id_rsa')
+    expect(textOf(denied)).toContain('credential material (matched ".ssh")')
+    expect(textOf(denied)).toContain('Ask the user for the specific value')
+    expect(runs).toEqual([])
+  })
+
+  it('refuses a dotted extension of a guarded name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-dotenv'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: 'C:\\work\\.env.local' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".env"')
+    expect(runs).toEqual([])
+  })
+
+  it('leaves an ordinary source file alone', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-source'), { provider: 'mock', model: 'mock' })
+
+    const allowed = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: 'src/environment.ts' }, agent,
+    })
+
+    expect(allowed.isError).toBe(false)
+    expect(runs).toEqual(['read'])
+  })
+
+  it('ignores a tool the deployment did not name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('grep', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-other-tool'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'grep',
+      arguments: { path: '/home/u/.ssh/id_rsa' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['grep'])
+  })
+})
+
+describe('command guard', () => {
+  /** The command rail as a deployment names it: one shell tool, one guarded pattern. */
+  const guarded: Config = {
+    commandGuard: {
+      tools: [{ tool: 'bash', commandArgument: 'command' }],
+      deny: [{
+        pattern: 'git\\s+push\\b[^\\n]*(--force\\b|\\s-f\\b)',
+        reason: 'rewrites a remote branch history others may already have',
+      }],
+    },
+  }
+
+  it('sends a matching command to approval, which denies with no channel', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-guarded'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'git push --force origin main' }, agent,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('would run a command this deployment guards')
+    expect(textOf(result)).toContain('rewrites a remote branch history')
+    expect(runs).toEqual([])
+  })
+
+  it('matches a guarded command inside a wrapper', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-wrapped'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'bash -c "git push --force origin main"' }, agent,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(runs).toEqual([])
+  })
+
+  it('runs a command that matches no guarded pattern', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-allowed'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
+      arguments: { command: 'git status --short' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['bash'])
+  })
+
+  it('ignores a tool the deployment did not name', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('pwsh', runs))
+    const agent = await ctx.agentLoop.create(SessionId('command-other-tool'), { provider: 'mock', model: 'mock' })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'pwsh',
+      arguments: { command: 'git push --force origin main' }, agent,
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['pwsh'])
+  })
+})
+
+describe('/guardrails status', () => {
+  it('reports every rail with its configured value', async () => {
+    const ctx = await commandHarness({
+      maxStepsPerTurn: 20,
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    const agent = await ctx.agentLoop.create(SessionId('status'), { provider: 'mock', model: 'mock' })
+
+    const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+    const text = execution?.result.text ?? ''
+
+    expect(text).toContain('Guardrails: 3 of 12 rails armed.')
+    expect(text).toContain('turn budget: 20 steps')
+    expect(text).toContain('sensitive reads: .env')
+    expect(text).toContain('command guard: off')
+    expect(text).toContain('write budget: off')
+  })
+
+  it('enforces every rail when the deployment mounts no command runtime', async () => {
+    const ctx = await harness({
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    expect(ctx.get('commands')).toBeUndefined()
+
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('status-no-commands'), { provider: 'mock', model: 'mock' })
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '.env' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(runs).toEqual([])
   })
 })
