@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns nine **advisory** capabilities into **enforced** ones.
+An out-of-tree DeepSeek Harness bundle that turns ten **advisory** capabilities into **enforced** ones.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the nine are hardenings of DeepSeek Harness's own advice. The other five turn the rules of two method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one) and **Aegis** (route before you act, verify before you claim) — from text the model is asked to follow into decisions the tool pipeline makes. Neither method pack is bundled here: the rails read what the model does, and the skills that teach it what to do stay where they are installed.
+Four of the ten are hardenings of DeepSeek Harness's own advice. The other six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -18,11 +18,43 @@ Four of the nine are hardenings of DeepSeek Harness's own advice. The other five
 | Skill invocation | The loader throws `skill "X" is not available for model invocation`, which names no next step | The denial names the `/name` gesture that would actually load it |
 | Routing (Aegis) | The method pack asks for a routing decision before the first non-readonly call; on its other hosts it appends a marker **after** the call that broke the contract | The call itself is refused until the decision is on the record |
 | Write breadth (Ponytail) | The ladder prefers the existing helper over a new one, with no mechanism behind it | A turn writing more distinct files than the deployment allows sends the next new path to approval |
-| Marker discipline (Ponytail) | The convention is `ponytail: <ceiling>, <upgrade path>`; the pack's own debt report flags a marker with no trigger as the one that rots | A marker with no upgrade path is refused before it is written |
+| Marker discipline (Ponytail) | The convention is `shortcut: <ceiling>, <upgrade path>` (older code says `ponytail:`); the pack's own debt report flags a marker with no trigger as the one that rots | A marker with no upgrade path is refused before it is written |
 | Dependency changes (Ponytail) | "Never add a new one for what a few lines can do" is prose | A write to a dependency manifest goes to approval |
 | Verification (Aegis) | `verification-before-completion` states the required evidence in a skill the model is asked to load | A turn that wrote files and ran no verification is sent back for its evidence before it can stop |
+| Turn completion (Compose Next) | The workflow tells the model to finish its tasks and produce delivery evidence; the loop still ends the turn whenever the model stops calling tools | A turn whose own todo list still holds open items is steered to continue before it can stop |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
+
+## Ponytail mode
+
+The method pack's own behavior is part of this bundle, not a skill a host has to install separately. The bundle patch mounts a second row (`prism-guardrails-ponytail`, name `prism-guardrails/ponytail`) in the profile, so the mode is present under every agent preset: one system-prompt section states the level's rules, and the slash commands that used to be described by skills are real registrations.
+
+| Level | Effect |
+|---|---|
+| `lite` | Build what was asked, and name the smaller option you did not take in one line |
+| `full` | The whole ladder, a check where the logic needs one, and a reply that names what was skipped and the risk (default) |
+| `ultra` | `full`, plus push back on any part of the request the need does not justify |
+| `off` | Contributes no section; the rails and commands stay mounted |
+
+| Command | Effect |
+|---|---|
+| `/ponytail [lite\|full\|ultra\|off\|auto]` | Show or switch the level; `auto` drops an explicit choice, and no argument prints the level with the full gesture list |
+| `/ponytail-debt [marker word]` | Scan the session's working directory for `shortcut:`/`ponytail:` markers and report the ledger, flagging every row with no upgrade trigger |
+| `/ponytail-review` | Steer the agent into the change-review workflow (bugs, safety, load, tests, speed, leanness) |
+| `/ponytail-audit` | The same workflow for the whole repository |
+| `/ponytail-gain` | The published benchmark scoreboard, with its honesty boundary |
+| `/ponytail-help` | The reference card |
+
+A working session reaches `lite` on its own, without a command:
+
+| Rule | Trigger | Result |
+|---|---|---|
+| Coding preset | the session runs under a preset listed in `autoCodingPresets` (`standard` and `ptc` by default), at creation or after a switch | `lite` |
+| Long task | the session opens `autoLongTaskSteps` cumulative steps (20 by default; `0` disables the rule) | `lite` |
+
+An explicit `/ponytail` choice wins over both rules for that session, and `/ponytail auto` drops the choice so the rules apply again. The level resolves per assembly from the session's own state, so one coding session running at `lite` never changes the level of a session beside it; `level:` in the row's config is the starting value and the fallback. The rails in `index.ts` remain the enforcement half — the mode states the rules and the rails refuse the writes that break them, so a level change never widens what the tool pipeline accepts.
+
+The prompt text and the workflows are maintained here rather than vendored from the method pack's `SKILL.md` files: updating the wording is an edit to `src/ponytail.ts`, and nothing else in the profile needs to change.
 
 ## Configuration
 
@@ -33,10 +65,11 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `planDeniedTools` | non-empty array of distinct, non-blank tool names | Global tool names refused while plan mode is active | rail off |
 | `repeatAskAfter` | integer `0` or `>= 2` | Consecutive identical calls tolerated before the next one goes to approval; `0` disables | rail off |
 | `maxStepsPerTurn` | integer `>= 1` | Steps one turn may open | rail off |
+| `unfinishedTodoContinuations` | integer `>= 0` | Times one turn is sent back because the agent's own todo list still has open items; `0` disables | rail off |
 | `skillInvocationGuidance` | boolean | Whether a user-only skill's model-invocation denial names the way forward | `true` |
 | `writeTools` | non-empty array of `{ tool, pathArgument, contentArgument? }` | The deployment's file-writing tools; required by every rail that reads written content | required by those rails |
 | `maxWrittenFilesPerTurn` | integer `>= 0` | Distinct files one turn may write before the next new path goes to approval; `0` disables | rail off |
-| `requirePonytailUpgradePaths` | boolean | Whether a written `ponytail:` comment must name its ceiling and upgrade path | `false` |
+| `requirePonytailUpgradePaths` | boolean | Whether a written `shortcut:` comment (older `ponytail:`) must name its ceiling and upgrade path | `false` |
 | `dependencyManifests` | non-empty array of distinct, non-blank file names | File names whose write goes to approval | rail off |
 | `routingContract.readOnlyTools` | non-empty array of distinct, non-blank tool names | The tools that only read; the first call to any other is the contract's trigger | rail off |
 | `verificationGate.verifyTools` | non-empty array of distinct, non-blank tool names | The tools whose completed call is accepted as verification | rail off |
@@ -54,6 +87,7 @@ Load-time rejections, each with the message asserted by the test suite:
 | `repeatAskAfter` not an integer, or `< 0` | `repeatAskAfter must be an integer >= 0` |
 | `repeatAskAfter: 1` | `repeatAskAfter must be 0 (off) or >= 2 — one call is not a loop` |
 | `maxStepsPerTurn` not an integer, or `< 1` | `maxStepsPerTurn must be an integer >= 1` |
+| `unfinishedTodoContinuations` not an integer, or `< 0` | `unfinishedTodoContinuations must be an integer >= 0` |
 | `skillInvocationGuidance` not a boolean | `skillInvocationGuidance must be a boolean` |
 | `writeTools` not an array, or empty | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
 | an entry naming no tool or no path argument | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
@@ -148,13 +182,13 @@ The turn number and the written-path set live in one per-turn record, advanced f
 
 ### Ponytail marker discipline
 
-A write whose text contains a comment-prefixed `ponytail:` marker naming no upgrade path is refused:
+A write whose text contains a comment-prefixed `shortcut:` marker naming no upgrade path is refused:
 
 ```
-Error: `src/lock.ts` writes a `ponytail:` marker with no upgrade path: "global lock". The convention is `ponytail: <ceiling>, <upgrade path>`; name the limit and the trigger that would revisit it, or delete the marker.
+Error: `src/lock.ts` writes a `shortcut:` marker with no upgrade path: "global lock". The convention is `shortcut: <ceiling>, <upgrade path>` (older code says `ponytail:`); name the limit and the trigger that would revisit it, or delete the marker.
 ```
 
-The convention is a separator with something after it — `ponytail: global lock, per-account locks if throughput matters` is accepted, `ponytail: global lock` is not. Every marker line in the written text is read, not only the first.
+The convention is a separator with something after it — `shortcut: global lock, per-account locks if throughput matters` is accepted, `shortcut: global lock` is not. Both the current `shortcut:` prefix and the older `ponytail:` prefix are read, and every marker line in the written text is read, not only the first.
 
 Refusing the write is the only point where the fix is free: after the file lands, an untriggered marker is a debt entry nobody reads. Only comment-prefixed markers count, so prose that merely mentions the convention — this file's own JSDoc included — is not a marker.
 
@@ -182,6 +216,18 @@ A completed call to any `verifyTools` tool is the evidence, and a **failing** ch
 
 The turn is interrupted at most once. A model that ignores the request stops at the next boundary rather than looping, so the worst case is one extra step.
 
+### Unfinished-todo gate
+
+A turn whose own todo list still holds `pending` or `in_progress` items is interrupted at its stopping boundary:
+
+```
+Your todo list still has 3 unfinished item(s): "T2 make Shortcuts.invoke return ShortcutResolution | undefined", "T3 command palette (store, component, locale, command)", "T4 region landmarks in workspace, conversation, sidebar-right". Continue with the next one, and rewrite the list when an item is no longer needed. Report the work as complete only when every item is completed or removed with its reason; if an item is blocked on a human decision, say which decision and why.
+```
+
+The list is the plan the model wrote for itself through `todo_write`, so a stop that leaves items open is the turn ending mid-plan — the shape a long implementation run produces when it reports progress instead of finishing. Nothing in DeepSeek Harness resists that stop: a turn ends when the model returns no tool call, and the only trace is the `turn/end` reason `completed`, which reads the same as an honest finish. This rail is the missing check, and the mechanism is the verification gate's: steering at `agent/turn-stopping` makes the loop observe pending input and run another step.
+
+The snapshot is read from the session log, so a resumed, forked, or compacted session is judged by the list it actually has; a session that never wrote one is left alone. `unfinishedTodoContinuations` bounds the steers per turn — a model that keeps stopping with work left reaches the budget and the next boundary is left alone, so the worst case is that many extra steps rather than a loop.
+
 ## Wiring
 
 The bundle patches one row over the profile root, and `cordis.patch.yml` ships that row under the package name — the form a profile resolves once the bundle is installed or published. Both forms below were booted for real against the shipped `headless` profile.
@@ -203,6 +249,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
         maxStepsPerTurn: 200
+        unfinishedTodoContinuations: 3
         skillInvocationGuidance: true
         writeTools:
           - { tool: write, pathArgument: file_path, contentArgument: content }
@@ -238,7 +285,7 @@ The bundle borrows the checkout's packages instead of declaring workspace depend
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with one external harness import
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 85 composed unit tests
+npm test            # 93 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -258,8 +305,9 @@ Vitest needs vite's Windows real-path probe to spawn a child process, which a co
 - **The routing record latches for the session.** A session that declares `Route: fast-path` once is never asked again until `compaction/end`. Detecting a per-task lapse in the declaration's meaning is a larger capability than a gate can infer from one message.
 - **The verification gate asks, it cannot require.** The stop boundary has no veto, so a model that ignores the steering and stops anyway ends the turn. The rail's enforcement is one extra step and a stated request, not a refusal; only the tool pipeline can refuse, and it has no say over the final text.
 - **The verification gate does not read the evidence it asks for.** It checks that a `verifyTools` call completed, not that the claim the model then makes matches that result.
+- **The unfinished-todo gate reads a list the model writes.** A model that marks every item `completed` before it stops ends the turn, so the gate buys attention to the plan, not proof the plan was executed. The list also persists across turns, so a stale entry left by an earlier turn steers a later one until the model closes or rewrites it. And the gate cannot tell a model that stopped to ask a question from one that stopped early: the bounded steer is the only pressure, and the reply it asks for — name the blocked item and the decision — is the model's own text.
 - **`skillNameArgument`'s non-object guard is unreachable through the shipped tool set.** The registry validates a call against the tool's compiled object schema before the pre-execute waterfall, so a non-object argument list is rejected first — the test suite pins that rejection. The two lines are kept so the function stays total at a model tool-JSON boundary rather than throwing inside a listener, which would fail every call to the tool.
 - **The repeat rail has no `include`/`exclude` patterns.** `@deepseek-ai/dsh-repeat-tool-reminder` offers wildcard tool selection and this rail does not; a deployment that needs it must say so with a concrete consumer.
 - **Reasoning-streak loop governance is not implemented.** This bundle detects repetition by tool name plus arguments only. Detecting a repeated *thinking* prefix and pruning the polluted span from the request view while the log keeps the full trajectory is a separate, larger capability.
-- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools` and `repeatAskAfter: 5` come from the fork's `CAPABILITY-PLAN.md`. `maxStepsPerTurn: 200` is a runaway backstop rather than a working limit: the plan's `20` truncated 11 of the 20 turns recorded in the fork's own deployment, each after about a minute of work, and no recorded turn ever finished naturally at that ceiling. `maxWrittenFilesPerTurn: 8` and the routing contract's read-only list are this bundle's own first pass over DeepSeek Harness's tool set; a deployment that disagrees edits the row.
+- **The shipped defaults are a deployment policy, not a recommendation.** `planDeniedTools` and `repeatAskAfter: 5` come from the fork's `CAPABILITY-PLAN.md`. `maxStepsPerTurn: 200` is a runaway backstop rather than a working limit: the plan's `20` truncated 11 of the 20 turns recorded in the fork's own deployment, each after about a minute of work, and no recorded turn ever finished naturally at that ceiling. `maxWrittenFilesPerTurn: 8` and the routing contract's read-only list are this bundle's own first pass over DeepSeek Harness's tool set; a deployment that disagrees edits the row. `unfinishedTodoContinuations: 3` is sized the same way: enough to carry a turn through the progress-report stop that produced it, small enough that a model which never finishes still ends the turn.
 - **No Chinese README pair is required for `plugins/`.** The repository's translation-pairing gate already reports the sibling `plugins/dsh-agent-progress/` for a missing pair; this bundle ships the pair so it adds no failure of its own.

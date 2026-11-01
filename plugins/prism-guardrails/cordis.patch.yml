@@ -20,6 +20,7 @@
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
         maxStepsPerTurn: 200
+        unfinishedTodoContinuations: 3
         skillInvocationGuidance: true
         writeTools:
           - { tool: write, pathArgument: file_path, contentArgument: content }
@@ -31,3 +32,20 @@
           readOnlyTools: [read, read_image, glob, grep]
         verificationGate:
           verifyTools: [bash, pwsh]
+
+    # The Ponytail mode itself: one system-prompt section carrying the level and
+    # the slash commands the skill set used to describe. Mounted from the bundle
+    # patch rather than a preset, so every agent mode reads the same section and
+    # every profile gets the same commands; `level: off` silences it without
+    # unmounting the row.
+    #
+    # A session under a coding preset, or one that opens this many steps, runs
+    # at lite on its own. Add a deployment's own preset ids to
+    # `autoCodingPresets`; `/ponytail auto|full|lite|ultra|off` still wins for
+    # the session that issued it.
+    - id: prism-guardrails-ponytail
+      name: 'prism-guardrails/ponytail'
+      config:
+        level: full
+        autoCodingPresets: [standard, ptc]
+        autoLongTaskSteps: 20

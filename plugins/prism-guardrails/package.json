@@ -1,14 +1,17 @@
 {
   "name": "prism-guardrails",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "DeepSeek Harness bundle turning nine advisory capabilities into enforced ones: plan-mode tool denial, repeated-call approval, a per-turn step budget, an actionable user-only skill denial, an enforced routing contract, a per-turn write budget, `ponytail:` marker discipline, dependency-change approval, and a verification gate at the turn boundary",
+  "description": "DeepSeek Harness bundle turning ten advisory capabilities into enforced ones: plan-mode tool denial, repeated-call approval, a per-turn step budget, a continuation while the agent's own todo list still has open items, an actionable user-only skill denial, an enforced routing contract, a per-turn write budget, `ponytail:`/`shortcut:` marker discipline, dependency-change approval, and a verification gate at the turn boundary — plus the Ponytail mode itself (levels, prompt section, debt/review/audit/gain/help commands) in every profile",
   "license": "MIT",
   "main": "lib/index.js",
   "exports": {
     ".": {
       "default": "./lib/index.js"
+    },
+    "./ponytail": {
+      "default": "./lib/ponytail.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
@@ -19,7 +22,7 @@
     }
   },
   "files": [
-    "lib/index.js",
+    "lib/**/*.js",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -32,6 +35,8 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-llm": "0.1.7-rc.1"
+    "@deepseek-ai/dsh-commands": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.4"
   }
 }

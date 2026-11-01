@@ -56,6 +56,11 @@ export interface Config {
   readonly repeatAskAfter?: number
   /** Steps one turn may open; omit to disable this rail. */
   readonly maxStepsPerTurn?: number
+  /**
+   * Times one turn may be sent back because the agent's own todo list still
+   * holds unfinished items. `0` (or an omitted field) leaves the rail off.
+   */
+  readonly unfinishedTodoContinuations?: number
   /** Whether a user-only skill's model-invocation denial names the way forward. Defaults to `true`. */
   readonly skillInvocationGuidance?: boolean
   /** The deployment's file-writing tools; required by every rail that reads written content. */
@@ -86,6 +91,7 @@ export interface ResolvedConfig {
   readonly planDeniedTools: ReadonlySet<string> | undefined
   readonly repeatAskAfter: number | undefined
   readonly maxStepsPerTurn: number | undefined
+  readonly unfinishedTodoContinuations: number | undefined
   readonly skillInvocationGuidance: boolean
   readonly writeTools: ReadonlyMap<string, ResolvedWriteTool> | undefined
   readonly maxWrittenFilesPerTurn: number | undefined
@@ -100,6 +106,7 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'planDeniedTools',
   'repeatAskAfter',
   'maxStepsPerTurn',
+  'unfinishedTodoContinuations',
   'skillInvocationGuidance',
   'writeTools',
   'maxWrittenFilesPerTurn',
@@ -159,6 +166,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     planDeniedTools: resolveDeniedTools(config.planDeniedTools),
     repeatAskAfter: resolveRepeatAskAfter(config.repeatAskAfter),
     maxStepsPerTurn: resolveMaxStepsPerTurn(config.maxStepsPerTurn),
+    unfinishedTodoContinuations: resolveUnfinishedTodoContinuations(config.unfinishedTodoContinuations),
     skillInvocationGuidance: resolveSkillInvocationGuidance(config.skillInvocationGuidance),
     writeTools,
     maxWrittenFilesPerTurn,
@@ -218,6 +226,21 @@ function resolveMaxStepsPerTurn(value: number | undefined): number | undefined {
     throw new Error(`prism-guardrails: maxStepsPerTurn must be an integer >= 1, received ${String(value)}`)
   }
   return value
+}
+
+/**
+ * Check the unfinished-todo continuation count, mapping the explicit `0`
+ * off-switch to no rail.
+ *
+ * The upper bound is a deployment policy — how long a turn may be kept alive
+ * past the model's own stopping point — so the bundle supplies no default.
+ */
+function resolveUnfinishedTodoContinuations(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`prism-guardrails: unfinishedTodoContinuations must be an integer >= 0, received ${String(value)}`)
+  }
+  return value === 0 ? undefined : value
 }
 
 /** Check the skill-guidance switch; a pure text improvement, so its default is on. */

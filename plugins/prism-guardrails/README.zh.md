@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把九项**建议性**能力变成**强制性**能力。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十项**建议性**能力变成**强制性**能力。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-九条之中有四条是对 DeepSeek Harness 自带建议的加固，另外五条把两个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）与 **Aegis**（先定路线再动手、先验证再声称完成）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。本 bundle 不内置这两个方法包：rail 只读模型做了什么，教模型该怎么做的 skill 仍留在它们各自被安装的位置。
+十条之中有四条是对 DeepSeek Harness 自带建议的加固，其余六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -18,11 +18,43 @@
 | skill 调用 | 加载器抛出 `skill "X" is not available for model invocation`，没有给出下一步 | 拒绝文案指出真正能加载它的 `/name` 手势 |
 | 路由（Aegis） | 方法包要求模型在首个非只读调用前给出路由决策；在它的其他宿主上，**破坏契约之后**才追加一个标记 | 在决策落档之前，该调用本身被拒绝 |
 | 写盘广度（Ponytail） | 阶梯偏好复用已有 helper 而非新写，但背后没有任何机制 | 一轮写入的不同文件数超过部署额度后，下一条新路径送交审批 |
-| 标记纪律（Ponytail） | 约定是 `ponytail: <ceiling>, <upgrade path>`；方法包自己的债务报告把"没有触发条件"的标记标为会腐烂的那一类 | 没有 upgrade path 的标记在写入之前就被拒绝 |
+| 标记纪律（Ponytail） | 约定是 `shortcut: <ceiling>, <upgrade path>`（旧代码写作 `ponytail:`）；方法包自己的债务报告把"没有触发条件"的标记标为会腐烂的那一类 | 没有 upgrade path 的标记在写入之前就被拒绝 |
 | 依赖变更（Ponytail） | "几行代码能做的，绝不新增依赖"只是一句散文 | 对依赖清单的写入送交审批 |
 | 完成验证（Aegis） | `verification-before-completion` 把所需证据写在"要求模型去加载"的 skill 里 | 一轮写了文件却没跑验证时，在它能停下之前被送回补证据 |
+| 轮次完成（Compose Next） | 工作流要求模型做完自己的任务并给出交付证据；但只要模型不再调用工具，循环照样结束该轮 | 模型自己写的 todo 清单里还有未完成项时，在它能停下之前被 steer 继续 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
+
+## Ponytail 模式
+
+方法包自身的行为成为本 bundle 的一部分，而不是需要宿主另行安装的 skill。bundle patch 在 profile 中挂载第二行（`prism-guardrails-ponytail`，name 为 `prism-guardrails/ponytail`），因此每种 agent preset 下都存在：一个 system-prompt 段落陈述当前档位的规则，原先由 skill 描述的斜杠命令变成真实注册。
+
+| 档位 | 效果 |
+|---|---|
+| `lite` | 只做被要求的事，并用一行说出你没采取的那个更小方案 |
+| `full` | 完整阶梯，该有检查的逻辑留一个检查，回复里写明跳过了什么、有什么风险（默认） |
+| `ultra` | 在 `full` 之上，对需求中必要性不足的部分先提出反对 |
+| `off` | 不贡献段落；rail 与命令仍然挂载 |
+
+| 命令 | 效果 |
+|---|---|
+| `/ponytail [lite\|full\|ultra\|off\|auto]` | 显示或切换档位；`auto` 取消显式选择，不带参数时打印当前档位与完整手势 |
+| `/ponytail-debt [标记词]` | 扫描会话工作目录里的 `shortcut:`/`ponytail:` 标记并输出账本，给没有升级触发的行标 `[no-trigger]` |
+| `/ponytail-review` | 把 agent 引入变更评审流程（正确性、安全、负载、测试、速度、精简） |
+| `/ponytail-audit` | 对整仓库执行同一套流程 |
+| `/ponytail-gain` | 官方基准记分板，附其诚实边界 |
+| `/ponytail-help` | 参考卡片 |
+
+工作中的会话会自动落到 `lite`，不需要任何命令：
+
+| 规则 | 触发条件 | 结果 |
+|---|---|---|
+| coding preset | 会话创建时、或切换后运行在 `autoCodingPresets` 列出的 preset 下（默认 `standard`、`ptc`） | `lite` |
+| 长任务 | 会话累计开启 `autoLongTaskSteps` 步（默认 20；`0` 关闭该规则） | `lite` |
+
+对该会话而言，显式 `/ponytail` 选择优先于这两条规则；`/ponytail auto` 取消选择、让规则重新生效。档位在每次装配时按会话自身状态解析，因此一个正在跑 `lite` 的 coding 会话不会改变旁边会话的档位；行配置里的 `level:` 是起始值与兜底值。`index.ts` 里的 rail 仍是执行的那一半——模式陈述规则，rail 拒绝违反规则的写入，因此切换档位不会放宽工具流水线接受的写入。
+
+提示词与工作流维护在这里，而不是从方法包的 `SKILL.md` 搬入：改措辞就是改 `src/ponytail.ts`，profile 里的其他东西都不用动。
 
 ## 配置
 
@@ -33,10 +65,11 @@
 | `planDeniedTools` | 非空、互不相同、非空白的工具名数组 | 计划模式生效期间被拒绝的全局工具名 | rail 关闭 |
 | `repeatAskAfter` | 整数 `0` 或 `>= 2` | 下一次调用送交审批前容许的连续相同调用次数；`0` 表示关闭 | rail 关闭 |
 | `maxStepsPerTurn` | 整数 `>= 1` | 一轮最多可开启的步骤数 | rail 关闭 |
+| `unfinishedTodoContinuations` | 整数 `>= 0` | 一轮因为模型自己的 todo 清单仍有未完成项而被送回继续的次数；`0` 表示关闭 | rail 关闭 |
 | `skillInvocationGuidance` | 布尔 | 模型调用"仅用户可调用"的 skill 被拒时，是否指出可行出路 | `true` |
 | `writeTools` | 非空的 `{ tool, pathArgument, contentArgument? }` 数组 | 该部署的写文件工具；所有需要读取写入内容的 rail 都以它为前置 | 由这些 rail 要求 |
 | `maxWrittenFilesPerTurn` | 整数 `>= 0` | 一轮可写入的不同文件数；超出后下一条新路径送交审批，`0` 表示关闭 | rail 关闭 |
-| `requirePonytailUpgradePaths` | 布尔 | 写入的 `ponytail:` 注释是否必须给出上限与升级路径 | `false` |
+| `requirePonytailUpgradePaths` | 布尔 | 写入的 `shortcut:` 注释（较早的 `ponytail:`）是否必须给出上限与升级路径 | `false` |
 | `dependencyManifests` | 非空、互不相同、非空白的文件名数组 | 写入这些文件名时送交审批 | rail 关闭 |
 | `routingContract.readOnlyTools` | 非空、互不相同、非空白的工具名数组 | 只做读取的工具；调用其他任何工具即为契约触发点 | rail 关闭 |
 | `verificationGate.verifyTools` | 非空、互不相同、非空白的工具名数组 | 其成功调用被认可为验证的工具 | rail 关闭 |
@@ -54,6 +87,7 @@
 | `repeatAskAfter` 非整数或 `< 0` | `repeatAskAfter must be an integer >= 0` |
 | `repeatAskAfter: 1` | `repeatAskAfter must be 0 (off) or >= 2 — one call is not a loop` |
 | `maxStepsPerTurn` 非整数或 `< 1` | `maxStepsPerTurn must be an integer >= 1` |
+| `unfinishedTodoContinuations` 非整数或 `< 0` | `unfinishedTodoContinuations must be an integer >= 0` |
 | `skillInvocationGuidance` 非布尔 | `skillInvocationGuidance must be a boolean` |
 | `writeTools` 不是数组或为空 | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
 | 条目没有给出工具名或路径参数 | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
@@ -148,13 +182,13 @@ this turn has already written 8 distinct files and `write` would make `src/late.
 
 ### Ponytail 标记纪律
 
-写入文本中含有"注释前缀 + `ponytail:`"标记、却没有给出升级路径的写入会被拒绝：
+写入文本中含有"注释前缀 + `shortcut:`"标记、却没有给出升级路径的写入会被拒绝：
 
 ```
-Error: `src/lock.ts` writes a `ponytail:` marker with no upgrade path: "global lock". The convention is `ponytail: <ceiling>, <upgrade path>`; name the limit and the trigger that would revisit it, or delete the marker.
+Error: `src/lock.ts` writes a `shortcut:` marker with no upgrade path: "global lock". The convention is `shortcut: <ceiling>, <upgrade path>` (older code says `ponytail:`); name the limit and the trigger that would revisit it, or delete the marker.
 ```
 
-约定是一个分隔符加其后的内容——`ponytail: global lock, per-account locks if throughput matters` 被接受，`ponytail: global lock` 不被接受。写入文本里的每一行标记都会被读取，不只第一行。
+约定是一个分隔符加其后的内容——`shortcut: global lock, per-account locks if throughput matters` 被接受，`shortcut: global lock` 不被接受。当前前缀 `shortcut:` 与较早的 `ponytail:` 都会被读取，且写入文本里的每一行标记都会被读取，不只第一行。
 
 拒绝写入是修补免费的唯一点：文件一旦落盘，没有触发条件的标记就是一条没人会读的债务条目。只有带注释前缀的标记才算数，因此仅仅提及该约定的散文——包括本文件自己的 JSDoc——不是标记。
 
@@ -182,6 +216,18 @@ This turn wrote src/lock.ts and ran no verification (`bash`, `pwsh`). Run the ch
 
 一轮最多被打断一次。忽略该请求的模型会在下一个边界停下，而不是陷入循环，因此最坏情况是多花一步。
 
+### 未完成 todo 闸门
+
+模型自己的 todo 清单里仍有 `pending` 或 `in_progress` 项的一轮，会在它的停止边界被打断：
+
+```
+Your todo list still has 3 unfinished item(s): "T2 make Shortcuts.invoke return ShortcutResolution | undefined", "T3 command palette (store, component, locale, command)", "T4 region landmarks in workspace, conversation, sidebar-right". Continue with the next one, and rewrite the list when an item is no longer needed. Report the work as complete only when every item is completed or removed with its reason; if an item is blocked on a human decision, say which decision and why.
+```
+
+这份清单是模型通过 `todo_write` 为自己排的计划，因此"停下时还有未完成项"就等于这一轮在半途结束——长实施跑到一半汇报"进展"而不是"完成"时就是这个形状。DeepSeek Harness 没有任何东西阻止这次停止：模型不再调用工具，一轮就结束，日志里只留下 `turn/end` 的 `completed`，与诚实的完成一模一样。这条 rail 补的正是这个缺口，机制沿用完成验证闸门：在 `agent/turn-stopping` 处 steer，会让循环观察到待处理输入并再跑一步。
+
+快照从会话日志读取，因此恢复、分叉或被压缩过的会话按它实际持有的清单判定；从未写过清单的会话不受影响。`unfinishedTodoContinuations` 限定每轮可被送回的次数——一直带着未完成项停下的模型用满额度后，下一个边界不再被打断，最坏情况是多花这么多步，而不是循环。
+
 ## 接线
 
 本 bundle 在 profile 根之上打一行 patch，`cordis.patch.yml` 以包名形式随附这一行——即 bundle 被安装或发布后 profile 能解析的形态。下面两种形态都针对随附的 `headless` profile 真实启动过。
@@ -203,6 +249,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
         planDeniedTools: [write, edit, str_replace_editor]
         repeatAskAfter: 5
         maxStepsPerTurn: 200
+        unfinishedTodoContinuations: 3
         skillInvocationGuidance: true
         writeTools:
           - { tool: write, pathArgument: file_path, contentArgument: content }
@@ -238,7 +285,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with one external harness import
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 85 composed unit tests
+npm test            # 93 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -258,8 +305,9 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 - **路由记录在整个会话内闭锁。** 一个会话声明过一次 `Route: fast-path` 后，直到 `compaction/end` 都不会再被追问。要检测"这次声明已不再适用于当前任务"，是比一道闸门能从一条消息里推断的更大的能力。
 - **完成验证闸门只能请求，无法强制。** 停止边界没有否决权，因此无视 steer 直接停下的模型照样会结束该轮。这条 rail 的强制力是"多一步 + 一条明确的请求"，而不是拒绝；只有工具流水线能拒绝，而它对最终文本没有发言权。
 - **完成验证闸门不检查它所索要的证据内容。** 它只检查某个 `verifyTools` 调用完成了，不检查模型随后给出的结论是否与那个结果相符。
+- **未完成 todo 闸门读的是模型自己写的清单。** 模型在停下前把所有项标成 `completed` 就能结束该轮，因此这道闸门换来的是"对计划的注意力"，而不是"计划确实被执行"的证明。清单还会跨轮保留，所以上一轮遗留的未完成项会把后面某一轮也推开，直到模型把它关闭或重写。它也区分不了"为提问而停"和"提前收工而停"：唯一压力是那几次有上限的 steer，而它要求的回应——说明被卡住的是哪一项、等的是哪个决定——仍然是模型自己的文字。
 - **`skillNameArgument` 的非对象防护在当前工具集下不可达。** 注册表会在 pre-execute waterfall 之前用工具编译后的对象 schema 校验调用，因此非对象的参数列表会先被拒绝——测试套件固定了这一拒绝行为。保留这两行是为了让函数在模型 tool-JSON 边界上保持全定义，而不是在监听器里抛错（那会让该工具的每一次调用都失败）。
 - **重复 rail 没有 `include`/`exclude` 模式。** `@deepseek-ai/dsh-repeat-tool-reminder` 提供通配符工具选择，本 rail 不提供；需要它的部署应先给出具体消费者。
 - **未实现推理链层面的循环治理。** 本 bundle 只按"工具名 + 参数"检测重复。检测重复的**推理**前缀、并把污染区间从请求视图中裁掉（日志保留完整轨迹）是另一项更大的能力。
-- **随附默认值是部署策略，不是推荐值。** `planDeniedTools` 与 `repeatAskAfter: 5` 取自本 fork 的 `CAPABILITY-PLAN.md`。`maxStepsPerTurn: 200` 是失控兜底，而不是日常工作上限：计划里的 `20` 在本 fork 自己的部署中截断了 20 个 turn 里的 11 个，每个都在约一分钟的工作后被截断，且没有任何一个 turn 是在该上限处自然结束的。`maxWrittenFilesPerTurn: 8` 与路由契约的只读列表，是本 bundle 对 DeepSeek Harness 工具集的第一次取值；不认同的部署请直接改这一行。
+- **随附默认值是部署策略，不是推荐值。** `planDeniedTools` 与 `repeatAskAfter: 5` 取自本 fork 的 `CAPABILITY-PLAN.md`。`maxStepsPerTurn: 200` 是失控兜底，而不是日常工作上限：计划里的 `20` 在本 fork 自己的部署中截断了 20 个 turn 里的 11 个，每个都在约一分钟的工作后被截断，且没有任何一个 turn 是在该上限处自然结束的。`maxWrittenFilesPerTurn: 8` 与路由契约的只读列表，是本 bundle 对 DeepSeek Harness 工具集的第一次取值；不认同的部署请直接改这一行。`unfinishedTodoContinuations: 3` 同理：足够把一次"汇报进展式停下"推回工作，又不至于让永远做不完的模型一直跑下去。
 - **`plugins/` 不要求中文 README 对照件。** 仓库的 translation-pairing 门禁已经把同级的 `plugins/dsh-agent-progress/` 报为缺少对照件；本 bundle 主动提供对照件，因此不新增失败项。

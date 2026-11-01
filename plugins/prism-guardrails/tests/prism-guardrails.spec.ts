@@ -4,6 +4,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
@@ -103,6 +104,7 @@ describe('configuration validation', () => {
       planDeniedTools: undefined,
       repeatAskAfter: undefined,
       maxStepsPerTurn: undefined,
+      unfinishedTodoContinuations: undefined,
       skillInvocationGuidance: true,
       writeTools: undefined,
       maxWrittenFilesPerTurn: undefined,
@@ -118,6 +120,7 @@ describe('configuration validation', () => {
       planDeniedTools: ['write', 'edit'],
       repeatAskAfter: 5,
       maxStepsPerTurn: 20,
+      unfinishedTodoContinuations: 2,
       skillInvocationGuidance: false,
       writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }],
       maxWrittenFilesPerTurn: 4,
@@ -129,6 +132,7 @@ describe('configuration validation', () => {
     expect([...(resolved.planDeniedTools ?? [])]).toEqual(['write', 'edit'])
     expect(resolved.repeatAskAfter).toBe(5)
     expect(resolved.maxStepsPerTurn).toBe(20)
+    expect(resolved.unfinishedTodoContinuations).toBe(2)
     expect(resolved.skillInvocationGuidance).toBe(false)
     expect(resolved.writeTools?.get('write')).toEqual({ pathArgument: 'path', contentArgument: 'content' })
     expect(resolved.maxWrittenFilesPerTurn).toBe(4)
@@ -146,6 +150,10 @@ describe('configuration validation', () => {
     expect(resolveConfig({ maxWrittenFilesPerTurn: 0 }).maxWrittenFilesPerTurn).toBeUndefined()
   })
 
+  it('treats unfinishedTodoContinuations 0 as the off switch rather than a count', () => {
+    expect(resolveConfig({ unfinishedTodoContinuations: 0 }).unfinishedTodoContinuations).toBeUndefined()
+  })
+
   it.each([
     ['a non-array denied list', { planDeniedTools: 'write' }, 'must be an array'],
     ['an empty denied list', { planDeniedTools: [] }, 'must not be empty'],
@@ -157,6 +165,8 @@ describe('configuration validation', () => {
     ['a single-call repeat threshold', { repeatAskAfter: 1 }, 'one call is not a loop'],
     ['a zero step budget', { maxStepsPerTurn: 0 }, 'integer >= 1'],
     ['a fractional step budget', { maxStepsPerTurn: 2.5 }, 'integer >= 1'],
+    ['a negative todo-continuation count', { unfinishedTodoContinuations: -1 }, 'integer >= 0'],
+    ['a fractional todo-continuation count', { unfinishedTodoContinuations: 1.5 }, 'integer >= 0'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
     ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
@@ -834,6 +844,33 @@ describe('ponytail marker discipline', () => {
     expect(runs).toEqual(['write'])
   })
 
+  it('applies the upgrade-path rule to the current shortcut: marker too', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-shortcut-bare')
+
+    const refused = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// shortcut: global lock\n',
+    })
+    expect(refused.isError).toBe(true)
+    expect(textOf(refused)).toContain('no upgrade path')
+    expect(runs).toEqual([])
+  })
+
+  it('accepts a shortcut: marker naming its ceiling and upgrade path', async () => {
+    const ctx = await harness(CONFIG)
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'marker-shortcut-complete')
+
+    const allowed = await toolCall(ctx, agent, 'write', {
+      path: 'lock.ts', content: '// shortcut: global lock, per-account locks if throughput matters\n',
+    })
+    expect(allowed.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+  })
+
   it('ignores prose that mentions the convention without a comment prefix', async () => {
     const ctx = await harness(CONFIG)
     const runs: string[] = []
@@ -968,5 +1005,69 @@ describe('verification gate', () => {
 
     expect(runs).toEqual([])
     expect(adapter.requests).toHaveLength(1)
+  })
+})
+
+describe('unfinished-todo gate', () => {
+  /** Boot a harness on one continuation budget, with the agent's list already written. */
+  async function todoHarness(
+    session: string,
+    todos: readonly { content: string; status: 'pending' | 'in_progress' | 'completed' }[],
+    responses: StreamChunk[][],
+    continuations = 1,
+  ): Promise<{ ctx: Context; agent: Agent; runs: string[]; adapter: MockAdapter }> {
+    const ctx = await harness({ unfinishedTodoContinuations: continuations })
+    const runs: string[] = []
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await newAgent(ctx, session)
+    agent.session.append('todo/write', { todos: [...todos] })
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, runs, adapter }
+  }
+
+  /** The text the model was sent in one request, across every content block. */
+  function requestText(request: GenerateOptions): string {
+    return request.messages
+      .map(message => message.content.map(block => block.type === 'text' ? block.text : '').join(''))
+      .join('\n')
+  }
+
+  it('sends a turn back to the items its own list still has open', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-unfinished', [
+      { content: 'T1 wire the store', status: 'in_progress' },
+      { content: 'T2 add the panel', status: 'pending' },
+    ], [textResponse('phase one done'), toolCallResponse('c1', 'probe', { i: 1 }), textResponse('done')])
+
+    await userTurn(ctx, agent, 'implement it')
+
+    const steered = adapter.requests[1]
+    if (steered === undefined) throw new Error('the second request carries the continuation')
+    expect(runs).toEqual(['probe'])
+    expect(adapter.requests).toHaveLength(3)
+    expect(requestText(steered)).toContain('still has 2 unfinished item(s)')
+    expect(requestText(steered)).toContain('T1 wire the store')
+  })
+
+  it('stops a turn whose list is finished', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-finished', [
+      { content: 'T1 wire the store', status: 'completed' },
+    ], [textResponse('done')])
+
+    await userTurn(ctx, agent, 'implement it')
+
+    expect(runs).toEqual([])
+    expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('stops steering after the configured number of continuations', async () => {
+    const { ctx, agent, runs, adapter } = await todoHarness('todo-bounded', [
+      { content: 'T1 wire the store', status: 'pending' },
+    ], [textResponse('one'), textResponse('two'), textResponse('three')], 2)
+
+    await userTurn(ctx, agent, 'implement it')
+
+    expect(runs).toEqual([])
+    expect(adapter.requests).toHaveLength(3)
   })
 })
