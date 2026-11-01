@@ -97,7 +97,6 @@ apps/desktop/
 | dsh-plugin | `dsh plugin --profile web add dsh-plugin`（桌面端改为 bundle 预装 + patch insert，见 2.9） |
 | dsh-win-terminal-inspector | 复制到 `<DSH_HOME>\profiles\web\plugins\` + `cordis.patch.yml` insert（`win-terminal-inspector` 行，name `./plugins/dsh-win-terminal-inspector/index.js`） |
 | dsh-better-sidebar | `dsh plugin --profile web add dsh-better-sidebar@latest`（pnpm 拦构建脚本时 `pnpm approve-builds --all` 后重跑） |
-| dsh-tauri | `dsh plugin --profile web add dsh-tauri` |
 | dsh-notification | `dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.1.3.tar.gz` |
 | dsh-session-context-menu | `dsh plugin --profile web add github:baihejiangnan/dsh-session-context-menu` |
 | dsh-im | `dsh plugin --profile web add -w @xmanrui/dsh-im` |
