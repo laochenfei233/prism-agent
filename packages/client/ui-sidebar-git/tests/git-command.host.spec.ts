@@ -114,10 +114,10 @@ describe('parseHunks', () => {
 
 describe('repositoryPath', () => {
   it('accepts a relative path inside the root and rejects escapes', () => {
-    expect(repositoryPath('/repo', 'src/a.ts')).toBe('src/a.ts')
-    expect(repositoryPath('/repo', '.')).toBe('.')
+    expect(repositoryPath('src/a.ts')).toBe('src/a.ts')
+    expect(repositoryPath('.')).toBe('.')
     for (const path of ['', '/etc/passwd', '../x', 'a/../../x', 'a\0b']) {
-      expect(repositoryPath('/repo', path)).toBeUndefined()
+      expect(repositoryPath(path)).toBeUndefined()
     }
   })
 })

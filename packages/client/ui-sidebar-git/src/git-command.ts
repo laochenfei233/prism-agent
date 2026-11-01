@@ -8,7 +8,7 @@
  * the repository root before they reach a command, and a failed command
  * carries its stderr tail to the route, which reports it.
  */
-import { isAbsolute, normalize, resolve, sep } from 'node:path'
+import { isAbsolute, normalize, resolve } from 'node:path'
 import type { GitRunOptions, GitRunResult } from '@deepseek-ai/dsh-workspace-changes'
 
 /** The one method these operations need from the shared git runner; a real run and a scripted one both satisfy it. */
@@ -175,12 +175,11 @@ export async function readFileDiff(
 }
 
 /**
- * Normalize one client-supplied path against the repository root.
- * @param root - repository top-level directory.
+ * Normalize one client-supplied path into a repository-relative spelling.
  * @param path - the path as received.
- * @returns the repository-relative path, or undefined when it is absolute, empty, NUL-bearing, or escapes the root.
+ * @returns the path, or undefined when it is absolute, empty, NUL-bearing, or carries a .. segment.
  */
-export function repositoryPath(root: string, path: string): string | undefined {
+export function repositoryPath(path: string): string | undefined {
   if (path.length === 0 || path.includes('\0') || isAbsolute(path)) return undefined
   const normalized = normalize(path).replaceAll('\\', '/')
   if (normalized === '..' || normalized.startsWith('../')) return undefined

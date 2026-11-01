@@ -115,8 +115,8 @@ async function statusResponse(deps: GitRouteDeps, sessionId: string, signal: Abo
  * @param path - the path as received.
  * @returns the path to use, or the response to answer with.
  */
-function checkedPath(root: string, path: string): string | Response {
-  const normalized = repositoryPath(root, path)
+function checkedPath(path: string): string | Response {
+  const normalized = repositoryPath(path)
   return normalized ?? new Response('Path is outside the repository.', { status: 400 })
 }
 
@@ -152,7 +152,7 @@ export async function handleDiff(deps: GitRouteDeps, request: Request): Promise<
   if (operations === undefined) return new Response('Git is unavailable on this Host.', { status: 409 })
   const root = await operations.locate(cwd, request.signal)
   if (root === null) return new Response('The working directory is not a git repository.', { status: 404 })
-  const checked = checkedPath(root, path)
+  const checked = checkedPath(path)
   if (checked instanceof Response) return checked
   return json(await operations.diff(root, checked, side, request.signal))
 }
@@ -212,7 +212,7 @@ async function mutate(
   if (root === null) return new Response('The working directory is not a git repository.', { status: 404 })
   const checked: string[] = []
   for (const path of body.paths) {
-    const normalized = checkedPath(root, path)
+    const normalized = checkedPath(path)
     if (normalized instanceof Response) return normalized
     checked.push(normalized)
   }
