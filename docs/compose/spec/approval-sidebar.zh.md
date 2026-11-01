@@ -3,7 +3,7 @@ feature: approval-sidebar
 status: delivered
 updated: 2026-11-01
 branch: feat/approval-sidebar
-commits: c22ec9f0b9..HEAD
+commits: c22ec9f0b9..aaa43b9043
 ---
 
 # 会话行内的审批
