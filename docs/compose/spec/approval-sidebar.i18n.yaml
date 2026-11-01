@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/approval-sidebar.md
 /:
-  en: 6a911ee90ef0b8b2
-  zh: 6a911ee90ef0b8b2
+  en: 361ed71a1519576a
+  zh: 361ed71a1519576a
 /approval-in-the-session-row:
   en: 7417551be68817b2
   zh: 7f39825606da553c
