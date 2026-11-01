@@ -14,6 +14,8 @@
  * @module prism-guardrails/config
  */
 
+import { createHash } from 'node:crypto'
+
 /**
  * One deployment tool that writes file content.
  *
@@ -307,6 +309,41 @@ function resolveMode(value: Mode | undefined): Mode {
     throw new Error(`prism-guardrails: mode must be "enforce" or "observe", received ${JSON.stringify(value)}`)
   }
   return value
+}
+
+/**
+ * The identity of one deployment's rail configuration.
+ *
+ * It covers the settings a rail decision reads and nothing else, so a
+ * conversation about a refusal can name the configuration that produced it.
+ *
+ * `mode` is normalized through the resolved value, so writing the default
+ * explicitly hashes the same as omitting it. An edit that changes no behavior —
+ * `repeatAskAfter: 0` against an omitted key — still moves the version, which
+ * costs a report line rather than a wrong decision.
+ *
+ * @param config - the deployment's raw rail configuration.
+ * @param mode - the resolved mode, which defaults an omitted key.
+ * @returns the first eight hex characters of the configuration's digest.
+ */
+export function configVersion(config: Config, mode: Mode): string {
+  return createHash('sha256').update(JSON.stringify(sortKeys({ ...config, mode }))).digest('hex').slice(0, 8)
+}
+
+/**
+ * Deep key-sort of a configuration value, so two writings that differ only in
+ * property order hash alike.
+ *
+ * @param value - any value from the deployment's configuration.
+ * @returns the same value with every object's keys in sorted order.
+ */
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys)
+  if (value === null || typeof value !== 'object') return value
+  const record = value as Record<string, unknown>
+  const sorted: Record<string, unknown> = {}
+  for (const key of Object.keys(record).sort()) sorted[key] = sortKeys(record[key])
+  return sorted
 }
 
 /** Check the plan-mode denial list; an empty list has no meaning, so it is an error rather than "off". */

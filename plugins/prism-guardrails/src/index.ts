@@ -57,8 +57,8 @@ import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
 import type { PostToolDecision, PreToolDecision } from '@deepseek-ai/dsh-tools'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
-import { resolveConfig } from './config.ts'
-import { configVersion, createLedger } from './decision.ts'
+import { configVersion, resolveConfig } from './config.ts'
+import { createLedger } from './decision.ts'
 import { PONYTAIL_MARKER } from './marker.ts'
 import type { Config, Mode, ResolvedConfig, ResolvedWriteTool } from './config.ts'
 import type { Decision, DecisionLedger, DecisionOutcome } from './decision.ts'
@@ -140,6 +140,7 @@ interface TurnRecords {
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = resolveConfig(config)
   const ledger = createLedger()
+  const version = configVersion(config, resolved.mode)
   installPlanModeDenial(ctx, resolved, ledger)
   installRepeatApproval(ctx, resolved, ledger)
   installTurnBudget(ctx, resolved, ledger)
@@ -155,7 +156,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   installUnfinishedTodoGate(ctx, resolved, ledger)
   installSensitiveReadDenial(ctx, resolved, ledger)
   installCommandGuard(ctx, resolved, ledger)
-  installStatusCommand(ctx, config, resolved, ledger)
+  installStatusCommand(ctx, resolved, ledger, version)
 }
 
 /**
@@ -184,7 +185,7 @@ function decide(
   decision: RailRefusal,
   next: () => Promise<PreToolDecision>,
 ): Promise<PreToolDecision> {
-  ledger.record(agent, { rail, outcome: mode === 'observe' ? 'observed' : decision.kind, subject, at: Date.now() })
+  ledger.record(agent, { rail, outcome: mode === 'observe' ? 'observed' : decision.kind, subject })
   return mode === 'observe' ? next() : Promise.resolve(decision)
 }
 
@@ -207,7 +208,7 @@ function note(
   subject: string,
   outcome: DecisionOutcome,
 ): void {
-  ledger.record(agent, { rail, outcome, subject, at: Date.now() })
+  ledger.record(agent, { rail, outcome, subject })
 }
 
 /**
@@ -223,6 +224,9 @@ function note(
  * for the next accepted step already refuses. A deployment without the
  * plan-mode service keeps its tools unrestricted; the rail has no state of its
  * own to invent.
+ *
+ * Observing records the refusal and returns `undefined`, which the guard reads
+ * as permission.
  */
 function installPlanModeDenial(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const denied = resolved.planDeniedTools
@@ -297,7 +301,9 @@ function installRepeatApproval(ctx: Context, resolved: ResolvedConfig, ledger: D
  * The judge is the step number the loop already carries in the pre-step
  * payload, so retries, rejected steps, resume, and fork are all correct with no
  * counter to keep, advance, or reset. The model never sees a rejected step, so
- * the log line is the only record of why the turn stopped.
+ * the log line and the ledger row are the only record of why the turn stopped.
+ * Observing skips both the refusal and the log line, which would otherwise say a
+ * step was not opened when it was.
  */
 function installTurnBudget(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const limit = resolved.maxStepsPerTurn
@@ -878,8 +884,12 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig, ledger: Dec
  * store once at apply time. A profile with no commands service keeps every rail
  * and loses only the report.
  */
-function installStatusCommand(ctx: Context, config: Config, resolved: ResolvedConfig, ledger: DecisionLedger): void {
-  const version = configVersion(config, resolved.mode)
+function installStatusCommand(
+  ctx: Context,
+  resolved: ResolvedConfig,
+  ledger: DecisionLedger,
+  version: string,
+): void {
   ctx.inject(['commands'], (scope: Context) => {
     scope.effect(() => scope.commands.register({
       definitionId: CommandDefinitionId('prism-guardrails/status'),
@@ -931,12 +941,18 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
       : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
-  const lines = [`Guardrails: ${String(armed)} of ${String(rails.length)} rails armed `
-    + `(mode: ${resolved.mode}, config ${version}).`]
+  // An observing deployment is not protected, so its first line says so before
+  // it says anything else: a reader who takes this report for protection is
+  // worse off than with no rails at all.
+  const lines = [resolved.mode === 'observe'
+    ? `Guardrails: OBSERVE MODE — ${String(armed)} of ${String(rails.length)} rails armed, `
+      + `nothing is refused (config ${version}).`
+    : `Guardrails: ${String(armed)} of ${String(rails.length)} rails armed (mode: enforce, config ${version}).`]
     .concat(rails.map(([name, detail]) => `${name}: ${detail ?? 'off'}`))
   // The decisions block earns its space only where the ledger carries something
-  // the model could not already see: an observe run, or an earlier one.
-  if (decisions.length > 0 || resolved.mode === 'observe') {
+  // the model could not already see: an observation, or an observe run that has
+  // made none yet.
+  if (decisions.some(decision => decision.outcome === 'observed') || resolved.mode === 'observe') {
     lines.push(...describeDecisions(decisions))
   }
   return lines.join('\n')
@@ -945,9 +961,10 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
 /**
  * The decisions block: a count, then the `observe` records the mode produced.
  *
- * Only `observed` rows are listed. Under `enforce` the model already read every
- * refusal, so a list of them would tell an operator nothing new; the rows that
- * matter are the calls a rail would have stopped and did not.
+ * Only `observed` rows are listed. An enforced `deny` is text the model read, and
+ * an enforced `ask` is a decision the approver made, so neither tells an operator
+ * what they do not already know; the rows that matter are the calls a rail would
+ * have stopped and did not.
  *
  * @param decisions - the session's recorded decisions, oldest first.
  * @returns the block's lines.
@@ -965,12 +982,12 @@ function describeDecisions(decisions: readonly Decision[]): readonly string[] {
  * One decision's subject, shortened for a report line.
  *
  * @param subject - the tool name, path, or command a rail judged.
- * @returns the subject, truncated on a character boundary with an ellipsis.
+ * @returns the subject, truncated on a code-point boundary with an ellipsis.
  */
 function subjectForReport(subject: string): string {
-  const clean = subject.replaceAll('\n', ' ')
-  return clean.length <= MAX_REPORTED_SUBJECT ? clean
-    : `${clean.slice(0, MAX_REPORTED_SUBJECT - 1)}…`
+  const points = [...subject.replaceAll('\n', ' ')]
+  return points.length <= MAX_REPORTED_SUBJECT ? points.join('')
+    : `${points.slice(0, MAX_REPORTED_SUBJECT - 1).join('')}…`
 }
 
 /**

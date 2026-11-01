@@ -12,8 +12,9 @@ import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../packages/core/agent-loop/tests/mock-adapter.ts'
-import { resolveConfig } from '../src/config.ts'
+import { resolveConfig, configVersion } from '../src/config.ts'
 import type { Config } from '../src/config.ts'
+import { createLedger } from '../src/decision.ts'
 import * as Guardrails from '../src/index.ts'
 
 /**
@@ -174,6 +175,16 @@ describe('configuration validation', () => {
   it('defaults the mode to enforce and accepts observe', () => {
     expect(resolveConfig({}).mode).toBe('enforce')
     expect(resolveConfig({ mode: 'observe' }).mode).toBe('observe')
+  })
+
+  it('gives one configuration one version, whichever order its keys were written in', () => {
+    const written = configVersion({ maxStepsPerTurn: 20, repeatAskAfter: 3 }, 'enforce')
+    const reordered = configVersion({ repeatAskAfter: 3, maxStepsPerTurn: 20 }, 'enforce')
+
+    expect(reordered).toBe(written)
+    expect(written).toMatch(/^[0-9a-f]{8}$/)
+    expect(configVersion({ maxStepsPerTurn: 21, repeatAskAfter: 3 }, 'enforce')).not.toBe(written)
+    expect(configVersion({ maxStepsPerTurn: 20, repeatAskAfter: 3 }, 'observe')).not.toBe(written)
   })
 
   it('treats maxWrittenFilesPerTurn 0 as the off switch rather than a budget', () => {
@@ -1343,7 +1354,8 @@ describe('observe mode', () => {
     expect(result.isError).toBe(false)
     expect(runs).toEqual(['bash'])
     const text = await report(ctx, agent)
-    expect(text).toContain('mode: observe')
+    expect(text).toContain('OBSERVE MODE')
+    expect(text).toContain('nothing is refused')
     expect(text).toContain('observed  command guard  git push --force origin main')
   })
 
@@ -1456,6 +1468,8 @@ describe('observe mode', () => {
     const runs: string[] = []
     ctx.tools.register(fixture('probe', runs))
     const agent = await newAgent(ctx, 'observe-budget-steps')
+    const warnings: string[] = []
+    vi.spyOn(ctx.logger, 'warn').mockImplementation((...args: unknown[]) => { warnings.push(args.map(String).join(' ')) })
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'probe', {}),
       toolCallResponse('c2', 'probe', {}),
@@ -1467,6 +1481,8 @@ describe('observe mode', () => {
 
     expect(runs).toEqual(['probe', 'probe'])
     expect(await report(ctx, agent)).toContain('observed  turn budget  step 2')
+    // The log line says a step "was not opened", which would be false here.
+    expect(warnings.filter(line => line.includes('was not opened'))).toEqual([])
   })
 
   it('runs a repeated call past the threshold and records it', async () => {
@@ -1508,6 +1524,61 @@ describe('observe mode', () => {
 
     expect(runs).toEqual(['skill'])
     expect(await report(ctx, agent)).toContain('observed  skill guidance  user-only')
+  })
+
+  it('still steers a turn back to its own todo list', async () => {
+    const ctx = await commandHarness({ mode: 'observe', unfinishedTodoContinuations: 1 })
+    const runs: string[] = []
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await newAgent(ctx, 'observe-todos')
+    agent.session.append('todo/write', {
+      todos: [{ content: 'T1 finish the change', status: 'pending' }],
+    } as never)
+    const adapter = new MockAdapter([
+      textResponse('progress report'),
+      textResponse('still reporting'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(await report(ctx, agent)).toContain('decisions this session: 1 (0 observed)')
+  })
+
+  it('shortens a long subject and caps how many rows it lists', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      commandGuard: {
+        tools: [{ tool: 'bash', commandArgument: 'command' }],
+        deny: [{ pattern: '^rm\\b', reason: 'deletes files' }],
+      },
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await newAgent(ctx, 'observe-truncation')
+    const long = `rm -rf ${'x'.repeat(200)}`
+
+    await toolCall(ctx, agent, 'bash', { command: long })
+
+    const text = await report(ctx, agent)
+    expect(text).toContain('…')
+    expect(text).not.toContain('x'.repeat(120))
+  })
+
+  it('keeps only the newest decisions and hands out a copy', () => {
+    const ledger = createLedger()
+    const agent = {} as Agent
+    for (let index = 0; index < 250; index += 1) {
+      ledger.record(agent, { rail: 'command guard', outcome: 'observed', subject: String(index) })
+    }
+
+    const listed = ledger.list(agent)
+    expect(listed).toHaveLength(200)
+    expect(listed[0]?.subject).toBe('50')
+    expect(listed.at(-1)?.subject).toBe('249')
+    listed.pop()
+    expect(ledger.list(agent)).toHaveLength(200)
   })
 
   it('still steers a turn back for evidence', async () => {
@@ -1570,8 +1641,7 @@ describe('/guardrails status', () => {
     expect(text).not.toContain('decisions this session')
   })
 
-  it('names the mode and the configuration version', async () => {
-    const ctx = await commandHarness({ maxStepsPerTurn: 20 })
+  it('names the mode and the configuration version', async () => {    const ctx = await commandHarness({ maxStepsPerTurn: 20 })
     const agent = await ctx.agentLoop.create(SessionId('status-version'), { provider: 'mock', model: 'mock' })
 
     const first = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
@@ -1625,5 +1695,20 @@ describe('/guardrails status', () => {
 
     expect(denied.isError).toBe(true)
     expect(runs).toEqual([])
+  })
+
+  it('prints no decisions block for an enforced refusal the model already read', async () => {
+    const ctx = await commandHarness({
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await newAgent(ctx, 'status-enforced-refusal')
+
+    expect((await toolCall(ctx, agent, 'read', { file_path: '.env' })).isError).toBe(true)
+
+    expect((await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text)
+      .not.toContain('decisions this session')
   })
 })

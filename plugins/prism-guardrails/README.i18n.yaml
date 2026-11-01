@@ -12,8 +12,8 @@
   en: a3a015188eef2d2b
   zh: 24954e3d6f274975
 /prism-guardrails/configuration:
-  en: 3fa36ee60ed3ae06
-  zh: 3e53fd62c78e13b4
+  en: b6571b0430be3372
+  zh: 462b9ab79e7769c3
 /prism-guardrails/rails:
   en: 72f7891b97c27a02
   zh: ebcc7fab8b465344
@@ -54,14 +54,14 @@
   en: 549affec11a149b9
   zh: 852d92c1b6c83a98
 /prism-guardrails/guardrails:
-  en: bb95f2f1ee062f62
-  zh: 68b949d4fa57b097
+  en: 96bd3ab2e8fde10f
+  zh: 38d06328bc158678
 /prism-guardrails/wiring:
   en: d2545073e0cae122
   zh: b1a4060392290b3f
 /prism-guardrails/build-and-verify:
-  en: b63a1f05909d8dd1
-  zh: 36474596f6f80427
+  en: 547f3d9993484ebe
+  zh: 1986d6879729b95f
 /prism-guardrails/known-limitations-and-deferred-work:
-  en: d9ee5b0f3356bbee
-  zh: ab2996cd9a1c657a
+  en: c88ea59b1abb035e
+  zh: a4ee022958824788

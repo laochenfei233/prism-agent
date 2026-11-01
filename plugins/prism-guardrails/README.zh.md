@@ -279,17 +279,17 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 本 bundle 注册一条命令，报告该部署实际启用（armed）了哪些 rail、当前所处的模式，以及 `observe` 下看见过的判定：
 
 ```
-Guardrails: 12 of 12 rails armed (mode: observe, config 3f2a9c1b).
+Guardrails: OBSERVE MODE — 12 of 12 rails armed, nothing is refused (config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
-decisions this session: 3 (3 observed)
+decisions this session: 2 (2 observed)
   observed  command guard  git push --force origin main
   observed  sensitive reads  .env.local
 ```
 
-它读取的是解析后的配置，因此报告不可能与 rail 的实际状态不一致。`config` 是这些 rail 当前依以判定的配置哈希，日志里的一次拒绝因此能对上产生它的设置。只列 `observed` 行：`enforce` 下的拒绝模型自己已经读过，值得人看一眼的是那些"本来会拦、但没拦"的调用。没有 `commands` 服务的部署保有全部 rail，只失去这份报告。
+它读取的是解析后的配置，因此报告不可能与 rail 的实际状态不一致。`config` 是这些 rail 当前依以判定的配置哈希，日志里的一次拒绝因此能对上产生它的设置。只列 `observed` 行，最多最近十条：`enforce` 下的 `deny` 是模型自己读过的文本，`enforce` 下的 `ask` 是审批人做过的决定，值得人看一眼的是那些"本来会拦、但没拦"的调用。没有 `commands` 服务的部署保有全部 rail，只失去这份报告。
 
 记录本身按会话保存在内存里，上限 200 条：它回答"这次会话里 rail 做了什么"，不回答"上周发生了什么"。
 
@@ -354,7 +354,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## 构建与验证
 
-本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有以值形式使用的两处例外——`createUserMessage`（完成验证闸门与未完成 todo 闸门用它 steer agent）与 `CommandDefinitionId`（每次命令注册都要用）——因此产物只携带这两个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。`@deepseek-ai/dsh-llm` 与 `@deepseek-ai/dsh-commands` 是解析它们的 peer dependency；`@deepseek-ai/dsh-system-prompt` 与它们并列声明，是 Ponytail 行所注入的服务，而不是被导入的模块。
+本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有以值形式使用的两处例外——`createUserMessage`（完成验证闸门与未完成 todo 闸门用它 steer agent）与 `CommandDefinitionId`（每次命令注册都要用）——因此产物只携带这两个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。它另一处导入是 `node:crypto`，内置模块，用于配置版本摘要。`@deepseek-ai/dsh-llm` 与 `@deepseek-ai/dsh-commands` 是解析它们的 peer dependency；`@deepseek-ai/dsh-system-prompt` 与它们并列声明，是 Ponytail 行所注入的服务，而不是被导入的模块。
 
 `tsconfig.json` 通过检出目录的**已构建**声明解析这些类型，这也是仓库内各包互相消费的方式——请先在检出目录里跑 `pnpm run build`。`tsdown.config.ts` 让 `@deepseek-ai/*` 保持外部，与同级的 `plugins/prism-memory` 一致：打包进副本会在 harness 依赖的跨实例身份上遮蔽 profile 自己的服务实例。
 
@@ -362,7 +362,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 138 composed unit tests
+npm test            # 143 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -376,7 +376,7 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 
 ## 已知限制与待办
 
-- **`observe` 是一种"带着 rail 却不受保护"的跑法。** 它只记录不拒绝，处于 observe 的部署并没有被保护；把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
+- **`observe` 关掉的是拒绝，不是 rail。** `deny`、`ask` 与 turn budget 的拒绝会变成记录；两处 `steer` 仍然会把一轮送回去补证据或补未完成的 todo。处于 observe 的部署对"这些拒绝本该挡住的调用"没有保护，把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
 - **决策记录只在内存里。** 按会话、上限 200 条、进程退出即消失，因此它只回答本次会话里 rail 做了什么。它是调参用的，不是审计日志。
 - **配置版本只覆盖 rail 配置。** 它标识的是 patch 行里的这些设置，不覆盖 profile 中其他插件，因此它指向一次拒绝背后的配置，而不是整个部署。
 - **本 bundle 在仓库测试运行器之外。** 它位于 `plugins/`，检出目录的 `vitest.config.ts` 不收集该目录，因此它自带配置，也不参与 `pnpm run test` 或逐文件覆盖率门禁。它的证据是上述套件，而不是 CI。

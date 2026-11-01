@@ -97,7 +97,7 @@ mode: enforce   # 默认；observe 时所有 rail 只记录不拦
 
 ```ts
 type Outcome = 'deny' | 'ask' | 'steer' | 'observed'
-interface Decision { rail: string; outcome: Outcome; subject: string; at: number }
+interface Decision { rail: string; outcome: Outcome; subject: string }
 ```
 
 - `record(agent, decision)`：写进 `WeakMap<Agent, Decision[]>`，**每个 session 一条环形缓冲，上限约 200 条**（超过就丢最旧的，台账不是审计日志）。
@@ -128,12 +128,14 @@ Guardrails: 12 of 12 rails armed (mode: enforce, config 3f2a9c1b).
 在现有十二行之后追加一块：
 
 ```
-decisions this session: 4 (3 would-deny, 1 would-ask)
-  observed  command guard  bash  "git push --force origin main"
-  observed  sensitive reads  read  ".env.local"
+Guardrails: OBSERVE MODE — 12 of 12 rails armed, nothing is refused (config 3f2a9c1b).
+...
+decisions this session: 2 (2 observed)
+  observed  command guard  git push --force origin main
+  observed  sensitive reads  .env.local
 ```
 
-**report 只列 observe 下的记录**——enforce 下的拦截模型已经看见了，再列一遍是冗余；observe 下的放行才是这个功能存在的理由。
+**report 只列 observe 下的记录**，最多最近十条。enforce 下的 `deny` 是模型已经读过的文本，`ask` 是审批人做过的决定，两者都不提供新信息；observe 下的放行才是这个功能存在的理由。
 
 ### 5.5 验收
 
@@ -231,10 +233,11 @@ decisions this session: 4 (3 would-deny, 1 would-ask)
 
 **做出来的**：`mode: enforce | observe` 一个键；`src/decision.ts`（每会话内存台账，上限 200 条，加 `configVersion()` 的 8 位摘要）；`src/index.ts` 的两个出口帮助函数 `decide()`（8 处 `tools/pre-execute`）与 `note()`（plan-mode 的 guard、pre-step 的 turn budget、两处 steer）；`/guardrails` 首行加模式与版本，observe 下追加决策块，只列 `observed` 行。
 
-**与原规格的差异（三处，都有理由）**：
+**与原规格的差异（四处，都有理由）**：
 
 1. **`steer` 不随 observe 降档。** 原规格 §5.1 写"observe 下所有 rail 只记录不拦"，但把一轮送回补证据是"要求"而非"拒绝"，观察模式把它关掉会顺带削弱正向能力。现在 `steer` 只记账、行为不变，报告里 `observed` 计数因此与 `steer` 分开。
 2. **没有新增 `observe.patch.yml`。** §5.6 列了这一项，但当前没有任何消费者：单测用 `commandHarness({mode:'observe'})` 直接构造，e2e 的四个用例绑定的是既有 fixture。为一个不存在的消费者加一个 fixture 文件是"for later"代码，等真有 e2e 场景再加。
-3. **版本哈希取的是原始 `Config`（补上解析后的 `mode`），不是逐字段投影的 `ResolvedConfig`。** 所有 rail 配置都影响判定，逐字段投影要多写 14 行且不改变结论；代价是 `repeatAskAfter: 0` 与省略该键哈希不同——只影响报告里的一个字符串，不影响任何判定。
+3. **版本哈希取的是原始 `Config`（补上解析后的 `mode`），不是逐字段投影的 `ResolvedConfig`。** 所有 rail 配置都影响判定，逐字段投影要多写 14 行且不改变结论；代价是 `repeatAskAfter: 0` 与省略该键哈希不同——只影响报告里的一个字符串，不影响任何判定。哈希函数放在 `config.ts`（配置身份），不放在仅管台账的 `decision.ts`。
+4. **决策块比 §5.4 的示例更紧凑。** 没有 `(3 would-deny, 1 would-ask)` 的拆分，也没有单独的工具列：`observe` 下每条记录本来就没有执行，"它会做什么"由 rail 名说明，而行里的 subject 是它判定的那条命令/路径，再加上工具名反而把最有用的信息挤到后面。行长另有 60 个码位的上限。
 
-**证据**：`npm test` 138 通过（原 123 + 新增 15）；`npm run build` 成功，产物外部导入仍只有 `@deepseek-ai/dsh-commands/brand`、`@deepseek-ai/dsh-llm` 与内置的 `node:crypto`；`npm run smoke` 通过。
+**证据**：`npm test` 143 通过（原 123 + 新增 20）；`npm run build` 成功，产物外部导入仍只有 `@deepseek-ai/dsh-commands/brand`、`@deepseek-ai/dsh-llm` 与内置的 `node:crypto`；`npm run smoke` 通过；`vitest run`（含 18 个 ponytail 用例与 4 个 e2e）165 通过。
