@@ -14,7 +14,7 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import type { DirectoryFlowOwnerProps, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
+import type { DirectoryFlowOwnerProps, SessionRowOwnerProps, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 import { createWorkspaceShortcutControls } from '../src/client/shortcuts.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
@@ -810,6 +810,35 @@ describe('WorkspaceBrowser', () => {
     expectVisible(12)
     fireEvent.click(screen.getByRole('button', { name: '收起' }))
     expectVisible(8)
+  })
+
+  it('renders the pending seat as a second line only while a row holds an interaction', () => {
+    const item = summary('session-1', 5)
+    const status = (pendingInteraction: SessionPendingInteraction | undefined) =>
+      hook<SessionStatusSnapshot>(new Map([[item.id, {
+        running: false, pendingInteraction, completionUnread: false,
+      }]]))
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: object) =>
+      name === 'sidebar.workspaces.session.pending'
+        ? <button type="button" data-testid="pending-seat">{(owner as SessionRowOwnerProps).sessionId}</button>
+        : null
+    const b = mount({
+      useSessions: hook(sessionState([item])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [item.id])])),
+      renderSlot,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.queryByTestId('pending-seat')).toBeNull()
+
+    rerender(b, {
+      useSessionStatus: status({ key: 'approval:1', kind: 'approval', sessionId: item.id } as SessionPendingInteraction),
+    })
+    const row = document.querySelector<HTMLElement>(`[data-row-key="session:${item.id}"]`)
+    if (row === null) throw new Error('session row missing')
+    expect(within(row).getByTestId('pending-seat').textContent).toBe('session-1')
+
+    rerender(b, { useSessionStatus: status(undefined) })
+    expect(screen.queryByTestId('pending-seat')).toBeNull()
   })
 
   it('keeps the raised row count, not the Session, when a new Session pushes it down', () => {
