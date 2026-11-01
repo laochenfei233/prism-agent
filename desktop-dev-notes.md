@@ -132,3 +132,12 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 - **Intel Mac "dsh exited during startup"**：待 CI 校验结果定性——若闭包 native 为 arm64，需把 bundle-runtime 的 pnpm 改为显式用内置 x64 node 调用（不再依赖 PATH 解析）。
 - **Gitea**：代码已有私有只读镜像（自动从 GitHub 同步）；构建产物如需走 Gitea 分发需另找上传通道（镜像仓库只读）。
 - **本地**：`apps/desktop` 有未跟踪 `.tmp-tauri-cli/`（npx 缓存的 Tauri CLI，不入库）；`~/.dsh` 保留 `sessions/`。
+
+## 打包排错记录：NSIS 长路径
+
+2026-11-01 打 `0.2.1-rc.4-alpha1` 安装包时 makensis 报
+`File: failed opening file "...\src-tauri\..\runtime\...\selectElementAccessibilityInteractiveContentAttributesSelectDescendant.md"`。
+
+- 原因是 `bundle.resources` 的源写成相对路径 `../runtime`，Tauri 把它原样写进 NSIS 的 `File` 指令，路径里保留了 `..`，叠加该文件的 190 字符文件名后越过 makensis 的可打开长度（实测 259 字符失败、同一目录用规范化绝对路径 247 字符成功）。
+- 临时绕过：构建前把 `apps/desktop/src-tauri/tauri.conf.json` 的 resources 源改成规范化绝对路径（`C:/.../apps/desktop/runtime`），打包完成后改回 `../runtime` 以保持可移植。
+- 长期修法（未做）：在 `bundle-runtime.mjs` 收尾时把超长路径的 inspector devtools 描述文件改名或在 NSIS 前把 runtime 放到短路径；CI 上若复现，优先检查该文件的相对路径长度。
