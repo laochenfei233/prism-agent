@@ -3,7 +3,7 @@ feature: approval-sidebar
 status: delivered
 updated: 2026-11-01
 branch: feat/approval-sidebar
-commits: c22ec9f0b9..d3206c01c9
+commits: c22ec9f0b9..aec898c7d8
 ---
 
 # Approval in the Session Row
