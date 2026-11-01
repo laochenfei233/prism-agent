@@ -1,8 +1,8 @@
 /** Shared file comparison for the turn-tail hover preview and Sidebar review. */
 import { useMemo, useRef } from 'react'
 import type { ReactNode, UIEvent } from 'react'
-import { Button, languageForPath, useCodeHighlighter } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { CodeHighlighter, HighlightSpan } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, hunkRows, languageForPath, useCodeHighlighter } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { CodeHighlighter, DiffRow, HighlightSpan } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceDiffHunk } from '@deepseek-ai/dsh-workspace-changes/types'
 import type { ChangesDiff } from '../changes.ts'
@@ -12,14 +12,6 @@ import css from './FileDiff.module.css'
 
 /** Maximum rendered lines per comparison. */
 export const MAX_RENDERED_LINES = 5000
-
-/** One drawn line of a hunk with its line numbers on each side. */
-export interface DiffRow {
-  kind: 'add' | 'del' | 'context'
-  old: number | undefined
-  new: number | undefined
-  text: string
-}
 
 /** One side-by-side row: the old side, the new side, or both. */
 export interface SplitRow {
@@ -55,25 +47,6 @@ function DiffText({ text, spans }: { text: string; spans: readonly HighlightSpan
   return <span className={css.text} data-diff-code={spans === undefined ? undefined : ''}>
     {spans === undefined ? text : spans.map((span, index) => <span key={index} style={span.style}>{span.text}</span>)}
   </span>
-}
-
-/**
- * Number a hunk's lines: context lines count on both sides, deletions on the
- * old side, additions on the new side.
- * @param hunk - a served hunk.
- * @returns the rows in order.
- */
-export function hunkRows(hunk: WorkspaceDiffHunk): DiffRow[] {
-  let oldNo = hunk.oldStart
-  let newNo = hunk.newStart
-  return hunk.lines.map((line) => {
-    const text = line.slice(1)
-    switch (line[0]) {
-      case '+': return { kind: 'add', old: undefined, new: newNo++, text }
-      case '-': return { kind: 'del', old: oldNo++, new: undefined, text }
-      default: return { kind: 'context', old: oldNo++, new: newNo++, text }
-    }
-  })
 }
 
 /**

@@ -96,6 +96,8 @@ export { ReadBlock, DEFAULT_READ_MAX_LINES } from './ReadBlock.tsx'
 export type { ReadBlockProps, ReadBlockLine, ReadBlockLabels } from './ReadBlock.tsx'
 export { DiffBlock, DEFAULT_DIFF_MAX_LINES, diffTotals } from './DiffBlock.tsx'
 export type { DiffBlockProps, DiffHunk, DiffBlockLabels } from './DiffBlock.tsx'
+export { hunkRows } from './diff-rows.ts'
+export type { DiffHunkLines, DiffRow } from './diff-rows.ts'
 export { SearchBlock, DEFAULT_SEARCH_MAX_LINES } from './SearchBlock.tsx'
 export type {
   SearchBlockProps, SearchMatchesBlockProps, SearchPathsBlockProps, SearchFileGroup, SearchBlockLineMatch,

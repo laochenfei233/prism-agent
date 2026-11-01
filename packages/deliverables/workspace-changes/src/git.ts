@@ -1,6 +1,8 @@
 /** Git working-tree snapshots, tree diffs, and ignore checks through the subprocess capability. */
 import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
+import type { Context } from '@deepseek-ai/cordis'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { parseNumstat, type NumstatEntry } from './numstat.ts'
 import { canonicalPath, isInside, toPosix } from './paths.ts'
@@ -89,6 +91,30 @@ export class GitRunner {
 function ok(result: GitRunResult, what: string): GitRunResult {
   if (result.exitCode !== 0) throw new Error(`${what} failed: ${result.stderr.trim()}`)
   return result
+}
+
+/**
+ * Resolve the git executable once per Host. On macOS the Xcode stub at
+ * `/usr/bin/git` opens an installer dialog instead of running, so it counts as
+ * absent until developer tools are selected.
+ * @param ctx - context carrying the subprocess capability.
+ * @param signal - caller lifetime.
+ * @returns the executable path, or null when git is unavailable.
+ */
+export async function resolveGitExecutable(ctx: Context, signal: AbortSignal): Promise<string | null> {
+  let executable: string
+  try {
+    executable = await ctx.subprocess.resolveExecutable('git', undefined, signal)
+  } catch {
+    return null
+  }
+  if (process.platform !== 'darwin' || executable !== '/usr/bin/git') return executable
+  const probe = ctx.subprocess.spawn({
+    argv: ['/usr/bin/xcode-select', '-p'], cwd: homedir(),
+    stdio: { stdin: 'ignore', stdout: { maxBytes: 4096 }, stderr: { maxBytes: 4096 } }, graceMs: 1_000, signal,
+  })
+  const outcome = await probe.done.catch(() => ({ exitCode: null }))
+  return outcome.exitCode === 0 ? executable : null
 }
 
 /** The repository enclosing a Session working directory and the private directory its snapshots write to. */
