@@ -337,7 +337,7 @@ interface SessionPersistenceSnapshot {
 
 随产品交付的 provider 实现抽象 `SessionPersistence` 约定（`create`/`open`/`stat`/`list`，逐会话 `SessionHandle` 承载 `read`/`append`/`flush`/`close`，全程可选支持取消），并通过共享的持久化契约套件：
 
-- **[dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl)**——逐会话仅追加的逻辑 JSONL 日志，默认存储为带 checksum 的连续 Zstandard frame，也可配置为原始行；具备崩溃安全的原子实体化、逐批 `fsync` 的 append，以及在第一次新 append 之前截断撕裂尾部。`stat`/`list` 携带 `sizeBytes` 与尽力而为的、由 `fs.stat` 派生的修订号。
+- **[dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl)**——逐会话仅追加的逻辑 JSONL 日志，默认存储为带 checksum 的连续 Zstandard frame，也可配置为原始行；具备崩溃安全的原子实体化、逐批 `fsync` 的 append，以及在第一次新 append 之前截断撕裂尾部。`stat`/`list` 携带 `sizeBytes`、产物的最后写入时间 `updatedAt`，以及尽力而为的、由 `fs.stat` 派生的修订号。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

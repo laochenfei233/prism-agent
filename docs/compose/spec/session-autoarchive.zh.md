@@ -42,8 +42,10 @@ commits: 724259145a..HEAD
 
 ## [S3] Scope
 
-- 范围内：`SessionPersistenceSnapshot` 的 `updatedAt` 读模型字段及其 JSONL 后端填充；新插件包（配置、扫描、选择、`cordis.patch.yml`、README 双语对）;选择与归档的单元测试；把构建好的插件装进本地 `~/.prism` profile，使运行中的应用暴露设置开关。
-- 范围外：自动生成的设置页之外的客户端 UI；归档集含义或侧边栏渲染已归档会话的任何改动；删除会话数据；归档空会话（从未收到用户消息的会话）；手动「立即归档」命令；没有 Workspace 注册表的 headless profile。
+- 范围内：`SessionPersistenceSnapshot` 的 `updatedAt` 读模型字段及其 JSONL 后端填充；新插件包（配置、扫描、选择、`cordis.patch.yml`、README 双语对）;选择、配置解析与归档的单元测试；把构建好的插件装进本地 `~/.prism` profile，使运行中的应用暴露设置开关。
+- 范围外：自动生成的设置页之外的客户端 UI；归档集含义或侧边栏渲染已归档会话的任何改动；删除会话数据；手动「立即归档」命令；没有 Workspace 注册表的 headless profile。
+
+从未收到用户消息的空会话与其它闲置会话一样被归档：扫描没有对话内容判据，而没人再打开的空会话正是这套扫描要清理的同类堆积。
 
 ## Tasks
 

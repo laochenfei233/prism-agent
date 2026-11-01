@@ -13,6 +13,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/cordis-plugin-timer'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
@@ -110,7 +111,7 @@ export function selectIdleSessions(
     const { header, updatedAt } = snapshot
     if (selection.archived.has(header.id) || selection.pinned.has(header.id)) continue
     if (header.origin === 'subagent' || header.parentSession !== undefined) continue
-    if (Math.max(header.createdAt, updatedAt ?? 0) > cutoff) continue
+    if (Math.max(header.createdAt, updatedAt ?? 0) >= cutoff) continue
     selected.push(header.id)
   }
   return selected
@@ -156,14 +157,18 @@ export async function sweep(dependencies: SweepDependencies, config: ResolvedCon
 /**
  * Install the scheduled sweep.
  *
+ * Config is resolved per sweep, not once at load: every field is volatile, so
+ * the Loader commits an edited value into the same references and the next pass
+ * reads the new window. A cadence edit re-arms the interval, because the bound
+ * it was created with is the old one.
+ *
  * One sweep runs at a time: a tick that arrives while the previous pass is still
  * listing returns immediately, so a slow store cannot stack passes. A failing
  * pass is logged and the next tick stays armed; nothing is retried inside it.
- * @param ctx - plugin context; both timers are disposed with it.
- * @param config - deployment configuration, resolved here so the defaults are stated once.
+ * @param ctx - plugin context; every timer is disposed with it.
+ * @param config - deployment configuration, resolved at each use.
  */
 export function apply(ctx: Context, config: Config): void {
-  const resolved = resolveConfig(config)
   let running = false
   const runOnce = async (): Promise<void> => {
     if (running) return
@@ -177,13 +182,21 @@ export function apply(ctx: Context, config: Config): void {
         now: () => Date.now(),
         skip: message => { ctx.logger.debug(`${name}: ${message}`) },
         warn: (message, error) => { ctx.logger.warn(`${name}: ${message}: ${String(error)}`) },
-      }, resolved)
+      }, resolveConfig(config))
     } catch (error: unknown) {
       ctx.logger.warn(`${name}: archive sweep failed: ${String(error)}`)
     } finally {
       running = false
     }
   }
+  const arm = (): (() => void) => ctx.interval(
+    () => { void runOnce() },
+    resolveConfig(config).sweepIntervalMinutes * MINUTE_MS,
+  )
+  let interval = arm()
   ctx.timeout(() => { void runOnce() }, FIRST_SWEEP_DELAY_MS)
-  ctx.interval(() => { void runOnce() }, resolved.sweepIntervalMinutes * MINUTE_MS)
+  ctx.on('loader/volatile-update', () => {
+    interval()
+    interval = arm()
+  })
 }

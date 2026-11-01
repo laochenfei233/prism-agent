@@ -42,8 +42,10 @@ Two facts constrain the design. The archive set already exists — `workspaceReg
 
 ## [S3] Scope
 
-- In scope: the `updatedAt` read-model field on `SessionPersistenceSnapshot` and its JSONL backend fill; the new plugin package (config, sweep, selection, `cordis.patch.yml`, README pair); unit tests for selection and archiving; installing the built plugin into the local `~/.prism` profile so the running app exposes the Settings switch.
-- Out of scope: a client UI beyond the auto-generated Settings page; any change to what the archive set means or how the sidebar renders archived Sessions; deleting Session data; archiving blank Sessions (Sessions that never received a user message); a manual "archive now" command; headless profiles without the Workspace registry.
+- In scope: the `updatedAt` read-model field on `SessionPersistenceSnapshot` and its JSONL backend fill; the new plugin package (config, sweep, selection, `cordis.patch.yml`, README pair); unit tests for selection, config resolution, and archiving; installing the built plugin into the local `~/.prism` profile so the running app exposes the Settings switch.
+- Out of scope: a client UI beyond the auto-generated Settings page; any change to what the archive set means or how the sidebar renders archived Sessions; deleting Session data; a manual "archive now" command; headless profiles without the Workspace registry.
+
+A Session that never received a user message is archived like any other idle Session: the sweep has no conversation-content test, and an empty Session nobody reopened is the same clutter the sweep exists to clear.
 
 ## Tasks
 

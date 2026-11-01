@@ -21,7 +21,9 @@
     "paths": {
       "vitest": ["../../node_modules/vitest"],
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader": ["../../vendor/loader/lib/types/index.d.ts"],
       "@deepseek-ai/cordis-plugin-timer": ["../../vendor/timer/lib/types/index.d.ts"],
+      "@deepseek-ai/cosmokit": ["../../vendor/cosmokit/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session-persistence": ["../../packages/session/session-persistence/lib/types/index.d.ts"],

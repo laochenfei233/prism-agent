@@ -4,16 +4,18 @@ import { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence
 import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import { WorkspaceActiveSessionError } from '@deepseek-ai/dsh-workspace'
 import { resolveConfig } from '../src/config.ts'
+import { Config } from '../src/index.ts'
 import type { SweepDependencies } from '../src/index.ts'
 import { selectIdleSessions, sweep } from '../src/index.ts'
 
 /**
  * Behavior suite for the idle-conversation sweep.
  *
- * The selection reads snapshots and the sweep writes through the dependencies
- * the plugin builds from the Workspace archive set and the Session store, so
- * these cases drive the real decision and the real archive call ordering without
- * standing in for either service.
+ * The selection is driven through the real schema output and the sweep through
+ * the archive-set dependencies the plugin builds, with the Session store and
+ * the archive set replaced by recordings. The config cases resolve through the
+ * plugin's own schemastery schema, because that is where the volatile
+ * references the Loader delivers are produced.
  */
 
 const NOW = Date.UTC(2026, 10, 1)
@@ -169,5 +171,33 @@ describe('sweep', () => {
     const deps = dependencies([], { listSessions })
     await expect(sweep(deps, resolveConfig({ enabled: false }))).resolves.toBe(0)
     expect(listSessions).not.toHaveBeenCalled()
+  })
+})
+
+describe('config resolution', () => {
+  it('reads the values the schema holds, not the volatile references it produces', () => {
+    // The Loader delivers the schema's output, whose volatile fields are
+    // `{ get() }` references. Reading them as plain values would turn every
+    // number below into NaN and the switch into a permanently true value.
+    expect(resolveConfig(Config({}))).toEqual({ enabled: true, idleDays: 30, sweepIntervalMinutes: 1_440 })
+    expect(resolveConfig(Config({ idleDays: 7, sweepIntervalMinutes: 60 })))
+      .toEqual({ enabled: true, idleDays: 7, sweepIntervalMinutes: 60 })
+    expect(resolveConfig(Config({ enabled: false })).enabled).toBe(false)
+  })
+
+  it('archives against the window the schema carries', async () => {
+    const deps = dependencies([stored('ten-days', { createdAt: NOW - 10 * DAY })])
+    await expect(sweep(deps, resolveConfig(Config({ idleDays: 7 })))).resolves.toBe(1)
+    expect(deps.archived).toEqual(['ten-days'])
+  })
+})
+
+describe('window edge', () => {
+  it('leaves a conversation that is exactly at the window edge alone', () => {
+    const selected = selectIdleSessions(
+      [stored('edge', { createdAt: NOW - 30 * DAY, updatedAt: NOW - 30 * DAY })],
+      { now: NOW, idleDays: 30, archived: new Set(), pinned: new Set() },
+    )
+    expect(selected).toEqual([])
   })
 })
