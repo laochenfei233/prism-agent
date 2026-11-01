@@ -123,6 +123,9 @@ describe('configuration validation', () => {
       dependencyManifests: undefined,
       routingContract: undefined,
       verificationGate: undefined,
+      readTools: undefined,
+      sensitivePaths: undefined,
+      commandGuard: undefined,
     })
   })
 
@@ -1113,11 +1116,27 @@ describe('unfinished-todo gate', () => {
 })
 
 describe('sensitive-read denial', () => {
-  /** The sensitive-path rail as a deployment names it: one reading tool, two segments. */
+  /** The sensitive-path rail as a deployment names it: one reading tool, three segments. */
   const guarded: Config = {
     readTools: [{ tool: 'read', pathArgument: 'file_path' }],
-    sensitivePaths: ['.env', '.ssh'],
+    sensitivePaths: ['.env', '.ssh', '.aws'],
   }
+
+  it('refuses a credential directory entry and never runs the tool', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-aws'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+      arguments: { file_path: '/home/u/.aws/credentials' }, agent,
+    })
+
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".aws"')
+    expect(runs).toEqual([])
+  })
 
   it('refuses a credential path and never runs the tool', async () => {
     const ctx = await harness(guarded)
@@ -1159,13 +1178,47 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-source'), { provider: 'mock', model: 'mock' })
 
-    const allowed = await ctx.tools.execute({
+    for (const filePath of ['src/environment.ts', 'src/index.ts']) {
+      const allowed = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+        arguments: { file_path: filePath }, agent,
+      })
+      expect(allowed.isError).toBe(false)
+    }
+    expect(runs).toEqual(['read', 'read'])
+  })
+
+  it('leaves the repository\'s own credentials package alone', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-package'), { provider: 'mock', model: 'mock' })
+
+    // A `credentials` segment in the shipped list would refuse both of these.
+    for (const filePath of ['packages/credentials/credentials/src/index.ts', 'docs/subsystems/credentials.md']) {
+      const allowed = await ctx.tools.execute({
+        signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
+        arguments: { file_path: filePath }, agent,
+      })
+      expect(allowed.isError).toBe(false)
+    }
+    expect(runs).toEqual(['read', 'read'])
+  })
+
+  it('refuses a credential path that is spelled in upper case', async () => {
+    const ctx = await harness(guarded)
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await ctx.agentLoop.create(SessionId('sensitive-read-upper'), { provider: 'mock', model: 'mock' })
+
+    const denied = await ctx.tools.execute({
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
-      arguments: { file_path: 'src/environment.ts' }, agent,
+      arguments: { file_path: 'C:\\Users\\U\\.SSH\\ID_RSA' }, agent,
     })
 
-    expect(allowed.isError).toBe(false)
-    expect(runs).toEqual(['read'])
+    expect(denied.isError).toBe(true)
+    expect(textOf(denied)).toContain('matched ".ssh"')
+    expect(runs).toEqual([])
   })
 
   it('ignores a tool the deployment did not name', async () => {
@@ -1272,10 +1325,34 @@ describe('/guardrails status', () => {
     const text = execution?.result.text ?? ''
 
     expect(text).toContain('Guardrails: 3 of 12 rails armed.')
-    expect(text).toContain('turn budget: 20 steps')
-    expect(text).toContain('sensitive reads: .env')
-    expect(text).toContain('command guard: off')
-    expect(text).toContain('write budget: off')
+    expect(text.split('\n')).toEqual([
+      'Guardrails: 3 of 12 rails armed.',
+      'plan-mode denial: off',
+      'repeat approval: off',
+      'turn budget: 20 steps',
+      'unfinished todos: off',
+      'skill guidance: on',
+      'write budget: off',
+      'ponytail markers: off',
+      'dependency manifests: off',
+      'routing contract: off',
+      'verification gate: off',
+      'sensitive reads: .env',
+      'command guard: off',
+    ])
+  })
+
+  it('registers even when the command runtime mounts after the bundle', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(Guardrails, { maxStepsPerTurn: 20 })
+    await ctx.plugin(CommandRuntime)
+
+    const agent = await ctx.agentLoop.create(SessionId('status-late-commands'), { provider: 'mock', model: 'mock' })
+    const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+
+    expect(execution?.result.text).toContain('turn budget: 20 steps')
   })
 
   it('enforces every rail when the deployment mounts no command runtime', async () => {

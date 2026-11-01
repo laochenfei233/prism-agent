@@ -82,7 +82,7 @@
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
 
-`readTools` 同理：`{ tool: read, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取文件内容的两个工具。`read_image` 取的是附件 id 而不是路径，因此不属于其中。
+`readTools` 同理：`{ tool: read, pathArgument: file_path }`、`{ tool: read_image, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取的三个工具。
 
 加载期拒绝项（每条文案都由测试套件断言）：
 
@@ -319,8 +319,9 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           verifyTools: [bash, pwsh]
         readTools:
           - { tool: read, pathArgument: file_path }
+          - { tool: read_image, pathArgument: file_path }
           - { tool: grep, pathArgument: path }
-        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519, credentials]
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519]
         commandGuard:
           tools:
             - { tool: bash, commandArgument: command }
@@ -344,21 +345,21 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## 构建与验证
 
-本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有以值形式使用的两处例外——`createUserMessage`（完成验证闸门与未完成 todo 闸门用它 steer agent）与 `CommandDefinitionId`（每次命令注册都要用）——因此产物只携带这两个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。`@deepseek-ai/dsh-llm` 与 `@deepseek-ai/dsh-commands` 因此是本 bundle 仅有的 peer dependency。
+本 bundle 借用检出目录里的包，而不声明 workspace 依赖。`src/` 里每一处 `@deepseek-ai/*` 导入都是 `import type`，只有以值形式使用的两处例外——`createUserMessage`（完成验证闸门与未完成 todo 闸门用它 steer agent）与 `CommandDefinitionId`（每次命令注册都要用）——因此产物只携带这两个外部导入，由加载它的 profile 解析，部署本身不需要额外安装任何东西。`@deepseek-ai/dsh-llm` 与 `@deepseek-ai/dsh-commands` 是解析它们的 peer dependency；`@deepseek-ai/dsh-system-prompt` 与它们并列声明，是 Ponytail 行所注入的服务，而不是被导入的模块。
 
 `tsconfig.json` 通过检出目录的**已构建**声明解析这些类型，这也是仓库内各包互相消费的方式——请先在检出目录里跑 `pnpm run build`。`tsdown.config.ts` 让 `@deepseek-ai/*` 保持外部，与同级的 `plugins/prism-memory` 一致：打包进副本会在 harness 依赖的跨实例身份上遮蔽 profile 自己的服务实例。
 
 ```sh
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
-npm run build       # lib/index.js with one external harness import
+npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 119 composed unit tests
+npm test            # 123 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
 `vitest.config.ts` 复用了检出目录 `tsconfig.base.json` 的 paths 门面与装饰器预处理，因此 `tests/prism-guardrails.spec.ts` 组合的是**真实**服务——生产工具流水线、脚本化 mock adapter 驱动的生产 agent 循环、真实 plan-mode 控制器、真实 skill 注册表、以及循环自身的停止边界——而不是为扩展点手搭的替身。断言落在模型可见的工具结果、实际发生的效果、以及请求次数上。
 
-`tests/capability.e2e.spec.ts` 更进一步：它通过真实 Loader 启动随附的 **headless** profile，以相对路径从构建产物加载本 bundle，用 mock adapter 脚本化模型，并在产生的会话事件里断言每条 rail 的强制力——计划模式拒绝文案、两次被允许后两次被拒的重复调用、以 `blocked` 结束于步骤预算的一轮、以及"仅用户可调用" skill 的指引。这次运行正是 overlay fixture 关闭会话标题提供者的原因：它会通过同一条路由发出自己的模型调用。它同时也是"构建产物那一个外部导入在真实 profile 中可解析"的证明。
+`tests/capability.e2e.spec.ts` 更进一步：它通过真实 Loader 启动随附的 **headless** profile，以相对路径从构建产物加载本 bundle，用 mock adapter 脚本化模型，并在产生的会话事件里断言其中四条 rail 的强制力——计划模式拒绝文案、两次被允许后两次被拒的重复调用、以 `blocked` 结束于步骤预算的一轮、以及"仅用户可调用" skill 的指引。这次运行正是 overlay fixture 关闭会话标题提供者的原因：它会通过同一条路由发出自己的模型调用。它同时也是"构建产物的外部导入在真实 profile 中可解析"的证明。
 
 `scripts/smoke.mjs` 对构建产物的文本做断言，而不执行它——产物导入的是 profile 的 harness 包，一个没有 profile 安装的检出目录无法解析它。rail 的注册由 Vitest 套件负责验证。
 

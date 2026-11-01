@@ -2,7 +2,8 @@
  * Standalone build for the out-of-tree Host half the Loader imports.
  *
  * Every harness import in `src/` is `import type` except `createUserMessage`
- * from `@deepseek-ai/dsh-llm` and the filesystem skill provider's `apply`.
+ * from `@deepseek-ai/dsh-llm` and `CommandDefinitionId` from
+ * `@deepseek-ai/dsh-commands/brand`.
  * The harness packages stay external, resolved from the profile that loads
  * this bundle, exactly as the sibling `plugins/prism-memory` does — so the
  * artifact carries those imports and a deployment installs nothing of its own.

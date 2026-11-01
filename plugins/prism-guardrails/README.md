@@ -82,7 +82,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
-`readTools` works the same way: `{ tool: read, pathArgument: file_path }` and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's two tools that read file content by path. `read_image` takes an attachment id rather than a path, so it is not one of them.
+`readTools` works the same way: `{ tool: read, pathArgument: file_path }`, `{ tool: read_image, pathArgument: file_path }`, and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's three tools that read by path.
 
 Load-time rejections, each with the message asserted by the test suite:
 
@@ -319,8 +319,9 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           verifyTools: [bash, pwsh]
         readTools:
           - { tool: read, pathArgument: file_path }
+          - { tool: read_image, pathArgument: file_path }
           - { tool: grep, pathArgument: path }
-        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519, credentials]
+        sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519]
         commandGuard:
           tools:
             - { tool: bash, commandArgument: command }
@@ -344,21 +345,21 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## Build and verify
 
-The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except the two the rails need as values — `createUserMessage`, which the verification and todo gates use to steer the agent, and `CommandDefinitionId`, which every command registration needs — so the emitted module carries only those external imports, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-commands` are therefore the bundle's only peer dependencies.
+The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except the two the rails need as values — `createUserMessage`, which the verification and todo gates use to steer the agent, and `CommandDefinitionId`, which every command registration needs — so the emitted module carries only those two external imports, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-commands` are the peer dependencies that resolve them; `@deepseek-ai/dsh-system-prompt`, declared beside them, is the service the Ponytail row injects rather than imports.
 
 `tsconfig.json` resolves those types through the checkout's **built** declarations, which is how the repository's own packages consume each other — run `pnpm run build` in the checkout first. `tsdown.config.ts` keeps `@deepseek-ai/*` external, as the sibling `plugins/prism-memory` does: a bundled copy would shadow the profile's own service instances across the cross-instance identity the harness relies on.
 
 ```sh
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
-npm run build       # lib/index.js with one external harness import
+npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 119 composed unit tests
+npm test            # 123 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
 `vitest.config.ts` reuses the checkout's `tsconfig.base.json` paths facade and decorator pre-transform, so `tests/prism-guardrails.spec.ts` composes the **real** services — the production tool pipeline, the production agent loop against a scripted mock adapter, the real plan-mode controller, the real skill registry, and the loop's own stopping boundary — rather than a hand-built stand-in for the extension points. Assertions are on model-visible tool results, executed effects, and request counts.
 
-`tests/capability.e2e.spec.ts` goes further: it boots the shipped **headless** profile through the real Loader with the bundle loaded from its built artifact by relative path, scripts the model through a mock adapter, and asserts each rail's enforcement in the resulting session events — the plan-mode denial text, two refused repeated calls after two permitted ones, a turn ending `blocked` at the step budget, and the user-only skill's guidance. That run is why the overlay fixtures disable the session-title provider: it issues its own model call through the same route. It is also what proves the built artifact's one external import resolves in a real profile.
+`tests/capability.e2e.spec.ts` goes further: it boots the shipped **headless** profile through the real Loader with the bundle loaded from its built artifact by relative path, scripts the model through a mock adapter, and asserts four rails' enforcement in the resulting session events — the plan-mode denial text, two refused repeated calls after two permitted ones, a turn ending `blocked` at the step budget, and the user-only skill's guidance. That run is why the overlay fixtures disable the session-title provider: it issues its own model call through the same route. It is also what proves the built artifact's external imports resolve in a real profile.
 
 `scripts/smoke.mjs` asserts on the built file's text rather than executing it, because the artifact imports the profile's harness package, which a checkout without a profile install cannot resolve. Rail registration is the Vitest suite's job.
 

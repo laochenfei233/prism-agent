@@ -46,7 +46,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { CommandResult, CommandRuntime } from '@deepseek-ai/dsh-commands'
+import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -793,19 +793,20 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig): void {
 /**
  * Register `/guardrails`, which reports which rails the deployment has armed.
  *
- * The `commands` service is optional: a profile without it keeps every rail and
- * loses only the report, so this reads it through `ctx.get` instead of
- * declaring the injection.
+ * The `commands` service mounts independently of this bundle and may appear
+ * after it, so the registration waits for the service instead of reading the
+ * store once at apply time. A profile with no commands service keeps every rail
+ * and loses only the report.
  */
 function installStatusCommand(ctx: Context, resolved: ResolvedConfig): void {
-  const commands = ctx.get('commands') as CommandRuntime | undefined
-  if (commands === undefined) return
-  ctx.effect(() => commands.register({
-    definitionId: CommandDefinitionId('prism-guardrails/status'),
-    name: 'guardrails',
-    description: 'Report which guardrail rails this deployment has armed',
-    handler: (): CommandResult => ({ kind: 'success', text: describeRails(resolved) }),
-  }), 'prism-guardrails.status')
+  ctx.inject(['commands'], (scope: Context) => {
+    scope.effect(() => scope.commands.register({
+      definitionId: CommandDefinitionId('prism-guardrails/status'),
+      name: 'guardrails',
+      description: 'Report which guardrail rails this deployment has armed',
+      handler: (): CommandResult => ({ kind: 'success', text: describeRails(resolved) }),
+    }), 'prism-guardrails.status')
+  })
 }
 
 /**
