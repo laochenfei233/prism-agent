@@ -123,8 +123,14 @@ export async function postCommit(
 export interface GitFace {
   /** Load the status for this tab. @param tabId - owning tab. @param signal - the tab record's lifetime. */
   readonly load: (tabId: TabId, signal: AbortSignal) => void
-  /** Open one entry's comparison. @param tabId - owning tab. @param entry - the row clicked. @param signal - the tab record's lifetime. */
-  readonly open: (tabId: TabId, entry: GitFileEntry, signal: AbortSignal) => void
+  /**
+   * Open one entry's comparison.
+   * @param tabId - owning tab.
+   * @param entry - the row clicked.
+   * @param side - the section the row sits in: index for staged, worktree otherwise.
+   * @param signal - the tab record's lifetime.
+   */
+  readonly open: (tabId: TabId, entry: GitFileEntry, side: GitSide, signal: AbortSignal) => void
   /** Close the open comparison. @param tabId - owning tab. */
   readonly close: (tabId: TabId) => void
   /** Stage one path. @param tabId - owning tab. @param path - repository-relative path. @param signal - the tab record's lifetime. */
@@ -167,9 +173,8 @@ export function createGitFace(fetchImpl: GitFetch): GitInjected {
         actions.failed(tabId, messageOf(error))
       })
     }
-    const open = (tabId: TabId, entry: GitFileEntry, signal: AbortSignal): void => {
+    const open = (tabId: TabId, entry: GitFileEntry, side: GitSide, signal: AbortSignal): void => {
       if (signal.aborted) return
-      const side: GitSide = entry.index !== ' ' && entry.index !== '?' ? 'index' : 'worktree'
       actions.select(tabId, { path: entry.path, side })
       const generation = bump(diffReads, tabId)
       actions.diffLoading(tabId)

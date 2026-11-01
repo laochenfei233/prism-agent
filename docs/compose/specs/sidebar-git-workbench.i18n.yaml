@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for sidebar-git-workbench.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/sidebar-git-workbench.md
+/:
+  en: 17c04a1c3bd0fa9d
+  zh: 17c04a1c3bd0fa9d
+/git-workbench:
+  en: e4bcb3e937e0afd6
+  zh: f037dcedac634c55
+/git-workbench/report:
+  en: 4c456d1fb9e66893
+  zh: 02b34640d7d82f76
+/git-workbench/s1-problem:
+  en: 6e34f441ff3a0368
+  zh: ab4383717543ee1c
+/git-workbench/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/git-workbench/s2-design/s2-1-data-channel:
+  en: f05a4cfa44b9c19c
+  zh: 4aac04c37ee3d6d2
+/git-workbench/s2-design/s2-2-routes:
+  en: ea54034a7028417b
+  zh: 923cdb24b14b462f
+/git-workbench/s2-design/s2-3-safety:
+  en: c1895b19ad8aa885
+  zh: a366c19ceff76780
+/git-workbench/s2-design/s2-4-reuse:
+  en: 323f318122046009
+  zh: 5aae1bbc7e433f46
+/git-workbench/s2-design/s2-5-diff-row-model:
+  en: cbe06a9ed4403eb1
+  zh: 0ac5bf793367c927
+/git-workbench/s2-design/s2-6-client:
+  en: 183a84b8b43cb0de
+  zh: b6999d50f0562ab7
+/git-workbench/s2-design/s2-7-refresh-and-races:
+  en: 1b9c6a32cc97d930
+  zh: 0b150d4e06e1077e
+/git-workbench/s2-design/s2-8-failures:
+  en: c15bf4b680a9c133
+  zh: 6d1476be1f3f53d7
+/git-workbench/s2-design/s2-9-deliberately-not-built:
+  en: 2a94305714de4db6
+  zh: 4c7d5ad73eb5fb24
+/git-workbench/s2-design/s2-10-candidate-enhancements-not-in-this-change:
+  en: 96b9a58f320d49c2
+  zh: bf4f9388eaabfd3f
+/git-workbench/s3-scope:
+  en: 8bc050476fe8bb38
+  zh: d4cbbfd2f1868589
+/git-workbench/tasks:
+  en: 9b527b07923b68e3
+  zh: 0fdae2d799ae23b9
+/git-workbench/s4-acceptance:
+  en: d106c0e4046c4843
+  zh: 52fb32f173b4133f

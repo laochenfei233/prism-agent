@@ -9,8 +9,8 @@ import type { Mock } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SidebarRightTabActions } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
-import { GitBody, hunkHeader, sectionsOf } from '../src/client/GitBody.tsx'
-import type { GitBodyProps, GitBodyTab } from '../src/client/GitBody.tsx'
+import { GitBody, branchLabel, hunkHeader, sectionsOf } from '../src/client/GitBody.tsx'
+import type { GitBodyProps } from '../src/client/GitBody.tsx'
 import type { GitFace } from '../src/client/face.ts'
 import { zh } from '../src/client/locales.ts'
 import { createGitStore } from '../src/client/store.ts'
@@ -25,6 +25,7 @@ interface Mounted {
   readonly actions: ReturnType<ReturnType<typeof createGitStore>['create']>['actions']
   readonly face: { [K in keyof GitFace]: Mock<GitFace[K]> }
   readonly bindCommands: ReturnType<typeof vi.fn>
+  readonly controller: AbortController
 }
 
 /**
@@ -42,10 +43,11 @@ function mount(options: { diffLoaded?: boolean } = {}): Mounted {
     commit: vi.fn<GitFace['commit']>(),
   }
   const bindCommands = vi.fn(() => vi.fn())
+  const controller = new AbortController()
   const tab = {
-    id: TAB, title: 'Changes', signal: new AbortController().signal,
+    id: TAB, title: 'Changes', signal: controller.signal,
     actions: { bindCommands } as Pick<SidebarRightTabActions, 'bindCommands'>,
-  } satisfies GitBodyTab
+  } satisfies ReturnType<GitBodyProps['useTabInfo']>['tab']
   const props: GitBodyProps = {
     ...face,
     useTabInfo: () => ({ tab }),
@@ -64,7 +66,7 @@ function mount(options: { diffLoaded?: boolean } = {}): Mounted {
       actions.diffLoaded(TAB, TEXT_DIFF)
     })
   }
-  return { view, actions, face, bindCommands }
+  return { view, actions, face, bindCommands, controller }
 }
 
 describe('GitBody', () => {
@@ -107,7 +109,7 @@ describe('GitBody', () => {
     const row = view.container.querySelector('[data-git-row="a.txt"] button[aria-expanded]')
     expect(row?.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(row!)
-    expect(face.open).toHaveBeenCalledWith(TAB, expect.objectContaining({ path: 'a.txt' }), expect.any(AbortSignal))
+    expect(face.open).toHaveBeenCalledWith(TAB, expect.objectContaining({ path: 'a.txt' }), 'worktree', expect.any(AbortSignal))
     act(() => {
       actions.select(TAB, { path: 'a.txt', side: 'worktree' })
       actions.diffLoaded(TAB, TEXT_DIFF)
@@ -173,7 +175,7 @@ describe('GitBody', () => {
     act(() => { actions.failed(TAB, 'no git') })
     expect(view.container.textContent).toContain(zh['state.failed'].replace('{message}', 'no git'))
     act(() => { actions.actionFailed(TAB, 'index locked') })
-    expect(view.getAllByRole('alert').at(-1)?.textContent).toBe('index locked')
+    expect(view.getAllByRole('alert').at(-1)?.textContent).toBe('操作失败：index locked')
     act(() => {
       actions.loaded(TAB, gitStatus([]))
       actions.committing(TAB, true)
@@ -213,6 +215,15 @@ describe('GitBody', () => {
     })
     expect(view.container.textContent).toContain(zh['commit.committing'])
   })
+
+  it('forgets its bucket when the tab record ends, so a reused id starts clean', () => {
+    const { view, actions, face, controller } = mount()
+    act(() => { actions.loaded(TAB, gitStatus([])) })
+    expect(view.container.textContent).toContain(zh['state.clean'])
+    act(() => { controller.abort() })
+    expect(face.load).toHaveBeenCalledTimes(2)
+    expect(view.container.querySelector('[data-git-state="loading"]')).not.toBeNull()
+  })
 })
 
 describe('section helpers', () => {
@@ -237,5 +248,12 @@ describe('section helpers', () => {
 
   it('states a hunk range', () => {
     expect(hunkHeader({ oldStart: 3, oldLines: 2, newStart: 4, newLines: 5, lines: [] })).toBe('@@ -3,2 +4,5 @@')
+  })
+
+  it('labels a branch, a detached HEAD, and a repository without commits', () => {
+    const t = makeTranslate(zh)
+    expect(branchLabel('main', t)).toBe('main')
+    expect(branchLabel('HEAD', t)).toBe(zh['branch.detached'])
+    expect(branchLabel(undefined, t)).toBe(zh['branch.unborn'])
   })
 })

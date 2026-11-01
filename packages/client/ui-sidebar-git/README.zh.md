@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-不离开会话就能处理 Session 的仓库。面板列分支、与上游的领先/落后，以及三段改动路径；点击一行展开该文件对索引或工作树的比较，底栏负责暂存与提交。暂存与取消暂存直接落在行上。Host 半提供面板读取的五条鉴权路由，浏览器半只注册 tab 类型，从不直接访问 git。
+不离开会话就能处理 Session 的仓库。面板列分支、与上游的领先/落后，以及三段改动路径；点击一行展开该文件对索引或工作树的比较，行上的动作只暂存或取消暂存那一条路径，底栏提交已暂存的内容。Host 半提供面板读取的五条鉴权路由，浏览器半只注册 tab 类型，从不直接访问 git。
 
 ## 目录
 
@@ -41,7 +41,7 @@ Host 半通过 `ctx.connection.fetch.register` 在 Connection 鉴权围栏内注
 
 每条路由都在 Host 上解析 Session 的工作目录，并用 `git rev-parse --show-toplevel` 定位仓库；客户端不提供任何被 Host 信任的路径。绝对路径、空串、含 NUL 字节、或逃出仓库根的路径一律以 400 拒绝。git 命令失败时以 422 返回其 stderr 尾部，面板就地展示。
 
-命令通过 `@deepseek-ai/dsh-workspace-changes` 的 `GitRunner` 执行，与回合改动记录共用清洗过的环境、超时与输出上限。`timeoutMs`、`outputMaxBytes`、`maxMessageBytes` 是经校验的 `Config` 字段。
+命令通过 `@deepseek-ai/dsh-workspace-changes` 的 `GitRunner` 执行，与回合改动记录共用清洗过的环境、超时与输出上限。每条带路径的命令都在 `GIT_LITERAL_PATHSPECS=1` 下运行，因此 `[ab].txt` 这样的名字只作用于该文件，而不是它的全部通配匹配。被输出上限截断的列表或比较会被拒绝，而不是带着错误行号画出来。`timeoutMs`、`outputMaxBytes`、`maxMessageBytes` 是经校验的 `Config` 字段。
 
 <a id="the-panel"></a>
 ## 面板

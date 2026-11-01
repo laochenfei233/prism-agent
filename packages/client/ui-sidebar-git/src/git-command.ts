@@ -45,6 +45,11 @@ export class GitCommandError extends Error {
 
 const NOT_A_REPOSITORY = /not a git repository/i
 const BINARY_DIFF = /^Binary files .* differ$/m
+/**
+ * Treat every pathspec literally. Without this, a path such as `[ab].txt` is a
+ * glob and a command would act on files the reader never selected.
+ */
+const LITERAL_PATHSPECS: Readonly<Record<string, string>> = { GIT_LITERAL_PATHSPECS: '1' }
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
 
 /**
@@ -98,6 +103,8 @@ export function parseStatus(stdout: string): GitFileEntry[] {
 export async function readRepositoryStatus(git: GitCommandRunner, root: string, signal: AbortSignal): Promise<RepositoryStatus> {
   const status = await git.run(['status', '--porcelain=v1', '-z', '--untracked-files=all'], { cwd: root, signal })
   if (status.exitCode !== 0) throw new GitCommandError('git status', status.stderr)
+  // A truncated listing lost its head, so the panel would show a partial, misaligned change set.
+  if (status.truncated) throw new GitCommandError('git status', 'the listing exceeded the output cap')
   const head = await git.run(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root, signal })
   const upstream = await git.run(['rev-list', '--count', '--left-right', '@{upstream}...HEAD'], { cwd: root, signal })
   const [behind, ahead] = upstream.exitCode === 0 ? upstream.stdout.trim().split('\t').map(Number) : []
@@ -148,13 +155,21 @@ export function parseHunks(text: string): GitHunk[] {
 export async function readFileDiff(
   git: GitCommandRunner, root: string, path: string, side: GitSide, signal: AbortSignal,
 ): Promise<GitDiff> {
-  const tracked = await git.run(['ls-files', '--error-unmatch', '--', path], { cwd: root, signal })
-  if (tracked.exitCode !== 0) return { kind: 'untracked', path }
+  // The entry's own status letters decide whether git can compare it at all: a staged
+  // deletion is absent from the index, so `ls-files` would call it untracked.
+  const status = await git.run(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', path], {
+    cwd: root, env: LITERAL_PATHSPECS, signal,
+  })
+  if (status.exitCode !== 0) throw new GitCommandError('git status', status.stderr)
+  const entry = parseStatus(status.stdout).find(candidate => candidate.path === path)
+  if (entry === undefined || entry.index === '?') return { kind: 'untracked', path }
   const args = side === 'index'
     ? ['diff', '--no-color', '--cached', '-U3', '--', path]
     : ['diff', '--no-color', '-U3', '--', path]
-  const comparison = await git.run(args, { cwd: root, signal })
+  const comparison = await git.run(args, { cwd: root, env: LITERAL_PATHSPECS, signal })
   if (comparison.exitCode !== 0) throw new GitCommandError('git diff', comparison.stderr)
+  // A truncated comparison lost its head, so its hunk numbering would be wrong.
+  if (comparison.truncated) throw new GitCommandError('git diff', 'the comparison exceeded the output cap')
   if (BINARY_DIFF.test(comparison.stdout) || comparison.stdout.includes('GIT binary patch')) return { kind: 'binary', path }
   return { kind: 'text', path, hunks: parseHunks(comparison.stdout) }
 }
@@ -184,7 +199,7 @@ export function repositoryPath(root: string, path: string): string | undefined {
 export async function stagePaths(
   git: GitCommandRunner, root: string, paths: readonly string[], signal: AbortSignal,
 ): Promise<void> {
-  const added = await git.run(['add', '--', ...paths], { cwd: root, signal })
+  const added = await git.run(['add', '--', ...paths], { cwd: root, env: LITERAL_PATHSPECS, signal })
   if (added.exitCode !== 0) throw new GitCommandError('git add', added.stderr)
 }
 
@@ -200,12 +215,12 @@ export async function stagePaths(
 export async function unstagePaths(
   git: GitCommandRunner, root: string, paths: readonly string[], signal: AbortSignal,
 ): Promise<void> {
-  const reset = await git.run(['reset', '-q', 'HEAD', '--', ...paths], { cwd: root, signal })
+  const reset = await git.run(['reset', '-q', 'HEAD', '--', ...paths], { cwd: root, env: LITERAL_PATHSPECS, signal })
   if (reset.exitCode === 0) return
   if (!/unknown revision|ambiguous argument|does not have any commits yet/i.test(reset.stderr)) {
     throw new GitCommandError('git reset', reset.stderr)
   }
-  const removed = await git.run(['rm', '--cached', '-r', '--', ...paths], { cwd: root, signal })
+  const removed = await git.run(['rm', '--cached', '-r', '--', ...paths], { cwd: root, env: LITERAL_PATHSPECS, signal })
   if (removed.exitCode !== 0) throw new GitCommandError('git rm --cached', removed.stderr)
 }
 

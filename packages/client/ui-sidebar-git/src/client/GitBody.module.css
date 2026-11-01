@@ -1,5 +1,5 @@
 /* The workbench fills the pane: a fixed branch bar, a scrolling change list,
-   and a fixed commit box. */
+   and a fixed commit box. Colours come from the theme aliases only. */
 .root {
   display: flex;
   flex: 1 1 auto;
@@ -38,7 +38,7 @@
 .count {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
-  font-size: var(--dsh-content-font-size-tertiary, 12px);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -53,7 +53,7 @@
   color: var(--dsw-alias-label-secondary);
   background: none;
   border: 0;
-  border-radius: var(--dsw-radius-control-sm, 8px);
+  border-radius: var(--dsw-radius-sm);
   cursor: pointer;
 }
 
@@ -80,9 +80,9 @@
   gap: 6px;
   align-items: baseline;
   margin: 0 0 4px;
-  padding: 0 8px 0 8px;
+  padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
-  font-size: var(--dsh-content-font-size-tertiary, 12px);
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -94,7 +94,7 @@
 }
 
 .row {
-  border-radius: var(--dsw-radius-control-sm, 8px);
+  border-radius: var(--dsw-radius-sm);
 }
 
 .row:hover {
@@ -129,22 +129,21 @@
   flex: 0 0 auto;
   width: 10px;
   color: var(--dsw-alias-label-secondary);
-  font-family: var(--dsw-font-mono, ui-monospace, monospace);
-  font-size: var(--dsh-content-font-size-tertiary, 12px);
-  text-transform: none;
+  font-family: var(--dsh-font-family-code-default);
+  font-size: 12px;
 }
 
 .letter[data-letter='M'] {
-  color: var(--dsw-alias-status-warning, #c98a00);
+  color: var(--dsw-alias-label-primary);
 }
 
 .letter[data-letter='A'],
 .letter[data-letter='?'] {
-  color: var(--dsw-alias-status-success, #2f9e44);
+  color: var(--dsw-alias-file-diff-added-marker);
 }
 
 .letter[data-letter='D'] {
-  color: var(--dsw-alias-status-error, #d64545);
+  color: var(--dsw-alias-file-diff-deleted-marker);
 }
 
 .path {
@@ -158,23 +157,23 @@
   flex: 0 0 auto;
   overflow: hidden;
   color: var(--dsw-alias-label-secondary);
-  font-size: var(--dsh-content-font-size-tertiary, 12px);
+  font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .diffBox {
-  padding: 0 8px 8px 8px;
+  padding: 0 8px 8px;
 }
 
 .diff {
   overflow-x: auto;
-  font-family: var(--dsw-font-mono, ui-monospace, monospace);
-  font-size: var(--dsh-content-font-size-tertiary, 12px);
+  font-family: var(--dsh-font-family-code-default);
+  font-size: 12px;
   line-height: 1.5;
   background: var(--dsw-alias-bg-base);
   border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-control-sm, 8px);
+  border-radius: var(--dsw-radius-sm);
 }
 
 .hunk + .hunk {
@@ -196,7 +195,7 @@
 .lineNo {
   flex: 0 0 auto;
   width: 32px;
-  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+  color: var(--dsw-alias-label-tertiary);
   text-align: right;
   user-select: none;
 }
@@ -206,11 +205,11 @@
 }
 
 .add {
-  background: var(--dsw-alias-diff-add-bg, rgba(47, 158, 68, 0.12));
+  background: var(--dsw-alias-file-diff-added-bg);
 }
 
 .del {
-  background: var(--dsw-alias-diff-del-bg, rgba(214, 69, 69, 0.12));
+  background: var(--dsw-alias-file-diff-deleted-bg);
 }
 
 .context {
@@ -226,7 +225,7 @@
 .error {
   padding: 8px;
   margin: 0;
-  color: var(--dsw-alias-status-error, #d64545);
+  color: var(--dsw-alias-file-diff-deleted-marker);
   overflow-wrap: anywhere;
 }
 
@@ -252,7 +251,7 @@
   padding: 0 8px;
   color: inherit;
   font: inherit;
-  background: var(--dsw-alias-bg-input, var(--dsw-alias-bg-base));
+  background: var(--dsw-alias-bg-base);
   border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-control-sm, 8px);
+  border-radius: var(--dsw-radius-sm);
 }

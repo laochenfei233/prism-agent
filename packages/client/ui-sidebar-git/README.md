@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Work with the Session's repository without leaving the conversation. The panel lists the branch, its divergence from the upstream, and every changed path in three sections; a row opens that file's comparison against the index or the work tree, and the footer stages or commits. Two of the three index mutations — stage and unstage — sit on the rows themselves. The Host half serves the five authenticated routes the panel reads; the browser half registers the tab type and never talks to git.
+Work with the Session's repository without leaving the conversation. The panel lists the branch, its divergence from the upstream, and every changed path in three sections; a row opens that file's comparison against the index or the work tree, its action stages or unstages that one path, and the footer commits the staged content. The Host half serves the five authenticated routes the panel reads; the browser half registers the tab type and never talks to git.
 
 ## Table of Contents
 
@@ -41,7 +41,7 @@ The Host half registers five routes on the Connection authentication fence throu
 
 Every route resolves the Session's working directory on the Host and locates the repository with `git rev-parse --show-toplevel`; the client never supplies a path the Host trusts. A path that is absolute, empty, contains a NUL byte, or escapes the repository root is refused with 400. A failed git command answers 422 with its stderr tail, which the panel shows in place.
 
-Commands run through `GitRunner` from `@deepseek-ai/dsh-workspace-changes`, so the scrubbed environment, timeout, and output cap are shared with turn-change recording. `timeoutMs`, `outputMaxBytes`, and `maxMessageBytes` are validated `Config` fields.
+Commands run through `GitRunner` from `@deepseek-ai/dsh-workspace-changes`, so the scrubbed environment, timeout, and output cap are shared with turn-change recording. Every path command runs with `GIT_LITERAL_PATHSPECS=1`, so a name such as `[ab].txt` acts on that one file rather than on every glob match. A listing or comparison the output cap truncated is refused instead of drawn with wrong numbering. `timeoutMs`, `outputMaxBytes`, and `maxMessageBytes` are validated `Config` fields.
 
 <a id="the-panel"></a>
 ## The panel

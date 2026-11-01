@@ -6,12 +6,13 @@
  */
 import type { ReactNode } from 'react'
 import { IconBranchOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 
-/** The title's props, narrowed to the member it reads so a test can supply it directly. */
-export interface GitTitleProps {
-  /** The framework's tab seat for this title. */
-  useTabInfo: () => { tab: { title: string } }
-}
+/** The title seat narrowed to the one member this component draws. */
+type TitleSeat = ReturnType<PropsRuntime<'sidebar.right.pane.tab.title'>['useTabInfo']>['tab']
+
+/** The title's props, keeping the framework's type for the seat it reads. */
+export type GitTitleProps = { useTabInfo: () => { tab: Pick<TitleSeat, 'title'> } }
 
 /**
  * The title as the chip and a floating panel's header show it.

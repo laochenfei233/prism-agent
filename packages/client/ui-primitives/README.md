@@ -76,6 +76,7 @@ Check this table before writing a control in a feature package. A plugin cannot 
 | `GuideArtworkBrowser`/`Files` | Fixed-palette 36×36 browser and folder artwork for sidebar guide entries. |
 | `FileTypeIcon`, `classifyFileType`, `fileExtension` | A category-colored 28px file or folder glyph and the shared case-insensitive filename mapping behind it. Code and configuration files use detailed full-color technology glyphs; use `LinkIconMedium` for link-leading glyphs and image previews for image content. |
 | `languageForPath`, `CODE_HIGHLIGHT_EXTENSIONS`, `useCodeHighlighter` | The lazy line-token highlighter shared by code preview and diff review. The filename grammar selection is re-exported from `@deepseek-ai/dsh-util-code-language`, the single extension table also behind the read card's persisted short-id `lang` hint. |
+| `hunkRows`, `DiffHunkLines`, `DiffRow` | The unified-diff row model: one drawn line with its old and new numbers, and the `+`/`-`/space numbering every comparison view shares. `DiffBlock` cards and the turned-file review both build their rows from it. |
 
 Four pairs are easy to confuse:
 

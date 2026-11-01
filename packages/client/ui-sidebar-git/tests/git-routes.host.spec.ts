@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { GIT_COMMIT_PATH, GIT_DIFF_PATH, GIT_STAGE_PATH, GIT_STATUS_PATH, GIT_UNSTAGE_PATH } from '../src/contract.ts'
 import { GitCommandError } from '../src/git-command.ts'
-import { failure, registerGitRoutes, type GitOperations, type GitRouteHost, type GitRouteRegistration } from '../src/git-routes.ts'
+import { failure, handleStage, registerGitRoutes, type GitOperations, type GitRouteHost, type GitRouteRegistration } from '../src/git-routes.ts'
 import { apply, type Config } from '../src/index.ts'
 
 // Every git command is a child process here; a loaded Windows host needs well over the default five seconds.
@@ -247,5 +247,12 @@ describe('git route failures', () => {
     expect((await call(GIT_UNSTAGE_PATH, '', post({ sessionId: 'owner', paths: ['a.txt'] }))).status).toBe(500)
     expect((await call(GIT_COMMIT_PATH, '', post({ sessionId: 'owner', message: 'm' }))).status).toBe(422)
     for (const dispose of disposers) await dispose()
+  })
+
+  it('rethrows a body read that failed for a reason other than malformed JSON', async () => {
+    const request = new Request(`http://localhost${GIT_STAGE_PATH}`, { method: 'POST', body: '{}' })
+    Object.defineProperty(request, 'json', { value: async () => { throw new TypeError('stream failed') } })
+    const deps = { cwdOf: () => '/work', operations: async () => undefined }
+    await expect(handleStage(deps, request)).rejects.toThrow('stream failed')
   })
 })

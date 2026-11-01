@@ -28,6 +28,7 @@ export const zh = {
   'state.clean': '工作区干净，没有待提交的改动。',
   'state.failed': '无法读取仓库状态：{message}',
   'branch.detached': '游离 HEAD',
+  'branch.unborn': '尚无提交',
   'branch.ahead': '领先 {count}',
   'branch.behind': '落后 {count}',
   'section.staged': '已暂存',
@@ -43,7 +44,7 @@ export const zh = {
   'commit.action': '提交',
   'commit.committing': '正在提交…',
   'commit.nothingStaged': '没有已暂存的改动。',
-  commitRefused: '提交被拒绝：{message}',
+  'action.failed': '操作失败：{message}',
 } satisfies Record<string, string>
 
 /** Git dictionary key union. */
@@ -61,6 +62,7 @@ export const en = {
   'state.clean': 'The working tree is clean; nothing to commit.',
   'state.failed': 'Could not read the repository status: {message}',
   'branch.detached': 'Detached HEAD',
+  'branch.unborn': 'No commits yet',
   'branch.ahead': '{count} ahead',
   'branch.behind': '{count} behind',
   'section.staged': 'Staged',
@@ -76,5 +78,5 @@ export const en = {
   'commit.action': 'Commit',
   'commit.committing': 'Committing…',
   'commit.nothingStaged': 'Nothing is staged.',
-  commitRefused: 'The commit was refused: {message}',
+  'action.failed': 'The action failed: {message}',
 } satisfies Record<SidebarGitKey, string>

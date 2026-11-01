@@ -62,7 +62,7 @@ describe('git face', () => {
 
   it('opens the comparison of the side the entry belongs to', async () => {
     const worktree = setup(answer(TEXT_DIFF))
-    worktree.face.open(TAB, ENTRY, worktree.signal)
+    worktree.face.open(TAB, ENTRY, 'worktree', worktree.signal)
     await settle()
     expect(worktree.script.calls[0]?.url).toContain('side=worktree')
     expect(worktree.instance.getSnapshot().byTab[TAB]).toMatchObject({
@@ -71,12 +71,12 @@ describe('git face', () => {
     })
 
     const staged = setup(answer(TEXT_DIFF))
-    staged.face.open(TAB, { path: 'a.txt', index: 'M', worktree: ' ' }, staged.signal)
+    staged.face.open(TAB, { path: 'a.txt', index: 'M', worktree: ' ' }, 'index', staged.signal)
     await settle()
     expect(staged.script.calls[0]?.url).toContain('side=index')
 
     const failed = setup(answer({ error: 'gone' }, 404))
-    failed.face.open(TAB, ENTRY, failed.signal)
+    failed.face.open(TAB, ENTRY, 'worktree', failed.signal)
     await settle()
     expect(failed.instance.getSnapshot().byTab[TAB]?.diff).toEqual({ kind: 'failed', message: 'gone' })
     failed.face.close(TAB)
@@ -124,7 +124,7 @@ describe('git face', () => {
     expect(instance.getSnapshot().byTab[TAB]?.status).toMatchObject({ kind: 'ready' })
     controller.abort()
     face.load(TAB, signal)
-    face.open(TAB, ENTRY, signal)
+    face.open(TAB, ENTRY, 'worktree', signal)
     face.stage(TAB, 'a.txt', signal)
     face.unstage(TAB, 'a.txt', signal)
     face.commit(TAB, 'm', signal)
@@ -150,7 +150,7 @@ describe('git face', () => {
       answer({ error: 'commit refused' }, 422),
     )
     aborted.face.load(TAB, aborted.signal)
-    aborted.face.open(TAB, ENTRY, aborted.signal)
+    aborted.face.open(TAB, ENTRY, 'worktree', aborted.signal)
     aborted.face.stage(TAB, 'a.txt', aborted.signal)
     aborted.face.commit(TAB, 'm', aborted.signal)
     aborted.controller.abort()
@@ -167,7 +167,7 @@ describe('git face', () => {
       answer(gitStatus([])),
     )
     aborted.face.load(TAB, aborted.signal)
-    aborted.face.open(TAB, ENTRY, aborted.signal)
+    aborted.face.open(TAB, ENTRY, 'worktree', aborted.signal)
     aborted.face.stage(TAB, 'a.txt', aborted.signal)
     aborted.face.commit(TAB, 'm', aborted.signal)
     aborted.controller.abort()
@@ -179,8 +179,8 @@ describe('git face', () => {
 
   it('keeps only the latest comparison for one tab', async () => {
     const latest = setup(answer(TEXT_DIFF), answer({ kind: 'binary', path: 'a.bin' }))
-    latest.face.open(TAB, ENTRY, latest.signal)
-    latest.face.open(TAB, { path: 'a.bin', index: ' ', worktree: 'M' }, latest.signal)
+    latest.face.open(TAB, ENTRY, 'worktree', latest.signal)
+    latest.face.open(TAB, { path: 'a.bin', index: ' ', worktree: 'M' }, 'worktree', latest.signal)
     await settle()
     expect(latest.instance.getSnapshot().byTab[TAB]?.diff).toEqual({ kind: 'ready', diff: { kind: 'binary', path: 'a.bin' } })
   })

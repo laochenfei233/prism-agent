@@ -105,7 +105,7 @@ async function statusFor(deps: GitRouteDeps, cwd: string, signal: AbortSignal): 
  */
 async function statusResponse(deps: GitRouteDeps, sessionId: string, signal: AbortSignal): Promise<Response> {
   const cwd = deps.cwdOf(sessionId)
-  if (cwd === undefined) return new Response('Session not found.', { status: 404 })
+  if (cwd === undefined) return new Response('The session has no working directory, or no longer exists.', { status: 404 })
   return json(await statusFor(deps, cwd, signal))
 }
 
@@ -169,7 +169,9 @@ async function readBody(request: Request): Promise<Record<string, unknown> | Res
       return new Response('Expected a JSON object.', { status: 400 })
     }
     return value as Record<string, unknown>
-  } catch {
+  } catch (error: unknown) {
+    // A body that is not JSON at all is a client mistake, not a Host failure.
+    if (!(error instanceof SyntaxError)) throw error
     return new Response('Expected a JSON object.', { status: 400 })
   }
 }

@@ -166,6 +166,11 @@ describe('readRepositoryStatus', () => {
     await expect(readRepositoryStatus(scripted({ exitCode: 128, stderr: 'fatal' }), '/repo', signal))
       .rejects.toThrow('git status failed')
   })
+
+  it('refuses a listing whose output was truncated', async () => {
+    await expect(readRepositoryStatus(scripted({ stdout: ' M a.txt\0', truncated: true }), '/repo', signal))
+      .rejects.toThrow('exceeded the output cap')
+  })
 })
 
 describe('readFileDiff', () => {
@@ -191,8 +196,39 @@ describe('readFileDiff', () => {
   })
 
   it('throws when git diff fails', async () => {
-    const git = scripted({ stdout: '' }, { exitCode: 1, stderr: 'fatal: bad path' })
+    const git = scripted({ stdout: ' M a.txt\0' }, { exitCode: 1, stderr: 'fatal: bad path' })
     await expect(readFileDiff(git, '/repo', 'a.txt', 'worktree', signal)).rejects.toThrow('git diff failed')
+  })
+
+  it('serves the comparison of a staged deletion instead of calling it untracked', async () => {
+    const { dir, git: instance } = await repository()
+    git(dir, 'rm', 'a.txt')
+    const diff = await readFileDiff(instance, dir, 'a.txt', 'index', signal)
+    expect(diff).toMatchObject({ kind: 'text', path: 'a.txt' })
+    expect(diff.kind === 'text' && diff.hunks[0]?.lines).toEqual(['-one'])
+  })
+
+  it('throws when the per-path status read fails', async () => {
+    await expect(readFileDiff(scripted({ exitCode: 128, stderr: 'fatal' }), '/repo', 'a.txt', 'worktree', signal))
+      .rejects.toThrow('git status failed')
+  })
+
+  it('refuses a comparison whose output was truncated', async () => {
+    const git = scripted({ stdout: ' M a.txt\0' }, { stdout: 'diff', truncated: true })
+    await expect(readFileDiff(git, '/repo', 'a.txt', 'worktree', signal))
+      .rejects.toThrow('exceeded the output cap')
+  })
+})
+
+describe('literal pathspecs', () => {
+  it('stages only the path it was handed, never a glob match', async () => {
+    const { dir, git: instance } = await repository()
+    for (const name of ['[ab].txt', 'a.txt', 'b.txt']) await writeFile(join(dir, name), `${name}\n`)
+    await stagePaths(instance, dir, ['[ab].txt'], signal)
+    const staged = (await readRepositoryStatus(instance, dir, signal)).entries
+      .filter(entry => entry.index === 'A')
+      .map(entry => entry.path)
+    expect(staged).toEqual(['[ab].txt'])
   })
 })
 

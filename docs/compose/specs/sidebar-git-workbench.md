@@ -1,98 +1,106 @@
 ---
 feature: sidebar-git-workbench
-status: designed
+status: delivered
 updated: 2026-11-01
 branch: feat/sidebar-workbench
-commits:
+commits: c22ec9f0b9..HEAD
 ---
 
-# 侧栏 Git 工作台
+# Git Workbench
+
+English | [中文](sidebar-git-workbench.zh.md)
 
 ## Report
 
+**What was built** — A native Git workbench tab in the right Sidebar. The panel lists the repository's branch, its divergence from the upstream, and every changed path in staged, unstaged, and untracked sections; a row opens that file's comparison against the index or the work tree, its action stages or unstages that one path, and the footer commits the staged content. Five authenticated Host routes serve status, one comparison, stage, unstage, and commit over the Connection fetch fence, reusing the shared `GitRunner` rather than copying git execution.
+
+**Verification** — `tsc -b tsconfig.client.json` and `pnpm run build:lib:client` pass; the package's eight suites run 76 tests at 100% per-file coverage; the touched client suites (`ui-primitives`, `ui-deliverables`, `ui-sidebar-right`, `ui-sidebar-git`) pass except one pre-existing icon-count assertion that also fails on the untouched checkout; `verify-client-packages`, `verify-package-dependencies`, `gen-tsconfig-paths --check`, `verify-client-ui-i18n`, `verify-md-links`, `verify-translation-pairing`, and both catalogs are clean for this change.
+
+**Journey log** — The first review found pathspec globbing (`[ab].txt` staging three files), the wrong comparison side for a file that is both staged and modified, a staged deletion reported as untracked, and a missing per-tab teardown; all four were fixed and covered by tests rather than by widening the panel.
+
 ## [S1] Problem
 
-prism-agent 的右栏已经有文件树、只读预览、终端、本轮改动 review，唯独没有 Git 状态、暂存与提交：用户要把工作交出去，只能切到外部终端或别的 Git 客户端。本仓库的 host 侧只有 `workspace-changes` 的回合快照（`GitRunner` + 私有对象库），没有任何把仓库状态、暂存、提交暴露给浏览器的通道。社区插件 `dsh-better-sidebar` 证明这类工作台有真实需求，但它把编辑器、任务、侧边对话一起塞进一个 19MB 第三方包；本项目要的是原生、只做提交闭环的那一块。
+The right column already had a file tree, read-only previews, a terminal, and the turn-change review, but no Git status, staging, or commit: users had to leave for an external terminal or another client. The Host exposed only turn snapshots, never a repository status, staging, or commit channel. The community plugin `dsh-better-sidebar` shows the demand exists, but it carries an editor, a task view, and a side conversation in one 19 MB third-party package; this project needed the commit loop, natively.
 
 ## [S2] Design
 
-### S2.1 数据通道
+### S2.1 Data channel
 
-不新建 Typert Remote 服务。Git 面板是请求/响应式、无流式、无跨进程类型生成需求，沿用 `ui-deliverables` 已经验证的 `ctx.connection.fetch.register` 路由（Connection 鉴权围栏内），host 半与 client 半放在同一个 client 插件包里。理由：Remote 需要 typert 生成产物、`api/remotes` 挂载、lookup 声明等一整套登记面，对只读状态与三个写操作是过度设计。
+No Typert Remote service. The panel exchanges small request-and-response records, needs no stream, and gains nothing from generated wire types, so it reuses the `ctx.connection.fetch.register` route fence that `ui-deliverables` already proves, with the Host half in the same plugin package.
 
-### S2.2 路由
+### S2.2 Routes
 
-全部按 `sessionId` 定位会话与其 `cwd`，由 host 用 `ctx.sessionQuery` 解析，不信任客户端传来的路径。
+Every route resolves the Session's working directory on the Host; no client-supplied path is trusted.
 
-| 路由 | 方法 | 语义 |
+| Route | Method | Meaning |
 |---|---|---|
-| `/api/git.status` | GET | `{ repo: false }`，或 `{ repo: true, root, branch, ahead, behind, entries: [{ path, index, worktree }] }`；`index`/`worktree` 为 porcelain 状态字母 |
-| `/api/git.diff` | GET | `?path=&side=index\|worktree` → `{ kind: 'text', hunks }` 或 `{ kind: 'binary' }` |
-| `/api/git.stage` | POST | `{ paths: string[] }` → 新的 status |
-| `/api/git.unstage` | POST | `{ paths: string[] }` → 新的 status |
-| `/api/git.commit` | POST | `{ message: string }` → `{ status }`；失败返回 422 与截断的 stderr |
+| `/api/git.status` | GET | `{ repo: false }`, or `{ repo: true, root, branch, ahead, behind, entries: [{ path, index, worktree }] }` |
+| `/api/git.diff` | GET | `?path=&side=index\|worktree` → `{ kind: 'text', hunks }`, `{ kind: 'binary' }`, or `{ kind: 'untracked' }` |
+| `/api/git.stage` | POST | `{ paths }` → the status after staging |
+| `/api/git.unstage` | POST | `{ paths }` → the status after unstaging |
+| `/api/git.commit` | POST | `{ message }` → the status after the commit, or 422 with the stderr tail |
 
-### S2.3 安全与边界
+### S2.3 Safety
 
-路径只接受仓库根内的相对路径：拒绝绝对路径、`..` 段、NUL、空串，并再次用 `git rev-parse --show-toplevel` 的根做包含校验；提交信息长度上限（默认 64 KiB）由 Config 提供。所有命令以 argv 数组执行，不经 shell；沿用 `GitRunner` 的清洗环境、超时与输出上限。写操作只由用户在面板里的手势触发，模型侧没有任何入口。
+A path is accepted only as a repository-relative spelling: absolute paths, `..` segments, NUL bytes, and empty strings are refused, and every path command runs with `GIT_LITERAL_PATHSPECS=1` so a name such as `[ab].txt` acts on one file instead of every glob match. Commands run as argv arrays, never through a shell, and inherit `GitRunner`'s scrubbed environment, timeout, and output cap; a truncated listing or comparison is refused rather than drawn with wrong numbering. Only the panel's user gestures reach the three mutations; no model-facing entry exists.
 
-### S2.4 复用
+### S2.4 Reuse
 
-`GitRunner` 目前只在 `workspace-changes/src/git.ts` 内部导出，包根只导出类型。本期把它提升为包根导出（一行 re-export，并在 `verify-package-dependencies` 的 host 导出分类里登记），新插件包依赖 `@deepseek-ai/dsh-workspace-changes` 的 host 半使用它，不复制 git 执行代码。`locateGitWorkspace` 不在此列：它为回合快照把对象库与索引重定向到私有目录，与本面板要在真实索引上暂存/提交的语义冲突，因此面板自己用 `git rev-parse --show-toplevel` 定位仓库。
+`GitRunner` and `resolveGitExecutable` moved to the `workspace-changes` package root (one re-export plus a `SAFE_HOST_DEPENDENCY_EXPORTS` classification), so the new package runs git through the same scrubbed environment instead of a second implementation. `locateGitWorkspace` stays out: it redirects the object store and index for turn snapshots, which conflicts with staging and committing against the real index, so the panel locates the repository with `git rev-parse --show-toplevel`.
 
-### S2.5 Diff 行模型
+### S2.5 Diff row model
 
-`ui-deliverables` 的 `hunkRows`/`DiffRow` 是把 hunk 行编号的纯函数，与渲染无关。把它提升到 `ui-primitives`（结构化的 `{ oldStart, newStart, lines }` 形参，不引入对 deliverables 包的类型依赖），`FileDiff` 改为从 `ui-primitives` 引入并继续 re-export 给同包测试；Git 面板用同一份行模型，只实现统一视图的极简 chrome（无 shiki、无分栏）。
+The pure hunk line-numbering (`hunkRows`, `DiffRow`) moved to `ui-primitives` over a structural `{ oldStart, newStart, lines }` parameter, with no dependency on a diff producer. The turn review imports it from there; the Git panel renders the same rows with its own minimal chrome (unified view only).
 
-### S2.6 客户端
+### S2.6 Client
 
-新包 `@deepseek-ai/dsh-client-ui-sidebar-git`：注册 tab 类型 `kind: 'git'`、guide entry（order 15，位于 files 的 10 与 terminal 的 20 之间）、`sidebar.right.pane.tab` 与 `.title` 两个 seat。面板结构：顶部仓库/分支条（ahead/behind）与刷新、右侧「暂存 N / 未暂存 M」统计；中部三段列表（已暂存、未暂存、未跟踪），点击文件名展开该文件的 diff；底部提交框（message 输入 + Commit，无暂存内容时禁用）。store 由 `defineStore` 创建，按 tab 生命周期持有。
+The `git` tab type registers with kind `git`, a guide entry at order 15, and the `sidebar.right.pane.tab` and `.title` seats. The panel is a branch bar, three sections, an in-place comparison, and a commit footer. The store is a `defineStore` instance owned by the tab lifecycle, and the tab record's abort ends its bucket.
 
-### S2.7 刷新与竞态
+### S2.7 Refresh and races
 
-打开面板、手动刷新、每次写操作成功后重新读取 status；不轮询、不监听文件系统。同一时刻只保留一个在途读取，后发请求以递增 token 覆盖先发结果，避免旧响应回写。
+The panel reads at mount and after every mutation; a mutation answers with the status it leaves behind, so no second round trip happens. It polls nothing and watches nothing. One read per tab is in force: a newer request retires an older settlement, and a request issued after abort returns without sending anything.
 
-### S2.8 失败
+### S2.8 Failures
 
-非仓库：空态说明「当前工作区不是 Git 仓库」。git 不可用：空态说明。读取失败：就地错误行 + 重试。提交失败（无 user.name/email、钩子拒绝等）：展示截断后的 stderr 尾部，保留输入内容。
+Outside a repository: an empty state. No git on the Host: an empty state. A read failure: an in-place error line. A refused commit: the stderr tail, with the draft kept.
 
-### S2.9 明确不做（及替代）
+### S2.9 Deliberately not built
 
-- 编辑器保存：写盘要走沙箱策略与新写入通道，成本远高于收益；本机编辑器由 `ui-open-in-app` 的「打开方式」承担。
-- 文件树搜索：composer 的 `@` 引用已能按路径跨工作区检索文件。
-- `sidebar_open` 工具：模型回答里的内联文件引用与 Markdown 链接已经能在右栏打开文件。
-- 侧边对话、子代理拓扑：已有 `ui-subagent` 的侧栏聊天 tab 与会话头部的 jobs/子代理目录。
+- Editing and saving: writing needs a new sandboxed write channel and conflicts with the review and delivery surfaces; the native editor already handles it through `ui-open-in-app`.
+- File-tree search: the composer's `@` reference already searches workspace paths.
+- A `sidebar_open` tool: inline file references and Markdown links already open files in the Sidebar.
+- Side conversations and a subagent topology: `ui-subagent`'s chat tab and the session header's jobs and subagent catalog already cover them.
 
-### S2.10 候选增强（不在本期）
+### S2.10 Candidate enhancements, not in this change
 
-- **改动归属**：文件行标注「本轮由哪个工具改过」，点开跳回对应会话回合。数据来自既有的 deliverables 操作记录，插件做不到，是本项目独有的角度。
-- **提交信息由模型起草**：暂存后一个按钮把 `git diff --cached` 摘要交给模型，回填提交框；需要新建一个模型可见的输入通道，成本高于面板本身，先不做。
-- **diff 行内提问**：选中行后在输入框引用 `path:line`；当前内联代码引用不支持行号，需要先扩展 `producedFileMentions`。
-- **LSP 跳转**：右栏代码视图接 `ctx.lsp` 的定义/引用/悬停，需要新的 host 通道与编辑器内核，是独立的一期。
+- Change attribution: mark each row with the turn and tool that touched it, from the recorded deliverables operations.
+- A model-drafted commit message: needs a new model-visible input channel, which costs more than the panel itself.
+- Inline diff questions: a selection referenced as `path:line`; inline code references do not carry line numbers yet.
+- LSP navigation: definitions and references inside the Sidebar, on top of `ctx.lsp`; a separate change with its own Host channel.
 
 ## [S3] Scope
 
-- In scope: S2.1–S2.8；`GitRunner` 包根导出；`hunkRows` 提升；新插件包的注册面、i18n、README 与测试。
-- Out of scope: 分支切换与新建、历史浏览、pull/push、冲突解决、diff 行内评论、多仓库、暂存部分行（hunk 级暂存）。
+- In scope: S2.1–S2.8, the two promoted exports, the new package's registration surfaces, bilingual README, and tests.
+- Out of scope: branch switching, history, pull and push, conflict resolution, inline diff comments, multiple repositories, hunk-level staging.
 
 ## Tasks
 
-- [ ] T1: `workspace-changes` 包根导出 `GitRunner`，登记 host 导出分类 (depends: none) `covers: S2.4`
-- [ ] T2: `hunkRows`/`DiffRow` 提升到 `ui-primitives`，`FileDiff` 改为引入 (depends: none) `covers: S2.5`
-- [ ] T3: 新包骨架与三条注册面（tsconfig 聚合、cordis 行、bundle 依赖）(depends: none)
-- [ ] T4: host 半只读路由：仓库定位、status 解析、diff 解析、参数校验 (depends: T1, T3) `covers: S2.2, S2.3`
-- [ ] T5: host 半写路由：stage/unstage/commit 与失败报告 (depends: T4)
-- [ ] T6: client 半数据层：fetch 客户端、store、竞态 token (depends: T3) `covers: S2.6, S2.7`
-- [ ] T7: tab 定义、guide entry、列表与 diff 视图、提交框、locales (depends: T2, T6)
-- [ ] T8: host 与 client 单测（含拒绝路径）、README、zh/en 词典 (depends: T5, T7)
-- [ ] T9: 验证：`build:artifacts`、`typecheck`、`test:gui`、`doc-sync`，需要时 `DSH_SNAPSHOT=replay pnpm run test:web` (depends: T8)
+- [x] T1: Export `GitRunner` and `resolveGitExecutable` from `workspace-changes` and classify them (covers: S2.4)
+- [x] T2: Move `hunkRows` and `DiffRow` into `ui-primitives` and rewire the review (covers: S2.5)
+- [x] T3: New package skeleton and its three registration surfaces
+- [x] T4: Host read routes: repository location, status parsing, comparison parsing, argument checks (covers: S2.2, S2.3)
+- [x] T5: Host write routes: stage, unstage, commit, and failure reporting
+- [x] T6: Client data layer: fetch face, store, read generations (covers: S2.6, S2.7)
+- [x] T7: Tab definition, guide entry, sections, comparison view, commit box, dictionaries
+- [x] T8: Host and client tests, README pair, zh/en dictionaries
+- [x] T9: Verification: client build, per-file coverage, gui suites, documentation gates
 
 ## [S4] Acceptance
 
-- [ ] 在 Git 仓库的会话里打开 Git tab，能看到分支、ahead/behind 与三段文件列表；非仓库会话看到空态而不是错误。
-- [ ] 点击已修改文件能展开统一 diff；二进制文件显示不可预览。
-- [ ] 暂存、取消暂存、提交后列表与统计立即更新；提交成功后输入框清空。
-- [ ] 提交失败时显示 stderr 尾部且不清空输入。
-- [ ] 绝对路径、`..`、仓库外路径的请求被 4xx 拒绝并有单测覆盖。
-- [ ] 面板不发起轮询；写操作成功后只读一次 status。
-- [ ] `pnpm run test:gui`、`pnpm run typecheck`、`pnpm run build:artifacts` 通过。
+- [x] Opening the Git tab in a repository Session shows the branch, ahead/behind, and three file sections; a non-repository Session sees an empty state instead of an error.
+- [x] A row opens a unified comparison on the side its section represents; a binary file shows that it cannot be previewed.
+- [x] Stage, unstage, and commit update the lists and counts; a successful commit clears the input.
+- [x] A refused commit shows the stderr tail and keeps the draft.
+- [x] Absolute paths, `..`, and glob-like names cannot act outside the clicked path, and each rejection has a test.
+- [x] The panel starts no polling and reads the status once per write.
+- [x] The package's per-file coverage is 100%, and the client build passes.

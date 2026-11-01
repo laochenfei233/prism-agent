@@ -17,11 +17,7 @@ import { GitTitle } from './GitTitle.tsx'
 import { en, zh } from './locales.ts'
 import { createGitStore } from './store.ts'
 
-export type { GitBodyProps } from './GitBody.tsx'
-export type { GitFace, GitFetch } from './face.ts'
 export type { SidebarGitKey } from './locales.ts'
-export type { DiffState, GitSelection, GitState, GitTabState, StatusState } from './store.ts'
-export type { GitDiff, GitFileEntry, GitHunk, GitSide, GitStatus } from '../contract.ts'
 
 /** This package's copy namespace. */
 const NS = 'sidebarGit'

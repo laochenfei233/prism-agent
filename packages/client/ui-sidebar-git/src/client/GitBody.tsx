@@ -11,38 +11,27 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button, IconBranchOutlineRegular, IconRefreshOutlineRegular, Tooltip, hunkRows } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { BoundActions } from '@deepseek-ai/dsh-client-store'
-import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
-import type { SidebarRightTabActions } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { GitDiff, GitFileEntry, GitHunk, GitSide, GitStatus } from '../contract.ts'
 import type { GitFace } from './face.ts'
 import type {} from './locales.ts'
-import type { GitSelection, GitState, GitTabState, createGitStore } from './store.ts'
+import type { GitSelection, GitTabState, createGitStore } from './store.ts'
 import css from './GitBody.module.css'
 
-/** The tab facts the body reads; a structural slice of what the slot seat supplies. */
-export interface GitBodyTab {
-  readonly id: TabId
-  readonly title: string
-  readonly signal: AbortSignal
-  readonly actions: Pick<SidebarRightTabActions, 'bindCommands'>
-}
+/** The tab seat the panel reads, narrowed from the framework's own share. */
+type TabSeat = ReturnType<PropsRuntime<'sidebar.right.pane.tab'>['useTabInfo']>['tab']
 
 /**
- * The body's props, narrowed to the members it reads so a test can supply them
- * directly: the tab seat hook, the store pair, the face, and copy.
+ * The body's props: the framework's tab seat narrowed to the members it reads,
+ * its store pair, its face, and its copy. Every member keeps the framework's
+ * own type, so a test can pass the same shapes without re-declaring them.
  */
-export interface GitBodyProps extends GitFace {
-  /** The framework's tab seat for this body. */
-  useTabInfo: () => { tab: GitBodyTab }
-  /** The framework's store selector. */
-  useStore: <T>(select: (state: GitState) => T) => T
-  /** The framework's action set for the declared store. */
-  actions: BoundActions<ReturnType<typeof createGitStore>>
-  /** Namespace-bound translate. */
-  t: TranslateNS<'sidebarGit'>
-}
+export type GitBodyProps =
+  & { useTabInfo: () => { tab: Pick<TabSeat, 'id' | 'title' | 'signal'> & { actions: Pick<TabSeat['actions'], 'bindCommands'> } } }
+  & Pick<PropsStore<ReturnType<typeof createGitStore>>, 'useStore' | 'actions'>
+  & GitFace
+  & Pick<PropsLocale<'sidebarGit'>, 't'>
 
 /**
  * Split the repository's entries into the three sections the panel draws.
@@ -68,6 +57,18 @@ export function sectionsOf(status: GitStatus): { staged: GitFileEntry[]; unstage
  */
 export function hunkHeader(hunk: GitHunk): string {
   return `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`
+}
+
+/**
+ * The branch line: the branch name, git's detached `HEAD`, or the label a
+ * repository without commits gets.
+ * @param branch - the branch the Host read, absent when HEAD is unborn.
+ * @param t - namespace-bound translate.
+ * @returns the line to draw.
+ */
+export function branchLabel(branch: string | undefined, t: GitBodyProps['t']): string {
+  if (branch === undefined) return t('branch.unborn')
+  return branch === 'HEAD' ? t('branch.detached') : branch
 }
 
 /**
@@ -127,7 +128,7 @@ function EntryRow({ entry, side, selection, state, tabId, signal, open, close, s
           type="button"
           className={css.pathButton}
           aria-expanded={opened}
-          onClick={() => { if (opened) close(tabId); else open(tabId, entry, signal) }}
+          onClick={() => { if (opened) close(tabId); else open(tabId, entry, side, signal) }}
         >
           <span className={css.letter} data-letter={letter}>{letter}</span>
           <span className={css.path}>{entry.path}</span>
@@ -167,6 +168,12 @@ export function GitBody({ useTabInfo, useStore, actions, load, open, close, stag
     load(tab.id, signal)
   }, [state, tab.id, signal, actions, load])
   useEffect(() => tab.actions.bindCommands({ refresh: () => { load(tab.id, signal) } }), [tab.actions, tab.id, signal, load])
+  // The tab record's abort ends its bucket: a later tab with the same id starts clean instead of reading a stale status.
+  useEffect(() => {
+    const forget = (): void => { actions.forget(tab.id) }
+    signal.addEventListener('abort', forget, { once: true })
+    return () => { signal.removeEventListener('abort', forget) }
+  }, [signal, tab.id, actions])
   if (state === undefined) return <div className={css.root} data-git-state="starting" />
   const ready = state.status.kind === 'ready' ? state.status.status : undefined
   const sections = ready === undefined ? undefined : sectionsOf(ready)
@@ -175,7 +182,7 @@ export function GitBody({ useTabInfo, useStore, actions, load, open, close, stag
     <header className={css.header}>
       <span className={css.branch}>
         <IconBranchOutlineRegular size={14} />
-        {ready === undefined ? '' : ready.branch ?? t('branch.detached')}
+        {ready === undefined ? '' : branchLabel(ready.branch, t)}
       </span>
       {ready?.ahead !== undefined && ready.ahead > 0
         && <span className={css.count}>{t('branch.ahead', { count: ready.ahead })}</span>}
@@ -220,7 +227,7 @@ export function GitBody({ useTabInfo, useStore, actions, load, open, close, stag
       )}
     </div>
     <footer className={css.commit}>
-      {state.error !== undefined && <p className={css.error} role="alert">{state.error}</p>}
+      {state.error !== undefined && <p className={css.error} role="alert">{t('action.failed', { message: state.error })}</p>}
       {stagedCount === 0 && <p className={css.note}>{t('commit.nothingStaged')}</p>}
       <input
         className={css.input}
