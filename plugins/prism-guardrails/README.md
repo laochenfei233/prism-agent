@@ -64,6 +64,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 
 | Key | Type | Meaning | Default |
 |---|---|---|---|
+| `mode` | `enforce` or `observe` | Whether a `deny` or `ask` is applied, or recorded and let through | `enforce` |
 | `planDeniedTools` | non-empty array of distinct, non-blank tool names | Global tool names refused while plan mode is active | rail off |
 | `repeatAskAfter` | integer `0` or `>= 2` | Consecutive identical calls tolerated before the next one goes to approval; `0` disables | rail off |
 | `maxStepsPerTurn` | integer `>= 1` | Steps one turn may open | rail off |
@@ -84,10 +85,13 @@ Every rail is **off** until its key names a value, and a key that is present but
 
 `readTools` works the same way: `{ tool: read, pathArgument: file_path }`, `{ tool: read_image, pathArgument: file_path }`, and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's three tools that read by path.
 
+`mode` is the only key that applies to every rail at once, and it is the only way to see a rail before arming it: under `observe` each rail decides exactly as it would under `enforce`, records the decision, and lets the call through. `/guardrails` lists what it would have stopped. A `deny` and an `ask` are both observations; a `steer` is not, because sending a turn back for evidence is a request to finish work rather than a refusal, and observing must not switch it off.
+
 Load-time rejections, each with the message asserted by the test suite:
 
 | Input | Result |
 |---|---|
+| `mode` neither `enforce` nor `observe` | `mode must be "enforce" or "observe", received …` |
 | `planDeniedTools` not an array | `planDeniedTools must be an array of tool names` |
 | `planDeniedTools: []` | `planDeniedTools must not be empty — omit the key to disable the plan-mode rail` |
 | a blank or non-string entry | `planDeniedTools entries must be non-empty tool names` |
@@ -272,17 +276,22 @@ Each `pattern` compiles at load and is matched case-insensitively against the ra
 
 ## `/guardrails`
 
-The bundle registers one command that reports which rails the deployment actually has armed:
+The bundle registers one command that reports which rails the deployment actually has armed, the mode it is running in, and what its `observe` runs have seen:
 
 ```
-Guardrails: 12 of 12 rails armed.
+Guardrails: 12 of 12 rails armed (mode: observe, config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
+decisions this session: 3 (3 observed)
+  observed  command guard  git push --force origin main
+  observed  sensitive reads  .env.local
 ```
 
-It reads the resolved configuration, so the report cannot disagree with the rails. A deployment with no `commands` service keeps every rail and loses only the report.
+It reads the resolved configuration, so the report cannot disagree with the rails. `config` is a hash of the configuration the rails are deciding under, so a refusal in a log can be tied to the settings that produced it. Only `observed` rows are listed: under `enforce` the model has already read every refusal, so the rows worth a human's attention are the calls a rail would have stopped and did not. A deployment with no `commands` service keeps every rail and loses only the report.
+
+The ledger behind those rows is per session and in memory, capped at 200 decisions: it answers "what did the rails do in this session", not "what happened last week".
 
 ## Wiring
 
@@ -345,7 +354,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 
 ## Build and verify
 
-The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except the two the rails need as values — `createUserMessage`, which the verification and todo gates use to steer the agent, and `CommandDefinitionId`, which every command registration needs — so the emitted module carries only those two external imports, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-commands` are the peer dependencies that resolve them; `@deepseek-ai/dsh-system-prompt`, declared beside them, is the service the Ponytail row injects rather than imports.
+The bundle borrows the checkout's packages instead of declaring workspace dependencies. Every `@deepseek-ai/*` import in `src/` is `import type` except the two the rails need as values — `createUserMessage`, which the verification and todo gates use to steer the agent, and `CommandDefinitionId`, which every command registration needs — so the emitted module carries only those two external imports, resolved from the profile that loads the bundle, and a deployment installs nothing of its own. Its other import is `node:crypto`, a builtin, for the configuration version's digest. `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-commands` are the peer dependencies that resolve them; `@deepseek-ai/dsh-system-prompt`, declared beside them, is the service the Ponytail row injects rather than imports.
 
 `tsconfig.json` resolves those types through the checkout's **built** declarations, which is how the repository's own packages consume each other — run `pnpm run build` in the checkout first. `tsdown.config.ts` keeps `@deepseek-ai/*` external, as the sibling `plugins/prism-memory` does: a bundled copy would shadow the profile's own service instances across the cross-instance identity the harness relies on.
 
@@ -353,7 +362,7 @@ The bundle borrows the checkout's packages instead of declaring workspace depend
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 123 composed unit tests
+npm test            # 138 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -367,6 +376,9 @@ Vitest needs vite's Windows real-path probe to spawn a child process, which a co
 
 ## Known Limitations and Deferred Work
 
+- **`observe` is a way to run with the rails off.** It records instead of refusing, so a deployment that is observed is not protected; a reader who mistakes one for the other is worse off than with no rails at all. `/guardrails` therefore prints the mode on its first line, and the key ships in no profile: a deployment that wants it writes it deliberately.
+- **The decision ledger is memory-only.** It is per session, capped at 200 rows, and lost when the process exits, so it answers what the rails did in this session and nothing about last week. It is a tuning aid, not an audit log.
+- **The configuration version covers the rail configuration only.** It names the settings in the patch row, not the rest of a profile's plugins, so it identifies the configuration behind a refusal rather than the deployment as a whole.
 - **The bundle is outside the repository test runner.** It lives in `plugins/`, which the checkout's `vitest.config.ts` does not collect, so it carries its own config and does not run under `pnpm run test` or the per-file coverage gate. Its evidence is the suites above, not CI.
 - **Written paths compare as the call wrote them.** `a.ts` and `./a.ts` are two paths and spend two files of the write budget. Canonicalizing them needs the filesystem resolved against the call's working directory, which would give this rail a provider dependency it does not otherwise have. The verification gate's message reports the same strings.
 - **`writeTools` names one content argument per tool.** A tool whose written text lives in a different argument per command — `str_replace_editor`'s `file_text` for `create` against `new_str` for `str_replace` — is not covered by the marker rail, and the shipped patch leaves it out of `writeTools` for that reason. Covering it needs a per-command argument map, which no current consumer has asked for.

@@ -105,8 +105,20 @@ export interface VerificationGateConfig {
   readonly verifyTools: readonly string[]
 }
 
+/**
+ * How the rails' decisions are applied.
+ *
+ * `observe` records what a rail would have refused, or sent to approval, and
+ * lets the call through: it is how a deployment reads a rail's reach before
+ * arming it. It downgrades `deny` and `ask` only — a steer is a request to
+ * finish work, not a refusal, so observing never weakens it.
+ */
+export type Mode = 'enforce' | 'observe'
+
 /** Raw configuration as written in a profile patch row. */
 export interface Config {
+  /** How `deny` and `ask` decisions are applied; defaults to `enforce`. */
+  readonly mode?: Mode
   /** Global tool names refused while plan mode is in force; omit to disable this rail. */
   readonly planDeniedTools?: readonly string[]
   /**
@@ -154,6 +166,7 @@ export interface ResolvedWriteTool {
 
 /** Configuration after load-time validation. `undefined` means the rail is off. */
 export interface ResolvedConfig {
+  readonly mode: Mode
   readonly planDeniedTools: ReadonlySet<string> | undefined
   readonly repeatAskAfter: number | undefined
   readonly maxStepsPerTurn: number | undefined
@@ -172,6 +185,7 @@ export interface ResolvedConfig {
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
 const KNOWN_KEYS: ReadonlySet<string> = new Set([
+  'mode',
   'planDeniedTools',
   'repeatAskAfter',
   'maxStepsPerTurn',
@@ -255,6 +269,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
   }
 
   return {
+    mode: resolveMode(config.mode),
     planDeniedTools: resolveDeniedTools(config.planDeniedTools),
     repeatAskAfter: resolveRepeatAskAfter(config.repeatAskAfter),
     maxStepsPerTurn: resolveMaxStepsPerTurn(config.maxStepsPerTurn),
@@ -277,6 +292,21 @@ function hasContentArgument(writeTools: ReadonlyMap<string, ResolvedWriteTool> |
   if (writeTools === undefined) return false
   for (const tool of writeTools.values()) if (tool.contentArgument !== undefined) return true
   return false
+}
+
+/**
+ * Check the decision mode.
+ *
+ * Both values are valid deployments, so the bundle supplies its own default
+ * rather than requiring the key: an absent `mode` keeps the pre-observe
+ * behavior that every existing profile already has.
+ */
+function resolveMode(value: Mode | undefined): Mode {
+  if (value === undefined) return 'enforce'
+  if (value !== 'enforce' && value !== 'observe') {
+    throw new Error(`prism-guardrails: mode must be "enforce" or "observe", received ${JSON.stringify(value)}`)
+  }
+  return value
 }
 
 /** Check the plan-mode denial list; an empty list has no meaning, so it is an error rather than "off". */

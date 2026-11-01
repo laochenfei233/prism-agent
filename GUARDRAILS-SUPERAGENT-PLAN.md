@@ -222,3 +222,19 @@ decisions this session: 4 (3 would-deny, 1 would-ask)
 - `scripts/verify-plugin-record-callers.ts:104,250` — P1 的硬约束
 - `packages/core/session/src/known-event-types.ts:8-20` — 读路径对未登记类型的处理
 - `packages/interaction/commands/src/index.ts:44,77` — 命令 handler 拿得到 agent
+
+---
+
+## 11. 交付记录（P0 已落地）
+
+本节记录 §5 实际做出来的东西，以及与原规格的差异。
+
+**做出来的**：`mode: enforce | observe` 一个键；`src/decision.ts`（每会话内存台账，上限 200 条，加 `configVersion()` 的 8 位摘要）；`src/index.ts` 的两个出口帮助函数 `decide()`（8 处 `tools/pre-execute`）与 `note()`（plan-mode 的 guard、pre-step 的 turn budget、两处 steer）；`/guardrails` 首行加模式与版本，observe 下追加决策块，只列 `observed` 行。
+
+**与原规格的差异（三处，都有理由）**：
+
+1. **`steer` 不随 observe 降档。** 原规格 §5.1 写"observe 下所有 rail 只记录不拦"，但把一轮送回补证据是"要求"而非"拒绝"，观察模式把它关掉会顺带削弱正向能力。现在 `steer` 只记账、行为不变，报告里 `observed` 计数因此与 `steer` 分开。
+2. **没有新增 `observe.patch.yml`。** §5.6 列了这一项，但当前没有任何消费者：单测用 `commandHarness({mode:'observe'})` 直接构造，e2e 的四个用例绑定的是既有 fixture。为一个不存在的消费者加一个 fixture 文件是"for later"代码，等真有 e2e 场景再加。
+3. **版本哈希取的是原始 `Config`（补上解析后的 `mode`），不是逐字段投影的 `ResolvedConfig`。** 所有 rail 配置都影响判定，逐字段投影要多写 14 行且不改变结论；代价是 `repeatAskAfter: 0` 与省略该键哈希不同——只影响报告里的一个字符串，不影响任何判定。
+
+**证据**：`npm test` 138 通过（原 123 + 新增 15）；`npm run build` 成功，产物外部导入仍只有 `@deepseek-ai/dsh-commands/brand`、`@deepseek-ai/dsh-llm` 与内置的 `node:crypto`；`npm run smoke` 通过。

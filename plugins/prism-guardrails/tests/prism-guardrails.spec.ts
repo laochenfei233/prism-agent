@@ -112,6 +112,7 @@ async function userTurn(ctx: Context, agent: Agent, text: string): Promise<void>
 describe('configuration validation', () => {
   it('resolves an empty configuration with every rail off and guidance on', () => {
     expect(resolveConfig({})).toEqual({
+      mode: 'enforce',
       planDeniedTools: undefined,
       repeatAskAfter: undefined,
       maxStepsPerTurn: undefined,
@@ -170,6 +171,11 @@ describe('configuration validation', () => {
     expect(resolveConfig({ repeatAskAfter: 0 }).repeatAskAfter).toBeUndefined()
   })
 
+  it('defaults the mode to enforce and accepts observe', () => {
+    expect(resolveConfig({}).mode).toBe('enforce')
+    expect(resolveConfig({ mode: 'observe' }).mode).toBe('observe')
+  })
+
   it('treats maxWrittenFilesPerTurn 0 as the off switch rather than a budget', () => {
     expect(resolveConfig({ maxWrittenFilesPerTurn: 0 }).maxWrittenFilesPerTurn).toBeUndefined()
   })
@@ -193,6 +199,7 @@ describe('configuration validation', () => {
     ['a fractional todo-continuation count', { unfinishedTodoContinuations: 1.5 }, 'integer >= 0'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
+    ['an unknown mode', { mode: 'dry-run' }, 'mode must be "enforce" or "observe"'],
     ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
     ['an empty write list', { writeTools: [] }, 'must not be empty'],
     ['a write entry naming no tool', { writeTools: [{ pathArgument: 'path' }] }, 'must name a tool'],
@@ -1312,6 +1319,225 @@ describe('command guard', () => {
   })
 })
 
+describe('observe mode', () => {
+  /** Read the status report, which is where an observed decision shows up. */
+  async function report(ctx: Context, agent: Agent): Promise<string> {
+    const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+    return execution?.result.text ?? ''
+  }
+
+  it('runs a guarded command and records it', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      commandGuard: {
+        tools: [{ tool: 'bash', commandArgument: 'command' }],
+        deny: [{ pattern: 'git\\s+push\\s+--force', reason: 'rewrites remote history' }],
+      },
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await newAgent(ctx, 'observe-command')
+
+    const result = await toolCall(ctx, agent, 'bash', { command: 'git push --force origin main' })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['bash'])
+    const text = await report(ctx, agent)
+    expect(text).toContain('mode: observe')
+    expect(text).toContain('observed  command guard  git push --force origin main')
+  })
+
+  it('runs a read of a credential path and records it', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      readTools: [{ tool: 'read', pathArgument: 'file_path' }],
+      sensitivePaths: ['.env'],
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const agent = await newAgent(ctx, 'observe-secret')
+
+    const result = await toolCall(ctx, agent, 'read', { file_path: '.env' })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['read'])
+    expect(await report(ctx, agent)).toContain('observed  sensitive reads  .env')
+  })
+
+  it('runs a dependency-manifest write and records it', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      writeTools: WRITE_TOOLS,
+      dependencyManifests: ['package.json'],
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'observe-manifest')
+
+    const result = await toolCall(ctx, agent, 'write', { path: 'package.json', content: '{}' })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+    expect(await report(ctx, agent)).toContain('observed  dependency manifests  package.json')
+  })
+
+  it('runs a write carrying an untriggered marker and records it', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      writeTools: WRITE_TOOLS,
+      requirePonytailUpgradePaths: true,
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'observe-marker')
+
+    const result = await toolCall(ctx, agent, 'write', {
+      path: 'src/lock.ts',
+      content: '// shortcut: global lock',
+    })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+    expect(await report(ctx, agent)).toContain('observed  ponytail markers  src/lock.ts')
+  })
+
+  it('runs a write beyond the file budget and records it', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      writeTools: WRITE_TOOLS,
+      maxWrittenFilesPerTurn: 1,
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'observe-budget')
+
+    expect((await toolCall(ctx, agent, 'write', { path: 'a.ts', content: '' })).isError).toBe(false)
+    const second = await toolCall(ctx, agent, 'write', { path: 'b.ts', content: '' })
+
+    expect(second.isError).toBe(false)
+    expect(runs).toEqual(['write', 'write'])
+    expect(await report(ctx, agent)).toContain('observed  write budget  b.ts')
+  })
+
+  it('runs the first non-readonly call and records it', async () => {
+    const ctx = await commandHarness({ mode: 'observe', routingContract: { readOnlyTools: ['read'] } })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'observe-routing')
+
+    const result = await toolCall(ctx, agent, 'write', { path: 'a.ts' })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+    expect(await report(ctx, agent)).toContain('observed  routing contract  write')
+  })
+
+  it('runs a denied plan-mode tool and records it', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(PlanModeController, { section: 'PLAN GUIDANCE' })
+    await ctx.plugin(CommandRuntime)
+    await ctx.plugin(Guardrails, { mode: 'observe', planDeniedTools: ['write'] })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    const agent = await newAgent(ctx, 'observe-plan')
+
+    expect(ctx.planMode.set(agent, true)).toBe('committed')
+    const result = await toolCall(ctx, agent, 'write', { path: 'a' })
+
+    expect(result.isError).toBe(false)
+    expect(runs).toEqual(['write'])
+    expect(await report(ctx, agent)).toContain('observed  plan-mode denial  write')
+  })
+
+  it('opens the step beyond the turn budget and records it', async () => {
+    const ctx = await commandHarness({ mode: 'observe', maxStepsPerTurn: 1 })
+    const runs: string[] = []
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await newAgent(ctx, 'observe-budget-steps')
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'probe', {}),
+      toolCallResponse('c2', 'probe', {}),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual(['probe', 'probe'])
+    expect(await report(ctx, agent)).toContain('observed  turn budget  step 2')
+  })
+
+  it('runs a repeated call past the threshold and records it', async () => {
+    const ctx = await commandHarness({ mode: 'observe', repeatAskAfter: 3 })
+    const runs: string[] = []
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await newAgent(ctx, 'observe-repeat')
+    const adapter = new MockAdapter([
+      ...Array.from({ length: 5 }, (_, index) => toolCallResponse(`c${index}`, 'probe', { q: 'same' })),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toHaveLength(5)
+    expect(await report(ctx, agent)).toContain('observed  repeat approval  probe')
+  })
+
+  it('runs a model-solicited user-only skill and records it', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(SkillRegistry)
+    await ctx.plugin(CommandRuntime)
+    await ctx.plugin(Guardrails, { mode: 'observe' })
+    const runs: string[] = []
+    ctx.tools.register(fixture('skill', runs))
+    ctx.skills.register({
+      name: 'user-only',
+      description: 'Only a human may invoke this',
+      source: 'runtime',
+      content: 'user-only body',
+      invocation: { modelInvocable: false, userInvocable: true },
+    })
+    const agent = await newAgent(ctx, 'observe-skill')
+
+    const result = await toolCall(ctx, agent, 'skill', { name: 'user-only' })
+
+    expect(runs).toEqual(['skill'])
+    expect(await report(ctx, agent)).toContain('observed  skill guidance  user-only')
+  })
+
+  it('still steers a turn back for evidence', async () => {
+    // A steer is a request to finish work, not a refusal: observing must not
+    // switch it off, which is why the report counts it apart from an observation.
+    const ctx = await commandHarness({
+      mode: 'observe',
+      writeTools: WRITE_TOOLS,
+      verificationGate: { verifyTools: ['bash'] },
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('write', runs))
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await newAgent(ctx, 'observe-verify')
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'write', { path: 'a.ts', content: '' }),
+      textResponse('done'),
+      toolCallResponse('c2', 'bash', { command: 'pnpm test' }),
+      textResponse('verified'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(runs).toEqual(['write', 'bash'])
+    expect(adapter.requests).toHaveLength(4)
+    expect(await report(ctx, agent)).toContain('decisions this session: 1 (0 observed)')
+  })
+})
+
 describe('/guardrails status', () => {
   it('reports every rail with its configured value', async () => {
     const ctx = await commandHarness({
@@ -1324,9 +1550,8 @@ describe('/guardrails status', () => {
     const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
     const text = execution?.result.text ?? ''
 
-    expect(text).toContain('Guardrails: 3 of 12 rails armed.')
-    expect(text.split('\n')).toEqual([
-      'Guardrails: 3 of 12 rails armed.',
+    expect(text).toContain('Guardrails: 3 of 12 rails armed (mode: enforce, config ')
+    expect(text.split('\n').slice(1, 13)).toEqual([
       'plan-mode denial: off',
       'repeat approval: off',
       'turn budget: 20 steps',
@@ -1340,6 +1565,34 @@ describe('/guardrails status', () => {
       'sensitive reads: .env',
       'command guard: off',
     ])
+    // Nothing was observed and nothing was refused, so the ledger has no rows
+    // beyond the count an observing deployment would need.
+    expect(text).not.toContain('decisions this session')
+  })
+
+  it('names the mode and the configuration version', async () => {
+    const ctx = await commandHarness({ maxStepsPerTurn: 20 })
+    const agent = await ctx.agentLoop.create(SessionId('status-version'), { provider: 'mock', model: 'mock' })
+
+    const first = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+    const second = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
+
+    expect(first?.result.text.split('\n')[0])
+      .toMatch(/^Guardrails: \d+ of 12 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
+    expect(second?.result.text).toEqual(first?.result.text)
+  })
+
+  it('moves the version when the rail configuration changes', async () => {
+    const one = await commandHarness({ maxStepsPerTurn: 20 })
+    const other = await commandHarness({ maxStepsPerTurn: 21 })
+    const first = await one.agentLoop.create(SessionId('status-version-a'), { provider: 'mock', model: 'mock' })
+    const second = await other.agentLoop.create(SessionId('status-version-b'), { provider: 'mock', model: 'mock' })
+
+    const versionOf = async (ctx: Context, agent: Agent): Promise<string> =>
+      /config ([0-9a-f]{8})\)/.exec((await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))
+        ?.result.text ?? '')?.[1] ?? ''
+
+    expect(await versionOf(one, first)).not.toBe(await versionOf(other, second))
   })
 
   it('registers even when the command runtime mounts after the bundle', async () => {
