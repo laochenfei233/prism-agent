@@ -2,11 +2,13 @@
  * Card stylesheet.
  *
  * Kept as a string because an out-of-tree bundle has no CSS pipeline: the card
- * renders it in a `<style>` element, so it leaves with the component. Rules
- * scope under `.lmm` wherever they compete with a primitive's own single-class
- * default; `button.lmm-danger` cannot, because the removal dialog portals to
- * `document.body` and takes its button out of the card's subtree. Every color
- * is a `--dsw-alias-*` token the Models page around it already consumes.
+ * renders it in a `<style>` element, so it leaves with the component. Classes
+ * carry the `lmm-` namespace so they never collide with a primitive's own
+ * defaults, and one that competes with those defaults outranks it;
+ * `button.lmm-danger` cannot take the namespace prefix because the removal
+ * dialog portals to `document.body`, outside the card's subtree. Colors are the
+ * `--dsw-alias-*` tokens the Models page around it consumes, apart from the
+ * select chevron explained where it is drawn.
  *
  * @module @prism/prism-local-models/client/styles
  */

@@ -41,7 +41,7 @@ export type LocalModelsLocaleKey =
 /** English copy. */
 export const en: Record<LocalModelsLocaleKey, string> = {
   title: 'Local models',
-  intro: 'Models Prism uses for its own OCR, translation, and embeddings, not for chat.',
+  intro: 'These models serve Prism\'s own OCR, translation, and embeddings, not chat.',
   path: 'Models directory',
   'variant.label': 'Version of {model}',
   'progress.label': '{model} download progress',
@@ -60,7 +60,7 @@ export const en: Record<LocalModelsLocaleKey, string> = {
   'action.remove': 'Remove',
   'action.probe': 'Test',
   'action.close': 'Close',
-  'action.failed': 'The operation failed: {error}',
+  'action.failed': 'Could not finish {model}: {error}',
   'probe.running': 'Testing',
   'probe.ok': 'Test passed: {detail}',
   'probe.fail': 'Test failed: {error}',
@@ -92,7 +92,7 @@ export const zh: Record<LocalModelsLocaleKey, string> = {
   'action.remove': '删除',
   'action.probe': '检测',
   'action.close': '关闭',
-  'action.failed': '操作失败：{error}',
+  'action.failed': '{model} 操作失败：{error}',
   'probe.running': '检测中',
   'probe.ok': '检测通过：{detail}',
   'probe.fail': '检测失败：{error}',

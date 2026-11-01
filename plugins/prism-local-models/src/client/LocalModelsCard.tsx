@@ -61,7 +61,7 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
   const [removal, setRemoval] = useState<ModelFamilyView | undefined>(undefined)
   const [removing, setRemoving] = useState(false)
   const [removeFailure, setRemoveFailure] = useState('')
-  const [failure, setFailure] = useState('')
+  const [failure, setFailure] = useState<{ model: string; message: string } | undefined>(undefined)
 
   const refresh = useCallback((): void => {
     void fetchCatalog().then(catalog => {
@@ -84,10 +84,10 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
     return () => window.clearInterval(timer)
   }, [busy, refresh])
 
-  const act = useCallback((run: () => Promise<unknown>): void => {
-    setFailure('')
+  const act = useCallback((model: string, run: () => Promise<unknown>): void => {
+    setFailure(undefined)
     void run().then(refresh).catch((error: RouteError) => {
-      setFailure(error.message)
+      setFailure({ model, message: error.message })
       refresh()
     })
   }, [refresh])
@@ -105,6 +105,7 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
       .catch((error: RouteError) => {
         setRemoving(false)
         setRemoveFailure(error.message)
+        refresh()
       })
   }
 
@@ -115,7 +116,11 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
       <p className="lmm-intro">{t('intro')}</p>
       {modelsRoot !== '' && <p className="lmm-path" title={modelsRoot}>{t('path')}: {modelsRoot}</p>}
       {loadError !== '' && <p className="lmm-message" data-tone="error">{t('load.error', { error: loadError })}</p>}
-      {failure !== '' && <p className="lmm-message" data-tone="error">{t('action.failed', { error: failure })}</p>}
+      {failure !== undefined && (
+        <p className="lmm-message" data-tone="error">
+          {t('action.failed', { model: failure.model, error: failure.message })}
+        </p>
+      )}
       <ul className="lmm-rows">
         {families.map(family => (
           <FamilyCard
@@ -125,9 +130,12 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
             selectedVariantId={selections[family.id] ?? family.selectedVariantId}
             onSelect={variantId => setSelections(previous => ({ ...previous, [family.id]: variantId }))}
             probeRunning={probes[family.id]?.running === true}
-            onInstall={variantId => act(() => postInstall(family.id, variantId))}
-            onCancel={() => act(() => postCancel(family.id))}
-            onRemove={() => setRemoval(family)}
+            onInstall={variantId => act(family.displayName, () => postInstall(family.id, variantId))}
+            onCancel={() => act(family.displayName, () => postCancel(family.id))}
+            onRemove={() => {
+              setRemoveFailure('')
+              setRemoval(family)
+            }}
             onProbe={() => {
               setProbes(previous => ({ ...previous, [family.id]: { running: true } }))
               void postProbe(family.id)
@@ -165,7 +173,9 @@ export function LocalModelsCard({ t }: LocalModelsCardProps): ReactElement {
         )}
       >
         {removeFailure !== '' && (
-          <p className="lmm-message" data-tone="error">{t('action.failed', { error: removeFailure })}</p>
+          <p className="lmm-message" data-tone="error">
+            {t('action.failed', { model: removal?.displayName ?? '', error: removeFailure })}
+          </p>
         )}
       </Modal>
     </section>
