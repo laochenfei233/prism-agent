@@ -50,7 +50,7 @@ pnpm install --offline
 |---|---|
 | markdown links | `apps/desktop/**` 下目标路径不存在（Tauri 迁移删掉了旧 Electron 脚本）、`AGENTS.md:123` 锚点失效 |
 | repository references | `docs/compose/spec/archive-import-prism-agent-e.md` 含 7 处提交哈希 |
-| translation pairing | `apps/desktop/runtime/**`、`design-assets/**`、`plugins/dsh-agent-progress/` 等缺中文对照件 |
+| translation pairing | `apps/desktop/runtime/**`、`design-assets/**`、`plugins/prism-progress/` 等缺中文对照件 |
 | package README model experience / limitations | `packages/experimental/speech-to-text-dashscope`、`packages/cron/cron` 缺 README 或 README 章节 |
 | type equivalence | 视当时源码而定 |
 

@@ -30,7 +30,7 @@ require(bundlePath)
 
 if (rows.length !== 1) throw new Error(`expected one module row, received ${rows.length}`)
 const [row] = rows
-if (row.id !== 'dsh-agent-progress') throw new Error(`unexpected module id ${String(row.id)}`)
+if (row.id !== 'prism-progress') throw new Error(`unexpected module id ${String(row.id)}`)
 
 const baseline = {
   'react': {
@@ -60,7 +60,7 @@ const ctx = {
   effect: (callback) => { effects.push(callback()) },
   locale: {
     register: (namespace, dictionaries) => {
-      if (namespace !== 'agentProgress') throw new Error(`unexpected namespace ${namespace}`)
+      if (namespace !== 'prismProgress') throw new Error(`unexpected namespace ${namespace}`)
       if (dictionaries.zh === undefined || dictionaries.en === undefined) throw new Error('incomplete dictionaries')
       return () => {}
     },
@@ -81,8 +81,8 @@ const ctx = {
 bundle.apply(ctx)
 
 const expected = [
-  { name: 'sidebar.panellist', key: 'agent-progress' },
-  { name: 'main', key: 'agent-progress' },
+  { name: 'sidebar.panellist', key: 'prism-progress' },
+  { name: 'main', key: 'prism-progress' },
 ]
 for (const want of expected) {
   const found = registrations.some(entry => entry.name === want.name && entry.key === want.key)

@@ -11,7 +11,7 @@
 import { defineConfig } from 'tsdown'
 
 /** Package name; also the module-table row id the browser half registers under. */
-const ID = 'dsh-agent-progress'
+const ID = 'prism-progress'
 
 /** Shell-seeded specifiers the browser half must not inline (see `packages/client/web/src/platform.ts`). */
 const BASELINE = [

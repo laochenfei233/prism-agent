@@ -79,7 +79,7 @@ CI（`.github/workflows/desktop-release.yml`）在三平台矩阵上执行同一
 ## 首次启动
 
 - 默认预设：`standard`（上游默认值；如需切换，在 `~/.prism/profiles/web/cordis.patch.yml` 中设置 `agent-presets.config.default`）
-- 本地内置插件：`aegis`、`dsh-agent-progress`、`prism-about`、`prism-guardrails`；`prism-meeting` 随实验性语音输入 bundle 一起提供，用于带语音转写的会议纪要；`dsh-plugin` 为插件中心/市场，`dsh-win-terminal-inspector` 为 Windows 终端检查器
+- 本地内置插件：`aegis`、`prism-progress`、`prism-about`、`prism-guardrails`；`prism-meeting` 随实验性语音输入 bundle 一起提供，用于带语音转写的会议纪要；`dsh-plugin` 为插件中心/市场，`dsh-win-terminal-inspector` 为 Windows 终端检查器
 - 可选插件（通过插件中心安装）：`dsh-better-sidebar`、`dsh-notification`、`dsh-session-context-menu`、`@xmanrui/dsh-im`（企微/飞书/钉钉/微信/QQ 等 9 渠道）、`dsh-lark`、`dsh-qqbot`、`dsh-vision-router`、`graph-memory`、`aegis`
 
 插件安装/更新/卸载全部走 dsh 官方机制（`dsh plugin` / dsh-plugin 插件中心），运行时内置 pnpm 与其同版本族。

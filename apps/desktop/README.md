@@ -78,7 +78,7 @@ Flow: the shell checks once, 30 seconds after launch — silent, with failures r
 ## First launch
 
 - Default preset: `standard` (the upstream default; switch it by setting `agent-presets.config.default` in `~/.prism/profiles/web/cordis.patch.yml`)
-- Bundled local plugins: `aegis`, `dsh-agent-progress`, `prism-about`, `prism-guardrails`; `prism-meeting` ships with the experimental voice-input bundle for speech-backed meeting minutes; `dsh-plugin` is the plugin center/market and `dsh-win-terminal-inspector` is the Windows terminal inspector
+- Bundled local plugins: `aegis`, `prism-progress`, `prism-about`, `prism-guardrails`; `prism-meeting` ships with the experimental voice-input bundle for speech-backed meeting minutes; `dsh-plugin` is the plugin center/market and `dsh-win-terminal-inspector` is the Windows terminal inspector
 - Optional plugins (install through the plugin center): `dsh-better-sidebar`, `dsh-notification`, `dsh-session-context-menu`, `@xmanrui/dsh-im` (WeCom/Feishu/DingTalk/WeChat/QQ and 9 channels), `dsh-lark`, `dsh-qqbot`, `dsh-vision-router`, `graph-memory`, `aegis`
 
 Plugin install/update/uninstall all go through official dsh mechanisms (`dsh plugin` / the dsh-plugin center); the runtime ships pnpm from the same version family.

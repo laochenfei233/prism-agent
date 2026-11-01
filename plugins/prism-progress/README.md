@@ -1,4 +1,4 @@
-# dsh-agent-progress
+# prism-progress
 
 English | [中文](README.zh.md)
 
@@ -93,9 +93,9 @@ so a freshly installed bundle is not served until the process restarts.
 Verify before/after the restart:
 
 ```sh
-curl -s http://127.0.0.1:3080/ | grep -c 'dsh-agent-progress'          # > 0 once composed
+curl -s http://127.0.0.1:3080/ | grep -c 'prism-progress'          # > 0 once composed
 curl -s -o /dev/null -w '%{http_code}\n' \
-  http://127.0.0.1:3080/plugins/dsh-agent-progress/client.js         # 200 once served
+  http://127.0.0.1:3080/plugins/prism-progress/client.js         # 200 once served
 ```
 
 After a reload the sidebar foot shows the progress entry; it carries a green

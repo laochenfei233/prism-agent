@@ -12,7 +12,7 @@ English | [中文](approval-panel.zh.md)
 
 ## Report
 
-**What was built** — A session waiting on an approval now carries a strip under its row in the Progress panel: the request's own one-line text and its two decisions. The panel reads the pending value structurally and answers it, so nothing new crosses the Host or the browser wire. Built in the out-of-tree `plugins/dsh-agent-progress` bundle.
+**What was built** — A session waiting on an approval now carries a strip under its row in the Progress panel: the request's own one-line text and its two decisions. The panel reads the pending value structurally and answers it, so nothing new crosses the Host or the browser wire. Built in the out-of-tree `plugins/prism-progress` bundle.
 
 ## [S1] Problem
 
@@ -44,7 +44,7 @@ Under the Session's row, inside the same list item. The row is itself a `<button
 
 ### S2.5 Tests
 
-`plugins/dsh-agent-progress/scripts/smoke.mjs` loads the built `lib/client.js` through the same module-loader handoff the shell uses, renders the page against a synthetic list and status snapshot, and now asserts: one approval strip for the approving Session and none for a question-kind wait, the requester's text and both decisions present, and a decision click delivering `allowed-once` to the request.
+`plugins/prism-progress/scripts/smoke.mjs` loads the built `lib/client.js` through the same module-loader handoff the shell uses, renders the page against a synthetic list and status snapshot, and now asserts: one approval strip for the approving Session and none for a question-kind wait, the requester's text and both decisions present, and a decision click delivering `allowed-once` to the request.
 
 ## [S3] Scope
 
@@ -65,4 +65,4 @@ Under the Session's row, inside the same list item. The row is itself a `<button
 - [x] A Session waiting on an approval shows the requester's text and both decisions in the panel (`smoke.mjs`: one strip, text, `reject`/`allowOnce`)
 - [x] A decision from the strip answers that request (`smoke.mjs`: the allow click delivers `allowed-once`)
 - [x] A Session waiting on another interaction kind shows its chip and no strip (`smoke.mjs`: the question-kind Session)
-- [x] The plugin typechecks and bundles (`tsc -p plugins/dsh-agent-progress/tsconfig.json`, tsdown)
+- [x] The plugin typechecks and bundles (`tsc -p plugins/prism-progress/tsconfig.json`, tsdown)

@@ -393,4 +393,4 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 - **命令守卫读的是原文。** 模式看到的是命令字符串，因此 `bash -c "git push --force"` 仍会被抓，但引号与变量技巧可以绕过；一条防线的好坏取决于部署写出的模式。要做到"包装即失效"的匹配需要 shell 解析器，目前没有任何消费者提出这一需求。
 - **被守卫的命令只是被"定价"，不是被"判死"。** `ask` 意味着一次正当的 `rm -rf` 构建目录每次都要一次审批；觉得太贵的部署应自己收窄模式。
 - **路径段匹配在边界上会过度命中。** `id_rsa` 也会挡住 `id_rsa.pub`；路径按调用写下的原样匹配，因此符号链接或绕道的相对路径不在覆盖范围内。
-- **`plugins/` 不要求中文 README 对照件。** 仓库的 translation-pairing 门禁已经把同级的 `plugins/dsh-agent-progress/` 报为缺少对照件；本 bundle 主动提供对照件，因此不新增失败项。
+- **`plugins/` 不要求中文 README 对照件。** 仓库的 translation-pairing 门禁已经把同级的 `plugins/prism-progress/` 报为缺少对照件；本 bundle 主动提供对照件，因此不新增失败项。

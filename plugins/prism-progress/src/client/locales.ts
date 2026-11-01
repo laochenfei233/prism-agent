@@ -1,7 +1,7 @@
 /** Product copy for the Agent Progress panel. */
 
 /** Dictionary namespace owned by this plugin. */
-export const NS = 'agentProgress'
+export const NS = 'prismProgress'
 
 /** Chinese dictionary. */
 export const zh: Record<string, string> = {

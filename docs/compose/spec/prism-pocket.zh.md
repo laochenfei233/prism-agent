@@ -28,7 +28,7 @@ commits: 8c5ed274ee..2f3a5b8ca1
 
 ### S2.1 形态：客户端补丁插件，不是独立应用，不改本体
 
-`plugins/prism-pocket`（`@prism/prism-pocket`），双面 Cordis 插件，沿用 `plugins/dsh-agent-progress` 的形态：节点半 `lib/index.js`（ESM），浏览器半 `lib/client.js`（经 `window.__ModuleLoader__` 注册的闭包工厂产物），`dsh.bundle.patch` + `dsh.client` 清单，`./client` 导出。不改动 `packages/` 与 `apps/`。所有适配只锚定应用自己声明的表面——`[data-slot="<key>"]` 容器（`packages/client/ui-renderer/src/client/scoped-slots.tsx` 写明的 addressable seam）、`data-testid` 属性、标准 ARIA 角色——每个适配都是一个能力探针，锚点缺失时跳过并在控制台留一行说明。这是相对 meow-smooth 的自觉改进：不猜选择器，不随版本碎裂。
+`plugins/prism-pocket`（`@prism/prism-pocket`），双面 Cordis 插件，沿用 `plugins/prism-progress` 的形态：节点半 `lib/index.js`（ESM），浏览器半 `lib/client.js`（经 `window.__ModuleLoader__` 注册的闭包工厂产物），`dsh.bundle.patch` + `dsh.client` 清单，`./client` 导出。不改动 `packages/` 与 `apps/`。所有适配只锚定应用自己声明的表面——`[data-slot="<key>"]` 容器（`packages/client/ui-renderer/src/client/scoped-slots.tsx` 写明的 addressable seam）、`data-testid` 属性、标准 ARIA 角色——每个适配都是一个能力探针，锚点缺失时跳过并在控制台留一行说明。这是相对 meow-smooth 的自觉改进：不猜选择器，不随版本碎裂。
 
 ### S2.2 激活条件
 

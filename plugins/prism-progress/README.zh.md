@@ -1,4 +1,4 @@
-# dsh-agent-progress
+# prism-progress
 
 [English](README.md) | 中文
 
@@ -68,9 +68,9 @@ dsh plugin --profile web add -w <absolute path to this directory>
 在重启前后分别验证：
 
 ```sh
-curl -s http://127.0.0.1:3080/ | grep -c 'dsh-agent-progress'          # > 0 once composed
+curl -s http://127.0.0.1:3080/ | grep -c 'prism-progress'          # > 0 once composed
 curl -s -o /dev/null -w '%{http_code}\n' \
-  http://127.0.0.1:3080/plugins/dsh-agent-progress/client.js         # 200 once served
+  http://127.0.0.1:3080/plugins/prism-progress/client.js         # 200 once served
 ```
 
 重新加载后，侧边栏底部会出现进度条目；只要有会话在运行，它就带一个绿色的计数徽章。

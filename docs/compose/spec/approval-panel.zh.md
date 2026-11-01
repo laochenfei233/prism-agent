@@ -12,7 +12,7 @@ commits: d26a0ebaee..4b40272185
 
 ## Report
 
-**已构建** — 等待审批的会话现在会在进展面板里带一条审批条：请求本人那一行文本和两个决定。面板按结构读取该待处理值并直接作答，因此 Host 与浏览器线上都没有新增内容。实现在树外的 `plugins/dsh-agent-progress` 插件里。
+**已构建** — 等待审批的会话现在会在进展面板里带一条审批条：请求本人那一行文本和两个决定。面板按结构读取该待处理值并直接作答，因此 Host 与浏览器线上都没有新增内容。实现在树外的 `plugins/prism-progress` 插件里。
 
 ## [S1] 问题
 
@@ -44,7 +44,7 @@ commits: d26a0ebaee..4b40272185
 
 ### S2.5 测试
 
-`plugins/dsh-agent-progress/scripts/smoke.mjs` 通过与 shell 相同的模块加载器握手加载构建产物 `lib/client.js`，用合成列表与状态快照渲染页面，并新增断言：审批会话有一条审批条、问题类等待没有；请求方文本与两个决定都在；点击决定把 `allowed-once` 送到该请求。
+`plugins/prism-progress/scripts/smoke.mjs` 通过与 shell 相同的模块加载器握手加载构建产物 `lib/client.js`，用合成列表与状态快照渲染页面，并新增断言：审批会话有一条审批条、问题类等待没有；请求方文本与两个决定都在；点击决定把 `allowed-once` 送到该请求。
 
 ## [S3] 范围
 
@@ -65,4 +65,4 @@ commits: d26a0ebaee..4b40272185
 - [x] 等待审批的会话在面板里显示请求方文本与两个决定（`smoke.mjs`：一条审批条、文本、`reject`/`allowOnce`）
 - [x] 审批条上的决定会作答该请求（`smoke.mjs`：点击允许送出 `allowed-once`）
 - [x] 等待其他交互类型的会话只显示 chip、没有审批条（`smoke.mjs`：问题类会话）
-- [x] 插件通过类型检查与打包（`tsc -p plugins/dsh-agent-progress/tsconfig.json`、tsdown）
+- [x] 插件通过类型检查与打包（`tsc -p plugins/prism-progress/tsconfig.json`、tsdown）

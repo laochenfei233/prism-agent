@@ -8,7 +8,7 @@
  */
 
 /** Cordis plugin name, matching the `cordis.patch.yml` row id. */
-export const name = 'agent-progress'
+export const name = 'prism-progress'
 
 /** No Host contribution: the browser half owns every surface. */
 export function apply(): void {}

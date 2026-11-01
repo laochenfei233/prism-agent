@@ -25,7 +25,7 @@ import { PANEL_CSS } from './styles.ts'
 type Translate = (key: string) => string
 
 /** The main-panel id, the sidebar row's id, and the page's key — one identity. */
-export const PANEL_ID = 'agent-progress'
+export const PANEL_ID = 'prism-progress'
 
 /** Services and seats this plugin's registrations need. */
 export const inject = ['slots', 'locale', 'sessions', 'uiWorkspace']
@@ -252,7 +252,7 @@ export function AgentProgressPanel(props: PageProps) {
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: Context): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'agent-progress: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'prism-progress: dictionaries')
   const t = ctx.locale.bind(NS)
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',
