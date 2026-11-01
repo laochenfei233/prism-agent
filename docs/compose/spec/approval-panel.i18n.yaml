@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/approval-panel.md
 /:
-  en: e5960672fbb695ac
-  zh: e5960672fbb695ac
+  en: 5fd02328d820c7e1
+  zh: 5fd02328d820c7e1
 /approval-in-the-progress-panel:
   en: f55f8420438b0536
   zh: 83575068e77566de

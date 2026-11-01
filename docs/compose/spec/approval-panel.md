@@ -3,7 +3,7 @@ feature: approval-panel
 status: delivered
 updated: 2026-11-01
 branch: feat/approval-panel
-commits: c22ec9f0b9..HEAD
+commits: d26a0ebaee..4b40272185
 ---
 
 # Approval in the Progress Panel
