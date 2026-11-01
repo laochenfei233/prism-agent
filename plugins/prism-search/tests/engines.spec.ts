@@ -3,6 +3,7 @@
  * read their result links (unwrapping redirects) and API engines read JSON.
  */
 import { describe, expect, it } from 'vitest'
+import { ENGINE_LABELS } from '../src/client/engine-labels.ts'
 import { ENGINE_SPECS, type EngineSpec } from '../src/engines.ts'
 
 /** The spec under test. */
@@ -22,6 +23,11 @@ describe('engine catalog', () => {
       expect(request.headers?.['authorization']).toBeUndefined()
       expect(request.url).toContain(encodeURIComponent('deepseek harness'))
     }
+  })
+
+  it('keeps the settings coverage names in catalog order', () => {
+    expect(ENGINE_LABELS.map(engine => engine.id)).toEqual(ENGINE_SPECS.map(spec => spec.id))
+    expect(ENGINE_LABELS.every(engine => engine.label.length > 0)).toBe(true)
   })
 
   it('selects Chinese parameters for a Chinese query', () => {
