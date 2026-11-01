@@ -129,24 +129,6 @@ describe('WorkspaceBrowser.module.css list', () => {
       .toBe('linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent)')
   })
 
-  it('grows a row only for an occupied pending line', () => {
-    // The wrapping layout follows the seat's rendered content, so a question or
-    // plan review — whose own interaction UI lives in the composer — leaves the
-    // line empty and keeps the single-line row.
-    const grown = rowDeclarations('.sessionRow:has(> .pendingLine:not(:empty))')
-    expect(grown?.get('flex-wrap')).toBe('wrap')
-    expect(grown?.get('height')).toBe('auto')
-    expect(grown?.get('min-height')).toBe('32px')
-    expect(rowDeclarations('.sessionRow.withPending')).toBeUndefined()
-    expect(rowDeclarations('.pendingLine:empty')?.get('display')).toBe('none')
-    // border-box keeps the title-aligned indent inside the row instead of
-    // overflowing the list's scroll clip.
-    const line = rowDeclarations('.pendingLine')
-    expect(line?.get('box-sizing')).toBe('border-box')
-    expect(line?.get('flex')).toBe('0 0 100%')
-    expect(line?.get('padding-inline-start')).toBe('20px')
-  })
-
   it('pins both rail controls to the shared left anchor during the column slide', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')

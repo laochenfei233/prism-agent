@@ -1,23 +1,14 @@
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
-/**
- * Browser approval consumer over the existing scoped Remote Event waterfall,
- * presenting one request in two places: the composer takeover of the Session
- * that asked, and the second line of that Session's row in the sidebar.
- */
+/** Browser approval consumer over the existing scoped Remote Event waterfall. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { PendingInteractionPublisher } from '@deepseek-ai/dsh-client-ui-session/client'
-// Type-only: pulls the row seat this package registers its occupant into.
-import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TypertClientEventListener } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { ApprovalPanel } from './ApprovalPanel.tsx'
-import { RowApproval } from './RowApproval.tsx'
-import type { ApprovalInjected } from './contract/slots.ts'
 import { PendingApproval } from './contract/slots.ts'
 import { en, zh } from './locales.ts'
 
@@ -97,29 +88,19 @@ export function apply(ctx: ClientContext): void {
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingApproval>(
     () => 0,
   )
-  // Both presentations resolve requester-owned copy the same way.
-  const approvalInjected = (): ApprovalInjected => ({
-    resolveReason: (reason: NonNullable<PendingApproval['displayReason']>) => ctx.locale.resolveText(reason),
-  })
   ctx.slots.inject('conversation.composer', () => ctx.slots.register({
     name: 'conversation.composer',
     priority: 1,
     select: ({ pendingInteraction }: ComposerChainProps): PendingApproval | null =>
       pendingInteraction instanceof PendingApproval ? pendingInteraction : null,
     locale: NS,
-    inject: approvalInjected,
+    inject: () => ({
+      resolveReason: (reason: NonNullable<PendingApproval['displayReason']>) => ctx.locale.resolveText(reason),
+    }),
     children: {
       'conversation.approval.detail': { kind: 'single', scope: 'session' },
     },
   }, ApprovalPanel))
-  // The same request answered from its Session row: the occupant reads it from
-  // the Session status snapshot, so it works while another Session is open.
-  ctx.slots.inject('sidebar.workspaces.session.pending', () => ctx.slots.register({
-    name: 'sidebar.workspaces.session.pending',
-    id: 'approval.pending',
-    locale: NS,
-    inject: approvalInjected,
-  }, RowApproval))
   ctx.remote.$on('approval/request', function (request, next) {
     return answerApproval(ctx, this, request, next, registerPendingInteraction)
   })

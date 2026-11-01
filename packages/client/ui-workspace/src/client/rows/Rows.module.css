@@ -116,31 +116,6 @@
   margin: 0 6px 0 4px;
 }
 
-/* PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5). */
-/* A row holding a pending interaction grows a second full-width line, and only
-   while the seat actually rendered an occupant: a question or plan review owns
-   its own composer UI, leaves this line empty, and keeps the single 32px row.
-   The line starts at the title's left edge so the wait reads as part of the
-   Session it blocks. */
-.sessionRow:has(> .pendingLine:not(:empty)) {
-  flex-wrap: wrap;
-  height: auto;
-  min-height: 32px;
-  padding-block: 4px;
-  row-gap: 2px;
-}
-
-.pendingLine {
-  flex: 0 0 100%;
-  box-sizing: border-box;
-  min-width: 0;
-  padding-inline-start: 20px;
-}
-
-.pendingLine:empty {
-  display: none;
-}
-
 .slot {
   flex: none;
   width: 16px;

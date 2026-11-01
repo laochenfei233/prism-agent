@@ -113,17 +113,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     within(waitingRow).getByText('Waiting for approval')
     within(waitingRow).getByText('Approval')
   })
-  // The same request is answerable from its Session row: the row carries the
-  // requester's summary and its own two decisions, whose accessible names name
-  // the Session so the composer card keeps the only plain "Allow once".
-  await waitFor(() => {
-    within(waitingRow).getByText('fixture 常驻审批（可答：批准/拒绝后消失）')
-  })
-  within(waitingRow).getByRole('button', { name: 'Allow once for Fixture 历史会话' })
-  within(waitingRow).getByRole('button', { name: 'Reject for Fixture 历史会话' })
   fireEvent.click(allowOnce)
-  // Answering in either place settles the one Host request and withdraws both.
-  await waitFor(() => { expect(document.querySelector('[data-row-approval]')).toBeNull() })
 
   // The fixture mirrors all three token-meter projections, so the assembled
   // ContextMeter reaches its composition panel instead of only the occupancy

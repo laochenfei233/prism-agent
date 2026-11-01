@@ -1,9 +1,7 @@
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
 /** Composer takeover for one pending approval waterfall. */
-import { useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ApprovalComposerProps, PendingApproval } from './contract/slots.ts'
-import { useApprovalAnswer } from './use-approval-answer.ts'
 import css from './ApprovalPanel.module.css'
 
 /**
@@ -26,9 +24,15 @@ function ApprovalFlow({ pending, reason, detail, t }: {
   detail: ReactNode
   t: ApprovalComposerProps['t']
 }) {
-  const { answered, answer } = useApprovalAnswer(pending)
+  const [answered, setAnswered] = useState(false)
+  const waiting = useRef(false)
+  const active = useRef(true)
   const composing = useRef(false)
   const compositionEnded = useRef(false)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
   // Arrows move focus between the two actions; Enter then presses the focused one through its own click handler.
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>): boolean => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
@@ -48,6 +52,16 @@ function ApprovalFlow({ pending, reason, detail, t }: {
     event.preventDefault()
     event.stopPropagation()
     return true
+  }
+  const answer = (outcome: 'allowed-once' | 'rejected'): void => {
+    if (waiting.current || !pending.answerable) return
+    waiting.current = true
+    setAnswered(true)
+    void pending.answer(outcome).catch(() => {
+      if (!active.current || !pending.answerable) return
+      waiting.current = false
+      setAnswered(false)
+    })
   }
   const keydown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const element = event.target as Element

@@ -42,9 +42,6 @@
       "path": "../ui-slots"
     },
     {
-      "path": "../ui-workspace"
-    },
-    {
       "path": "../shortcuts/tsconfig.client.json"
     }
   ]
