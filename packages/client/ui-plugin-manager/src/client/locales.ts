@@ -227,6 +227,7 @@ export const zh = {
   reasonIncompatibleVersionUnnamed: '这个插件与当前 DSH 版本不兼容，运行它可能导致崩溃或数据丢失。',
   reasonIncompatibleInstall: '请安装与当前 DSH 兼容的插件版本。',
   reasonIncompatibleInstalled: '请卸载后重新安装与当前 DSH 兼容的版本。',
+  reasonIncompatibleAppProvided: '这个插件的文件由应用提供，卸载不会替换它；更新应用后重启即可加载随包的版本。',
   reasonOperationError: 'Host 报告了一个错误',
 } satisfies Record<string, string>
 
@@ -455,5 +456,6 @@ export const en = {
   reasonIncompatibleVersionUnnamed: 'This plugin is incompatible with the running DSH version; running it may cause crashes or data loss.',
   reasonIncompatibleInstall: 'Install a plugin version compatible with this DSH.',
   reasonIncompatibleInstalled: 'Uninstall it and install a version compatible with this DSH.',
+  reasonIncompatibleAppProvided: 'The app provides this plugin\'s files, so uninstalling does not replace them; update the app and restart to load the bundled version.',
   reasonOperationError: 'The Host reported an error.',
 } satisfies Record<PluginManagerLocaleKey, string>

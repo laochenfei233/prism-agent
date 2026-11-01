@@ -772,7 +772,13 @@ function PackageDetail({
         {description === undefined ? null : <p className={css.detailDesc}>{description}</p>}
       </div>
       <MetadataError error={pkg.meta?.error} t={t} />
-      {pkg.error === undefined ? null : <p className={css.reason} role="status">{t('reasonLabel')}: {managementText(pkg.error, t)}</p>}
+      {pkg.error === undefined
+        ? null
+        : (
+          <p className={css.reason} role="status">
+            {t('reasonLabel')}: {managementText({ ...pkg.error, ...pkg.installed ? {} : { appProvided: true as const } }, t)}
+          </p>
+        )}
       {pkg.readOnlyReason === undefined ? null : <p className={css.reason} role="status">{managementText({ code: pkg.readOnlyReason }, t)}</p>}
       {preview === undefined ? null : <PackagePreview src={preview} title={title} t={t} />}
       <div className={css.detailSections}>

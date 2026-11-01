@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for plugin-seed-refresh.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/plugin-seed-refresh.md
+/:
+  en: 00ad3d8cb2cc1149
+  zh: 7535051f2adc7b8c
+/plugin-seed-refresh:
+  en: de6a051e560316f4
+  zh: 23d9967fb3ec788c
+/plugin-seed-refresh/report:
+  en: 109719cb1269c3c6
+  zh: 6727ac3e1ad03048
+/plugin-seed-refresh/s1-problem:
+  en: aa54f0062a4ce4b5
+  zh: 2d133c11ade4fd6a
+/plugin-seed-refresh/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/plugin-seed-refresh/s2-design/s2-1-launcher-owned-plugin-copies-track-the-installation:
+  en: e96931ddf6221dc9
+  zh: 14a310659808715d
+/plugin-seed-refresh/s2-design/s2-2-packaging-builds-every-local-bundle-and-refuses-an-entry-less-one:
+  en: 8465aad7428269a4
+  zh: acba3ee93544cd6f
+/plugin-seed-refresh/s2-design/s2-3-the-plugin-page-names-the-remedy-an-app-provided-bundle-actually-has:
+  en: 4875653038b66324
+  zh: f9f98c2b3e2eba81
+/plugin-seed-refresh/s3-scope:
+  en: 11c306b595e2e8cd
+  zh: a9e4abb2fa2fd809
+/plugin-seed-refresh/tasks:
+  en: e7b812c87c817d6f
+  zh: 00d221657d1ba03b
+/plugin-seed-refresh/s4-acceptance:
+  en: 0d82f38fcc30140e
+  zh: 85f9f550e1cf82ef

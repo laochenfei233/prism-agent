@@ -270,6 +270,7 @@ async function deployDsh() {
   patchBrokenLinks(repo);
   patchMissingPeers(repo);
   patchDesktopBrowserAuth();
+  buildLocalPlugins(repo);
   copyLocalPlugins(repo);
   if (PLATFORM === 'linux') pruneForeignLinuxPlatformPackages();
   if (PLATFORM === 'mac' || PLATFORM === 'linux') pruneForeignNativeModules();
@@ -281,13 +282,53 @@ async function deployDsh() {
 // Keep every local bundle under the repository's `plugins/` directory in the
 // desktop runtime. The shell copies these into the profile on first launch and
 // selects their package names as profile bundle layers.
-function copyLocalPlugins(repo) {
+//
+// The packages under `plugins/` are outside the pnpm workspace, so the
+// repository build never builds them and their `lib/` output is gitignored. An
+// unbuilt package has nothing its `main` names, and a profile seeded from it
+// cannot load, so each one is built here and a build that produces no entry
+// fails packaging instead of shipping.
+
+// The entry file a package declares: `main`, else Node's own `index.js`.
+function packageEntry(dir) {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  return join(dir, typeof manifest.main === 'string' ? manifest.main : 'index.js');
+}
+
+export function buildLocalPlugins(repo) {
+  const sourceRoot = join(repo, 'plugins');
+  if (!existsSync(sourceRoot)) return;
+  const tsdown = join(repo, 'node_modules', 'tsdown', 'dist', 'run.mjs');
+  if (!existsSync(tsdown)) {
+    throw new Error(`tsdown is missing at ${tsdown}; run pnpm install in the checkout`);
+  }
+  for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const source = join(sourceRoot, entry.name);
+    if (!existsSync(join(source, 'tsdown.config.ts'))) continue;
+    execFileSync(process.execPath, [tsdown, '--config', 'tsdown.config.ts'], { cwd: source, stdio: 'inherit' });
+    const built = packageEntry(source);
+    if (!existsSync(built)) {
+      throw new Error(`local plugin ${entry.name} built without ${built}`);
+    }
+    step(`local plugin ${entry.name} built`);
+  }
+}
+
+export function copyLocalPlugins(repo) {
   const sourceRoot = join(repo, 'plugins');
   if (!existsSync(sourceRoot)) return;
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const source = join(sourceRoot, entry.name);
     if (!existsSync(join(source, 'package.json'))) continue;
+    const built = packageEntry(source);
+    if (!existsSync(built)) {
+      // A package whose sources this checkout does not hold cannot be built from
+      // it; shipping the metadata alone would seed a copy nothing can import.
+      console.warn(`[bundle-runtime] local plugin ${entry.name} has no ${built}; not copied`);
+      continue;
+    }
     const destination = join(PLUGINS_DIR, entry.name);
     rmSync(destination, { recursive: true, force: true });
     cpSync(source, destination, {
