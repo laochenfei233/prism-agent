@@ -34,7 +34,7 @@ A checkout that has not installed the package can point the row at the built ent
 | `idleDays` | `30` | 1–3650 | Days without dialogue before a conversation joins the archive set |
 | `sweepIntervalMinutes` | `1440` | 5–10080 | Minutes between sweeps |
 
-All three are `volatile`: the Settings page writes the value into the Config reference the Loader already handed the plugin, and the next sweep reads it. A cadence edit re-arms the interval, because the bound it was created with is the old one; no restart and no plugin remount is involved.
+All three are `volatile`: the Settings page writes the value into the Config reference the Loader already handed the plugin, and the next sweep reads it. Any volatile edit re-arms the interval, so the periodic pass after an edit lands a full `sweepIntervalMinutes` later; no restart and no plugin remount is involved.
 
 ## How one sweep decides
 
@@ -50,4 +50,4 @@ The first sweep runs 60 seconds after the plugin loads and the rest follow `swee
 - **Blank conversations are not classified.** A Session that never received a user message has no special treatment: it is archived once it is old enough, like any other idle Session.
 - **The activity clock is the log's last write.** A backend that rewrites a log for maintenance (a format migration, a checkpoint) makes that Session look active, so it waits another window. The archive is late rather than wrong.
 - **No manual "archive now".** The sweep is the only trigger; a user who wants a conversation archived immediately uses the sidebar action.
-- **The suite has no Loader composition case.** The specs resolve the plugin's own schema (so a volatile reference cannot pass as a plain value) and drive the sweep through recorded dependencies, but nothing boots the Loader, the Workspace registry, and the timer together; the plugin's activation and cadence are checked against a composed profile instead.
+- **The suite has no Loader composition case.** The specs resolve the plugin's own schema (so a volatile reference cannot pass as a plain value) and drive the sweep through recorded dependencies, but nothing boots the Loader, the Workspace registry, and the timer together: the entry's composition is checked with `prism --profile web --dump-config`, and its first pass runs in the app after the next launch.

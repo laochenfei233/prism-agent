@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/session-autoarchive.md
 /:
-  en: 7f2c20447c7e3f0c
-  zh: 7f2c20447c7e3f0c
+  en: 07aff06fc4354d16
+  zh: 07aff06fc4354d16
 /auto-archive-idle-sessions:
   en: e14efa4814c14ae2
   zh: c76d6f648e49bd24
 /auto-archive-idle-sessions/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: e3f420a9e066cb08
+  zh: 215382a42d88510b
 /auto-archive-idle-sessions/s1-problem:
   en: d4e8f4b28a25cc86
   zh: 1b624e2e9fb701e0

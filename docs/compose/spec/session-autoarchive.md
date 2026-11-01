@@ -1,6 +1,6 @@
 ---
 feature: session-autoarchive
-status: in-progress
+status: delivered
 updated: 2026-11-01
 branch: feat/session-autoarchive
 commits: 724259145a..HEAD
@@ -11,6 +11,20 @@ commits: 724259145a..HEAD
 English | [中文](session-autoarchive.zh.md)
 
 ## Report
+
+**What was built** — `prism-session-autoarchive` archives conversations nobody has touched for a configurable number of days (30 by default) into the Workspace archive set. It reads every visible Session once every `sweepIntervalMinutes` (default one day), skips archived, pinned, subagent, and forked Sessions, ages the rest by `max(createdAt, updatedAt)`, and leaves a Session whose work is running to the archive set's own refusal. All three fields are volatile Config fields, so the Settings page generated for the plugin edits them live.
+
+The one core change is the `updatedAt` field on `SessionPersistenceSnapshot`, filled by the JSONL backend from the artifact `mtime` it already stats for `sizeBytes`. Nothing else in the Session read model answers "when was this Session last active": the header carries only `createdAt`, and the projection cache holds a last-prompt time only for Sessions it has checkpointed.
+
+**Verification** — `jsonl.spec.ts` 189/189 pass including the new `updatedAt` case; the plugin suite passes 11/11 (selection, refusal handling, per-field config resolution through the plugin's own schema, window edge); plugin `tsc --noEmit` exit 0; `pnpm run build:artifacts` 6/6 gates and `pnpm run build:check` 2/2 gates; `pnpm run test:docs` 20 passed with only the pre-existing `verify-repository-references` failure; `verify-translation-pairing` 1055 pairs consistent; pre-commit hooks (lint, whitespace, pairing, vendor guard) pass. In the installed profile, `prism --profile web --dump-config` composes the entry with the shipped config, and importing the installed package shows `resolveConfig(Config({ idleDays: 7 }))` → `{"enabled":true,"idleDays":7,"sweepIntervalMinutes":1440}` with plain `boolean`/`number` types.
+
+**Journey log** —
+
+- The first implementation read the config fields as plain values. Every field is `.volatile()`, so the Loader hands `{ get() }` references: the idle cutoff became NaN (archive everything), `enabled: false` stayed truthy, and `ctx.interval(fn, NaN)` clamped to a 1 ms loop. Review caught it; `resolveConfig` now reads through `isVolatile`, runs per sweep, and re-arms the interval on `loader/volatile-update`.
+- A hand-written bundle entry in the installed profile disappeared on the next app launch, so the plugin never mounted. The supported path is `prism plugin --profile web add <spec>`, which records the package as a profile dependency; `--dump-config` then confirms the composed entry.
+- The desktop shell rewrites `dsh.profile.bundles` at start-up, and the profile's plugins mount only when the app spawns the server, so the first real sweep runs on the next launch. An attempt to observe the running instance instead showed that every idle Session left unarchived was a subagent child — the exclusion working — but could not prove a positive sweep, and the running server hosts the agent session doing the work, so it was not restarted.
+- `gen-cordis-catalog` already fails on this checkout (unrelated type-link violations), so the generated API catalog could not be refreshed and the subsystems doc copy was updated by hand.
+- A fresh worktree has no `node_modules` and no built `lib/types`; both `pnpm install --offline` and `pnpm run build:artifacts` have to run before the plugin's typecheck and specs work, and vitest needs a wider sandbox because vite probes `net use` through a child process.
 
 ## [S1] Problem
 

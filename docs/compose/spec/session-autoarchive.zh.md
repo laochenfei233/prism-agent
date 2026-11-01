@@ -1,6 +1,6 @@
 ---
 feature: session-autoarchive
-status: in-progress
+status: delivered
 updated: 2026-11-01
 branch: feat/session-autoarchive
 commits: 724259145a..HEAD
@@ -11,6 +11,20 @@ commits: 724259145a..HEAD
 [English](session-autoarchive.md) | 中文
 
 ## Report
+
+**做了什么** —— `prism-session-autoarchive` 把超过可配置天数（默认 30 天）无人触碰的对话归档进 Workspace 归档集。它每 `sweepIntervalMinutes`（默认一天）读取一次所有可见会话，跳过已归档、已 pin、子代理与分叉会话，其余按 `max(createdAt, updatedAt)` 计算活动时间，遇到仍有工作运行的会话就交给归档集自身拒绝。三个字段都是 volatile 配置项，插件自动生成的设置页可以直接改它们。
+
+唯一的底层改动是 `SessionPersistenceSnapshot` 上的 `updatedAt`，由 JSONL 后端用它为 `sizeBytes` 已经在读的产物 `mtime` 填充。会话读模型里没有别的字段能回答「这个会话最后什么时候活跃过」：header 只有 `createdAt`，而投影缓存只对它 checkpoint 过的会话保存最后提示时间。
+
+**验证** —— `jsonl.spec.ts` 189/189 通过（含新增的 `updatedAt` 用例）；插件套件 11/11 通过（选择、拒绝处理、逐字段经插件自身 schema 的配置解析、窗口边界）；插件 `tsc --noEmit` 退出码 0；`pnpm run build:artifacts` 6/6、`pnpm run build:check` 2/2；`pnpm run test:docs` 20 项通过，仅剩既有的 `verify-repository-references` 失败；`verify-translation-pairing` 1055 对一致；提交钩子（lint、空白、配对、vendor guard）通过。在已安装的 profile 上，`prism --profile web --dump-config` 组合出该条目与出厂配置，导入已安装包后 `resolveConfig(Config({ idleDays: 7 }))` 得到 `{"enabled":true,"idleDays":7,"sweepIntervalMinutes":1440}`，类型为普通 `boolean`/`number`。
+
+**Journey log** ——
+
+- 第一版把配置字段当普通值读。三个字段都是 `.volatile()`，Loader 交给插件的是 `{ get() }` 引用：闲置截止时间变成 NaN（归档一切）、`enabled: false` 永远为真、`ctx.interval(fn, NaN)` 被夹到 1 毫秒循环。评审发现后，`resolveConfig` 改为经 `isVolatile` 读取、每轮扫描重新解析，并在 `loader/volatile-update` 上重建定时器。
+- 在已安装 profile 里手写的 bundle 条目在下次启动时消失，插件因此从未挂载。受支持的路径是 `prism plugin --profile web add <spec>`，它把包登记为 profile 依赖；随后用 `--dump-config` 确认条目已组合进去。
+- 桌面 shell 在启动时重写 `dsh.profile.bundles`，而 profile 的插件只在应用拉起服务进程时挂载，所以第一次真实扫描要等下次启动。尝试直接观察运行实例时只看到「闲置未归档的会话全是子代理会话」（说明排除规则生效），无法证明正向归档；而且运行中的服务正是执行这次改动的 agent 会话所在，因此没有重启它。
+- `gen-cordis-catalog` 在该检出上本来就失败（无关的类型链接违规），生成式 API 目录无法刷新，改为手工更新 subsystems 文档副本。
+- 新工作树没有 `node_modules` 也没有构建出的 `lib/types`；要跑插件类型检查与 spec，需要先 `pnpm install --offline` 与 `pnpm run build:artifacts`，而 vitest 需要更宽的沙箱，因为 vite 会通过子进程探测 `net use`。
 
 ## [S1] Problem
 
