@@ -23,9 +23,10 @@ Chinese engine parameters and `zh.wikipedia.org`; other queries use English.
    contributes nothing.
 2. Results merge by RRF (`1 / (60 + rank)`), deduplicated on a normalized URL
    (tracking parameters, fragment, trailing slash, `www.` removed).
-3. The top `fetchTopN` results are fetched concurrently and their readable page
-   text replaces the engine excerpt; the final URL after redirects replaces the
-   engine's link wrapper.
+3. The top `fetchTopN` results are fetched concurrently through the deployment's
+   fetch provider (so its address and redirect policy applies) and their readable
+   page text replaces the engine excerpt; the final URL after redirects replaces
+   the engine's link wrapper.
 4. When a model is configured, the top `maxRerankCandidates` results go to it as
    one auxiliary call that returns a JSON order; the fused order survives when
    the call or its answer is unusable.
@@ -43,13 +44,16 @@ The plugin adds one **Settings → Search** section:
 
 ## Install into a profile
 
+Build the package once, then install the folder as a profile dependency:
+
 ```sh
+pnpm install && pnpm build
 dsh plugin --profile web add /path/to/prism-search
 ```
 
-Then open Settings → Search, enable the provider, and (optionally) pick an
-ordering model. A profile whose `web` row pins another search provider keeps
-using it until the switch is enabled.
+Restart the service. Then open Settings → Search, enable the provider, and
+(optionally) pick an ordering model. A profile whose `web` row pins another
+search provider keeps using it until the switch is enabled.
 
 ## Configuration
 
@@ -73,7 +77,7 @@ restart. Defaults suit a desktop connection.
 pnpm install
 pnpm build        # lib/index.js (Host) and lib/client.js (browser half)
 pnpm typecheck
-pnpm test         # 52 unit tests, no network
+pnpm test         # unit tests, no network
 pnpm smoke        # built artifact: registration plus one stubbed search
 ```
 

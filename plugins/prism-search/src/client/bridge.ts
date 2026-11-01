@@ -113,6 +113,8 @@ export interface SearchSettingsView {
   readonly rerankModel: string
   /** Every model the Models page currently advertises. */
   readonly models: readonly ModelOption[]
+  /** Why the catalog read failed, empty when it succeeded. */
+  readonly catalogError: string
   /** Revision of the web row's settings. */
   readonly webRevision: number
   /** Revision of this plugin's settings. */
@@ -183,6 +185,7 @@ export function createSettingsBridge(remote: RemoteLike): SettingsBridge {
           rerankProvider: stringOf(ownValue?.['rerankProvider']) ?? '',
           rerankModel: stringOf(ownValue?.['rerankModel']) ?? '',
           models,
+          catalogError: catalog.ok ? '' : catalog.error.message,
           webRevision: web.revision,
           ownRevision: own.revision,
         },

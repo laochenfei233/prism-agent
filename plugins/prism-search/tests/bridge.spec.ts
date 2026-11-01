@@ -4,6 +4,7 @@
  * provider only when that choice changed.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { inject as clientInject } from '../src/client/services.ts'
 import {
   createSettingsBridge, NAMESPACE, PROVIDER_ID, WEB_NAMESPACE,
   type ModelCatalog, type RemoteLike, type SettingsDescribeValue,
@@ -51,6 +52,10 @@ function remoteOf(view: SettingsDescribeValue = described()): { remote: RemoteLi
 }
 
 describe('createSettingsBridge', () => {
+  it('declares the Remote namespaces the bridge calls as injected services', () => {
+    expect(clientInject).toEqual(expect.arrayContaining(['remote', 'remote.settings', 'remote.session']))
+  })
+
   it('loads the selection, the provider switch, and the model catalog', async () => {
     const { remote } = remoteOf(described({ rerankProvider: 'provider-a', rerankModel: 'large' }))
     const result = await createSettingsBridge(remote).load()
@@ -66,10 +71,22 @@ describe('createSettingsBridge', () => {
           { provider: 'provider-a', providerName: 'Provider A', model: 'small', modelName: 'Small' },
           { provider: 'provider-a', providerName: 'Provider A', model: 'large', modelName: 'Large' },
         ],
+        catalogError: '',
         webRevision: 7,
         ownRevision: 3,
       },
     })
+  })
+
+  it('reports a failed catalog read while still showing the stored route', async () => {
+    const { remote } = remoteOf(described({ rerankProvider: 'provider-a', rerankModel: 'large' }))
+    const failing: RemoteLike = {
+      ...remote,
+      session: { modelCatalog: async () => ({ ok: false as const, error: { message: 'provider unreachable' } }) },
+    }
+    const result = await createSettingsBridge(failing).load()
+    expect(result.ok && result.value.catalogError).toBe('provider unreachable')
+    expect(result.ok && result.value.rerankProvider).toBe('provider-a')
   })
 
   it('reports the switch as on when the web row already selects this provider', async () => {

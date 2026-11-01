@@ -20,9 +20,7 @@ export { en, NS, zh } from './locales.ts'
 export type { SearchLocaleKey } from './locales.ts'
 export { SearchSection } from './SearchSection.tsx'
 export type { SearchSectionProps } from './SearchSection.tsx'
-
-/** Services required by the browser half. */
-export const inject = ['slots', 'locale', 'remote']
+export { inject } from './services.ts'
 
 /**
  * Register the Prism Search settings section.

@@ -26,7 +26,6 @@ const OPTIONS: PrismSearchOptions = {
 function engineSpec(id: string, hits: readonly EngineHit[]): EngineSpec {
   return {
     id,
-    label: id,
     build: query => ({ url: `https://${id}.test/?q=${encodeURIComponent(query)}` }),
     parse: () => [...hits],
   }

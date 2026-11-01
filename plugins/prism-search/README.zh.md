@@ -20,8 +20,8 @@ Exchange。全部免费、无需账号或 API Key。中文查询使用中文引�
    引擎不贡献任何结果。
 2. 结果按 RRF（`1 / (60 + rank)`）融合，并按归一化 URL 去重（去掉跟踪参数、
    片段、结尾斜杠和 `www.`）。
-3. 抓取排名前 `fetchTopN` 条结果，用网页正文替换引擎摘要；重定向后的最终 URL 替换
-   引擎的跳转链接。
+3. 抓取排名前 `fetchTopN` 条结果，走部署的 fetch 提供方（因而沿用其地址与重定向
+   策略），用网页正文替换引擎摘要；重定向后的最终 URL 替换引擎的跳转链接。
 4. 配置了模型时，前 `maxRerankCandidates` 条结果作为一次辅助模型调用发给它，要求
    返回 JSON 顺序；调用失败或回答不可用时保留融合顺序。
 5. 结果按调用方的 `maxResults` 截断。
@@ -37,12 +37,15 @@ Exchange。全部免费、无需账号或 API Key。中文查询使用中文引�
 
 ## 安装到 profile
 
+先构建一次，再把目录作为 profile 依赖安装：
+
 ```sh
+pnpm install && pnpm build
 dsh plugin --profile web add /path/to/prism-search
 ```
 
-然后在 设置 → 搜索 里启用提供方，并按需选择重排模型。若 profile 的 `web` 行
-原本固定了别的搜索提供方，在开关打开前仍会继续使用它。
+重启服务。然后打开 设置 → 搜索，启用提供方，并按需选择重排模型。若 profile 的
+`web` 行原本固定了别的搜索提供方，在开关打开前仍会继续使用它。
 
 ## 配置
 
@@ -66,7 +69,7 @@ dsh plugin --profile web add /path/to/prism-search
 pnpm install
 pnpm build        # lib/index.js (Host) and lib/client.js (browser half)
 pnpm typecheck
-pnpm test         # 52 unit tests, no network
+pnpm test         # unit tests, no network
 pnpm smoke        # built artifact: registration plus one stubbed search
 ```
 

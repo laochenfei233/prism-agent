@@ -75,6 +75,8 @@ export function SearchSection({ t, load, save }: SearchSectionProps): ReactEleme
       setView(result.value)
       setEnabled(result.value.enabled)
       setSelected(initialKey(result.value))
+    }).catch((error: unknown) => {
+      if (active) setLoadError(messageOf(error))
     })
     return () => { active = false }
   }, [load])
@@ -107,7 +109,12 @@ export function SearchSection({ t, load, save }: SearchSectionProps): ReactEleme
         setView(next.value)
         setEnabled(next.value.enabled)
         setSelected(initialKey(next.value))
+      }).catch((error: unknown) => {
+        setSaveError(messageOf(error))
       })
+    }).catch((error: unknown) => {
+      setSaving(false)
+      setSaveError(messageOf(error))
     })
   }
 
@@ -151,7 +158,9 @@ export function SearchSection({ t, load, save }: SearchSectionProps): ReactEleme
             </select>
           </label>
           <div style={styles.hint}>
-            {view.models.length === 0 ? t('model.empty') : t('model.hint', { count: view.models.length })}
+            {view.catalogError !== ''
+              ? t('model.unavailable', { message: view.catalogError })
+              : view.models.length === 0 ? t('model.empty') : t('model.hint', { count: view.models.length })}
           </div>
           <div style={styles.row}>
             <button type="button" disabled={!writable || !dirty || saving} onClick={commit} style={styles.button}>
@@ -176,5 +185,10 @@ const styles: Record<string, CSSProperties> = {
   select: { minWidth: 260, maxWidth: 420 },
   button: { cursor: 'pointer' },
   ok: { fontSize: 12, opacity: 0.8 },
-  error: { fontSize: 12, color: 'crimson', overflowWrap: 'anywhere' },
+  error: { fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', overflowWrap: 'anywhere' },
+}
+
+/** A rejected bridge call's message; the bridge itself reports `{ ok: false }` results. */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

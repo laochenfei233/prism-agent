@@ -40,8 +40,6 @@ export interface EngineRequest {
 export interface EngineSpec {
   /** Stable engine id, recorded on every fused result. */
   readonly id: string
-  /** Display name. */
-  readonly label: string
   /**
    * Build the request for one query.
    * @param query - the user's query.
@@ -171,7 +169,6 @@ function isoFromSeconds(value: unknown): string | undefined {
 export const ENGINE_SPECS: readonly EngineSpec[] = [
   {
     id: 'google',
-    label: 'Google',
     build: (query) => ({
       url: `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&hl=${locale(query).language}`,
     }),
@@ -179,7 +176,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'bing',
-    label: 'Bing',
     build: (query) => ({
       url: `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=20&mkt=${locale(query).region}`,
     }),
@@ -187,7 +183,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'duckduckgo',
-    label: 'DuckDuckGo',
     build: (query) => ({
       url: `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}&kl=${isCJK(query) ? 'cn-zh' : 'us-en'}`,
     }),
@@ -195,43 +190,36 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'brave',
-    label: 'Brave',
     build: (query) => ({ url: `https://search.brave.com/search?q=${encodeURIComponent(query)}&source=web` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['brave.com'] }),
   },
   {
     id: 'startpage',
-    label: 'Startpage',
     build: (query) => ({ url: `https://www.startpage.com/sp/search?query=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['startpage.com'] }),
   },
   {
     id: 'yahoo',
-    label: 'Yahoo',
     build: (query) => ({ url: `https://search.yahoo.com/search?p=${encodeURIComponent(query)}&n=20` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['yahoo.com'] }),
   },
   {
     id: 'yandex',
-    label: 'Yandex',
     build: (query) => ({ url: `https://yandex.com/search/?text=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['yandex.com', 'yandex.ru', 'yandex.net'] }),
   },
   {
     id: 'mojeek',
-    label: 'Mojeek',
     build: (query) => ({ url: `https://www.mojeek.com/search?q=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['mojeek.com'] }),
   },
   {
     id: 'marginalia',
-    label: 'Marginalia',
     build: (query) => ({ url: `https://search.marginalia.nu/search?query=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, skipHosts: ['marginalia.nu'] }),
   },
   {
     id: 'qwant',
-    label: 'Qwant',
     build: (query) => ({
       url: `https://api.qwant.com/v3/search/web?q=${encodeURIComponent(query)}&count=${PER_ENGINE_LIMIT}&locale=${isCJK(query) ? 'zh_CN' : 'en_US'}&offset=0&device=desktop&safesearch=1`,
       headers: { accept: 'application/json', 'x-requested-with': 'XMLHttpRequest' },
@@ -259,25 +247,21 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'baidu',
-    label: 'Baidu',
     build: (query) => ({ url: `https://www.baidu.com/s?wd=${encodeURIComponent(query)}&rn=20` }),
     parse: (html, base) => harvest(html, { base, pick: anchor => /^https?:\/\/www\.baidu\.com\/link\?/.test(anchor.href) || anchor.href.startsWith('/link?') }),
   },
   {
     id: 'sogou',
-    label: 'Sogou',
     build: (query) => ({ url: `https://www.sogou.com/web?query=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, pick: anchor => /^\/link\?url=/.test(anchor.href) || /sogou\.com\/link\?url=/.test(anchor.href) }),
   },
   {
     id: 'so360',
-    label: '360 Search',
     build: (query) => ({ url: `https://www.so.com/s?q=${encodeURIComponent(query)}` }),
     parse: (html, base) => harvest(html, { base, pick: anchor => /^https?:\/\/www\.so\.com\/link\?/.test(anchor.href) || anchor.href.startsWith('/link?') }),
   },
   {
     id: 'bilibili',
-    label: 'Bilibili',
     build: (query) => ({
       url: `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(query)}&page=1`,
       headers: { accept: 'application/json', referer: 'https://www.bilibili.com/' },
@@ -305,7 +289,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'wikipedia',
-    label: 'Wikipedia',
     build: (query) => ({
       url: `https://${isCJK(query) ? 'zh' : 'en'}.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=${PER_ENGINE_LIMIT}&srprop=snippet%7Ctimestamp&srsearch=${encodeURIComponent(query)}`,
       headers: { accept: 'application/json' },
@@ -333,7 +316,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'github',
-    label: 'GitHub',
     build: (query) => ({
       url: `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=${PER_ENGINE_LIMIT}&sort=stars&order=desc`,
       headers: { accept: 'application/vnd.github+json' },
@@ -361,7 +343,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'hackernews',
-    label: 'Hacker News',
     build: (query) => ({
       url: `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&hitsPerPage=${PER_ENGINE_LIMIT}&tags=story`,
       headers: { accept: 'application/json' },
@@ -390,7 +371,6 @@ export const ENGINE_SPECS: readonly EngineSpec[] = [
   },
   {
     id: 'stackexchange',
-    label: 'Stack Exchange',
     build: (query) => ({
       url: `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&pagesize=${PER_ENGINE_LIMIT}&site=stackoverflow&q=${encodeURIComponent(query)}`,
       headers: { accept: 'application/json' },

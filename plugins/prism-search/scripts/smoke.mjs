@@ -1,7 +1,8 @@
 /**
  * Built-artifact smoke check: loads `lib/index.js` the way the Loader does,
- * registers the provider on a minimal web registry, and runs one search with a
- * stubbed network so the package's own engine parsing and fusion run end to end.
+ * registers the provider on a minimal web service, and runs one search with a
+ * stubbed network so the package's own engine parsing, fusion, and page reading
+ * run end to end.
  *
  * Run after `npm run build`: `node scripts/smoke.mjs`
  */
@@ -24,13 +25,20 @@ const config = {
   maxRerankCandidates: field(12),
 }
 
+const RESULT_PAGE = `<!doctype html><html><head><title>Composition smoke</title></head><body>
+  <a href="https://www.bing.com/ck/a?u=a1aHR0cHM6Ly9leGFtcGxlLm9yZy9hcnRpY2xl">Example Org Article</a>
+  <p>The excerpt that the reader takes as the result snippet.</p>
+  <a href="/search?q=other">Other</a>
+</body></html>`
+
 const registered = []
+const web = {
+  registerSearchProvider: (provider) => { registered.push(provider); return () => {} },
+  fetch: async (request) => ({ url: request.url, statusCode: 200, body: { kind: 'html', content: RESULT_PAGE } }),
+}
 const ctx = {
-  effect: (callback) => {
-    const dispose = callback()
-    return dispose
-  },
-  web: { registerSearchProvider: (provider) => { registered.push(provider); return () => {} } },
+  effect: (callback) => callback(),
+  get: (service) => (service === 'web' ? web : undefined),
 }
 
 apply(ctx, config)
@@ -38,12 +46,6 @@ assert.equal(registered.length, 1)
 const provider = registered[0]
 assert.equal(provider.id, 'prism-search')
 assert.equal(provider.available(), true)
-
-const RESULT_PAGE = `<!doctype html><html><head><title>Composition smoke</title></head><body>
-  <a href="https://www.bing.com/ck/a?u=a1aHR0cHM6Ly9leGFtcGxlLm9yZy9hcnRpY2xl">Example Org Article</a>
-  <p>The excerpt that the reader takes as the result snippet.</p>
-  <a href="/search?q=other">Other</a>
-</body></html>`
 
 globalThis.fetch = async (url) => new Response(
   url.includes('api.github.com') ? JSON.stringify({ items: [] })
