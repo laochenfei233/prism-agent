@@ -22,9 +22,20 @@ One row per session, most relevant first (running, then most recently active):
 | goal chip | the `goal` projection value |
 | plan-mode chip | the `plan` projection value |
 | waiting / new-result chips | the session-status snapshot (`pendingInteraction`, `completionUnread`) |
+| approval strip | the `pendingInteraction` value when it is an approval: the requester's one-line text plus Reject and Allow once |
 
 The header summarises running sessions and open todos. Clicking a row opens
 that session through `ctx.uiWorkspace.openSession` and closes the panel.
+
+A session waiting on an **approval** also carries a strip under its row: the
+request's own text (the requester's localized copy when it supplies one, else
+its audit reason) and the two decisions. The strip renders beside the row
+rather than inside it, because the row is itself a button and a decision nested
+in a button is not a control a browser can activate. Answering there settles
+the same request the conversation's approval card shows, and both disappear
+together. The panel reads the value structurally — `kind`, the text fields, and
+an `answer` callback — so it needs no import from the package that publishes
+it and no Host surface of its own.
 
 ## What it does not do
 

@@ -42,6 +42,12 @@ declare module '@deepseek-ai/cordis' {
        * @returns the bound translator.
        */
       bind(namespace: string): (key: string, params?: Record<string, string | number>) => string
+      /**
+       * Resolve requester-owned localized copy in the current UI language.
+       * @param text - locale code to copy, as an approval request carries it.
+       * @returns the copy for the active language.
+       */
+      resolveText(text: Record<string, string>): string
     }
     sessions: {
       /** Refresh the Host-authoritative session list. */

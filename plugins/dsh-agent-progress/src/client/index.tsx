@@ -12,10 +12,12 @@
  * the per-session status snapshot), so this plugin adds no Host service, RPC
  * surface, or storage.
  */
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { Context } from '@deepseek-ai/cordis'
-import { deriveProgress, type ProgressRow, type SessionListLike, type SessionStatusLike } from './progress.ts'
+import {
+  deriveProgress, type ApprovalDecision, type ApprovalRequest, type ProgressRow, type SessionListLike, type SessionStatusLike,
+} from './progress.ts'
 import { en, NS, zh } from './locales.ts'
 import { PANEL_CSS } from './styles.ts'
 
@@ -45,6 +47,7 @@ type PageProps = GlobalSeats & {
   t: Translate
   openSession: (sessionId: string) => void
   refresh: () => void
+  resolveReason: (copy: Readonly<Record<string, string>>) => string
 }
 
 /** Substitute `{n}` in a dictionary line. */
@@ -101,6 +104,64 @@ function RowProgress({ row, t }: { row: ProgressRow, t: Translate }) {
         ? <span className="ap-chip ap-goal" data-tone="business" title={`${t('goal')}: ${row.goal}`}>{row.goal}</span>
         : null}
       {row.planning ? <span className="ap-chip">{t('planning')}</span> : null}
+    </div>
+  )
+}
+
+/**
+ * The pending approval under its session: the requester's one-line summary and
+ * the two decisions. It sits beside the row rather than inside it, because the
+ * row is itself a button and a decision nested in a button is not a control a
+ * browser can activate.
+ * @param props.approval - the request to present.
+ * @param props.title - the session's displayed title, named in each accessible name.
+ * @param props.resolveReason - resolves requester-owned copy in the UI language.
+ * @param props.t - the panel's translator.
+ * @returns the approval strip.
+ */
+function ApprovalBar({ approval, title, resolveReason, t }: {
+  approval: ApprovalRequest
+  title: string
+  resolveReason: (copy: Readonly<Record<string, string>>) => string
+  t: Translate
+}) {
+  const [answered, setAnswered] = useState(false)
+  const busy = useRef(false)
+  const answer = (decision: ApprovalDecision): void => {
+    if (busy.current) return
+    busy.current = true
+    setAnswered(true)
+    void approval.answer(decision).catch(() => {
+      busy.current = false
+      setAnswered(false)
+    })
+  }
+  const text = approval.displayReason === null ? approval.reason : resolveReason(approval.displayReason)
+  return (
+    <div className="ap-approval" data-approval-key={approval.key} aria-busy={answered}>
+      <span className="ap-approval-text" title={text}>
+        {text.length > 0 ? text : t('approvalFallback').replace('{tool}', approval.toolName)}
+      </span>
+      <span className="ap-approval-actions">
+        <button
+          type="button"
+          className="ap-approval-reject"
+          disabled={answered}
+          aria-label={t('rejectFor').replace('{title}', title)}
+          onClick={() => { answer('rejected') }}
+        >
+          {t('reject')}
+        </button>
+        <button
+          type="button"
+          className="ap-approval-allow"
+          disabled={answered}
+          aria-label={t('allowOnceFor').replace('{title}', title)}
+          onClick={() => { answer('allowed-once') }}
+        >
+          {t('allowOnce')}
+        </button>
+      </span>
     </div>
   )
 }
@@ -167,6 +228,16 @@ export function AgentProgressPanel(props: PageProps) {
                 </span>
                 <RowProgress row={row} t={props.t} />
               </button>
+              {row.approval === null
+                ? null
+                : (
+                  <ApprovalBar
+                    approval={row.approval}
+                    title={row.title}
+                    resolveReason={props.resolveReason}
+                    t={props.t}
+                  />
+                )}
             </li>
           ))}
         </ul>
@@ -197,6 +268,7 @@ export function apply(ctx: Context): void {
     inject: () => ({
       openSession: (sessionId: string) => { ctx.uiWorkspace.openSession(sessionId) },
       refresh: () => { void ctx.sessions.refresh() },
+      resolveReason: (copy: Readonly<Record<string, string>>) => ctx.locale.resolveText(copy),
     }),
   }, AgentProgressPanel))
 }

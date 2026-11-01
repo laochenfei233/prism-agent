@@ -62,6 +62,35 @@ export interface ProgressRow {
   readonly goal: string | null
   /** Plan mode is effectively active. */
   readonly planning: boolean
+  /** The approval this session waits on, when the pending interaction is one. */
+  readonly approval: ApprovalRequest | null
+}
+
+/** A decision the panel can return for a pending approval. */
+export type ApprovalDecision = 'allowed-once' | 'rejected'
+
+/**
+ * One pending approval as the panel presents it. The value arrives through the
+ * session-status snapshot, published by whichever package answers the approval
+ * waterfall, so this panel reads it structurally instead of importing that
+ * package: `kind`, the requester's text, and an `answer` callback are the whole
+ * protocol it relies on.
+ */
+export interface ApprovalRequest {
+  /** Stable identity of this request, for the rendered element's key. */
+  readonly key: string
+  /** Tool asking for the decision. */
+  readonly toolName: string
+  /** Audit reason supplied by the requester; the fallback text. */
+  readonly reason: string
+  /** Requester-owned localized copy, resolved by the page's language seat. */
+  readonly displayReason: Readonly<Record<string, string>> | null
+  /**
+   * Answer the request, at most once.
+   * @param decision - the decision the reader chose.
+   * @returns settlement of the waiting request.
+   */
+  answer(decision: ApprovalDecision): Promise<void>
 }
 
 /** The complete panel view. */
@@ -128,6 +157,52 @@ export function parsePlan(value: unknown): boolean {
 }
 
 /**
+ * Read a requester-owned localized text map.
+ * @param value - the raw `displayReason` value.
+ * @returns the copy map, or null when absent or malformed.
+ */
+function localizedCopy(value: unknown): Readonly<Record<string, string>> | null {
+  if (typeof value !== 'object' || value === null) return null
+  const copy: Record<string, string> = {}
+  for (const [locale, text] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof text !== 'string') return null
+    copy[locale] = text
+  }
+  return Object.keys(copy).length > 0 ? copy : null
+}
+
+/**
+ * Read a pending approval off the session-status snapshot. The package that
+ * answers the approval waterfall owns the value's class, so this reader accepts
+ * any object carrying the approval discriminator and an answer callback, and
+ * reports nothing for a settled request or another interaction kind.
+ * @param value - the raw `pendingInteraction` value.
+ * @returns the approval, or null when this session waits on something else.
+ */
+export function parseApproval(value: unknown): ApprovalRequest | null {
+  if (typeof value !== 'object' || value === null) return null
+  const record = value as {
+    kind?: unknown
+    key?: unknown
+    toolName?: unknown
+    reason?: unknown
+    displayReason?: unknown
+    answerable?: unknown
+    answer?: unknown
+  }
+  if (record.kind !== 'approval' || record.answerable === false) return null
+  if (typeof record.answer !== 'function') return null
+  const answer = record.answer as (decision: ApprovalDecision) => Promise<void>
+  return {
+    key: typeof record.key === 'string' ? record.key : 'approval',
+    toolName: typeof record.toolName === 'string' ? record.toolName : '',
+    reason: typeof record.reason === 'string' ? record.reason : '',
+    displayReason: localizedCopy(record.displayReason),
+    answer: decision => answer.call(record, decision),
+  }
+}
+
+/**
  * Last path segment of a working directory.
  * @param cwd - absolute or relative directory path.
  * @returns the basename, or the input when it has no separator.
@@ -167,6 +242,7 @@ export function deriveProgress(
       todos: parseTodos(rows0),
       goal: parseGoal(projections?.['goal']),
       planning: parsePlan(projections?.['plan']),
+      approval: parseApproval(entry?.pendingInteraction),
     })
   }
   rows.sort((left, right) => {

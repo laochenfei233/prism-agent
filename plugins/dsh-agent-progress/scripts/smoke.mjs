@@ -37,6 +37,8 @@ const baseline = {
     Fragment: Symbol('Fragment'),
     useEffect: (callback) => { callback() },
     useMemo: (factory) => factory(),
+    useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
+    useRef: (value) => ({ current: value }),
   },
   'react/jsx-runtime': {
     Fragment: Symbol('Fragment'),
@@ -63,6 +65,7 @@ const ctx = {
       return () => {}
     },
     bind: () => key => key,
+    resolveText: text => text.en ?? Object.values(text)[0] ?? '',
   },
   slots: {
     inject: (name, callback) => { callback() },
@@ -113,7 +116,7 @@ const todos = [
   { content: 'Verify in the browser', status: 'pending' },
 ]
 const list = {
-  ids: ['session-a', 'session-b', 'session-c'],
+  ids: ['session-a', 'session-b', 'session-c', 'session-d'],
   byId: {
     'session-a': {
       id: 'session-a',
@@ -141,12 +144,39 @@ const list = {
       updatedAt: Date.now() - 30_000,
       projectionValues: { todos: [{ content: 'Do the thing', status: 'completed' }, { content: 'Wait', status: 'pending' }] },
     },
+    'session-d': {
+      id: 'session-d',
+      displayTitle: 'Question pending',
+      cwd: '/home/dev/other',
+      running: false,
+      updatedAt: Date.now() - 60_000,
+      projectionValues: { todos: null },
+    },
   },
 }
+const approvals = []
 const status = new Map([
   ['session-a', { running: true, pendingInteraction: undefined, completionUnread: false }],
-  ['session-b', { running: false, pendingInteraction: { key: 'ask' }, completionUnread: false }],
+  ['session-b', {
+    running: false,
+    pendingInteraction: {
+      kind: 'approval',
+      key: 'approval:1',
+      toolName: 'write',
+      reason: 'Write notes.txt',
+      displayReason: { en: 'Write notes.txt', zh: '写入 notes.txt' },
+      answerable: true,
+      answer: async (decision) => { approvals.push(decision) },
+    },
+    completionUnread: false,
+  }],
   ['session-c', { running: false, pendingInteraction: undefined, completionUnread: true }],
+  // Another interaction kind keeps its waiting chip and offers no approval strip.
+  ['session-d', {
+    running: false,
+    pendingInteraction: { key: 'question:1', kind: 'question', sessionId: 'session-d' },
+    completionUnread: false,
+  }],
 ])
 
 const page = registrations.find(entry => entry.name === 'main')
@@ -181,9 +211,24 @@ function findAll(node, predicate, found = []) {
 }
 
 const rowElements = findAll(page.component(pageProps), node => node.props?.className === 'ap-row')
-if (rowElements.length !== 3) throw new Error(`expected three session rows, received ${rowElements.length}`)
+if (rowElements.length !== 4) throw new Error(`expected four session rows, received ${rowElements.length}`)
 rowElements[0].props.onClick()
 if (opened[0] !== 'session-a') throw new Error(`clicking the first row opened ${String(opened[0])}`)
+
+// The approval renders under its own session with both decisions, and only
+// there: the question-kind wait on session-d keeps its chip and no strip.
+const strips = findAll(page.component(pageProps), node => node.props?.className === 'ap-approval')
+if (strips.length !== 1) throw new Error(`expected one approval strip, received ${strips.length}`)
+for (const needle of ['Write notes.txt', 'reject', 'allowOnce']) {
+  const stripText = textOf(strips[0])
+  if (!stripText.includes(needle)) throw new Error(`approval strip is missing ${JSON.stringify(needle)}: ${stripText}`)
+}
+const allow = findAll(page.component(pageProps), node => node.props?.className === 'ap-approval-allow')
+if (allow.length !== 1) throw new Error(`expected one allow decision, received ${allow.length}`)
+allow[0].props.onClick()
+if (approvals.length !== 1 || approvals[0] !== 'allowed-once') {
+  throw new Error(`the allow decision sent ${JSON.stringify(approvals)}`)
+}
 
 const iconText = textOf(panelRow.component({ size: 16, active: true }))
 if (iconText.length > 0) throw new Error(`the sidebar glyph rendered text: ${iconText}`)

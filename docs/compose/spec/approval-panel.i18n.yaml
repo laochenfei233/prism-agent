@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for approval-panel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/approval-panel.md
+/:
+  en: e5960672fbb695ac
+  zh: e5960672fbb695ac
+/approval-in-the-progress-panel:
+  en: f55f8420438b0536
+  zh: 83575068e77566de
+/approval-in-the-progress-panel/report:
+  en: e261084e4fe7730e
+  zh: 95133d99d476d4f7
+/approval-in-the-progress-panel/s1-problem:
+  en: 2cf4ff8b6851529a
+  zh: 2c4ef4248a657f49
+/approval-in-the-progress-panel/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/approval-in-the-progress-panel/s2-design/s2-1-where-the-value-comes-from:
+  en: 039473576e18c33c
+  zh: 1bcd1f11497416b2
+/approval-in-the-progress-panel/s2-design/s2-2-where-the-strip-sits:
+  en: e0a4881b8acb53f3
+  zh: a78fcc095b3d23e1
+/approval-in-the-progress-panel/s2-design/s2-3-what-the-strip-shows-and-does:
+  en: d73c9418197b4d03
+  zh: 52c3c4cd772a827b
+/approval-in-the-progress-panel/s2-design/s2-4-limits:
+  en: 26071b7a30f3be4d
+  zh: 0bf5b25317595fd4
+/approval-in-the-progress-panel/s2-design/s2-5-tests:
+  en: 5768c2799f16adca
+  zh: 178d824b7357217c
+/approval-in-the-progress-panel/s3-scope:
+  en: 4fd8eaf69e28827b
+  zh: b4aaa472d08690d8
+/approval-in-the-progress-panel/tasks:
+  en: ae165ba862a75591
+  zh: 988ad0b8b740cfcf
+/approval-in-the-progress-panel/s4-acceptance:
+  en: d77e19e9d285656f
+  zh: 5f21c5c8cae1062a
