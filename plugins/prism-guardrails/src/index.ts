@@ -950,11 +950,9 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     : `Guardrails: ${String(armed)} of ${String(rails.length)} rails armed (mode: enforce, config ${version}).`]
     .concat(rails.map(([name, detail]) => `${name}: ${detail ?? 'off'}`))
   // The decisions block earns its space only where the ledger carries something
-  // the model could not already see: an observation, or an observe run that has
-  // made none yet.
-  if (decisions.some(decision => decision.outcome === 'observed') || resolved.mode === 'observe') {
-    lines.push(...describeDecisions(decisions))
-  }
+  // the model could not already see, which is the observe run itself: `observed`
+  // is the only outcome that mode writes.
+  if (resolved.mode === 'observe') lines.push(...describeDecisions(decisions))
   return lines.join('\n')
 }
 

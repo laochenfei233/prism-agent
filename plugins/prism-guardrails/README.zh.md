@@ -362,7 +362,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 143 composed unit tests
+npm test            # 144 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 

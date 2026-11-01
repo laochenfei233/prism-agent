@@ -1531,9 +1531,7 @@ describe('observe mode', () => {
     const runs: string[] = []
     ctx.tools.register(fixture('probe', runs))
     const agent = await newAgent(ctx, 'observe-todos')
-    agent.session.append('todo/write', {
-      todos: [{ content: 'T1 finish the change', status: 'pending' }],
-    } as never)
+    agent.session.append('todo/write', { todos: [{ content: 'T1 finish the change', status: 'pending' }] })
     const adapter = new MockAdapter([
       textResponse('progress report'),
       textResponse('still reporting'),
@@ -1546,7 +1544,7 @@ describe('observe mode', () => {
     expect(await report(ctx, agent)).toContain('decisions this session: 1 (0 observed)')
   })
 
-  it('shortens a long subject and caps how many rows it lists', async () => {
+  it('pins the subject cap at 60 code points, across an astral character', async () => {
     const ctx = await commandHarness({
       mode: 'observe',
       commandGuard: {
@@ -1557,13 +1555,37 @@ describe('observe mode', () => {
     const runs: string[] = []
     ctx.tools.register(fixture('bash', runs))
     const agent = await newAgent(ctx, 'observe-truncation')
-    const long = `rm -rf ${'x'.repeat(200)}`
 
-    await toolCall(ctx, agent, 'bash', { command: long })
+    // 3 + 70 code points, cut after 59 and closed with an ellipsis. A code-unit
+    // cut would leave half of an emoji here, so the assertion is exact.
+    await toolCall(ctx, agent, 'bash', { command: `rm ${'😀'.repeat(70)}` })
+
+    const line = (await report(ctx, agent)).split('\n').find(row => row.trimStart().startsWith('observed')) ?? ''
+    expect(line).toBe(`  observed  command guard  rm ${'😀'.repeat(56)}…`)
+    expect(line.isWellFormed()).toBe(true)
+  })
+
+  it('lists the newest ten observations', async () => {
+    const ctx = await commandHarness({
+      mode: 'observe',
+      commandGuard: {
+        tools: [{ tool: 'bash', commandArgument: 'command' }],
+        deny: [{ pattern: '^rm\\b', reason: 'deletes files' }],
+      },
+    })
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const agent = await newAgent(ctx, 'observe-row-cap')
+    for (let index = 0; index < 12; index += 1) {
+      await toolCall(ctx, agent, 'bash', { command: `rm -rf build${String(index)}` })
+    }
 
     const text = await report(ctx, agent)
-    expect(text).toContain('…')
-    expect(text).not.toContain('x'.repeat(120))
+    const rows = text.split('\n').filter(row => row.trimStart().startsWith('observed'))
+    expect(rows).toHaveLength(10)
+    expect(rows.at(-1)).toContain('build11')
+    expect(rows[0]).toContain('build2')
+    expect(text).toContain('decisions this session: 12 (12 observed)')
   })
 
   it('keeps only the newest decisions and hands out a copy', () => {
@@ -1641,7 +1663,8 @@ describe('/guardrails status', () => {
     expect(text).not.toContain('decisions this session')
   })
 
-  it('names the mode and the configuration version', async () => {    const ctx = await commandHarness({ maxStepsPerTurn: 20 })
+  it('names the mode and the configuration version', async () => {
+    const ctx = await commandHarness({ maxStepsPerTurn: 20 })
     const agent = await ctx.agentLoop.create(SessionId('status-version'), { provider: 'mock', model: 'mock' })
 
     const first = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)

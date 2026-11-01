@@ -150,7 +150,8 @@ decisions this session: 2 (2 observed)
 | 文件 | 改动 |
 |---|---|
 | `src/config.ts` | `mode` 键 + 校验 + `ResolvedConfig.mode` |
-| `src/decision.ts` | 新增：台账、环形缓冲、`configVersion()` |
+| `src/decision.ts` | 新增：台账、环形缓冲 |
+| `src/config.ts` | `mode` 键 + 校验 + `configVersion()`（配置身份） |
 | `src/index.ts` | 两个出口帮助函数 + 10 处决策出口替换 + 2 处只记账 + `/guardrails` 报告 |
 | `README.md` / `README.zh.md` | 配置表加 `mode` 行、`/guardrails` 输出更新、限制里写清 observe 的安全后果 |
 | `tests/prism-guardrails.spec.ts` | 10 处可观察出口各一个 observe 用例 + 版本用例 |
@@ -231,13 +232,13 @@ decisions this session: 2 (2 observed)
 
 本节记录 §5 实际做出来的东西，以及与原规格的差异。
 
-**做出来的**：`mode: enforce | observe` 一个键；`src/decision.ts`（每会话内存台账，上限 200 条，加 `configVersion()` 的 8 位摘要）；`src/index.ts` 的两个出口帮助函数 `decide()`（8 处 `tools/pre-execute`）与 `note()`（plan-mode 的 guard、pre-step 的 turn budget、两处 steer）；`/guardrails` 首行加模式与版本，observe 下追加决策块，只列 `observed` 行。
+**做出来的**：`mode: enforce | observe` 一个键与 `configVersion()`（都在 `src/config.ts`）；`src/decision.ts` 只放台账（每会话内存，上限 200 条）；`src/index.ts` 的两个出口帮助函数 `decide()`（8 处 `tools/pre-execute`）与 `note()`（plan-mode 的 guard、pre-step 的 turn budget、两处 steer）；`/guardrails` 首行加模式与版本，observe 下追加决策块，只列 `observed` 行。
 
 **与原规格的差异（四处，都有理由）**：
 
 1. **`steer` 不随 observe 降档。** 原规格 §5.1 写"observe 下所有 rail 只记录不拦"，但把一轮送回补证据是"要求"而非"拒绝"，观察模式把它关掉会顺带削弱正向能力。现在 `steer` 只记账、行为不变，报告里 `observed` 计数因此与 `steer` 分开。
 2. **没有新增 `observe.patch.yml`。** §5.6 列了这一项，但当前没有任何消费者：单测用 `commandHarness({mode:'observe'})` 直接构造，e2e 的四个用例绑定的是既有 fixture。为一个不存在的消费者加一个 fixture 文件是"for later"代码，等真有 e2e 场景再加。
 3. **版本哈希取的是原始 `Config`（补上解析后的 `mode`），不是逐字段投影的 `ResolvedConfig`。** 所有 rail 配置都影响判定，逐字段投影要多写 14 行且不改变结论；代价是 `repeatAskAfter: 0` 与省略该键哈希不同——只影响报告里的一个字符串，不影响任何判定。哈希函数放在 `config.ts`（配置身份），不放在仅管台账的 `decision.ts`。
-4. **决策块比 §5.4 的示例更紧凑。** 没有 `(3 would-deny, 1 would-ask)` 的拆分，也没有单独的工具列：`observe` 下每条记录本来就没有执行，"它会做什么"由 rail 名说明，而行里的 subject 是它判定的那条命令/路径，再加上工具名反而把最有用的信息挤到后面。行长另有 60 个码位的上限。
+4. **决策块比 §5.4 的示例更紧凑。** 没有 `(3 would-deny, 1 would-ask)` 的拆分，也没有单独的工具列：`observe` 下调用照常执行，只是那条拒绝没有生效，调用本身由 rail 名已经说明；行里的 subject 是它判定的那条命令或路径，再加上工具名反而把最有用的信息挤到后面。subject 有 60 个码位（code point）的上限，超出部分以省略号收尾。
 
-**证据**：`npm test` 143 通过（原 123 + 新增 20）；`npm run build` 成功，产物外部导入仍只有 `@deepseek-ai/dsh-commands/brand`、`@deepseek-ai/dsh-llm` 与内置的 `node:crypto`；`npm run smoke` 通过；`vitest run`（含 18 个 ponytail 用例与 4 个 e2e）165 通过。
+**证据**：`npm test` 144 通过（原 123 + 新增 21）；`npm run build` 成功，产物外部导入仍只有 `@deepseek-ai/dsh-commands/brand`、`@deepseek-ai/dsh-llm` 与内置的 `node:crypto`；`npm run smoke` 通过；`vitest run`（含 18 个 ponytail 用例与 4 个 e2e）166 通过。
