@@ -1,14 +1,26 @@
 ---
 feature: prism-search
-status: designed
+status: delivered
 updated: 2026-11-01
 branch: feat/prism-search
-commits: dd1145a3c5..
+commits: dd1145a3c5..cc6a6a6d02
 ---
 
 # Prism Search
 
 ## Report
+
+**What was built** — `plugins/prism-search` (`@prism/prism-search`): a Host half registering a keyless `ctx.web` search provider `prism-search` that queries 18 free engines in parallel, fuses their rankings with RRF on normalized URLs, reads the top pages through `ctx.web.fetch`, and orders the result with a model chosen in Models through one auxiliary `ctx.llm.stream()` call; and a browser half adding Settings → Search, which switches `web.searchProvider` onto the provider and stores the ordering route from the live model catalog. The shipped `web_search` tool and its card, limits, and timeout policy are reused unchanged.
+
+**Verification** — `tsc -p tsconfig.json --noEmit` exit 0; `vitest run --config vitest.config.ts` 9 files / 68 tests pass (engine parsers, HTML/URL helpers, RRF fusion, rerank parsing, provider pipeline, settings bridge, config schema, wrapper resolution, real-Cordis composition); `tsdown --config tsdown.config.ts` build pass, `lib/index.js` externalizes only `@deepseek-ai/schemastery` and `lib/client.js` requests only `react`/`react/jsx-runtime`; `node scripts/smoke.mjs` on the built artifact prints `{"registered":"prism-search","sources":1,"first":"https://example.org/article"}`; `verify-translation-pairing plugins/prism-search/README.md` consistent.
+
+**Journey log** —
+
+- The first review found the Host read the LLM service with `Reflect.get(ctx, 'llm')` while injecting only `web`, so every ordered search threw instead of keeping the fused order. The read is now `ctx.get('llm')`, and a real-Cordis composition test covers ordered and unordered searches plus disposal.
+- The settings card injected only `remote`; `remote.settings` and `remote.session` are separate inject-gated services, so the section could read nothing. Both are now injected and the list is asserted by a test.
+- Page fetching originally opened the plugin's own connections to URLs taken from engine HTML, bypassing the deployment's fetch policy. It now reads pages through `ctx.web.fetch`, whose cross-origin redirect rule then broke Baidu/Sogou/360 wrappers; those are resolved by probing the engine's own redirect endpoint with redirects unfollowed and reading the destination through the same seam.
+- The separate `page.ts` reader and unused engine display labels were deleted rather than kept beside the new path.
+- The knowledge that an out-of-tree plugin cannot write Session events is recorded in the README as a known limitation: the ordering prompt stays reconstructable from the logged search arguments, logged sources, and the fixed template.
 
 ## [S1] Problem
 
@@ -63,24 +75,24 @@ The browser half registers a `settings.section` entry (`prism-search`) that read
 
 ## Tasks
 
-- [ ] T1: scaffold the package (manifest, tsconfig, tsdown, vitest, patch, README) (depends: none)
-- [ ] T2: HTML/text helpers and capped HTTP transport (depends: T1)
-- [ ] T3: 18 engine specs and their parsers (depends: T2)
-- [ ] T4: RRF fusion and URL normalization (depends: T1)
-- [ ] T5: model rerank with JSON-order parsing and fallback (depends: T1)
-- [ ] T6: provider pipeline (fan-out, fusion, page fetch, rerank, bounds) (depends: T2, T3, T4, T5)
-- [ ] T7: host entry, config schema, provider registration (depends: T6)
-- [ ] T8: browser settings section, bridge, locales (depends: T7)
-- [ ] T9: unit tests for helpers, parsers, fusion, rerank, pipeline (depends: T2-T8)
-- [ ] T10: verify (typecheck, tests, build) and document (depends: T9)
+- [x] T1: scaffold the package (manifest, tsconfig, tsdown, vitest, patch, README) (depends: none)
+- [x] T2: HTML/text helpers and capped HTTP transport (depends: T1)
+- [x] T3: 18 engine specs and their parsers (depends: T2)
+- [x] T4: RRF fusion and URL normalization (depends: T1)
+- [x] T5: model rerank with JSON-order parsing and fallback (depends: T1)
+- [x] T6: provider pipeline (fan-out, fusion, page fetch, rerank, bounds) (depends: T2, T3, T4, T5)
+- [x] T7: host entry, config schema, provider registration (depends: T6)
+- [x] T8: browser settings section, bridge, locales (depends: T7)
+- [x] T9: unit tests for helpers, parsers, fusion, rerank, pipeline (depends: T2-T8)
+- [x] T10: verify (typecheck, tests, build) and document (depends: T9)
 
 ## [S4] Acceptance
 
-- [ ] AC1: The built host half registers a `ctx.web` search provider whose id is `prism-search` and whose `available()` is `true` without any credential.
-- [ ] AC2: The provider exposes 18 keyless engines by default; a search query fans out to all of them and a failing engine cannot fail the search while another returns results.
-- [ ] AC3: Results from several engines merge by RRF, deduplicate on normalized URL, and record every contributing engine.
-- [ ] AC4: The top `fetchTopN` results are fetched through the deployment's fetch seam; readable page text replaces the snippet when available, and the final URL from a redirect replaces the engine URL.
-- [ ] AC5: When `rerankProvider`/`rerankModel` are set, the provider makes exactly one model call through `ctx.llm.stream()` and reorders by its JSON order; any model failure keeps the RRF order and still returns sources.
-- [ ] AC6: `request.maxResults` is honored by the provider, and `truncated` is `true` only when it cut results.
-- [ ] AC7: The settings section lists models from the model catalog, saves the chosen provider/model with the read revision, and can set `web.searchProvider` to `prism-search`.
-- [ ] AC8: Typecheck, unit tests, and the tsdown build pass.
+- [x] AC1: The built host half registers a `ctx.web` search provider whose id is `prism-search` and whose `available()` is `true` without any credential.
+- [x] AC2: The provider exposes 18 keyless engines by default; a search query fans out to all of them and a failing engine cannot fail the search while another returns results.
+- [x] AC3: Results from several engines merge by RRF, deduplicate on normalized URL, and record every contributing engine.
+- [x] AC4: The top `fetchTopN` results are fetched through the deployment's fetch seam; readable page text replaces the snippet when available, and the final URL from a redirect replaces the engine URL.
+- [x] AC5: When `rerankProvider`/`rerankModel` are set, the provider makes exactly one model call through `ctx.llm.stream()` and reorders by its JSON order; any model failure keeps the RRF order and still returns sources.
+- [x] AC6: `request.maxResults` is honored by the provider, and `truncated` is `true` only when it cut results.
+- [x] AC7: The settings section lists models from the model catalog, saves the chosen provider/model with the read revision, and can set `web.searchProvider` to `prism-search`.
+- [x] AC8: Typecheck, unit tests, and the tsdown build pass.
