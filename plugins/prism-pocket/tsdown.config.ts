@@ -37,7 +37,7 @@ export default defineConfig([
     dts: false,
     clean: true,
     fixedExtension: false,
-    deps: { neverBundle: ['@deepseek-ai/cordis', '@deepseek-ai/schemastery'] },
+    deps: { neverBundle: ['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-llm'] },
   },
   {
     name: `${ID}/client`,

@@ -23,6 +23,13 @@ import { detectTailscale } from './tailscale.ts'
 import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
 import { phoneAccess, probeVerdict } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
+import { BotStore } from './bots/store.ts'
+import { BotSupervisor } from './bots/supervisor.ts'
+import { BotConversations, readBotHostServices } from './bots/binding.ts'
+import { BotOutbox, assistantTextOf } from './bots/outbox.ts'
+import { BotAskRelay } from './bots/asks.ts'
+import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, runBotAction, type BotRouteDeps } from './bots/routes.ts'
+import type { BotChannelId, BotInbound } from './bots/types.ts'
 
 export { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
 export { isOriginTrusted, phoneAccess, phoneTarget, remoteCommands } from './remote-status.ts'
@@ -37,8 +44,8 @@ export type * from './types.ts'
 /** Cordis plugin name, matching the `cordis.patch.yml` row id. */
 export const name = 'pocket'
 
-/** Host services this plugin needs (`webServer` is the carrier's service name). */
-export const inject = ['connection', 'webServer', 'webStartup', 'dshHomePath']
+/** Host services this plugin needs (`webServer` is the carrier's service name; the session trio delivers bot chat). */
+export const inject = ['connection', 'webServer', 'webStartup', 'dshHomePath', 'agents', 'sessions', 'sessionController']
 
 /** Pocket delivery policy. */
 export interface Config {
@@ -83,6 +90,7 @@ interface WebStartupLike {
 interface PocketRuntime {
   surface: PocketServerSurface
   connection: ConnectionRoute
+  webserver: WebServerLike
   material: Promise<VapidMaterial>
   store: SubscriptionStore
   config: Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
@@ -106,6 +114,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       trustedHosts: [...(webStartup.trustedHosts ?? [])],
     },
     connection,
+    webserver,
     material: loadOrCreateVapidKeys(join(homeOf(ctx), 'pocket', 'keys.json')),
     store: new SubscriptionStore(join(homeOf(ctx), 'pocket', 'subscriptions.json')),
     config: resolved,
@@ -136,6 +145,106 @@ export function apply(ctx: Context, config: Config = {}): void {
   installPocketTriggers(ctx, deliverer(ctx, runtime), {
     notifyTurnComplete: resolved.notifyTurnComplete,
   })
+  installBots(ctx, runtime)
+}
+
+/** Everything the bots wiring needs, resolved once at apply time. */
+function installBots(ctx: Context, runtime: PocketRuntime): void {
+  const store = new BotStore(join(homeOf(ctx), 'pocket', 'bots.json'))
+  const supervisor = new BotSupervisor({
+    onInbound: (channel, message) => { void deliverInbound(channel, message) },
+    onStatus: () => { /* the status lives on the supervisor; the routes read it there. */ },
+  })
+  const send = async (channel: BotChannelId, chatId: string, text: string): Promise<void> => {
+    const handle = supervisor.handle(channel)
+    if (handle === undefined) throw new Error(`${channel} is not running`)
+    await handle.send(chatId, text)
+  }
+  const warn = (detail: string): void => { ctx.logger.warn(`pocket bots: ${detail}`) }
+  const conversations = new BotConversations({
+    store,
+    ...readBotHostServices(ctx),
+    hooks: {
+      send: async (channel, chatId, text) => {
+        try {
+          await send(channel, chatId, text)
+        } catch (cause: unknown) {
+          warn(cause instanceof Error ? cause.message : String(cause))
+        }
+      },
+      onBound: () => { /* the binding lives in the store; the routes read it there. */ },
+    },
+  })
+  const relay = new BotAskRelay({ targetOf: sessionId => conversations.targetOf(sessionId), send })
+  const outbox = new BotOutbox({
+    targetOf: sessionId => conversations.targetOf(sessionId),
+    handleOf: channel => supervisor.handle(channel),
+    warn,
+  })
+
+  const deliverInbound = async (channel: BotChannelId, message: BotInbound): Promise<void> => {
+    try {
+      const entry = store.entry(channel)
+      if (entry?.sessionId !== undefined && relay.consume(channel, message.chatId, entry.sessionId, message.text)) return
+      await conversations.onInbound(channel, message)
+    } catch (cause: unknown) {
+      warn(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+
+  const routeDeps: BotRouteDeps = { store, supervisor, deliverInbound, warn }
+  ctx.effect(() => runtime.connection.fetch.register({
+    path: POCKET_BOTS_PATH,
+    methods: ['GET', 'POST'],
+    requestBody: 'buffered',
+    fetch: async request => botsResponse(request, routeDeps),
+  }), 'pocket: bots routes')
+
+  registerBotCallbackRoutes(ctx, runtime.webserver, routeDeps)
+
+  // Replies ride the session event stream; only bound sessions relay.
+  ctx.effect(() => ctx.on('session/event', (session, event) => {
+    if (event.type !== 'assistant/message') return
+    outbox.onAssistantText(session.id, assistantTextOf(event.data.message))
+  }), 'pocket: bot replies')
+
+  // The ask relays observe the two answerer waterfalls and always delegate when not claiming.
+  ctx.effect(() => ctx.on('approval/request', async (request, next) => {
+    return await relay.handleApproval(request.agent.id, request.toolName, next)
+  }), 'pocket: approval relay')
+  ctx.effect(() => ctx.on('user-questions/request', async (request, next) => {
+    return await relay.handleQuestion(request.agent?.id ?? '', request, next)
+  }), 'pocket: question relay')
+
+  // Enabled channels start once the plugin is live; failures are recorded on their state.
+  void (async () => {
+    for (const channel of store.enabledChannels()) {
+      const config = store.config(channel)
+      if (config !== undefined) await supervisor.start(channel, config)
+    }
+  })().catch((cause: unknown) => {
+    warn(cause instanceof Error ? cause.message : String(cause))
+  })
+
+  ctx.effect(() => async () => {
+    await supervisor.dispose()
+  }, 'pocket: bots disposal')
+}
+
+/** Answer one authenticated bots request: GET lists, POST acts. */
+async function botsResponse(request: Request, deps: BotRouteDeps): Promise<Response> {
+  if (request.method === 'GET') return jsonResponse(listView(deps))
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return jsonResponse({ error: 'invalid JSON body' }, 400)
+  }
+  try {
+    return jsonResponse(await runBotAction(readBotAction(body), deps))
+  } catch (cause: unknown) {
+    return jsonResponse({ error: cause instanceof Error ? cause.message : String(cause) }, 400)
+  }
 }
 
 /**

@@ -25,6 +25,8 @@
     "skipLibCheck": true,
     "paths": {
       "@deepseek-ai/dsh-brand": ["../../packages/util/brand/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-llm": ["../../packages/llm/llm/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-llm/types": ["../../packages/llm/llm/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session/types": ["../../packages/core/session/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-user-approval": ["../../packages/interaction/user-approval/lib/types/index.d.ts"],
