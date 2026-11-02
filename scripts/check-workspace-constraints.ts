@@ -220,10 +220,13 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The plugin market parses fetched indexes in a private Worker resolved
   // relative to import.meta.url; it is shipped without a public package subpath.
   '@deepseek-ai/dsh-plugin-market': ['lib/worker.cjs'],
-  // The argv-prefix runner entry ships beside the lib as its own bundle;
-  // sandbox-local resolves it through the package's ./runner export. tsdown
-  // also shares its generated FFI code through a hashed runtime chunk.
-  '@deepseek-ai/dsh-sandbox-windows-acl': ['lib/runner.js', 'lib/types-*.js', 'assets'],
+  // The argv-prefix runner and the grant-runner helper ship beside the lib as
+  // their own bundles; sandbox-local resolves them through the package's
+  // ./runner and ./grant-runner exports. tsdown also shares the generated FFI
+  // and path code between those entries through a hashed `types-*.js` chunk.
+  '@deepseek-ai/dsh-sandbox-windows-acl': [
+    'lib/runner.js', 'lib/grant-runner.js', 'lib/types-*.js', 'assets',
+  ],
   '@deepseek-ai/dsh-skill-badge': ['assets'],
   '@deepseek-ai/dsh-skill-office': ['assets'],
   '@deepseek-ai/dsh-subprocess': ['lib/control.js'],

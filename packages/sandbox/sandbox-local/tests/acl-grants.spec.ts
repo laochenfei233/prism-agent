@@ -405,10 +405,10 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       const tempDir = flag(confined.argv, '--temp') ?? ''
       setBehavior('fail')
       sandbox.internals.rmTempDir = () => { throw new Error('rm exploded') }
-      const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
+      const reported: unknown[] = []
+      vi.spyOn(ctx.logger, 'warn').mockImplementation((entry) => { reported.push(entry) })
 
       await dispose()
-      const reported: unknown[] = warn.mock.calls.map(call => call[0] as unknown)
       expect(reported.some(entry => typeof entry === 'string' && entry.includes('cleanup completed with 2 failure(s)'))).toBe(true)
       const messages = reported.flatMap(entry => entry instanceof Error ? [entry.message] : [])
       expect(messages).toContainEqual(expect.stringContaining('exited with code 127'))
