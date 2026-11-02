@@ -1,9 +1,9 @@
 ---
 feature: plugin-seed-refresh
-status: in-progress
-updated: 2026-11-01
+status: delivered
+updated: 2026-11-02
 branch: feat/plugin-seed-refresh
-commits: c21408d0fb..HEAD (filled at delivery)
+commits: c21408d0fb..cf85f0a33b
 ---
 
 # Plugin Seed Refresh
@@ -12,7 +12,16 @@ English | [中文](plugin-seed-refresh.zh.md)
 
 ## Report
 
-Pending delivery.
+**What was built** — The desktop shell reconciles the plugin copies it seeds into `$DSH_HOME/profiles/node_modules` with the installation it is running: a copy is replaced when the installation ships a different manifest, when the copy lacks the entry its manifest declares, or when the recorded installation version changed; no copy is created or replaced from a build without its entry, and none through a link; the swap stages the new build and restores the previous copy when it fails. That is what made `@prism-ai/prism-meeting` 「异常」: its profile copy still declared 0.1.7-rc.1 peers, so the loader skipped the bundle although its `lib/` bytes matched the installed ones. Packaging now builds every `plugins/*` bundle through the checkout's tsdown before copying, fails when a build produces no declared entry, and clears then skips a package this checkout cannot build (`plugins/prism-meeting`, whose sources are not in this repository). The plugin page names the remedy an app-provided bundle actually has — update the app and restart — instead of uninstall and reinstall.
+
+**Verification** — `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib seed_tests` (with `CARGO_TARGET_DIR` set to the main checkout's target) → 9 passed. `node --check apps/desktop/scripts/bundle-runtime.mjs` → clean. A throwaway harness over the exported packaging helpers built and copied `prism-pocket` (32706 B), `prism-local-models` (60033 B), and `prism-session-autoarchive` (7534 B) into `apps/desktop/runtime/plugins/*/lib/index.js`, cleared a planted `runtime/plugins/prism-meeting` and skipped it by name, and failed naming a fixture whose build emitted no declared entry. `node node_modules/vitest/vitest.mjs run packages/client/ui-plugin-manager/tests` → 6 files, 263 tests. `pnpm run typecheck` → 5/5 gates; `pnpm run build:check` → 2/2. `npx tsx scripts/run-oxlint.ts apps/desktop/scripts packages/client/ui-plugin-manager` → 0 errors. `verify-md-links` passed, and `verify-translation-pairing` and `verify-md-wrap` report nothing for the files this change touches. PRE-EXISTING reds elsewhere, untouched here: `verify-md-wrap` (`docs/compose/specs/appearance-themes.md`, `custom-theme-presets.md`), `verify-translation-pairing` (`packages/client`, `ui-primitives`, `ui-theme`, `ui-settings-general` README records), `verify-repository-references` (existing `.changelog` fragments and `python/sdk/uv.lock`), `verify-concrete-terms` (`plugins/prism-search/src/fusion.ts`), `verify-package-readme-summaries` (`ui-chat`, `ui-conversation`, `sandbox-windows-acl`), `verify-package-readme-model-experience` (`ui-sidebar-git`), `scripts/doc-standard.spec.ts` (`packages/backup/prism-backup/README.zh.md`), and the repo-wide `lint` (383 findings elsewhere).
+
+**Journey log**
+
+- The profile copy's `lib/` was byte-identical to the installed one, so the failure looked like a seeding-byte problem; compatibility reads the manifest's peer ranges, and the stale `package.json` was the cause.
+- Local bundles live outside the pnpm workspace, so the release build never built them. Making packaging fail on an unbuildable bundle also failed `prism-meeting`, whose sources this repository does not track, so the copy step clears its destination and skips it by name instead.
+- Tests that scratched in the system temporary directory began failing with `EACCES` under this machine's harness; they scratch under the crate's `target/` directory now.
+- The junction case silently passed when `mklink` failed; it requires the junction now, and review added the dangling-link case.
 
 ## [S1] Problem
 
@@ -53,7 +62,7 @@ The local bundles, the market bundle (`dsh-plugin`), and the Windows terminal in
 
 The copy step then skips, on the console and by name, a package whose entry this checkout cannot produce at all, rather than shipping a package nothing can import, and it clears first whatever a previous bundling run left in `runtime/plugins`. `plugins/prism-meeting` is that case: this repository tracks only its manifest, patch and README, so its `lib/` exists only when the packaging checkout already held one.
 
-A skipped package leaves the profile still selecting the name: an upgraded profile keeps the copy an earlier installation seeded, the loader reports the bundle as unresolvable, and the app-update remedy on the plugin page cannot clear it, because no release of this checkout ships the package. Restoring those sources, or installing the package into the profile, is outside this change.
+A skipped package leaves the profile still selecting the name: an upgraded profile keeps the copy an earlier installation seeded, the loader skips the bundle as incompatible, and the app-update remedy on the plugin page cannot clear it, because no release of this checkout ships the package. Restoring those sources, or installing the package into the profile, is outside this change.
 
 The packages' own `build`/`bundle` scripts are not used: outside the workspace, `pnpm run` finds no local `node_modules/.bin` and auto-installs the directory first. tsdown is what both script names run, and it is the same builder every bundled plugin declares.
 
@@ -68,22 +77,22 @@ The packages' own `build`/`bundle` scripts are not used: outside the workspace, 
 
 ## Tasks
 
-- [ ] T1: one seed/refresh helper in `setup.rs` (`copy_is_stale`, `replace_dir`, `is_link`) used by local bundles, the market bundle, and the terminal-inspector copy (covers: S2.1)
-- [ ] T2: installation-version marker so an upgrade refreshes every seeded copy (covers: S2.1)
-- [ ] T3: unit tests over scratch homes: stale manifest, missing entry, unbuilt source keeps the copy, never replace a link, version marker forces a refresh (covers: S2.1)
-- [ ] T4: `bundle-runtime.mjs` builds local bundles before copying and fails on a missing declared entry (covers: S2.2)
-- [ ] T5: `ui-plugin-manager` app-provided remedy, dictionary entries, and a page test (covers: S2.3)
-- [ ] T6: desktop README packaging line and the verification round (depends: T1, T2, T3, T4, T5)
+- [x] T1: one seed/refresh helper in `setup.rs` (`copy_is_stale`, `replace_dir`, `is_link`) used by local bundles, the market bundle, and the terminal-inspector copy (covers: S2.1)
+- [x] T2: installation-version marker so an upgrade refreshes every seeded copy (covers: S2.1)
+- [x] T3: unit tests over scratch homes: stale manifest, missing entry, unbuilt source keeps the copy, never replace a link, version marker forces a refresh (covers: S2.1)
+- [x] T4: `bundle-runtime.mjs` builds local bundles before copying and fails on a missing declared entry (covers: S2.2)
+- [x] T5: `ui-plugin-manager` app-provided remedy, dictionary entries, and a page test (covers: S2.3)
+- [x] T6: desktop README packaging line and the verification round (depends: T1, T2, T3, T4, T5)
 
 ## [S4] Acceptance
 
-- [ ] A1: a profile copy whose `package.json` differs from the installation's is replaced wholesale, and no dropped file survives (T1, T3)
-- [ ] A2: a profile copy missing its declared entry is replaced when the installation copy has it (T1, T3)
-- [ ] A3: when the installation copy lacks its declared entry, the profile copy is untouched, no copy is created for a bundle that has none, and the bundle name is still selected (T1, T3)
-- [ ] A4: a junction or symlink destination is never replaced (T1, T3)
-- [ ] A5: a changed installation version refreshes every seeded copy once and records the version (T2, T3)
-- [ ] A6: the packaging build produces `lib/index.js` for `prism-pocket`, `prism-local-models`, and `prism-session-autoarchive`, and the copy step places it under `apps/desktop/runtime/plugins/` (T4)
-- [ ] A7: packaging fails naming the package when its build produced no declared entry (T4)
-- [ ] A8: an incompatible bundle the profile does not own renders the app-provided remedy, not the uninstall one (T5)
-- [ ] A9: `cargo test --lib setup::` passes, `node --check apps/desktop/scripts/bundle-runtime.mjs` passes, and the plugin-manager specs pass (T6)
-- [ ] A10: a package whose entry this checkout cannot produce is skipped by name and not copied (T4)
+- [x] A1: a profile copy whose `package.json` differs from the installation's is replaced wholesale, and no dropped file survives (T1, T3)
+- [x] A2: a profile copy missing its declared entry is replaced when the installation copy has it (T1, T3)
+- [x] A3: when the installation copy lacks its declared entry, the profile copy is untouched, no copy is created for a bundle that has none, and the bundle name is still selected (T1, T3)
+- [x] A4: a junction or symlink destination is never replaced (T1, T3)
+- [x] A5: a changed installation version refreshes every seeded copy once and records the version (T2, T3)
+- [x] A6: the packaging build produces `lib/index.js` for `prism-pocket`, `prism-local-models`, and `prism-session-autoarchive`, and the copy step places it under `apps/desktop/runtime/plugins/` (T4)
+- [x] A7: packaging fails naming the package when its build produced no declared entry (T4)
+- [x] A8: an incompatible bundle the profile does not own renders the app-provided remedy, not the uninstall one (T5)
+- [x] A9: `cargo test --lib setup::` passes, `node --check apps/desktop/scripts/bundle-runtime.mjs` passes, and the plugin-manager specs pass (T6)
+- [x] A10: a package whose entry this checkout cannot produce is skipped by name and not copied (T4)

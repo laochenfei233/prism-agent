@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/plugin-seed-refresh.md
 /:
-  en: 00ad3d8cb2cc1149
-  zh: 7535051f2adc7b8c
+  en: 7988273db6a1a3fb
+  zh: 7988273db6a1a3fb
 /plugin-seed-refresh:
   en: de6a051e560316f4
   zh: 23d9967fb3ec788c
 /plugin-seed-refresh/report:
-  en: 109719cb1269c3c6
-  zh: 6727ac3e1ad03048
+  en: 716b07d02733626e
+  zh: 35c55eb84662dc61
 /plugin-seed-refresh/s1-problem:
   en: aa54f0062a4ce4b5
   zh: 2d133c11ade4fd6a
@@ -21,8 +21,8 @@
   en: cf48c90b2bd0ea79
   zh: 942b9a3e342ba14c
 /plugin-seed-refresh/s2-design/s2-2-packaging-builds-every-local-bundle-and-refuses-an-entry-less-one:
-  en: 4aa5846c8ddf2b44
-  zh: 42e3e338e4b6fe51
+  en: ac998d370e5065cd
+  zh: 51cd26060b1185fe
 /plugin-seed-refresh/s2-design/s2-3-the-plugin-page-names-the-remedy-an-app-provided-bundle-actually-has:
   en: 4875653038b66324
   zh: f9f98c2b3e2eba81
@@ -30,8 +30,8 @@
   en: 3de296cebf05fc3a
   zh: 10dbb33959616b58
 /plugin-seed-refresh/tasks:
-  en: e7b812c87c817d6f
-  zh: 00d221657d1ba03b
+  en: c6c2915becaf7e0a
+  zh: 8b7d193212a67743
 /plugin-seed-refresh/s4-acceptance:
-  en: 0d82f38fcc30140e
-  zh: 85f9f550e1cf82ef
+  en: b3ca96dc1555d492
+  zh: f18074846a18a988
