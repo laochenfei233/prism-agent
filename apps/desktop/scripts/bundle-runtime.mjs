@@ -279,6 +279,12 @@ async function deployDsh() {
   injectDesktopHostBridge(distDest);
 }
 
+// The entry file a package declares: `main`, else Node's own `index.js`.
+function packageEntry(dir) {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  return join(dir, typeof manifest.main === 'string' ? manifest.main : 'index.js');
+}
+
 // Keep every local bundle under the repository's `plugins/` directory in the
 // desktop runtime. The shell copies these into the profile on first launch and
 // selects their package names as profile bundle layers.
@@ -288,13 +294,6 @@ async function deployDsh() {
 // unbuilt package has nothing its `main` names, and a profile seeded from it
 // cannot load, so each one is built here and a build that produces no entry
 // fails packaging instead of shipping.
-
-// The entry file a package declares: `main`, else Node's own `index.js`.
-function packageEntry(dir) {
-  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-  return join(dir, typeof manifest.main === 'string' ? manifest.main : 'index.js');
-}
-
 export function buildLocalPlugins(repo) {
   const sourceRoot = join(repo, 'plugins');
   if (!existsSync(sourceRoot)) return;
@@ -322,15 +321,17 @@ export function copyLocalPlugins(repo) {
     if (!entry.isDirectory()) continue;
     const source = join(sourceRoot, entry.name);
     if (!existsSync(join(source, 'package.json'))) continue;
+    // The destination is cleared first, so a package skipped below cannot keep
+    // the copy an earlier bundling run left in the runtime.
+    const destination = join(PLUGINS_DIR, entry.name);
+    rmSync(destination, { recursive: true, force: true });
     const built = packageEntry(source);
     if (!existsSync(built)) {
       // A package whose sources this checkout does not hold cannot be built from
       // it; shipping the metadata alone would seed a copy nothing can import.
-      console.warn(`[bundle-runtime] local plugin ${entry.name} has no ${built}; not copied`);
+      step(`WARN: local plugin ${entry.name} has no ${built}; not copied`);
       continue;
     }
-    const destination = join(PLUGINS_DIR, entry.name);
-    rmSync(destination, { recursive: true, force: true });
     cpSync(source, destination, {
       recursive: true,
       filter: (path) => {

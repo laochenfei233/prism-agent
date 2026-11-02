@@ -43,7 +43,7 @@ commits: c21408d0fb..HEAD（交付时填写）
 - 安装包自己那份缺少声明的入口。这个尚未构建的包既不得替换一份能用的副本，也不得播下一份无法加载的副本 —— 正是这条守卫让三个未构建包没有毁掉可用的 profile 副本，它保留下来；
 - 目标是链接（pnpm 的 `link:` 投影或开发者做的 junction）。透过它写会落进另一个检出目录。
 
-替换是整体性的 —— 先 `remove_dir_all` 再复制 —— 新构建删掉的文件不会残留。替换失败时保留原有副本且不阻断启动：可能有另一个实例占着文件，下次启动会重试。`$DSH_HOME/profiles/.seeded-runtime` 记录最近一次整体对齐的安装包版本。
+替换是分步的：先把安装包的构建复制到同级的暂存目录，再把现有副本改名让位，最后把暂存目录改名到位。换位失败会恢复原副本，因此任何失败都不会留下被删了一半或缺失的 bundle，新构建删掉的文件也不会残留。换位失败不阻断启动；安装包保持未记录，下次启动重试。`$DSH_HOME/profiles/.seeded-runtime` 记录最近一次整体对齐的安装包版本。
 
 本地 bundle、市场 bundle（`dsh-plugin`）与 Windows 终端检测器副本共用一个辅助函数，因此「只复制一次」这个根因只修一处。
 
@@ -51,7 +51,9 @@ commits: c21408d0fb..HEAD（交付时填写）
 
 `bundle-runtime.mjs` 在复制之前构建本地 bundle：凡带 `tsdown.config.ts` 的 `plugins/<dir>`，都用检出目录自带的 tsdown 构建（`node_modules/tsdown`，工作目录设在该包）。构建没有产出声明入口时，打包以包名报错，三个未构建的 bundle 因此变成打包错误，而不是一次发行。
 
-复制步骤随后在控制台按包名跳过那些本检出压根产不出入口的包 —— `plugins/prism-meeting` 在这里只有元数据和一份构建产物，源码不在本检出 —— 而不是随包发行一个无人能导入的包。被跳过的包不会出现在 `runtime/plugins`，这正是真实状态：profile 解析不到它。
+复制步骤随后在控制台按包名跳过那些本检出压根产不出入口的包，而不是随包发行一个无人能导入的包；它还会先清掉上一次打包留在 `runtime/plugins` 里的东西。`plugins/prism-meeting` 就是这种情况：本仓库只跟踪它的清单、patch 与 README，只有当打包所用的检出本来就带着 `lib/` 时它才存在。
+
+被跳过的包会让 profile 继续选中这个名字：升级过的 profile 保留早先安装包播下的副本，加载器报该 bundle 无法解析，而插件页的「更新应用」补救也清不掉它 —— 因为本检出的任何发行都不再带这个包。恢复这些源码、或把该包安装进 profile，不在本次改动范围内。
 
 不使用各包自己的 `build`/`bundle` 脚本：在 workspace 之外，`pnpm run` 找不到本地 `node_modules/.bin`，并会先自动安装该目录。两个脚本名跑的都是 tsdown，而它正是每个随包插件声明的构建器。
 
@@ -62,7 +64,7 @@ commits: c21408d0fb..HEAD（交付时填写）
 ## [S3] Scope
 
 - 范围内：桌面播种（`apps/desktop/src-tauri/src/setup.rs`）、桌面运行时打包（`apps/desktop/scripts/bundle-runtime.mjs`）、插件管理页的不兼容补救（`packages/client/ui-plugin-manager`）、桌面 README 的打包说明。
-- 范围外：改变 `evaluatePluginCompatibility` 或 bundle 解析顺序；刷新用户自己安装的包；插件页里「重新播种」的动作；市场自身的更新流程。
+- 范围外：改变 `evaluatePluginCompatibility` 或 bundle 解析顺序；刷新用户自己安装的包；插件页里「重新播种」的动作；市场自身的更新流程；把 `plugins/prism-meeting` 的源码恢复到本仓库。
 
 ## Tasks
 

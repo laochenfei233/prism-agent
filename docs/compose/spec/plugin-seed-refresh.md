@@ -43,7 +43,7 @@ A copy is kept, and none is created, when either holds:
 - the installation's own copy lacks its declared entry. That unbuilt package must not replace a copy that works, nor seed one that cannot load — this is the guard that kept the three unbuilt bundles from destroying working profile copies, and it stays;
 - the destination is a link (a pnpm `link:` projection or a developer junction). Rewriting through it would write into another checkout.
 
-Replacement is wholesale — `remove_dir_all` then copy — so a file the new build dropped cannot linger. A replacement that fails leaves the existing copy and does not block startup: a second instance may hold a file, and the next launch retries. `$DSH_HOME/profiles/.seeded-runtime` records the installation version of the last full pass.
+Replacement is staged: the installation's build is copied to a sibling directory, the existing copy is renamed aside, and the staged copy is renamed into place. A swap that fails restores the existing copy, so no failure leaves a partially deleted or missing bundle, and a file the new build dropped cannot linger. A failed swap does not block startup; the installation stays unrecorded, so the next launch retries. `$DSH_HOME/profiles/.seeded-runtime` records the installation version of the last full pass.
 
 The local bundles, the market bundle (`dsh-plugin`), and the Windows terminal inspector copy share one helper, so the copy-once root cause is fixed once.
 
@@ -51,7 +51,9 @@ The local bundles, the market bundle (`dsh-plugin`), and the Windows terminal in
 
 `bundle-runtime.mjs` builds the local bundles before copying them: for every `plugins/<dir>` shipping a `tsdown.config.ts`, it runs the checkout's own tsdown (`node_modules/tsdown`, cwd at the package). A build that produces no declared entry fails packaging with the package's name, so the three unbuilt bundles become a packaging error instead of a release.
 
-The copy step then skips, on the console and by name, a package whose entry this checkout cannot produce at all — `plugins/prism-meeting` holds only metadata and a build output here, because its sources live outside this checkout — rather than shipping a package nothing can import. A skipped package is absent from `runtime/plugins`, which is the honest state: the profile cannot resolve it.
+The copy step then skips, on the console and by name, a package whose entry this checkout cannot produce at all, rather than shipping a package nothing can import, and it clears first whatever a previous bundling run left in `runtime/plugins`. `plugins/prism-meeting` is that case: this repository tracks only its manifest, patch and README, so its `lib/` exists only when the packaging checkout already held one.
+
+A skipped package leaves the profile still selecting the name: an upgraded profile keeps the copy an earlier installation seeded, the loader reports the bundle as unresolvable, and the app-update remedy on the plugin page cannot clear it, because no release of this checkout ships the package. Restoring those sources, or installing the package into the profile, is outside this change.
 
 The packages' own `build`/`bundle` scripts are not used: outside the workspace, `pnpm run` finds no local `node_modules/.bin` and auto-installs the directory first. tsdown is what both script names run, and it is the same builder every bundled plugin declares.
 
@@ -62,7 +64,7 @@ The packages' own `build`/`bundle` scripts are not used: outside the workspace, 
 ## [S3] Scope
 
 - In scope: desktop seeding (`apps/desktop/src-tauri/src/setup.rs`), desktop runtime packaging (`apps/desktop/scripts/bundle-runtime.mjs`), the plugin manager's incompatibility remedy (`packages/client/ui-plugin-manager`), and the desktop README packaging line.
-- Out of scope: changing `evaluatePluginCompatibility` or the bundle resolution order; refreshing user-installed packages; a plugin-manager action that re-seeds a bundle; the marketplace's own update flow.
+- Out of scope: changing `evaluatePluginCompatibility` or the bundle resolution order; refreshing user-installed packages; a plugin-manager action that re-seeds a bundle; the marketplace's own update flow; restoring `plugins/prism-meeting`'s sources to this repository.
 
 ## Tasks
 

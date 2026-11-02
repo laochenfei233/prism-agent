@@ -429,11 +429,14 @@ fn copy_is_stale(source: &Path, dest: &Path, refresh_all: bool) -> bool {
     if !declared_entry(source).is_some_and(|entry| entry.exists()) {
         return false;
     }
-    if !dest.exists() {
-        return true;
-    }
+    // A link is checked before existence: `exists` follows the link, so a
+    // dangling projection would otherwise look like a fresh destination and be
+    // written through.
     if is_link(dest) {
         return false;
+    }
+    if !dest.exists() {
+        return true;
     }
     if !declared_entry(dest).is_some_and(|entry| entry.exists()) {
         return true;
@@ -444,17 +447,27 @@ fn copy_is_stale(source: &Path, dest: &Path, refresh_all: bool) -> bool {
     fs::read(source.join("package.json")).ok() != fs::read(dest.join("package.json")).ok()
 }
 
-/// Replace a directory wholesale: copy into a sibling staging directory first,
-/// so a copy that fails part-way leaves the existing copy loadable.
+/// Replace a directory with the installation's build: copy into a sibling
+/// directory first, move the old copy aside, then put the new one in place. One
+/// rename follows the copy, and a failed swap restores the old copy, so no
+/// failure leaves a partially deleted or missing bundle.
 fn replace_dir(source: &Path, dest: &Path) -> Result<(), String> {
     let name = dest
         .file_name()
         .ok_or_else(|| format!("{} has no directory name", dest.display()))?;
-    let staging = dest.with_file_name(format!("{}.incoming", name.to_string_lossy()));
+    let sibling = |suffix: &str| dest.with_file_name(format!("{}.{suffix}", name.to_string_lossy()));
+    let staging = sibling("incoming");
+    let displaced = sibling("previous");
     fs::remove_dir_all(&staging).ok();
     copy_dir(source, &staging)?;
-    fs::remove_dir_all(dest).map_err(|e| e.to_string())?;
-    fs::rename(&staging, dest).map_err(|e| e.to_string())
+    fs::remove_dir_all(&displaced).ok();
+    fs::rename(dest, &displaced).map_err(|e| e.to_string())?;
+    if let Err(error) = fs::rename(&staging, dest) {
+        fs::rename(&displaced, dest).ok();
+        return Err(error.to_string());
+    }
+    fs::remove_dir_all(&displaced).ok();
+    Ok(())
 }
 
 /// Seed or refresh one launcher-owned copy from the installation.
@@ -521,7 +534,8 @@ fn record_installation(home: &Path, runtime_plugins: &Path) {
 #[cfg(test)]
 mod seed_tests {
     use super::{
-        copy_is_stale, installation_changed, place_launcher_copy, record_installation,
+        copy_is_stale, ensure_local_bundles, installation_changed, place_launcher_copy,
+        record_installation,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -614,6 +628,47 @@ mod seed_tests {
     }
 
     #[test]
+    fn a_bundle_this_installation_cannot_build_is_still_selected() {
+        let root = scratch("selected");
+        let runtime_plugins = root.join("runtime").join("plugins");
+        let source = runtime_plugins.join("example");
+        fs::create_dir_all(&source).expect("plugin dir");
+        fs::write(
+            source.join("package.json"),
+            "{\"name\":\"@prism/example\",\"version\":\"0.1.0\",\"main\":\"lib/index.js\",\
+             \"dsh\":{\"bundle\":{\"patch\":\"./cordis.patch.yml\"}}}",
+        )
+        .expect("manifest");
+
+        let (names, current) = ensure_local_bundles(&root, &runtime_plugins, false).expect("selected");
+        assert_eq!(names, vec!["@prism/example".to_string()]);
+        assert!(current);
+        assert!(!root
+            .join("profiles")
+            .join("node_modules")
+            .join("@prism")
+            .join("example")
+            .exists());
+    }
+
+    #[test]
+    fn a_dangling_link_is_never_written_through() {
+        let root = scratch("dangling");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let target = root.join("checkout").join("example");
+        plugin(&target, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        fs::create_dir_all(dest.parent().expect("parent")).expect("parent dir");
+        make_dir_link(&target, &dest).expect("junction");
+        fs::remove_dir_all(&target).expect("target removed");
+
+        assert!(!copy_is_stale(&source, &dest, true));
+        assert!(place_launcher_copy(&source, &dest, true).expect("kept"));
+        assert!(!dest.join("lib").join("index.js").exists());
+    }
+
+    #[test]
     fn a_copy_without_its_entry_is_replaced() {
         let root = scratch("entryless");
         let source = root.join("plugins").join("example");
@@ -635,11 +690,9 @@ mod seed_tests {
         plugin(&target, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
         let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
         fs::create_dir_all(dest.parent().expect("parent")).expect("parent dir");
-        if make_dir_link(&target, &dest).is_err() {
-            // Creating a directory link needs a privilege this host may not
-            // grant; the guard itself is what the case pins.
-            return;
-        }
+        // A junction is the link pnpm projects into the profile, and NTFS
+        // creates one without a privilege.
+        make_dir_link(&target, &dest).expect("junction");
 
         assert!(!copy_is_stale(&source, &dest, true));
         assert!(place_launcher_copy(&source, &dest, true).expect("kept"));
@@ -704,5 +757,3 @@ mod seed_tests {
         }
     }
 }
-
-
