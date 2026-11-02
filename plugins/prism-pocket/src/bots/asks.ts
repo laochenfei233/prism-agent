@@ -150,8 +150,8 @@ export class BotAskRelay {
       }
       return true
     }
-    const reply = classifyAskReply(text)
-    if (reply !== 'number') {
+    // Digits map to the question's own options; 1/2 are not yes/no here.
+    if (!/^[0-9]+$/u.test(text.trim())) {
       void this.deps.send(channel, chatId, '回复编号 · reply a number')
       return true
     }

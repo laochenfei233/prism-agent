@@ -98,7 +98,7 @@ html.prism-active [data-slot="main"] table {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 640px;
+  max-width: 720px;
   color: var(--dsw-alias-label-primary);
 }
 .prism-panel {
@@ -211,6 +211,185 @@ html.prism-active [data-slot="main"] table {
   color: var(--dsw-alias-label-secondary);
 }
 .prism-page-message[data-tone='error'] { color: var(--dsw-alias-state-error-primary); }
+
+/* The phone panel: the QR is the page's signature element — a white plate
+   either theme scans, flanked by the verdict and the missing steps. */
+.prism-phone {
+  display: grid;
+  grid-template-columns: minmax(168px, 216px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.prism-phone-qr {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.prism-qr {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--dsw-radius-md, 8px);
+  background: #fff;
+  box-shadow: 0 0 0 0.5px var(--dsw-alias-border-l1);
+}
+.prism-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.prism-qr-empty {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 24px 12px;
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+.prism-qr-caption {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
+}
+.prism-phone-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+@media (max-width: 560px) {
+  .prism-phone { grid-template-columns: 1fr; }
+}
+
+/* The channel cards: a quiet list with one brand chip each. */
+.prism-channels {
+  display: flex;
+  flex-direction: column;
+}
+.prism-channel {
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  padding-top: 12px;
+}
+.prism-channel:first-child { border-top: 0; padding-top: 0; }
+.prism-channel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.prism-channel-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+  user-select: none;
+}
+.prism-channel-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.prism-channel-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.prism-channel-tag {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 18px;
+}
+.prism-channel-status {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.prism-channel-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: var(--dsw-alias-label-quaternary, var(--dsw-alias-border-l4));
+  vertical-align: 1px;
+}
+.prism-channel-status[data-tone='online']::before { background: var(--dsw-alias-state-success-primary); }
+.prism-channel-status[data-tone='starting']::before { background: var(--dsw-alias-state-warn-primary); }
+.prism-channel-status[data-tone='error'] { color: var(--dsw-alias-state-error-primary); }
+.prism-channel-status[data-tone='error']::before { background: var(--dsw-alias-state-error-primary); }
+.prism-channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.prism-channel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-2);
+}
+.prism-channel-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.prism-channel-link {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: none;
+}
+.prism-channel-link:hover { text-decoration: underline; }
+.prism-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prism-field-label {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+.prism-field-set { color: var(--dsw-alias-state-success-primary); }
+.prism-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+}
+.prism-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+}
+select.prism-input { height: 30px; }
 .prism-button {
   display: inline-flex;
   align-items: center;

@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { BotChannelId, BotConfig, BotEntry, BotStoreBody } from './types.ts'
+import { BOT_CHANNELS } from './types.ts'
 import { reviveBotConfig } from './validate.ts'
 
 /** Read a store body without trusting it; corrupt or missing yields empty. */
@@ -127,7 +128,7 @@ export class BotStore {
 
   /** Every channel currently enabled, in page order. */
   enabledChannels(): readonly BotChannelId[] {
-    return (Object.keys(this.body.bots) as BotChannelId[]).filter(channel => this.body.bots[channel]?.enabled === true)
+    return BOT_CHANNELS.filter(channel => this.body.bots[channel]?.enabled === true)
   }
 
   /** Rewrite the file atomically with owner-only permissions. */
