@@ -19,10 +19,22 @@ const bundlePath = resolve(here, '../lib/client.js')
 
 const rows = []
 
+// Browser surfaces the panel touches: the module-loader handoff, the placement
+// preference, and the window events that publish a change.
+const storage = new Map()
+globalThis.localStorage = {
+  getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+  setItem: (key, value) => { storage.set(key, String(value)) },
+  removeItem: (key) => { storage.delete(key) },
+}
+
 globalThis.window = {
   __ModuleLoader__: {
     load: (row) => { rows.push(row) },
   },
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => true,
 }
 
 const require = createRequire(import.meta.url)
@@ -216,7 +228,8 @@ rowElements[0].props.onClick()
 if (opened[0] !== 'session-a') throw new Error(`clicking the first row opened ${String(opened[0])}`)
 
 // The approval renders under its own session with both decisions, and only
-// there: the question-kind wait on session-d keeps its chip and no strip.
+// there: the question-kind wait on session-d keeps its chip and no strip. The
+// shipped placement is this panel, so the strip carries the decisions.
 const strips = findAll(page.component(pageProps), node => node.props?.className === 'ap-approval')
 if (strips.length !== 1) throw new Error(`expected one approval strip, received ${strips.length}`)
 for (const needle of ['Write notes.txt', 'reject', 'allowOnce']) {
@@ -228,6 +241,22 @@ if (allow.length !== 1) throw new Error(`expected one allow decision, received $
 allow[0].props.onClick()
 if (approvals.length !== 1 || approvals[0] !== 'allowed-once') {
   throw new Error(`the allow decision sent ${JSON.stringify(approvals)}`)
+}
+
+// Switching the placement to the session list moves the decisions out of the
+// panel and leaves the request readable with a hint.
+const placementButtons = findAll(page.component(pageProps), node => node.props?.className === undefined
+  && node.type === 'button' && node.props?.onClick !== undefined && String(textOf(node)) === 'placement.list')
+if (placementButtons.length !== 1) throw new Error(`expected one list-placement control, received ${placementButtons.length}`)
+placementButtons[0].props.onClick()
+if (storage.get('dsh.approval.placement') !== 'list') {
+  throw new Error(`the placement control wrote ${String(storage.get('dsh.approval.placement'))}`)
+}
+const listMode = findAll(page.component(pageProps), node => node.props?.className === 'ap-approval')
+if (listMode.length !== 1) throw new Error(`expected the strip to stay readable, received ${listMode.length}`)
+if (!textOf(listMode[0]).includes('hint.list')) throw new Error(`the strip lost its placement hint: ${textOf(listMode[0])}`)
+if (findAll(page.component(pageProps), node => node.props?.className === 'ap-approval-allow').length !== 0) {
+  throw new Error('the panel kept the decisions while the session list owns them')
 }
 
 const iconText = textOf(panelRow.component({ size: 16, active: true }))

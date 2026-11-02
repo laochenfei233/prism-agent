@@ -113,14 +113,14 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     within(waitingRow).getByText('Waiting for approval')
     within(waitingRow).getByText('Approval')
   })
-  // The same request is answerable from its Session row: the row carries the
-  // requester's summary and its own two decisions, whose accessible names name
-  // the Session so the composer card keeps the only plain "Allow once".
+  // The same request is readable in its Session row. The shipped placement puts
+  // the decisions in the Progress panel, so the row shows the requester's
+  // summary and says where the decisions are instead of repeating them.
   await waitFor(() => {
     within(waitingRow).getByText('fixture 常驻审批（可答：批准/拒绝后消失）')
   })
-  within(waitingRow).getByRole('button', { name: 'Allow once for Fixture 历史会话' })
-  within(waitingRow).getByRole('button', { name: 'Reject for Fixture 历史会话' })
+  within(waitingRow).getByText('Approve in Progress')
+  expect(within(waitingRow).queryByRole('button', { name: 'Allow once for Fixture 历史会话' })).toBeNull()
   fireEvent.click(allowOnce)
   // Answering in either place settles the one Host request and withdraws both.
   await waitFor(() => { expect(document.querySelector('[data-row-approval]')).toBeNull() })

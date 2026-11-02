@@ -32,3 +32,10 @@
   color: var(--dsw-alias-state-error-primary);
   border-color: transparent;
 }
+
+.hint {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}

@@ -1,8 +1,9 @@
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5).
 /**
  * Browser approval consumer over the existing scoped Remote Event waterfall,
  * presenting one request in two places: the composer takeover of the Session
- * that asked, and the second line of that Session's row in the sidebar.
+ * that asked, and the second line of that Session's row in the sidebar. A
+ * placement preference decides which of the two carries the decisions.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -17,8 +18,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { ApprovalPanel } from './ApprovalPanel.tsx'
 import { RowApproval } from './RowApproval.tsx'
-import type { ApprovalInjected } from './contract/slots.ts'
+import type { ApprovalInjected, ApprovalRowInjected } from './contract/slots.ts'
 import { PendingApproval } from './contract/slots.ts'
+import { approvalPlacementSource } from './placement.ts'
 import { en, zh } from './locales.ts'
 
 export type {
@@ -26,8 +28,11 @@ export type {
   ApprovalDecision,
   ApprovalDetailOwnerProps,
   ApprovalPresentationRequest,
+  ApprovalRowInjected,
+  ApprovalRowProps,
   PendingApproval,
 } from './contract/slots.ts'
+export type { ApprovalPlacement } from './placement.ts'
 export type { ApprovalKey } from './locales.ts'
 
 /** Required services: Agent scopes, Remote Events, Session UI, Slot registry, and copy. */
@@ -101,6 +106,13 @@ export function apply(ctx: ClientContext): void {
   const approvalInjected = (): ApprovalInjected => ({
     resolveReason: (reason: NonNullable<PendingApproval['displayReason']>) => ctx.locale.resolveText(reason),
   })
+  // One source per registration would also work; sharing one instance keeps the
+  // renderer's hook cache keyed on a single identity for the whole plugin.
+  const placement = approvalPlacementSource()
+  const rowApprovalInjected = (): ApprovalRowInjected => ({
+    ...approvalInjected(),
+    hooks: { placement },
+  })
   ctx.slots.inject('conversation.composer', () => ctx.slots.register({
     name: 'conversation.composer',
     priority: 1,
@@ -118,7 +130,7 @@ export function apply(ctx: ClientContext): void {
     name: 'sidebar.workspaces.session.pending',
     id: 'approval.pending',
     locale: NS,
-    inject: approvalInjected,
+    inject: rowApprovalInjected,
   }, RowApproval))
   ctx.remote.$on('approval/request', function (request, next) {
     return answerApproval(ctx, this, request, next, registerPendingInteraction)

@@ -30,6 +30,9 @@ function rowProps(
     sessionId,
     displayTitle: 'Notes session',
     useSessionStatus: selector => selector(snapshot),
+    // The row carries the decisions while the placement names this surface;
+    // one case below flips it to the panel.
+    usePlacement: selector => selector('list'),
     resolveReason: (reason: NonNullable<PendingApproval['displayReason']>) => reason.en,
     t: (key: string, params?: Record<string, string>) => {
       const template = messages[key] ?? key
@@ -53,6 +56,19 @@ describe('RowApproval', () => {
     expect(document.querySelector('[data-row-approval="write"]')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Reject for Notes session' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Allow once for Notes session' })).toBeTruthy()
+  })
+
+  it('keeps the summary readable and the decisions in the panel while the placement says so', () => {
+    const pending = new PendingApproval(id('s1'), { toolName: 'write', reason: 'Write notes.txt' })
+    render(<RowApproval {...rowProps(pending, { usePlacement: selector => selector('progress') })} />)
+
+    expect(screen.getByText('Write notes.txt')).toBeTruthy()
+    expect(screen.getByText('hint.progress')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Allow once for Notes session' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reject for Notes session' })).toBeNull()
+    expect(document.querySelector('[data-row-approval="write"]')).not.toBeNull()
+    pending.abort(new Error('test cleanup'))
+    void pending.result.catch(() => {})
   })
 
   it('prefers requester-owned presentation copy and falls back to the tool copy', () => {

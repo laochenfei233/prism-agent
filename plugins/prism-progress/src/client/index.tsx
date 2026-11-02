@@ -12,12 +12,13 @@
  * the per-session status snapshot), so this plugin adds no Host service, RPC
  * surface, or storage.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   deriveProgress, type ApprovalDecision, type ApprovalRequest, type ProgressRow, type SessionListLike, type SessionStatusLike,
 } from './progress.ts'
+import { PLACEMENT_EVENT, readPlacement, writePlacement, type ApprovalPlacement } from './placement.ts'
 import { en, NS, zh } from './locales.ts'
 import { PANEL_CSS } from './styles.ts'
 
@@ -109,20 +110,22 @@ function RowProgress({ row, t }: { row: ProgressRow, t: Translate }) {
 }
 
 /**
- * The pending approval under its session: the requester's one-line summary and
- * the two decisions. It sits beside the row rather than inside it, because the
- * row is itself a button and a decision nested in a button is not a control a
- * browser can activate.
+ * The pending approval under its session: the requester's one-line summary and,
+ * when this surface carries the decisions, the two of them. It sits beside the
+ * row rather than inside it, because the row is itself a button and a decision
+ * nested in a button is not a control a browser can activate.
  * @param props.approval - the request to present.
  * @param props.title - the session's displayed title, named in each accessible name.
  * @param props.resolveReason - resolves requester-owned copy in the UI language.
+ * @param props.actionable - whether the reader's placement puts the decisions here.
  * @param props.t - the panel's translator.
  * @returns the approval strip.
  */
-function ApprovalBar({ approval, title, resolveReason, t }: {
+function ApprovalBar({ approval, title, resolveReason, actionable, t }: {
   approval: ApprovalRequest
   title: string
   resolveReason: (copy: Readonly<Record<string, string>>) => string
+  actionable: boolean
   t: Translate
 }) {
   const [answered, setAnswered] = useState(false)
@@ -143,24 +146,30 @@ function ApprovalBar({ approval, title, resolveReason, t }: {
         {text.length > 0 ? text : t('approvalFallback').replace('{tool}', approval.toolName)}
       </span>
       <span className="ap-approval-actions">
-        <button
-          type="button"
-          className="ap-approval-reject"
-          disabled={answered}
-          aria-label={t('rejectFor').replace('{title}', title)}
-          onClick={() => { answer('rejected') }}
-        >
-          {t('reject')}
-        </button>
-        <button
-          type="button"
-          className="ap-approval-allow"
-          disabled={answered}
-          aria-label={t('allowOnceFor').replace('{title}', title)}
-          onClick={() => { answer('allowed-once') }}
-        >
-          {t('allowOnce')}
-        </button>
+        {actionable
+          ? (
+            <>
+              <button
+                type="button"
+                className="ap-approval-reject"
+                disabled={answered}
+                aria-label={t('rejectFor').replace('{title}', title)}
+                onClick={() => { answer('rejected') }}
+              >
+                {t('reject')}
+              </button>
+              <button
+                type="button"
+                className="ap-approval-allow"
+                disabled={answered}
+                aria-label={t('allowOnceFor').replace('{title}', title)}
+                onClick={() => { answer('allowed-once') }}
+              >
+                {t('allowOnce')}
+              </button>
+            </>
+          )
+          : <span className="ap-approval-hint">{t('hint.list')}</span>}
       </span>
     </div>
   )
@@ -177,6 +186,20 @@ export function AgentProgressPanel(props: PageProps) {
   const list = props.useSessions(state => state)
   const status = props.useSessionStatus(state => state)
   const view = useMemo(() => deriveProgress(list, status), [list, status])
+  const [placement, setPlacement] = useState<ApprovalPlacement>(readPlacement)
+  useEffect(() => {
+    const sync = (): void => { setPlacement(readPlacement()) }
+    window.addEventListener('storage', sync)
+    window.addEventListener(PLACEMENT_EVENT, sync)
+    return () => {
+      window.removeEventListener('storage', sync)
+      window.removeEventListener(PLACEMENT_EVENT, sync)
+    }
+  }, [])
+  const choosePlacement = (value: ApprovalPlacement): void => {
+    writePlacement(value)
+    setPlacement(value)
+  }
   const now = Date.now()
 
   return (
@@ -194,6 +217,22 @@ export function AgentProgressPanel(props: PageProps) {
           </p>
         </div>
         <span className="ap-spacer" />
+        <span className="ap-placement" role="group" aria-label={props.t('placement.aria')}>
+          <button
+            type="button"
+            aria-pressed={placement === 'progress'}
+            onClick={() => { choosePlacement('progress') }}
+          >
+            {props.t('placement.progress')}
+          </button>
+          <button
+            type="button"
+            aria-pressed={placement === 'list'}
+            onClick={() => { choosePlacement('list') }}
+          >
+            {props.t('placement.list')}
+          </button>
+        </span>
         <button type="button" onClick={() => { props.refresh() }}>{props.t('refresh')}</button>
       </header>
       {view.rows.length === 0 ? (
@@ -235,6 +274,7 @@ export function AgentProgressPanel(props: PageProps) {
                     approval={row.approval}
                     title={row.title}
                     resolveReason={props.resolveReason}
+                    actionable={placement === 'progress'}
                     t={props.t}
                   />
                 )}

@@ -2,9 +2,10 @@
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
-  PropsLocale, PropsRenderSlots, PropsRuntime,
+  HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ApprovalKey } from '../locales.ts'
+import type { ApprovalPlacement } from '../placement.ts'
 
 /* jscpd:ignore-start -- Approval and Question intentionally own independent pending-settlement lifecycles. */
 function settlePendingComposer(settle: () => void, failureMessage: string): Promise<void> {
@@ -184,6 +185,24 @@ export interface ApprovalInjected {
    */
   resolveReason(reason: NonNullable<ApprovalPresentationRequest['displayReason']>): string
 }
+
+/**
+ * Row occupant share: the same reason resolver plus the placement the reader
+ * chose. The placement rides the reserved `hooks` compartment, so the occupant
+ * reads it through its bound `usePlacement` hook and never sees the source.
+ */
+export interface ApprovalRowInjected extends ApprovalInjected {
+  hooks: {
+    /** Where the decisions live; both surfaces stay readable either way. */
+    placement: HostObservable<ApprovalPlacement>
+  }
+}
+
+/** Full props of the Session-row occupant. */
+export type ApprovalRowProps =
+  PropsRuntime<'sidebar.workspaces.session.pending'>
+  & PropsLocale<'approval'>
+  & InjectFace<ApprovalRowInjected>
 
 /** Full props of the approval composer takeover. */
 export type ApprovalComposerProps =

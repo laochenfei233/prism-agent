@@ -22,20 +22,28 @@ One row per session, most relevant first (running, then most recently active):
 | goal chip | the `goal` projection value |
 | plan-mode chip | the `plan` projection value |
 | waiting / new-result chips | the session-status snapshot (`pendingInteraction`, `completionUnread`) |
-| approval strip | the `pendingInteraction` value when it is an approval: the requester's one-line text plus Reject and Allow once |
+| approval strip | the `pendingInteraction` value when it is an approval: the requester's one-line text plus Reject and Allow once while this panel owns the decisions |
 
-The header summarises running sessions and open todos. Clicking a row opens
-that session through `ctx.uiWorkspace.openSession` and closes the panel.
+The header summarises running sessions and open todos and carries the
+**approval placement** control. Clicking a row opens that session through
+`ctx.uiWorkspace.openSession` and closes the panel.
 
 A session waiting on an **approval** also carries a strip under its row: the
 request's own text (the requester's localized copy when it supplies one, else
-its audit reason) and the two decisions. The strip renders beside the row
-rather than inside it, because the row is itself a button and a decision nested
-in a button is not a control a browser can activate. Answering there settles
-the same request the conversation's approval card shows, and both disappear
-together. The panel reads the value structurally — `kind`, the text fields, and
-an `answer` callback — so it needs no import from the package that publishes
-it and no Host surface of its own.
+its audit reason) and, while this panel owns the decisions, Reject and Allow
+once. The strip renders beside the row rather than inside it, because the row is
+itself a button and a decision nested in a button is not a control a browser can
+activate. Answering there settles the same request the conversation's approval
+card shows, and both disappear together. The panel reads the value structurally
+— `kind`, the text fields, and an `answer` callback — so it needs no import from
+the package that publishes it and no Host surface of its own.
+
+The placement control writes one browser preference shared with the shipped
+approval UI: `dsh.approval.placement`, values `progress` (the shipped default)
+and `list`, published to the other surface through a `dsh:approval-placement`
+window event. Whichever surface does not own the decisions keeps showing the
+request's text with a hint naming the other one, so an approval is never
+invisible and never answerable in two places at once.
 
 ## What it does not do
 

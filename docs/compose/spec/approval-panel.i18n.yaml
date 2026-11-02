@@ -3,41 +3,47 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/approval-panel.md
 /:
-  en: 5fd02328d820c7e1
-  zh: 5fd02328d820c7e1
-/approval-in-the-progress-panel:
-  en: f55f8420438b0536
-  zh: 83575068e77566de
-/approval-in-the-progress-panel/report:
-  en: ce3c16d85ce1cb0a
-  zh: 3a1f260267c6db73
-/approval-in-the-progress-panel/s1-problem:
-  en: 2cf4ff8b6851529a
-  zh: 2c4ef4248a657f49
-/approval-in-the-progress-panel/s2-design:
+  en: 027ef89eb964e681
+  zh: 027ef89eb964e681
+/approval-surfaces:
+  en: f5973805360ceef4
+  zh: 4770aca70a681d59
+/approval-surfaces/report:
+  en: 54777c4b4d03cafb
+  zh: 395a07506aeae42a
+/approval-surfaces/s1-problem:
+  en: 4eb9521087e21f16
+  zh: d770486636c492ee
+/approval-surfaces/s2-design:
   en: ecbb0dbfa14686f0
   zh: 3c4e147edaa36f87
-/approval-in-the-progress-panel/s2-design/s2-1-where-the-value-comes-from:
-  en: 039473576e18c33c
-  zh: 1bcd1f11497416b2
-/approval-in-the-progress-panel/s2-design/s2-2-where-the-strip-sits:
-  en: e0a4881b8acb53f3
-  zh: a78fcc095b3d23e1
-/approval-in-the-progress-panel/s2-design/s2-3-what-the-strip-shows-and-does:
-  en: d73c9418197b4d03
-  zh: 52c3c4cd772a827b
-/approval-in-the-progress-panel/s2-design/s2-4-limits:
-  en: 26071b7a30f3be4d
-  zh: 0bf5b25317595fd4
-/approval-in-the-progress-panel/s2-design/s2-5-tests:
-  en: 9d4b02c370dd4fe2
-  zh: 1ad50c5a1e73411a
-/approval-in-the-progress-panel/s3-scope:
-  en: 4fd8eaf69e28827b
-  zh: b4aaa472d08690d8
-/approval-in-the-progress-panel/tasks:
-  en: ae165ba862a75591
-  zh: 988ad0b8b740cfcf
-/approval-in-the-progress-panel/s4-acceptance:
-  en: 40fed8620b56b2e0
-  zh: ac8526e7148b13c1
+/approval-surfaces/s2-design/s2-1-where-the-value-comes-from:
+  en: d8a00c13d22646c1
+  zh: a2b4324cb3298e4a
+/approval-surfaces/s2-design/s2-2-the-two-surfaces:
+  en: 4620684d3a5d342a
+  zh: 227dc193d9009674
+/approval-surfaces/s2-design/s2-3-the-placement-preference:
+  en: 79dba0c56a69e607
+  zh: d2a7da9fe4eeb2b2
+/approval-surfaces/s2-design/s2-4-answering:
+  en: bcdfad86aa5298f1
+  zh: 3a306bcbed6efec5
+/approval-surfaces/s2-design/s2-5-limits:
+  en: 1d6d30769882c04a
+  zh: 564c919acc4af2ac
+/approval-surfaces/s2-design/s2-6-tests:
+  en: 3c5d0895a77034af
+  zh: 416a1f81ac06ccf0
+/approval-surfaces/s3-scope:
+  en: 5844a3411ab01f42
+  zh: 9435f0670e14a1cc
+/approval-surfaces/tasks:
+  en: 6625775223c1c4a7
+  zh: 1905504022a09bb7
+/approval-surfaces/s4-acceptance:
+  en: fb469cad9a40eaf8
+  zh: eca694f5d76c70c9
+/approval-surfaces/s5-upstream-divergence:
+  en: dc39f6c1f5fd8186
+  zh: e9041b07f3d09499

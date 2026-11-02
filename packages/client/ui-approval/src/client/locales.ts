@@ -10,6 +10,8 @@ export const zh = {
   allowOnce: '允许一次',
   'rejectFor': '拒绝：{title}',
   'allowOnceFor': '允许一次：{title}',
+  'hint.progress': '在进展面板审批',
+  'hint.list': '在对话列表审批',
 } satisfies Record<string, string>
 
 /** Approval dictionary key union. */
@@ -24,4 +26,6 @@ export const en = {
   allowOnce: 'Allow once',
   'rejectFor': 'Reject for {title}',
   'allowOnceFor': 'Allow once for {title}',
+  'hint.progress': 'Approve in Progress',
+  'hint.list': 'Approve in the session list',
 } satisfies Record<ApprovalKey, string>

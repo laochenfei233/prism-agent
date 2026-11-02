@@ -45,4 +45,8 @@ export const PANEL_CSS = `
 .ap-approval-allow{border-color:transparent!important;background:var(--dsw-alias-state-business-primary,#4176e6);color:#fff}
 .ap-approval-allow:hover:not(:disabled){filter:brightness(1.06)}
 .ap-approval button:disabled{opacity:.55;cursor:default}
+.ap-approval-hint{font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary,#81858c);white-space:nowrap}
+.ap-placement{display:flex;align-items:center;gap:2px;padding:2px;border-radius:15px;background:var(--dsw-alias-bg-module-platform,#f5f6f7)}
+.ap-placement button{min-height:26px;padding:0 10px;border:0;border-radius:13px;background:transparent;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#61666b)}
+.ap-placement button[aria-pressed=true]{background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#0f1115);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 `
