@@ -8,7 +8,7 @@ kind: "package-reference"
 
 ## 概述
 
-基于 Agent-scoped Remote Event waterfall 的浏览器审批界面。插件通过 `ctx.uiSession` 发布每个待处理请求、接管 Conversation composer、按需渲染关联的 Tool 详情，并将用户决定返回给等待中的 Host 请求。同一个请求还会作为该 Session 侧栏行的第二行出现：请求方的一行摘要，以及——只有当读者的「审批位置」偏好把它放在这里时的——两个决定。该偏好（`dsh.approval.placement`，默认进展面板）与 `plugins/prism-progress` 里的进展面板共用，因此只有一处带「拒绝」与「允许一次」，另一处给出说明它的提示。当浏览器必须为等待中的 Host 操作收集批准时，请使用它。卡片可以用键盘作答：卡片持有焦点时 Enter 允许一次、Escape 拒绝；方向键在两个动作之间移动焦点，Enter 按下当前聚焦的动作；两条路径调用与按钮相同的处理函数。
+基于 Agent-scoped Remote Event waterfall 的浏览器审批界面。插件通过 `ctx.uiSession` 发布每个待处理请求、接管 Conversation composer、按需渲染关联的 Tool 详情，并将用户决定返回给等待中的 Host 请求。同一个请求还会作为该 Session 侧栏行的第二行出现：请求方的一行摘要，以及——只有当读者的「审批位置」偏好把它放在这里时的——两个决定。该偏好（`dsh.approval.placement`，默认进展面板）与 `plugins/prism-progress` 里的进展面板共用，并且在通用设置里也提供一行入口，因此只有一处带「拒绝」与「允许一次」，另一处给出说明它的提示。当浏览器必须为等待中的 Host 操作收集批准时，请使用它。卡片可以用键盘作答：卡片持有焦点时 Enter 允许一次、Escape 拒绝；方向键在两个动作之间移动焦点，Enter 按下当前聚焦的动作；两条路径调用与按钮相同的处理函数。
 
 ## 目录
 

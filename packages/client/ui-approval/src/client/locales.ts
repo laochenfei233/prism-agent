@@ -12,6 +12,10 @@ export const zh = {
   'allowOnceFor': '允许一次：{title}',
   'hint.progress': '在进展面板审批',
   'hint.list': '在对话列表审批',
+  'settings.title': '审批位置',
+  'settings.description': '「拒绝」与「允许一次」显示在哪里；另一处只显示请求内容。',
+  'settings.progress': '进展面板',
+  'settings.list': '对话列表',
 } satisfies Record<string, string>
 
 /** Approval dictionary key union. */
@@ -28,4 +32,8 @@ export const en = {
   'allowOnceFor': 'Allow once for {title}',
   'hint.progress': 'Approve in Progress',
   'hint.list': 'Approve in the session list',
+  'settings.title': 'Where approvals are answered',
+  'settings.description': 'Reject and Allow once appear here; the other place keeps showing the request.',
+  'settings.progress': 'Progress panel',
+  'settings.list': 'Session list',
 } satisfies Record<ApprovalKey, string>

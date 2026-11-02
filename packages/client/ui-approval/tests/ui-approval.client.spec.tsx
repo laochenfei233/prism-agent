@@ -224,7 +224,7 @@ describe('approval Remote Event consumer', () => {
       .resolves.toBe('unavailable')
     expect(next).toHaveBeenCalledOnce()
     expect(bench.pending.getSnapshot()).toEqual([])
-    expect(bench.register).toHaveBeenCalledTimes(2)
+    expect(bench.register).toHaveBeenCalledTimes(3)
   })
 
   it('publishes one scoped takeover, returns the answer, and keeps stable registrations', async () => {
@@ -263,7 +263,7 @@ describe('approval Remote Event consumer', () => {
     await expect(result).resolves.toBe('allowed-once')
     expect(next).not.toHaveBeenCalled()
     expect(bench.pending.getSnapshot()).toEqual([])
-    expect(bench.register).toHaveBeenCalledTimes(2)
+    expect(bench.register).toHaveBeenCalledTimes(3)
     expect(bench.disposeSlot).not.toHaveBeenCalled()
     await scope.fiber.dispose()
   })
@@ -323,7 +323,7 @@ describe('approval Remote Event consumer', () => {
   it('removes stable registrations with the plugin lifetime', async () => {
     const bench = await setupPlugin()
     await bench.ctx.fiber.dispose()
-    expect(bench.disposeSlot).toHaveBeenCalledTimes(2)
+    expect(bench.disposeSlot).toHaveBeenCalledTimes(3)
     expect(bench.disposeLocale).toHaveBeenCalledOnce()
   })
 })

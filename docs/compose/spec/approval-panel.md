@@ -33,7 +33,7 @@ The panel does not import the package that publishes the value. It reads the sha
 
 ### S2.3 The placement preference
 
-One browser preference, written and read on both sides: key `dsh.approval.placement`, window event `dsh:approval-placement`, values `progress` (shipped default) and `list`. The panel's header carries a two-button group that writes it, using `aria-pressed` for the active choice. Each surface reads the placement through its own channel — the row occupant through the injected `hooks` compartment, the panel through local state it refreshes on the event and on `storage` changes — and renders either the decisions or a hint naming the other surface.
+One browser preference, written and read on both sides: key `dsh.approval.placement`, window event `dsh:approval-placement`, values `progress` (shipped default) and `list`. Two controls write it: the Progress panel's header carries a two-button group (`aria-pressed` for the active choice), and Settings → General carries an `ApprovalPlacementRow` in the `settings.general.item` list slot — so a reader who never opens the panel can still find the option. Each surface reads the placement through its own channel — the row occupant and the settings row through the injected `hooks` compartment, the panel through local state it refreshes on the event and on `storage` changes — and renders either the decisions or a hint naming the other surface.
 
 The preference is per browser and per origin, like the other view preferences; it is not a Host setting and does not travel between devices.
 
@@ -49,13 +49,13 @@ Only the owning surface renders 拒绝 / 允许一次. Each decision calls the r
 
 ### S2.6 Tests
 
-- `ui-approval` spec: the occupant shows the summary in both placements, offers the decisions only when the placement names the row, and answers through the request.
+- `ui-approval` spec: the occupant shows the summary in both placements, offers the decisions only when the placement names the row, and answers through the request; the Settings row shows both places, writes the chosen one, and reflects a value changed elsewhere.
 - `ui-workspace` spec: the seat renders only for a row with a pending interaction, and the stylesheet grows the row only for an occupied line.
 - `prism-progress` smoke (`scripts/smoke.mjs`): loads the built bundle through the module-loader handoff, asserts the strip with decisions under the shipped placement, switches the placement through the header control, and asserts the strip keeps the text with a hint and no decisions.
 
 ## [S3] Scope
 
-- In scope: the row seat and its occupant, the panel strip, the placement preference and its control, the dictionary keys, the styles, and the tests above.
+- In scope: the row seat and its occupant, the panel strip, the placement preference and its two controls (panel header, General settings), the dictionary keys, the styles, and the tests above.
 - Out of scope: the composer card, Host approval semantics, structured summary fields, notifications, and per-Session placement.
 
 ## Tasks
@@ -63,7 +63,7 @@ Only the owning surface renders 拒绝 / 允许一次. Each decision calls the r
 - [x] T1: Declare the row seat and render its occupant (`ui-workspace`, `ui-approval`)
 - [x] T2: Derive the pending approval for the panel and render its strip (`prism-progress`)
 - [x] T3: Store, publish, and read the placement preference on both sides
-- [x] T4: Put the placement control in the panel header
+- [x] T4: Put the placement control in the panel header and in General settings
 - [x] T5: Component specs and the plugin smoke for both placements
 - [x] T6: Rebuild `lib/client.js` and update the three README pairs and this document
 

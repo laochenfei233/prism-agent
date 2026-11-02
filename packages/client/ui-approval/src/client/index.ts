@@ -17,10 +17,11 @@ import type { TypertClientEventListener } from '@deepseek-ai/dsh-typert-protocol
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { ApprovalPanel } from './ApprovalPanel.tsx'
+import { ApprovalPlacementRow } from './ApprovalPlacementRow.tsx'
 import { RowApproval } from './RowApproval.tsx'
 import type { ApprovalInjected, ApprovalRowInjected } from './contract/slots.ts'
 import { PendingApproval } from './contract/slots.ts'
-import { approvalPlacementSource } from './placement.ts'
+import { approvalPlacementSource, writeApprovalPlacement } from './placement.ts'
 import { en, zh } from './locales.ts'
 
 export type {
@@ -132,6 +133,15 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: rowApprovalInjected,
   }, RowApproval))
+  // General settings carries the same preference, for readers who never open
+  // the Progress panel's header.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'approval-placement',
+    order: 160,
+    locale: NS,
+    inject: () => ({ hooks: { placement }, setPlacement: writeApprovalPlacement }),
+  }, ApprovalPlacementRow))
   ctx.remote.$on('approval/request', function (request, next) {
     return answerApproval(ctx, this, request, next, registerPendingInteraction)
   })
