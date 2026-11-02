@@ -1,11 +1,15 @@
 import { defineConfig } from 'tsdown'
 
-// The confinement runner builds as its own entry (path-loaded by
-// dsh-sandbox-local's win32 chain), inlining the sandbox primitives while
-// koffi stays an external native require — the same shape as
+// The confinement runner and the grant runner build as their own entries
+// (path-loaded by dsh-sandbox-local's win32 chain), inlining the sandbox
+// primitives while koffi stays an external native require — the same shape as
 // directory-picker-native's worker entry.
 export default defineConfig({
-  entry: { index: 'lib/types/index.js', runner: 'lib/types/runner.js' },
+  entry: {
+    index: 'lib/types/index.js',
+    runner: 'lib/types/runner.js',
+    'grant-runner': 'lib/types/grant-runner.js',
+  },
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',

@@ -92,14 +92,16 @@ const windowsOnlyCoverageExclusions = process.platform !== 'win32'
     ]
   : []
 
-// The confinement runner entry executes exclusively as a spawned child
-// process (the sandbox seam's argv-prefix wrapper): its module-level main()
-// would run the confinement in-process if imported, and vitest's v8 coverage
-// never measures child processes. Its behavior is pinned end-to-end by
-// tests/runner.spec.ts, which spawns the real entry through tsx.
+// The confinement runner and grant runner entries execute exclusively as
+// spawned child processes (the sandbox seam's argv-prefix and grant helpers):
+// their module-level main() would run the work in-process if imported, and
+// vitest's v8 coverage never measures child processes. Their behavior is
+// pinned end-to-end by tests/runner.spec.ts and tests/grant-runner.spec.ts,
+// which spawn the real entries through tsx.
 const windowsRunnerCoverageExclusions = process.platform === 'win32'
   ? [
       'packages/sandbox/sandbox-windows-acl/src/runner.ts',
+      'packages/sandbox/sandbox-windows-acl/src/grant-runner.ts',
       // The session write lock's POSIX face (fs-ext flock plus inode
       // verification) executes only off-Windows: the Linux lanes hold its
       // per-file 100%, while the Windows branch is unit-pinned by

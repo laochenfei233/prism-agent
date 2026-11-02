@@ -22,12 +22,17 @@
       "types": "./lib/types/runner.d.ts",
       "default": "./lib/runner.js"
     },
+    "./grant-runner": {
+      "types": "./lib/types/grant-runner.d.ts",
+      "default": "./lib/grant-runner.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/runner.js",
+    "lib/grant-runner.js",
     "lib/types-*.js",
     "assets",
     "lib/types/**/*.d.ts"

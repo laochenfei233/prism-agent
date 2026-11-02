@@ -1,87 +1,81 @@
 /**
  * windows-acl grant ownership through the real LocalSandboxProvider: one
  * standing capability per workspace plus one random, distinct, revocable
- * temp capability per live session/workspace pair. The Win32 grant surface
- * is mocked; native access checks live in sandbox-windows-acl's runner suite.
+ * temp capability per live session/workspace pair, each materialized by a
+ * grant-runner helper child (the Win32 ACL work itself is covered by
+ * sandbox-windows-acl's real-FFI suites; this spec drives a fake child that
+ * records its argv, so the spawn, memoization, timeout, and teardown
+ * contracts hold on every platform).
  */
 
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
+import { tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
 import { outsideTempWorkspaceParent } from '../../../../scripts/snapshot-workspace-parent.ts'
 
-/** Cross-file state shared with the vi.mock factory (hoisting contract). */
-const mockState = vi.hoisted(() => ({
-  grants: [] as Array<{
-    writeSid: string
-    added: Array<{ path: string; standing: boolean }>
-    denied: string[]
-    disposed: boolean
-  }>,
-  addFailure: undefined as Error | undefined,
-  /** Restrict an add failure to standing (workspace) or revocable (temp). */
-  addFailureStanding: undefined as boolean | undefined,
-  createTempFailure: undefined as Error | undefined,
-  disposeFailure: undefined as Error | undefined,
-}))
+/**
+ * The fake grant runner: argv `[node, fake.mjs, LOG, BEHAVIOR, ...forwarded]`.
+ * Every run records the forwarded argv first; `fail` then prints the failure
+ * signature and exits 127; `hang` exits late, so the test observes both the
+ * abandoned wait and the untouched child settling.
+ */
+const FAKE_GRANT_RUNNER = `
+import { appendFileSync } from 'node:fs'
+const [log, behavior] = process.argv.slice(2, 4)
+const forwarded = process.argv.slice(4)
+appendFileSync(log, JSON.stringify(forwarded) + '\\n')
+if (behavior === 'fail') {
+  process.stderr.write('windows-acl-grant: exploded\\n')
+  process.exit(127)
+}
+if (behavior === 'hang') await new Promise(resolve => setTimeout(resolve, 5000))
+`
 
-vi.mock('@deepseek-ai/dsh-sandbox-windows-acl', () => {
-  class MockAclWriteGrant {
-    readonly writeSid: string
-    readonly added: Array<{ path: string; standing: boolean }> = []
-    readonly denied: string[] = []
-    disposed = false
-    constructor(writeSid: string) {
-      this.writeSid = writeSid
-      mockState.grants.push(this)
-    }
-    static create(writeSid: string): MockAclWriteGrant {
-      if (writeSid.startsWith('TEMP:') && mockState.createTempFailure !== undefined) throw mockState.createTempFailure
-      return new MockAclWriteGrant(writeSid)
-    }
-    add(path: string, standing = false): void {
-      this.added.push({ path, standing })
-      if (mockState.addFailure !== undefined
-        && (mockState.addFailureStanding === undefined || mockState.addFailureStanding === standing)) {
-        throw mockState.addFailure
-      }
-    }
-    deny(path: string): void {
-      this.denied.push(path)
-    }
-    dispose(): void {
-      if (mockState.disposeFailure !== undefined) throw mockState.disposeFailure
-      this.disposed = true
-    }
-  }
-  return {
-    registerAclDiagnosisSkill: vi.fn(),
-    AclWriteGrant: MockAclWriteGrant,
-    assertTempRootOutsideWorkspace: (workspaceRoot: string, tempRoot: string) => {
-      const workspace = realpathSync.native(workspaceRoot)
-      const temp = realpathSync.native(tempRoot)
-      if (temp === workspace || temp.startsWith(`${workspace}${process.platform === 'win32' ? '\\' : '/'}`)) {
-        throw new Error(`Windows ACL temp root must be outside the workspace: workspace=${workspaceRoot}; temp=${tempRoot}`)
-      }
-    },
-    workspaceWriteSid: () => 'S-1-4-42-42',
-    tempWriteSid: (path: string) => `TEMP:${path}`,
-  }
-})
+interface Setup {
+  ctx: Context
+  sandbox: LocalSandboxProvider
+  /** Disposes the provider exactly once, however many callers await it. */
+  dispose: () => Promise<void>
+  log: string
+  setBehavior: (behavior: 'ok' | 'fail' | 'hang') => void
+}
 
-const WORKSPACE_SID = 'S-1-4-42-42'
+/** Directories every test leaves behind, removed after each test. */
+const cleanupDirs: string[] = []
 
-async function setup() {
+async function setup(config: { grantTimeoutMs?: number } = {}): Promise<Setup> {
   const ctx = new Context()
-  const fiber = await ctx.plugin(LocalSandboxProvider, {})
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-acl-grants-test-')))
+  cleanupDirs.push(scratch)
+  const log = join(scratch, 'grant-log.jsonl')
+  const script = join(scratch, 'fake-grant-runner.mjs')
+  writeFileSync(script, FAKE_GRANT_RUNNER)
+  const fiber = await ctx.plugin(LocalSandboxProvider, config)
   const sandbox = ctx.sandbox as LocalSandboxProvider
-  sandbox.internals = { platform: 'win32', windowsAclRunnerArgs: ['node', 'windows-acl-runner.js'] }
-  return { ctx, sandbox, fiber }
+  sandbox.internals = {
+    platform: 'win32',
+    windowsAclRunnerArgs: ['node', 'windows-acl-runner.js'],
+    windowsAclGrantRunnerArgs: [process.execPath, script, log, 'ok'],
+  }
+  let disposed = false
+  return {
+    ctx, sandbox, log,
+    dispose: async () => {
+      if (disposed) return
+      disposed = true
+      await fiber.dispose()
+    },
+    setBehavior: (behavior) => {
+      sandbox.internals = { ...sandbox.internals, windowsAclGrantRunnerArgs: [process.execPath, script, log, behavior] }
+    },
+  }
 }
 
 function workspaceRoot(): string {
@@ -93,28 +87,22 @@ function flag(argv: readonly string[], name: string): string | undefined {
   return index < 0 ? undefined : argv[index + 1]
 }
 
+function loggedInvocations(log: string): string[][] {
+  if (!existsSync(log)) return []
+  return readFileSync(log, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as string[])
+}
+
 describe('windows-acl write grants (LocalSandboxProvider)', () => {
   const scratch: string[] = []
 
-  beforeEach(() => {
-    mockState.grants = []
-    mockState.addFailure = undefined
-    mockState.addFailureStanding = undefined
-    mockState.createTempFailure = undefined
-    mockState.disposeFailure = undefined
+  afterEach(() => {
+    for (const dir of [...scratch.splice(0), ...cleanupDirs.splice(0)]) rmSync(dir, { recursive: true, force: true })
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 
-  const cleanup = () => {
-    for (const grant of mockState.grants) {
-      for (const added of grant.added) {
-        if (!added.standing) rmSync(added.path, { recursive: true, force: true })
-      }
-    }
-    for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true })
-  }
-
-  it('does not create grants for a cancelled confinement request', async () => {
-    const { sandbox, fiber } = await setup()
+  it('does not spawn a grant runner for a cancelled confinement request', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
       const ws = workspaceRoot()
       scratch.push(ws)
@@ -122,13 +110,13 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       await expect(sandbox.confine(['true'], {
         mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('cancelled'),
       }, AbortSignal.abort(reason))).rejects.toBe(reason)
-      expect(mockState.grants).toEqual([])
-    } finally { await fiber.dispose(); cleanup() }
+      expect(loggedInvocations(log)).toEqual([])
+    } finally { await dispose() }
   })
 
-  it('workspace-write materializes one standing workspace grant and one private temp capability, then reuses both', async () => {
+  it('workspace-write spawns one grant runner per pair covering workspace and temp, then reuses both', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
-      const { sandbox, fiber } = await setup()
       const ws = workspaceRoot()
       scratch.push(ws)
       const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-1') }
@@ -138,77 +126,70 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       const tempSid = flag(confined.argv, '--temp-write-sid')
       expect(tempDir).toBeDefined()
       expect(basename(tempDir ?? '')).toMatch(/^dsh-[A-Za-z0-9_-]{6}$/u)
-      expect(tempSid).toBe(`TEMP:${tempDir}`)
-      expect(tempSid).not.toBe(WORKSPACE_SID)
+      expect(tempSid).toBe(tempWriteSid(tempDir ?? ''))
+      expect(tempSid).not.toBe(workspaceWriteSid(ws))
       expect(confined.argv).toEqual([
         'node', 'windows-acl-runner.js',
         '--workspace', ws,
         '--temp', tempDir,
         '--mode', 'workspace-write',
-        '--write-sid', WORKSPACE_SID,
+        '--write-sid', workspaceWriteSid(ws),
         '--temp-write-sid', tempSid,
         '--',
         'pwsh', '/Command', 'x',
       ])
-      expect(mockState.grants).toEqual([
-        expect.objectContaining({ writeSid: WORKSPACE_SID, added: [{ path: ws, standing: true }], disposed: false }),
-        expect.objectContaining({ writeSid: tempSid, added: [{ path: tempDir, standing: false }], disposed: false }),
-      ])
+      expect(loggedInvocations(log)).toEqual([[
+        '--workspace', ws,
+        '--write-sid', workspaceWriteSid(ws),
+        '--temp', tempDir,
+        '--temp-write-sid', tempSid,
+      ]])
       expect(existsSync(tempDir ?? '')).toBe(true)
 
       expect((await sandbox.confine(['pwsh', '/Command', 'x'], policy)).argv).toEqual(confined.argv)
-      expect(mockState.grants).toHaveLength(2)
-
-      await fiber.dispose()
-      expect(mockState.grants.every(grant => grant.disposed)).toBe(true)
-      expect(existsSync(tempDir ?? '')).toBe(false)
+      expect(loggedInvocations(log)).toHaveLength(1)
+      expect(existsSync(tempDir ?? '')).toBe(true)
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
-  it('denies the harness home inside the workspace on the standing grant', async () => {
-    const { sandbox, fiber } = await setup()
-    const ws = workspaceRoot()
-    scratch.push(ws)
-    const home = join(ws, '.prism')
-    mkdirSync(home)
-    vi.stubEnv('DSH_HOME', home)
+  it('denies the harness home inside the workspace and passes no deny outside it', async () => {
+    const inside = await setup()
     try {
-      await sandbox.confine(['pwsh', '/Command', 'x'], {
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      const home = join(ws, '.prism')
+      mkdirSync(home, { recursive: true })
+      vi.stubEnv('DSH_HOME', home)
+      const confined = await inside.sandbox.confine(['pwsh', '/Command', 'x'], {
         mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-home'),
       })
-      const workspaceGrant = mockState.grants.find(grant => grant.writeSid === WORKSPACE_SID)
-      expect(workspaceGrant?.denied).toEqual([realpathSync.native(home)])
+      expect(confined.argv).not.toContain('--deny') // the deny travels to the grant runner, not the confinement runner
+      const invocation = loggedInvocations(inside.log)[0] ?? []
+      expect(invocation).toContain('--deny')
+      expect(flag(invocation, '--deny')).toBe(realpathSync.native(home))
     } finally {
-      vi.unstubAllEnvs()
-      await fiber.dispose()
-      cleanup()
+      await inside.dispose()
     }
-  })
 
-  it('does not deny a harness home outside the workspace', async () => {
-    const { sandbox, fiber } = await setup()
-    const ws = workspaceRoot()
-    scratch.push(ws)
-    // Outside the workspace and every platform temp grant.
-    vi.stubEnv('DSH_HOME', join(outsideTempWorkspaceParent(), 'dsh-home-outside-acl'))
+    const outside = await setup()
     try {
-      await sandbox.confine(['pwsh', '/Command', 'x'], {
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      vi.stubEnv('DSH_HOME', join(outsideTempWorkspaceParent(), 'dsh-home-outside-acl'))
+      await outside.sandbox.confine(['pwsh', '/Command', 'x'], {
         mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-outside'),
       })
-      const workspaceGrant = mockState.grants.find(grant => grant.writeSid === WORKSPACE_SID)
-      expect(workspaceGrant?.denied).toEqual([])
+      expect(loggedInvocations(outside.log)[0]).not.toContain('--deny')
     } finally {
-      vi.unstubAllEnvs()
-      await fiber.dispose()
-      cleanup()
+      await outside.dispose()
     }
   })
 
-  it('read-only materializes no capability; upgrade creates them and downgrade leaves them reusable', async () => {
+  it('read-only materializes no capability; upgrade creates one and downgrade leaves it reusable', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
-      const { sandbox, fiber } = await setup()
       const ws = workspaceRoot()
       scratch.push(ws)
       const readOnly: SandboxPolicy = { mode: 'read-only', workspaceRoot: ws, sessionId: SessionId('switch') }
@@ -222,28 +203,26 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
         '--',
         'true',
       ])
-      expect(mockState.grants).toHaveLength(0)
+      expect(loggedInvocations(log)).toEqual([])
 
       const upgraded = await sandbox.confine(['true'], workspaceWrite)
-      expect(flag(upgraded.argv, '--temp-write-sid')).not.toBe(WORKSPACE_SID)
-      expect(mockState.grants).toHaveLength(2)
+      expect(flag(upgraded.argv, '--temp-write-sid')).not.toBe(workspaceWriteSid(ws))
+      expect(loggedInvocations(log)).toHaveLength(1)
       await sandbox.confine(['true'], readOnly)
-      expect(mockState.grants).toHaveLength(2)
-      expect(mockState.grants.every(grant => !grant.disposed)).toBe(true)
+      expect(loggedInvocations(log)).toHaveLength(1)
       expect((await sandbox.confine(['true'], workspaceWrite)).argv).toEqual(upgraded.argv)
-
-      await fiber.dispose()
+      expect(loggedInvocations(log)).toHaveLength(1)
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
   it('a fresh provider gives a resumed session a new temp path and SID, so crash residue cannot collide', async () => {
+    const first = await setup()
     try {
       const ws = workspaceRoot()
       scratch.push(ws)
       const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('resumed') }
-      const first = await setup()
       const firstConfined = await first.sandbox.confine(['true'], policy)
       const firstTemp = flag(firstConfined.argv, '--temp') ?? ''
 
@@ -256,17 +235,15 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       expect(flag(secondConfined.argv, '--temp-write-sid')).not.toBe(flag(firstConfined.argv, '--temp-write-sid'))
       expect(existsSync(firstTemp)).toBe(true)
       expect(existsSync(secondTemp)).toBe(true)
-
-      await second.fiber.dispose()
-      await first.fiber.dispose()
+      await second.dispose()
     } finally {
-      cleanup()
+      await first.dispose()
     }
   })
 
-  it('forks and workspace changes receive distinct temp capabilities while each workspace grant is reused', async () => {
+  it('forks and workspace changes receive distinct temp capabilities, one grant spawn per pair', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
-      const { sandbox, fiber } = await setup()
       const wsA = workspaceRoot()
       const wsB = workspaceRoot()
       scratch.push(wsA, wsB)
@@ -277,90 +254,93 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       expect(flag(child.argv, '--temp')).not.toBe(flag(parent.argv, '--temp'))
       expect(flag(child.argv, '--temp-write-sid')).not.toBe(flag(parent.argv, '--temp-write-sid'))
       expect(flag(moved.argv, '--temp')).not.toBe(flag(parent.argv, '--temp'))
-      expect(mockState.grants).toHaveLength(5) // workspace A + two temps + workspace B + one temp
-
-      await fiber.dispose()
+      expect(loggedInvocations(log)).toHaveLength(3)
+      expect(flag(loggedInvocations(log)[2] ?? [], '--workspace')).toBe(wsB)
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
-  it('workspace grant failure disposes its SID, aggregates cleanup failure, and never creates a temp directory', async () => {
+  it('a failing grant child fails closed with the seam error, removes the temp dir, and the retry respawns', async () => {
+    const { sandbox, dispose, log, setBehavior } = await setup()
     try {
-      const { sandbox } = await setup()
       const ws = workspaceRoot()
       scratch.push(ws)
-      mockState.addFailureStanding = true
-      mockState.addFailure = new Error('workspace grant exploded')
+      setBehavior('fail')
       await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('workspace-fail'),
-      })).rejects.toThrow('workspace grant exploded')
-      expect(mockState.grants).toHaveLength(1)
-      expect(mockState.grants[0]!.disposed).toBe(true)
-
-      mockState.disposeFailure = new Error('workspace cleanup exploded')
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('fail'),
+      })).rejects.toThrow(SandboxUnavailableError)
+      // The memo was dropped: the retry spawns a fresh child.
+      setBehavior('ok')
       await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('workspace-cleanup-fail'),
-      })).rejects.toThrow(/workspace grant failed and its cleanup also failed/u)
-      expect(mockState.grants).toHaveLength(2)
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('fail'),
+      })).resolves.toBeDefined()
+      expect(loggedInvocations(log)).toHaveLength(2)
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
-  it('rejects a workspace containing the ambient temp root before any ACL mutation', async () => {
-    const { sandbox } = await setup()
-    await expect(sandbox.confine(['true'], {
-      mode: 'workspace-write', workspaceRoot: realpathSync.native(tmpdir()), sessionId: SessionId('overlap'),
-    })).rejects.toThrow(/temp root must be outside the workspace/u)
-    expect(mockState.grants).toHaveLength(0)
-  })
-
-  it('temp grant creation/add failures remove the random directory; cleanup failures aggregate', async () => {
+  it('an expired grant wait fails the command fast, leaves the child to land the ACEs, and the retry respawns', async () => {
+    const { sandbox, dispose, log, setBehavior } = await setup({ grantTimeoutMs: 300 })
     try {
-      const { sandbox } = await setup()
       const ws = workspaceRoot()
       scratch.push(ws)
+      setBehavior('hang')
+      let heartbeat = 0
+      const heartbeats = setInterval(() => { heartbeat += 1 }, 20)
+      const started = Date.now()
+      try {
+        await expect(sandbox.confine(['true'], {
+          mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('timeout'),
+        })).rejects.toThrow(/still running in the background/u)
+        expect(Date.now() - started).toBeLessThan(2000)
+        expect(heartbeat).toBeGreaterThan(2) // the event loop kept ticking while the child ran
+      } finally {
+        clearInterval(heartbeats)
+      }
 
-      mockState.createTempFailure = new Error('temp SID creation exploded')
+      // The abandoned child is untouched: it settles and records its argv.
+      await vi.waitFor(() => { expect(loggedInvocations(log)).toHaveLength(1) }, { timeout: 8000 })
+      // The dropped memo means the retry spawns a fresh (fast) child.
+      setBehavior('ok')
+      await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('timeout') })
+      expect(loggedInvocations(log)).toHaveLength(2)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('rejects a workspace containing the ambient temp root before any grant runner spawns', async () => {
+    const { sandbox, dispose, log } = await setup()
+    try {
       await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('create-fail'),
-      })).rejects.toThrow('temp SID creation exploded')
-      expect(mockState.grants).toHaveLength(1) // workspace only; random temp was removed
+        mode: 'workspace-write', workspaceRoot: realpathSync.native(tmpdir()), sessionId: SessionId('overlap'),
+      })).rejects.toThrow(/temp root must be outside the workspace/u)
+      expect(loggedInvocations(log)).toEqual([])
+    } finally {
+      await dispose()
+    }
+  })
 
-      mockState.createTempFailure = undefined
-      mockState.addFailureStanding = false
-      mockState.addFailure = new Error('temp add exploded')
-      await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('add-fail'),
-      })).rejects.toThrow('temp add exploded')
-      const failedTempGrant = mockState.grants.at(-1)
-      expect(failedTempGrant?.disposed).toBe(true)
-      expect(failedTempGrant?.added).toHaveLength(1)
-      expect(existsSync(failedTempGrant?.added[0]?.path ?? '')).toBe(false)
-
-      mockState.addFailureStanding = false
-      mockState.addFailure = new Error('temp add exploded')
+  it('a failing temp grant removes the random directory and aggregates the removal failure', async () => {
+    const { sandbox, dispose, setBehavior } = await setup()
+    try {
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      setBehavior('fail')
       sandbox.internals.rmTempDir = () => { throw new Error('temp rm exploded') }
       await expect(sandbox.confine(['true'], {
         mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('rm-fail'),
       })).rejects.toThrow(/temp grant materialization failed and its cleanup also failed/u)
-      delete sandbox.internals.rmTempDir
-
-      mockState.addFailureStanding = false
-      mockState.addFailure = new Error('temp add exploded')
-      mockState.disposeFailure = new Error('temp cleanup exploded')
-      await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('aggregate-fail'),
-      })).rejects.toThrow(/temp grant materialization failed and its cleanup also failed/u)
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
   it('agentless calls pass a temp root and no capabilities; the runner owns the private child lifecycle', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
-      const { sandbox, fiber } = await setup()
       const confined = await sandbox.confine(['pwsh', '/Command', 'x'], { mode: 'workspace-write', workspaceRoot: '/ws' })
       expect(confined.argv).toEqual([
         'node', 'windows-acl-runner.js',
@@ -370,53 +350,72 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
         '--',
         'pwsh', '/Command', 'x',
       ])
-      expect(mockState.grants).toHaveLength(0)
-      await fiber.dispose()
+      expect(loggedInvocations(log)).toEqual([])
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 
   it('agentless workspace-write passes the nested home denial to the runner', async () => {
-    const { sandbox, fiber } = await setup()
-    const ws = workspaceRoot()
-    scratch.push(ws)
-    const home = join(ws, '.prism')
-    mkdirSync(home)
-    vi.stubEnv('DSH_HOME', home)
+    const { sandbox, dispose, log } = await setup()
     try {
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      const home = join(ws, '.prism')
+      mkdirSync(home, { recursive: true })
+      vi.stubEnv('DSH_HOME', home)
       const confined = await sandbox.confine(['pwsh', '/Command', 'x'], { mode: 'workspace-write', workspaceRoot: ws })
       const at = confined.argv.indexOf('--deny')
       expect(at).toBeGreaterThan(-1)
       expect(confined.argv[at + 1]).toBe(realpathSync.native(home))
       expect(confined.argv).not.toContain('--write-sid')
+      expect(loggedInvocations(log)).toEqual([])
     } finally {
-      vi.unstubAllEnvs()
-      await fiber.dispose()
-      cleanup()
+      await dispose()
     }
   })
 
-  it('provider teardown reports grant and directory cleanup failures without aborting teardown', async () => {
+  it('provider teardown revokes each temp capability through the child and removes its directory', async () => {
+    const { sandbox, dispose, log } = await setup()
     try {
-      const { ctx, sandbox, fiber } = await setup()
       const ws = workspaceRoot()
       scratch.push(ws)
       const confined = await sandbox.confine(['true'], {
         mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('dispose'),
       })
       const tempDir = flag(confined.argv, '--temp') ?? ''
-      mockState.disposeFailure = new Error('revoke exploded')
+      const tempSid = flag(confined.argv, '--temp-write-sid') ?? ''
+
+      await dispose()
+      expect(loggedInvocations(log).at(-1)).toEqual(['--revoke', '--path', tempDir, '--write-sid', tempSid])
+      expect(existsSync(tempDir)).toBe(false)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('provider teardown reports revoke and removal failures without aborting teardown', async () => {
+    const { ctx, sandbox, dispose, setBehavior } = await setup()
+    try {
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      const confined = await sandbox.confine(['true'], {
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('dispose'),
+      })
+      const tempDir = flag(confined.argv, '--temp') ?? ''
+      setBehavior('fail')
       sandbox.internals.rmTempDir = () => { throw new Error('rm exploded') }
       const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
 
-      await fiber.dispose()
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cleanup completed with 3 failure(s)'))
-      expect(warn).toHaveBeenCalledWith(expect.objectContaining({ message: 'revoke exploded' }))
-      expect(warn).toHaveBeenCalledWith(expect.objectContaining({ message: 'rm exploded' }))
-      expect(existsSync(tempDir)).toBe(true) // injected removal failed; test cleanup reclaims it
+      await dispose()
+      const reported: unknown[] = warn.mock.calls.map(call => call[0] as unknown)
+      expect(reported.some(entry => typeof entry === 'string' && entry.includes('cleanup completed with 2 failure(s)'))).toBe(true)
+      const messages = reported.flatMap(entry => entry instanceof Error ? [entry.message] : [])
+      expect(messages).toContainEqual(expect.stringContaining('exited with code 127'))
+      expect(messages).toContainEqual(expect.stringContaining('rm exploded'))
+      expect(existsSync(tempDir)).toBe(true) // the injected removal failed; the directory stays for temp hygiene
     } finally {
-      cleanup()
+      await dispose()
     }
   })
 })

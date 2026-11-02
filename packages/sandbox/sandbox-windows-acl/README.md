@@ -117,6 +117,17 @@ The seam materializes the deterministic workspace SID's ACE standing (once per w
 
 When launched with the subprocess control marker, the runner forwards fd 7 through the restricted child's CRT startup table and closes its own copy immediately after spawn. The optional `controlFileDescriptor: 7` input requires `stdio: 'inherit'`; requesting it with piped stdio fails before process creation.
 
+### The grant runner
+
+The seam-facing grant surface is the `./grant-runner` entry: a short-lived helper the seam spawns so grant materialization never runs on its own event-loop thread. One `SetNamedSecurityInfoW` inheritance propagation over a large workspace tree can block for minutes, and running it in-process froze every conversation a Host served. Grant mode applies the standing workspace ACE, its harness-home denies, and the pair's revocable temp ACE in one child; revoke mode removes one directory's capability ACEs. Every failure prints `windows-acl-grant: <detail>` to stderr and exits 127.
+
+```sh
+node grant-runner.js --workspace <dir> --write-sid <S-1-4-…> [--deny <dir>]... [--temp <dir> --temp-write-sid <S-1-4-…>]
+node grant-runner.js --revoke --path <dir> --write-sid <S-1-4-…>
+```
+
+The seam never kills the child: an expired wait abandons it, the ACEs land in the background, and the next provision's exact-entry skip is O(1) because the standing workspace ACE is already in place. `AclWriteGrant` remains the in-process API for callers that own their own thread.
+
 ### Verified boundaries
 
 - **Everyone stays in both restricting lists, but no longer confers write authority** — the keep-alive group is required for early DLL initialization and CNG; the Low label now denies an Everyone-granted write outside the labeled roots, so that former gap is closed.

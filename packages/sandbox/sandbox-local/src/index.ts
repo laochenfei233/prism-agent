@@ -8,20 +8,26 @@
  * The windows-acl rung additionally owns the write grants: the write SID is
  * the per-WORKSPACE identity derived from the canonical workspace path
  * (`workspaceWriteSid`), while every live session receives a RANDOM private
- * temp directory and its own derived capability (`tempWriteSid`). The
- * workspace-root ACE materializes once per workspace per server lifetime
- * and STANDS (the cross-session reuse cache — the exact-ACE skip makes
- * every later provision O(1) instead of re-propagating the tree per
- * session); the private-temp ACEs are revoked on dispose. The runner
- * receives both SIDs (their presence marks the seam-managed contract) and
- * stops managing DACLs itself. The rung reports partial enforcement because
- * NTFS hard links alias one file object across paths, reads stay unconfined,
- * and a tree another AppContainer tool has ACL'd with a package SID is not
- * readable by the Low-integrity child.
+ * temp directory and its own derived capability (`tempWriteSid`). The ACL
+ * work itself runs in the package's grant-runner helper child — the
+ * `SetNamedSecurityInfoW` tree propagation over a freshly granted workspace
+ * can block for minutes on large trees, so it must never execute on the
+ * server's event-loop thread. The provider derives the SIDs (pure string
+ * derivation), spawns the child, and awaits its exit up to `grantTimeoutMs`;
+ * a timed-out or aborted wait leaves the child running so the standing ACEs
+ * land in the background and the exact-ACE skip turns the retry into O(1).
+ * The workspace-root ACE materializes once per workspace per server lifetime
+ * and STANDS (the cross-session reuse cache); the private-temp ACEs are
+ * revoked on dispose through the same child. The runner receives both SIDs
+ * (their presence marks the seam-managed contract) and stops managing DACLs
+ * itself. The rung reports partial enforcement because NTFS hard links alias
+ * one file object across paths, reads stay unconfined, and a tree another
+ * AppContainer tool has ACL'd with a package SID is not readable by the
+ * Low-integrity child.
  * @module @deepseek-ai/dsh-sandbox-local
  */
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -37,7 +43,7 @@ import z from '@deepseek-ai/schemastery'
 import { SandboxProvider, SandboxUnavailableError, canonicalPath } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, ConfinedSandboxMode, RunnerFailureRule, SandboxEnforcement, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import { AclWriteGrant, assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
+import { assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { bwrapProfileArgs, landlockProfileArgs, protectedRootsWithin, seatbeltProfileArgs } from './profiles.ts'
 
@@ -63,6 +69,13 @@ export interface Config {
   runnerFailureSignatures?: string[]
   /** Positive timeout for each functional probe; zero would mean unbounded to Node. */
   probeTimeoutMs?: number
+  /**
+   * Positive wall-clock limit for WAITING on one grant-runner child (default
+   * 120000). The child is never killed: an expired wait abandons it to finish
+   * the standing ACEs in the background (the exact-ACE skip makes the next
+   * provision O(1)) while the current command fails closed.
+   */
+  grantTimeoutMs?: number
 }
 
 /** Probe whether `bwrap` can create the profile; the provider caches the bounded result. */
@@ -132,6 +145,10 @@ export interface SandboxInternals {
   windowsAclRunnerArgs?: string[]
   /** Replaces the resolved windows-acl runner built entry path (a fake lib/runner.js location). */
   windowsAclRunnerEntry?: string
+  /** Replaces the resolved windows-acl grant-runner argv prefix (a fake grant runner). */
+  windowsAclGrantRunnerArgs?: string[]
+  /** Replaces the resolved windows-acl grant-runner built entry path (a fake lib/grant-runner.js location). */
+  windowsAclGrantRunnerEntry?: string
   /** Replaces the functional windows-acl probe (the win32 chain's sole rung — only consulted if that chain ever grows). */
   probeWindowsAcl?: () => boolean
   /** Replaces the private-temp-directory removal at provider dispose (a throwing fake exercises the cleanup-failure path). */
@@ -145,7 +162,26 @@ type SelectedRunner = { runner: 'bwrap' | 'landlock' | 'seatbelt' | 'windows-acl
 interface AclTempCapability {
   dir: string
   writeSid: string
-  grant: AclWriteGrant
+}
+
+/**
+ * One grant-runner child's settled facts, each independent: how the child
+ * exited, whether the WAIT expired before that (the child keeps running), and
+ * the stderr captured for failure classification.
+ */
+interface GrantRunnerOutcome {
+  /** Process exit code; null while still running or on spawn rejection. */
+  exitCode: number | null
+  /** Terminating signal; null for a normal exit. */
+  signal: NodeJS.Signals | null
+  /** Whether the wait gave up before the child exited (the child is abandoned, not killed). */
+  timedOut: boolean
+  /** Whether the caller's abort signal fired while waiting. */
+  aborted: boolean
+  /** Spawn rejection (ENOENT, EACCES, …); undefined on a successful spawn. */
+  spawnError: Error | undefined
+  /** Captured stderr, capped, for the `windows-acl-grant: ` failure signature. */
+  stderr: string
 }
 
 /**
@@ -218,6 +254,27 @@ const DENIAL_SIGNATURES = {
 const WINDOWS_ACL_RUNNER_FAILURE_EXIT = 127
 
 /**
+ * The grant runner's stderr failure signature (its GRANT_RUNNER_SIGNATURE
+ * contract, printed on every runner-side ACL failure).
+ */
+const GRANT_RUNNER_FAILURE_SIGNATURE = 'windows-acl-grant: '
+
+/**
+ * The grant-runner child's environment: only the system roots and the temp
+ * path its per-path ACL lock file needs (`GetTempPathW` reads `TMP`/`TEMP`).
+ * No ambient entry — harness credentials and proxy variables never reach the
+ * child, which spawns nothing and reads no user configuration.
+ */
+function grantChildEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const name of ['SystemRoot', 'SYSTEMROOT', 'SystemDrive', 'TEMP', 'TMP']) {
+    const value = process.env[name]
+    if (value !== undefined) env[name] = value
+  }
+  return env
+}
+
+/**
  * Runner-owned fatal diagnostics. Landlock has a versioned exit-125 plus
  * fatal-line launcher-failure contract. Bubblewrap's current fatal paths exit
  * 1 but its public contract does not reserve that status, while sandbox-exec
@@ -243,11 +300,10 @@ const RUNNER_FAILURE_RULES = {
 
 /**
  * Local process-sandbox provider. Registers as `ctx.sandbox`. Caches the
- * chain verdict and, on the windows-acl rung, the write grants
- * ({@link AclWriteGrant}: the standing workspace-root grant per workspace
- * and the revocable private-temp grant per live session/workspace pair, the
- * latter revoked on provider dispose); the one-time probes spawn nothing
- * else.
+ * chain verdict and, on the windows-acl rung, the grant-runner memos (the
+ * standing workspace-root grant per workspace and the revocable private-temp
+ * grant per live session/workspace pair, the latter revoked on provider
+ * dispose); the one-time probes spawn nothing else.
  */
 export class LocalSandboxProvider extends SandboxProvider {
   // Inline schema call: the config catalog walks `static Config` statically.
@@ -255,6 +311,7 @@ export class LocalSandboxProvider extends SandboxProvider {
     runnerCommand: z.array(z.string()).default([]),
     runnerFailureSignatures: z.array(z.string()).default([]),
     probeTimeoutMs: z.natural().default(5_000),
+    grantTimeoutMs: z.natural().default(120_000),
   })
 
   /** Test hook (mirrors the bash executors' `internals`). */
@@ -263,17 +320,22 @@ export class LocalSandboxProvider extends SandboxProvider {
   private readonly runnerCommand: string[] | undefined
   private readonly configuredRunnerFailureSignatures: string[]
   private readonly probeTimeoutMs: number
+  private readonly grantTimeoutMs: number
   /** Cached chain verdict; undefined until the first confined wrap needs it. */
   private selectedRunner: SelectedRunner | 'unavailable' | undefined
   /**
-   * Server-lifetime write grants (windows-acl rung): the STANDING
-   * workspace-root grant per workspace (its ACE is the cross-session reuse
-   * cache and outlives the provider — never revoked) and the REVOCABLE
-   * private-temp grant per live session/workspace pair (revoked on provider
-   * dispose).
+   * Server-lifetime write-grant bookkeeping (windows-acl rung): an in-flight
+   * memo per live session/workspace pair so concurrent commands share one
+   * grant-runner child, plus the settled records teardown revokes. The maps
+   * hold promises and plain data, not FFI objects — the ACEs live in the
+   * filesystem; a rejected memo is dropped so the next command retries with a
+   * fresh child (whose exact-entry skip makes a partially applied run cheap).
+   * The standing workspace-root ACE is never revoked (the cross-session
+   * reuse cache).
    */
-  private readonly workspaceGrants = new Map<string, AclWriteGrant>()
-  private readonly tempCapabilities = new Map<string, AclTempCapability>()
+  private readonly tempCapabilities = new Map<string, Promise<AclTempCapability>>()
+  /** Settled temp capabilities, the teardown revoke list. */
+  private readonly tempRecords = new Map<string, AclTempCapability>()
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
@@ -295,6 +357,8 @@ export class LocalSandboxProvider extends SandboxProvider {
     this.configuredRunnerFailureSignatures = runnerFailureSignatures
     this.probeTimeoutMs = config.probeTimeoutMs as number
     assertPositiveFinite('probeTimeoutMs', this.probeTimeoutMs)
+    this.grantTimeoutMs = config.grantTimeoutMs as number
+    assertPositiveFinite('grantTimeoutMs', this.grantTimeoutMs)
     // An operator-supplied runner does not use the ACL backend. The registry
     // remains optional and may be mounted after this provider.
     /* v8 ignore next 3 -- Windows-only registration; the Linux coverage lane cannot take this branch */
@@ -304,9 +368,11 @@ export class LocalSandboxProvider extends SandboxProvider {
     // The temp grants are revoked with the provider: a clean server
     // shutdown leaves no temp ACEs behind (workspace ACEs stand by design —
     // the reuse cache; an unclean shutdown leaves them for the next
-    // provision's exact-ACE skip).
-    ctx.effect(() => () => {
-      this.revokeAclGrants()
+    // provision's exact-ACE skip). Teardown awaits the revoke children, so a
+    // grant child still preparing when shutdown starts is abandoned, not
+    // awaited — its ACEs land in the background either way.
+    ctx.effect(() => async () => {
+      await this.revokeAclGrants()
     })
   }
 
@@ -334,22 +400,22 @@ export class LocalSandboxProvider extends SandboxProvider {
       })
     }
     const selected = this.selectRunner(policy.mode)
-    const runnerArgv = this.runnerArgv(selected.runner, policy)
-    return Promise.resolve<ConfinedArgv>({
+    const runnerArgv = await this.runnerArgv(selected.runner, policy, signal)
+    return {
       argv: [...runnerArgv, '--', ...argv],
       enforcement: selected.enforcement,
       denialSignatures: DENIAL_SIGNATURES[selected.runner],
       runnerFailureRules: RUNNER_FAILURE_RULES[selected.runner],
-    })
+    }
   }
 
   /** The selected rung's runner invocation (program + profile arguments) for one policy. */
-  private runnerArgv(runner: SelectedRunner['runner'], policy: SandboxPolicy): string[] {
+  private async runnerArgv(runner: SelectedRunner['runner'], policy: SandboxPolicy, signal?: AbortSignal): Promise<string[]> {
     switch (runner) {
       case 'bwrap': return ['bwrap', ...bwrapProfileArgs(policy)]
       case 'landlock': return [this.landlockLauncher(), ...landlockProfileArgs(policy)]
       case 'seatbelt': return [this.seatbeltExec(), ...seatbeltProfileArgs(policy)]
-      case 'windows-acl': return this.windowsAclRunnerArgv(policy)
+      case 'windows-acl': return this.windowsAclRunnerArgv(policy, signal)
       default: return assertNever(runner)
     }
   }
@@ -357,16 +423,17 @@ export class LocalSandboxProvider extends SandboxProvider {
   /**
    * The windows-acl runner argv for one policy. With a calling session (the
    * policy's `sessionId`) under workspace-write, the grants are materialized
-   * once per provider lifetime — the standing workspace-root grant per
-   * workspace and a revocable, RANDOM private-temp capability per live
-   * session/workspace pair. The runner receives `--write-sid` plus
-   * `--temp-write-sid` and grants nothing itself. Agentless workspace-write
-   * calls pass the ambient temp ROOT and no SID flags: the runner creates and
-   * removes a random private child directory for that one invocation.
+   * once per provider lifetime through the grant-runner helper child — the
+   * standing workspace-root grant per workspace and a revocable, RANDOM
+   * private-temp capability per live session/workspace pair. The runner
+   * receives `--write-sid` plus `--temp-write-sid` and grants nothing itself.
+   * Agentless workspace-write calls pass the ambient temp ROOT and no SID
+   * flags: the runner creates and removes a random private child directory
+   * for that one invocation.
    * @param policy - the resolved per-call policy.
    * @returns the runner invocation.
    */
-  private windowsAclRunnerArgv(policy: SandboxPolicy): string[] {
+  private async windowsAclRunnerArgv(policy: SandboxPolicy, signal?: AbortSignal): Promise<string[]> {
     const sessionId = policy.sessionId
     if (sessionId === undefined || policy.mode === 'read-only') {
       // The standalone runner manages its own DACLs, so the home denial travels
@@ -382,7 +449,7 @@ export class LocalSandboxProvider extends SandboxProvider {
         ...denied,
       ]
     }
-    const temp = this.materializeAclGrant(sessionId, policy.workspaceRoot)
+    const temp = await this.materializeAclGrant(sessionId, policy.workspaceRoot, signal)
     return [
       ...this.windowsAclRunnerInvocation(),
       '--workspace', policy.workspaceRoot,
@@ -395,104 +462,225 @@ export class LocalSandboxProvider extends SandboxProvider {
 
   /**
    * Materialize one workspace-write policy's ACEs once per provider
-   * lifetime. The workspace SID and standing root grant are shared by the
-   * workspace. The temp directory is random and carries a distinct SID, so
-   * another session on the same workspace cannot use the shared workspace
-   * SID to enter it. A fresh provider always chooses a new path; crash
-   * residue therefore cannot collide with or authorize a resumed session.
-   * Fail-closed: a half-materialized temp grant is revoked and its directory
-   * removed before the error propagates.
+   * lifetime, each apply running in the grant-runner helper child so the
+   * tree propagation never blocks the server. The workspace SID and standing
+   * root grant are shared by the workspace. The temp directory is random and
+   * carries a distinct SID, so another session on the same workspace cannot
+   * use the shared workspace SID to enter it. A fresh provider always
+   * chooses a new path; crash residue therefore cannot collide with or
+   * authorize a resumed session. Fail-closed: a failed temp grant removes
+   * its random directory before the error propagates; a timed-out wait
+   * abandons the child (the ACEs land in the background) and fails the
+   * command with `SANDBOX_UNAVAILABLE`.
    * @param sessionId - the policy's calling-session identity.
    * @param workspaceRoot - the resolved policy root.
+   * @param signal - cancellation observed while waiting for the children.
    * @returns the pair's private temp directory and write capability.
    */
-  private materializeAclGrant(sessionId: SessionId, workspaceRoot: string): AclTempCapability {
+  private async materializeAclGrant(
+    sessionId: SessionId, workspaceRoot: string, signal?: AbortSignal,
+  ): Promise<AclTempCapability> {
     assertTempRootOutsideWorkspace(workspaceRoot, tmpdir())
-    const writeSid = workspaceWriteSid(workspaceRoot)
-    if (!this.workspaceGrants.has(workspaceRoot)) {
-      const grant = AclWriteGrant.create(writeSid)
-      try {
-        grant.add(workspaceRoot, true)
-        // The standing workspace ACE inherits into everything below it, so a
-        // harness home inside the workspace needs an explicit deny in front of
-        // that inherited allow.
-        for (const protectedRoot of protectedRootsWithin({ mode: 'workspace-write', workspaceRoot })) {
-          if (existsSync(protectedRoot)) grant.deny(protectedRoot)
-        }
-      } catch (error) {
-        // Free the SID; a standing ACE (if the apply succeeded before a
-        // post-apply throw) is the intended end state, not an error
-        // artifact — nothing to revoke.
-        try {
-          grant.dispose()
-        } catch (cleanupError) {
-          throw new AggregateError([error, cleanupError], 'sandbox-local windows-acl workspace grant failed and its cleanup also failed')
-        }
-        throw error
-      }
-      this.workspaceGrants.set(workspaceRoot, grant)
-    }
     const key = JSON.stringify([String(sessionId), workspaceRoot])
-    const existing = this.tempCapabilities.get(key)
-    if (existing !== undefined) return existing
+    let pending = this.tempCapabilities.get(key)
+    if (pending === undefined) {
+      pending = this.materializeAclGrantPair(workspaceRoot, key, signal)
+      this.tempCapabilities.set(key, pending)
+      // Drop a rejected memo so the next command retries with a fresh child;
+      // the loser of a timed-out wait keeps running and its ACEs still land.
+      pending.catch(() => {
+        if (this.tempCapabilities.get(key) === pending) this.tempCapabilities.delete(key)
+      })
+    }
+    return pending
+  }
+
+  /**
+   * One pair's grant-runner invocation: the standing workspace-root ACE
+   * (its exact-entry skip makes a repeat invocation O(1)), the harness-home
+   * denies, and the pair's revocable temp ACE — one child for all three.
+   */
+  private async materializeAclGrantPair(
+    workspaceRoot: string, key: string, signal?: AbortSignal,
+  ): Promise<AclTempCapability> {
     const tempDir = mkdtempSync(join(tmpdir(), 'dsh-'))
     const tempSid = tempWriteSid(tempDir)
-    let grant: AclWriteGrant | undefined
     try {
-      grant = AclWriteGrant.create(tempSid)
-      grant.add(tempDir)
+      // The standing workspace ACE inherits into everything below it, so a
+      // harness home inside the workspace needs an explicit deny in front of
+      // that inherited allow.
+      const denyArgs = protectedRootsWithin({ mode: 'workspace-write', workspaceRoot })
+        .filter(root => existsSync(root))
+        .flatMap(root => ['--deny', root])
+      const outcome = await this.runGrantRunner([
+        '--workspace', workspaceRoot,
+        '--write-sid', workspaceWriteSid(workspaceRoot),
+        ...denyArgs,
+        '--temp', tempDir,
+        '--temp-write-sid', tempSid,
+      ], signal)
+      this.throwOnGrantRunnerFailure(`workspace grant under ${workspaceRoot}`, outcome, signal)
     } catch (error) {
-      const cleanupFailures: unknown[] = []
-      if (grant !== undefined) {
-        try {
-          grant.dispose()
-        } catch (cleanupError) {
-          cleanupFailures.push(cleanupError)
-        }
-      }
       try {
         this.removeTempDir(tempDir)
       } catch (cleanupError) {
-        cleanupFailures.push(cleanupError)
-      }
-      if (cleanupFailures.length > 0) {
-        throw new AggregateError([error, ...cleanupFailures], 'sandbox-local windows-acl temp grant materialization failed and its cleanup also failed')
+        throw new AggregateError([error, cleanupError], 'sandbox-local windows-acl temp grant materialization failed and its cleanup also failed')
       }
       throw error
     }
-    const capability = { dir: tempDir, writeSid: tempSid, grant }
-    this.tempCapabilities.set(key, capability)
+    const capability = { dir: tempDir, writeSid: tempSid }
+    this.tempRecords.set(key, capability)
     return capability
   }
 
   /**
-   * Dispose every write grant (provider dispose): the revocable temp ACEs
-   * are revoked, the private temp directories this provider created are
-   * removed, and every SID allocation is freed; the standing workspace ACEs
-   * stay (the reuse cache). Cleanup failures are reported, not thrown:
-   * cordis teardown must not be aborted by grant cleanup. A crash skips all
-   * of it, but a new provider never reuses the residue's random path or SID;
-   * OS temp hygiene (or manual removal) eventually reclaims it.
+   * Spawn the grant-runner helper child and wait for its exit up to
+   * `grantTimeoutMs`. The child is NEVER killed and never assigned to this
+   * process's job: an expired or aborted wait abandons it so the standing
+   * ACEs land in the background (a hub that exits mid-grant is exactly the
+   * partial state the exact-ACE skip cannot repair). Every outcome fact —
+   * exit code, signal, timeout, abort, spawn rejection, stderr — is reported
+   * independently.
    */
-  private revokeAclGrants(): void {
-    if (this.workspaceGrants.size === 0 && this.tempCapabilities.size === 0) return
-    const failures: unknown[] = []
-    for (const grant of [...this.workspaceGrants.values(), ...[...this.tempCapabilities.values()].map(capability => capability.grant)]) {
-      try {
-        grant.dispose()
-      } catch (error) {
-        failures.push(error)
+  private runGrantRunner(args: readonly string[], signal?: AbortSignal): Promise<GrantRunnerOutcome> {
+    const invocation = this.windowsAclGrantRunnerInvocation()
+    const child = spawn(invocation[0] ?? '', [...invocation.slice(1), ...args], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: grantChildEnv(),
+      windowsHide: true,
+    })
+    return new Promise<GrantRunnerOutcome>((resolve) => {
+      let stderr = ''
+      const STDERR_CAP = 8 * 1024
+      child.stderr.setEncoding('utf8')
+      child.stderr.on('data', (chunk: string) => {
+        if (stderr.length < STDERR_CAP) stderr += chunk
+      })
+      let settled = false
+      const finish = (outcome: GrantRunnerOutcome): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', onAbort)
+        resolve(outcome)
       }
-    }
-    for (const { dir } of this.tempCapabilities.values()) {
-      try {
-        this.removeTempDir(dir)
-      } catch (error) {
-        failures.push(error)
+      // An abandoned child keeps its stderr pipe alive from our side; close
+      // it so the server can exit while the child finishes. The child writes
+      // nothing on success, so a broken pipe costs only a failure that was
+      // already failing.
+      const abandon = (): void => {
+        child.stderr.destroy()
       }
+      const timer = setTimeout(() => {
+        abandon()
+        finish({ exitCode: child.exitCode, signal: child.signalCode, timedOut: true, aborted: false, spawnError: undefined, stderr })
+      }, this.grantTimeoutMs)
+      const onAbort = (): void => {
+        abandon()
+        finish({ exitCode: child.exitCode, signal: child.signalCode, timedOut: false, aborted: true, spawnError: undefined, stderr })
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      child.on('error', (spawnError: Error) => {
+        finish({ exitCode: null, signal: null, timedOut: false, aborted: false, spawnError, stderr })
+      })
+      child.on('close', (exitCode, signal) => {
+        finish({
+          exitCode, signal, timedOut: false, aborted: false, spawnError: undefined, stderr,
+        })
+      })
+      // The child is never killed and never assigned to this process's job:
+      // on Windows an unassigned child survives this process, so the grant
+      // still lands after an abandoned wait or a server exit.
+      child.unref()
+    })
+  }
+
+  /**
+   * Classify one grant-runner outcome and throw the fail-closed seam error,
+   * or return when the child exited 0 before the wait expired. An aborted
+   * wait rethrows the caller's abort reason; a timed-out wait names the
+   * abandoned child's continuing work so the caller can retry later.
+   */
+  private throwOnGrantRunnerFailure(purpose: string, outcome: GrantRunnerOutcome, signal?: AbortSignal): void {
+    if (outcome.aborted) throw signal?.reason ?? new Error(`sandbox-local: ${purpose} wait aborted`)
+    if (outcome.exitCode === 0 && !outcome.timedOut && outcome.spawnError === undefined) return
+    if (outcome.spawnError !== undefined) {
+      throw new SandboxUnavailableError('workspace-write', `${purpose}: grant runner could not start: ${outcome.spawnError.message}`)
     }
-    this.workspaceGrants.clear()
+    if (outcome.timedOut) {
+      throw new SandboxUnavailableError(
+        'workspace-write',
+        `${purpose}: the grant runner did not finish within ${this.grantTimeoutMs}ms. `
+        + 'The workspace preparation is still running in the background and later commands reuse it once it lands — retry this command.',
+      )
+    }
+    const detail = outcome.stderr.split(/\r?\n/u).find(line => line.includes(GRANT_RUNNER_FAILURE_SIGNATURE))
+    throw new SandboxUnavailableError(
+      'workspace-write',
+      `${purpose}: grant runner exited with code ${outcome.exitCode}${detail === undefined ? '' : `: ${detail.trim()}`}`,
+    )
+  }
+
+  /**
+   * The windows-acl grant-runner argv prefix, resolved like the confinement
+   * runner's (built lib/ entry in production, package source through tsx in
+   * development) and overridable by the same style of test hooks.
+   */
+  private windowsAclGrantRunnerInvocation(): string[] {
+    const override = this.internals.windowsAclGrantRunnerArgs
+    if (override !== undefined) return override
+    const builtEntry = this.internals.windowsAclGrantRunnerEntry
+      ?? fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-sandbox-windows-acl/grant-runner'))
+    if (existsSync(builtEntry)) return [process.execPath, builtEntry]
+    const sourceEntry = fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-sandbox-windows-acl/src/grant-runner.ts'))
+    const sourceConfig = fileURLToPath(new URL('../../../../tsconfig.base.json', import.meta.url))
+    const registration = `import { register } from ${JSON.stringify(import.meta.resolve('tsx/esm/api'))}; register({ tsconfig: ${JSON.stringify(sourceConfig)} });`
+    return [process.execPath, '--import', `data:text/javascript,${encodeURIComponent(registration)}`, sourceEntry]
+  }
+
+  /**
+   * Dispose every write grant (provider dispose): each settled temp
+   * capability is revoked through a grant-runner child and its private
+   * directory removed; the standing workspace ACEs stay (the reuse cache).
+   * Cleanup failures are reported, not thrown: cordis teardown must not be
+   * aborted by grant cleanup. A materialization still in flight at teardown
+   * is abandoned — its random temp path and SID are never reused, so the
+   * residue is exactly the crash case: OS temp hygiene (or manual removal)
+   * eventually reclaims it, and a later provision's exact-ACE skip stays O(1).
+   */
+  private async revokeAclGrants(): Promise<void> {
+    const settled = [...this.tempRecords.values()]
     this.tempCapabilities.clear()
+    this.tempRecords.clear()
+    if (settled.length === 0) return
+    const failures: unknown[] = []
+    await Promise.all(settled.map(async ({ dir, writeSid }) => {
+      try {
+        const outcome = await this.runGrantRunner(['--revoke', '--path', dir, '--write-sid', writeSid])
+        // A still-running revoke child owns the directory: removing it now
+        // would race the ACE rewrite, so the residue joins the crash case.
+        if (outcome.timedOut || outcome.aborted) {
+          const why = outcome.timedOut ? `wait exceeded ${this.grantTimeoutMs}ms` : 'teardown aborted'
+          failures.push(new Error(`sandbox-local: temp revoke for ${dir} was abandoned while running (${why})`))
+          return
+        }
+        if (outcome.spawnError !== undefined) failures.push(outcome.spawnError)
+        if (outcome.exitCode !== 0) {
+          const detail = outcome.stderr.split(/\r?\n/u).find(line => line.includes(GRANT_RUNNER_FAILURE_SIGNATURE))
+          failures.push(new Error(`sandbox-local: temp revoke for ${dir} exited with code ${outcome.exitCode}`
+            + (detail === undefined ? '' : `: ${detail.trim()}`)))
+        }
+        // The child exited (or never started), so the random directory is
+        // ours to remove; its own failure is independent of the revoke's.
+        try {
+          this.removeTempDir(dir)
+        } catch (error) {
+          failures.push(error)
+        }
+      } catch (error) {
+        failures.push(error)
+      }
+    }))
     if (failures.length > 0) {
       this.ctx.logger.warn(`sandbox-local: windows-acl grant cleanup completed with ${failures.length} failure(s)`)
       for (const error of failures) this.ctx.logger.warn(error)

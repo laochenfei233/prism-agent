@@ -119,6 +119,17 @@ seam 先把确定性工作区 SID 的 ACE 常驻物化（每个工作区每服�
 
 启动时若带有 subprocess 控制标记，runner 会通过受限子进程的 CRT 启动表转发 fd 7，并在 spawn 后立即关闭自身副本。可选的 `controlFileDescriptor: 7` 输入要求 `stdio: 'inherit'`；在管道 stdio 下请求它会在进程创建前失败。
 
+### 授权 runner
+
+面向 seam 的授权入口是 `./grant-runner`：seam 为"授权物化绝不在自己的事件循环线程上执行"而 spawn 的短生命周期辅助进程。对大工作区树的一次 `SetNamedSecurityInfoW` 继承传播可能阻塞数分钟，在进程内执行曾使一个 Host 服务的所有对话冻结。授权模式在一个子进程中应用常驻工作区 ACE、其 harness home deny 以及该会话对的临时 ACE（可回收）；撤销模式移除单个目录的能力 ACE。每个失败都会向 stderr 打印 `windows-acl-grant: <detail>` 并以 127 退出。
+
+```sh
+node grant-runner.js --workspace <dir> --write-sid <S-1-4-…> [--deny <dir>]... [--temp <dir> --temp-write-sid <S-1-4-…>]
+node grant-runner.js --revoke --path <dir> --write-sid <S-1-4-…>
+```
+
+seam 从不杀死该子进程：等待超时后只是放弃等待，ACE 仍在后台落地，下一次准备因常驻工作区 ACE 已就位而走精确条目跳过，代价 O(1)。`AclWriteGrant` 仍是拥有自身线程的调用方使用的进程内 API。
+
 ### 已验证边界
 
 - **Everyone 仍留在两种 restricting 列表中，但不再带来写权限。** 保活组是早期 DLL 初始化与 CNG 所必需的；如今 Low 标签会拒绝对被标记根目录之外、由 Everyone 授权的写入，因此这一旧缺口已关闭。

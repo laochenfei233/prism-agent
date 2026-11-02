@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-02-windows-acl-grant-off-main-thread.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-windows-acl-grant-off-main-thread.md
+/agent-note-windows-acl-grants-run-in-a-helper-child:
+  en: 1fdd08b1ddab290b
+  zh: d9cd6c3ebe09091f
+/agent-note-windows-acl-grants-run-in-a-helper-child/problem:
+  en: 862036f68c21574c
+  zh: f01b4c72c9d04bbe
+/agent-note-windows-acl-grants-run-in-a-helper-child/decision:
+  en: 2d10d9c264fd8fa1
+  zh: a10d6fae86c0cf63
+/agent-note-windows-acl-grants-run-in-a-helper-child/alternatives-considered:
+  en: b0b452ab6c41e767
+  zh: 0e080d42325338d2
+/agent-note-windows-acl-grants-run-in-a-helper-child/consequences:
+  en: 7c62ab86b6accb86
+  zh: e7df4a391bd54d8f
+/agent-note-windows-acl-grants-run-in-a-helper-child/testing:
+  en: 2dce42b5e6541795
+  zh: a22e230cfc1f81e7
