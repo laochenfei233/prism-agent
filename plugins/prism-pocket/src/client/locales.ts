@@ -11,20 +11,19 @@ export const NS = 'pocket.settings'
 /** Every key the plugin's dictionaries define. */
 export type PocketLocaleKey =
   | 'nav'
-  | 'remote.title'
-  | 'remote.trusted'
-  | 'remote.untrusted'
-  | 'remote.server'
-  | 'remote.publicUrl'
-  | 'remote.tailscale.available'
-  | 'remote.tailscale.unavailable'
-  | 'remote.commands.title'
-  | 'remote.commands.directIp'
-  | 'remote.commands.serve'
-  | 'remote.commands.trustedHost'
-  | 'remote.commands.publicUrl'
-  | 'remote.commands.copy'
-  | 'remote.commands.copied'
+  | 'phone.title'
+  | 'phone.ready'
+  | 'phone.blocked.loopback'
+  | 'phone.blocked.noTailscale'
+  | 'phone.blocked.notServing'
+  | 'phone.blocked.untrusted'
+  | 'phone.copy'
+  | 'phone.copied'
+  | 'phone.steps'
+  | 'step.serve'
+  | 'step.trust'
+  | 'step.trust.hint'
+  | 'step.trust.cli'
   | 'push.title'
   | 'push.state.on'
   | 'push.state.off'
@@ -48,24 +47,23 @@ export type PocketLocaleKey =
 /** English copy. */
 export const en: Record<PocketLocaleKey, string> = {
   nav: 'Pocket',
-  'remote.title': 'Remote access',
-  'remote.trusted': 'This connection is trusted',
-  'remote.untrusted': 'This connection does not match the trust fence',
-  'remote.server': 'Server',
-  'remote.publicUrl': 'Public URL',
-  'remote.tailscale.available': 'Tailscale',
-  'remote.tailscale.unavailable': 'Tailscale was not detected on this machine',
-  'remote.commands.title': 'Open the server to your phone',
-  'remote.commands.directIp': 'Direct Tailscale IP',
-  'remote.commands.serve': 'Serve over MagicDNS',
-  'remote.commands.trustedHost': 'Trust the ts.net domain',
-  'remote.commands.publicUrl': 'Advertise the public URL',
-  'remote.commands.copy': 'Copy',
-  'remote.commands.copied': 'Copied',
-  'push.title': 'Push notifications',
+  'phone.title': 'Phone access',
+  'phone.ready': 'Your phone can open this now',
+  'phone.blocked.loopback': 'Your phone cannot reach this yet: the server listens on this machine only',
+  'phone.blocked.noTailscale': 'No route off this machine: the server listens on loopback and Tailscale was not found',
+  'phone.blocked.notServing': 'One step left: proxy this port to your tailnet',
+  'phone.blocked.untrusted': 'One step left: let the server trust this address',
+  'phone.copy': 'Copy phone link',
+  'phone.copied': 'Copied',
+  'phone.steps': 'Still needed',
+  'step.serve': 'Proxy the port to Tailscale',
+  'step.trust': 'Trust this address',
+  'step.trust.hint': 'Add it to the profile cordis.patch.yml, then restart the app.',
+  'step.trust.cli': 'Starting the server from the command line instead? Pass this flag:',
+  'push.title': 'Notifications',
   'push.state.on': 'Enabled',
   'push.state.off': 'Disabled',
-  'push.subscriptions': '{n} subscribed browser(s)',
+  'push.subscriptions': '{n} subscribed device(s)',
   'push.subscribe': 'Enable on this device',
   'push.subscribed': 'This device is subscribed',
   'push.denied': 'Notifications are blocked in this browser',
@@ -86,21 +84,20 @@ export const en: Record<PocketLocaleKey, string> = {
 /** Chinese copy. */
 export const zh: Record<PocketLocaleKey, string> = {
   nav: '口袋',
-  'remote.title': '远程访问',
-  'remote.trusted': '当前连接已受信任',
-  'remote.untrusted': '当前连接未通过信任围栏',
-  'remote.server': '服务器',
-  'remote.publicUrl': '公网 URL',
-  'remote.tailscale.available': 'Tailscale',
-  'remote.tailscale.unavailable': '未在这台机器上检测到 Tailscale',
-  'remote.commands.title': '把服务器开放给手机',
-  'remote.commands.directIp': 'Tailscale IP 直连',
-  'remote.commands.serve': '通过 MagicDNS 反代',
-  'remote.commands.trustedHost': '信任 ts.net 域名',
-  'remote.commands.publicUrl': '对外公布 URL',
-  'remote.commands.copy': '复制',
-  'remote.commands.copied': '已复制',
-  'push.title': '推送通知',
+  'phone.title': '手机访问',
+  'phone.ready': '手机现在可以打开',
+  'phone.blocked.loopback': '手机还连不上：服务只监听本机',
+  'phone.blocked.noTailscale': '手机还连不上：服务只监听本机，也没检测到 Tailscale',
+  'phone.blocked.notServing': '还差一步：把这个端口代理到 Tailscale',
+  'phone.blocked.untrusted': '还差一步：让服务信任这个地址',
+  'phone.copy': '复制手机链接',
+  'phone.copied': '已复制',
+  'phone.steps': '还需要做到',
+  'step.serve': '把这个端口代理到 Tailscale',
+  'step.trust': '信任这个地址',
+  'step.trust.hint': '写进 profile 的 cordis.patch.yml 后重启应用。',
+  'step.trust.cli': '如果是命令行启动的服务，改用这个参数：',
+  'push.title': '通知',
   'push.state.on': '已启用',
   'push.state.off': '未启用',
   'push.subscriptions': '已订阅 {n} 台设备',

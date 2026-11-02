@@ -28,10 +28,23 @@ export interface PocketTailscaleInfo {
   detail?: string
 }
 
+/** The address a phone should open, and what still stands in its way. */
+export interface PocketPhoneAccess {
+  /** The first thing blocking the phone, when something does. */
+  blocker?: 'loopback' | 'no-tailscale' | 'not-serving' | 'untrusted'
+  /** The address already passes the Host/Origin fence. */
+  trusted: boolean
+  /** Authenticated URL to open on the phone; carries the login token, so never render it verbatim. */
+  url?: string
+  /** The same URL with its token elided, safe to display and to keep in a screenshot. */
+  display?: string
+}
+
 /** The `GET /api/pocket/remote` body. */
 export interface PocketRemoteStatus {
   server: PocketServerSurface
   tailscale: PocketTailscaleInfo
+  phone: PocketPhoneAccess
   pocket: {
     pushEnabled: boolean
     notifyTurnComplete: boolean
@@ -42,16 +55,14 @@ export interface PocketRemoteStatus {
   }
 }
 
-/** Copyable remote-access commands the settings page renders. */
+/** Copyable deployment steps the settings page renders. */
 export interface PocketRemoteCommands {
-  /** `prism --profile web --host <tailscale-ip>` — the fence accepts the bind IP directly. */
-  directIp?: string
-  /** `tailscale serve --bg --https=443 http://127.0.0.1:<port>` for the MagicDNS path. */
+  /** `tailscale serve --bg --https=443 http://127.0.0.1:<port>` — exposes the loopback listener to the tailnet. */
   serve?: string
-  /** `--trusted-host <machine>.<tailnet>.ts.net` for the MagicDNS path. */
+  /** Profile patch that admits the MagicDNS authority through the Host/Origin fence. */
+  trust?: string
+  /** `--trusted-host <machine>.<tailnet>.ts.net` for a server the user starts from the CLI. */
   trustedHost?: string
-  /** `--public-url https://<machine>.<tailnet>.ts.net/` for the MagicDNS path. */
-  publicUrl?: string
 }
 
 /** What the agent needs a human for; the service worker composes localized text from it. */

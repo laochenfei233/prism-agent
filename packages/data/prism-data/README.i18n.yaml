@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/data/prism-data/README.md
+/:
+  en: bd138d2b5ad28fb8
+  zh: bd138d2b5ad28fb8
+/prism-prism-data:
+  en: c63a0a5a527a5f8f
+  zh: 66a4c796fc3316b6
+/prism-prism-data/summary:
+  en: 3dd825979c2b4c0d
+  zh: 43e1f686ec1bb6cf
+/prism-prism-data/table-of-contents:
+  en: b563e4ec4727d0de
+  zh: e8f2fad6c654a303
+/prism-prism-data/use-this-package:
+  en: 919ae15d8ac4ce00
+  zh: 1ee89f7e891122d2
+/prism-prism-data/use-this-package/composition:
+  en: 660678c683443aa0
+  zh: e7d8273d3b806fbe
+/prism-prism-data/use-this-package/route-contract:
+  en: b04f5d0eeec31f69
+  zh: 45f35232b1c2ed78
+/prism-prism-data/use-this-package/what-to-expect:
+  en: e6938da1059a33ec
+  zh: 8e7ae4cf5f43d282
+/prism-prism-data/use-this-package/failures:
+  en: 92604a3232471dec
+  zh: 42cb71b6a9f88826
+/prism-prism-data/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 7ae097f3abcc5d9c
+/prism-prism-data/understand-the-implementation/design-split:
+  en: 929b87d4e1c7944e
+  zh: 7b623ddea537e37b
+/prism-prism-data/understand-the-implementation/tabs-are-fixed-pages-are-not:
+  en: 57cfa840a22dd7b1
+  zh: 2a4fe16daf106230
+/prism-prism-data/understand-the-implementation/launch-pointer:
+  en: bd61c49611cffcce
+  zh: a539d8954a8b2073
+/prism-prism-data/understand-the-implementation/test-coverage:
+  en: 68bf8cfcdf7f1be9
+  zh: fb445e84e2205fd3
+/prism-prism-data/further-exploration:
+  en: c0b4f4955f2e4a98
+  zh: 7dcebef51b02c97e
+/prism-prism-data/model-experience:
+  en: 9d85350fcbb2da0a
+  zh: 9a58183824f607c4
+/prism-prism-data/model-experience/kv-cache-effect:
+  en: 0a517bd2327a887f
+  zh: fb1910c54882b7b0
+/prism-prism-data/known-limitations-and-deferred-work:
+  en: 1d1bb84ce9368df1
+  zh: 9c685994366f8eff

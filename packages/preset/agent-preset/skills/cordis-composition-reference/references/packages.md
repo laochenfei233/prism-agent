@@ -119,6 +119,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-sidebar-browser` | no | Sandboxed Web browser tabs for the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-sidebar-documentpreview` | yes | Extensible Sidebar previews for Office documents, spreadsheets, Markdown, code, images, PDF, HTML, and plain text |
 | `@deepseek-ai/dsh-client-ui-sidebar-files` | no | Workspace file tree tab type for the right Sidebar: lazy directory listing over the workspaceFiles Remote namespace, opening files into the Sidebar |
+| `@deepseek-ai/dsh-client-ui-sidebar-git` | yes | Git workbench tab type for the right Sidebar: repository status, staged, unstaged, and untracked sections, file comparisons, and staging or committing from the panel |
 | `@deepseek-ai/dsh-client-ui-sidebar-right` | no | Right Sidebar: the docking surface's session-bound state, its panel and header expand control, and the navigation service over it |
 | `@deepseek-ai/dsh-client-ui-sidebar-terminal` | no | Interactive shell tabs for the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-skill` | no | Web skill references and the dedicated skill tool row |
@@ -182,6 +183,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-cron` | yes | Calendar scheduling capability: five-field cron expression parsing, day matching, and occurrence resolution over an explicit IANA zone |
 | `@deepseek-ai/dsh-tool-cron` | yes | Model-facing scheduled-task tools over the ctx.cron capability, with unattended-authority checks |
+
+## data
+
+| Package | Config | Description |
+|---|---|---|
+| `@prism/prism-data` | no | Data settings page: the harness home, relocating it to another directory, and the tabs that host backup and import/export |
 
 ## deliverables
 

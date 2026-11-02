@@ -20,11 +20,12 @@ import { deliverBark, deliverWebPush } from './push/sender.ts'
 import { installPocketTriggers, type PocketDeliverer } from './push/triggers.ts'
 import { SubscriptionStore } from './push/store.ts'
 import { detectTailscale } from './tailscale.ts'
-import type { PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
+import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
+import { phoneAccess, probeVerdict } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
 
 export { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
-export { isOriginTrusted, remoteCommands } from './remote-status.ts'
+export { isOriginTrusted, phoneAccess, phoneTarget, remoteCommands } from './remote-status.ts'
 export { detectTailscale, parseTailscaleStatus } from './tailscale.ts'
 export { encryptPushPayload } from './push/encrypt.ts'
 export { generateVapidKeys, loadOrCreateVapidKeys, vapidAuthorization } from './push/keys.ts'
@@ -66,6 +67,8 @@ interface ConnectionRoute {
       readonly fetch: (request: Request) => Promise<Response>
     }): () => Promise<void>
   }
+  /** Adds this process's login token to an application URL. */
+  authenticatedUrl(baseUrl: string): string
 }
 
 /** Structural view of the startup-provided web surface values. */
@@ -79,6 +82,7 @@ interface WebStartupLike {
 /** Everything `apply` resolved once, shared by the routes and the deliverer. */
 interface PocketRuntime {
   surface: PocketServerSurface
+  connection: ConnectionRoute
   material: Promise<VapidMaterial>
   store: SubscriptionStore
   config: Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
@@ -101,6 +105,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       ...(webStartup.publicUrl !== undefined ? { publicUrl: webStartup.publicUrl } : {}),
       trustedHosts: [...(webStartup.trustedHosts ?? [])],
     },
+    connection,
     material: loadOrCreateVapidKeys(join(homeOf(ctx), 'pocket', 'keys.json')),
     store: new SubscriptionStore(join(homeOf(ctx), 'pocket', 'subscriptions.json')),
     config: resolved,
@@ -183,11 +188,17 @@ async function deliverToSubscription(
   }
 }
 
+/** How long one request to the advertised phone address may take before it counts as unreachable. */
+const PHONE_PROBE_TIMEOUT_MS = 2500
+
 /** Assemble the remote-status body: surface facts, tailscale probe, pocket state. */
 async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
+  const tailscale = await detectTailscale()
+  const phone = await resolvePhone(phoneAccess(runtime.surface, tailscale))
   return {
     server: runtime.surface,
-    tailscale: await detectTailscale(),
+    tailscale,
+    phone: phoneOf(runtime.connection, phone),
     pocket: {
       pushEnabled: runtime.config.pushEnabled,
       notifyTurnComplete: runtime.config.notifyTurnComplete,
@@ -196,6 +207,54 @@ async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
       subscriptions: runtime.store.size,
     },
   }
+}
+
+/**
+ * Turn the configured guess into a measured answer for advertised addresses.
+ *
+ * `phoneAccess` can only compare against the authorities this invocation was
+ * told about, and the profile patch that carries the fence override is not one
+ * of them. Requesting the address settles it: no answer means nothing proxies
+ * it yet, and a `403` means the proxy answered but the fence refused.
+ * @param access - the configured phone target and trust guess.
+ * @returns the same target with the blocker the request proved.
+ */
+async function resolvePhone(
+  access: ReturnType<typeof phoneAccess>,
+): Promise<ReturnType<typeof phoneAccess>> {
+  const target = access.target
+  // A loopback or bind-address target needs no proxy, so configuration settles it.
+  if (target === undefined || !target.startsWith('https://')) return access
+  try {
+    const response = await fetch(new URL('api/pocket/remote', target), {
+      signal: AbortSignal.timeout(PHONE_PROBE_TIMEOUT_MS),
+    })
+    return probeVerdict(response.status) === 'accepted'
+      ? { target, trusted: true }
+      : { target, trusted: false, blocker: 'untrusted' }
+  } catch {
+    return { target, trusted: false, blocker: 'not-serving' }
+  }
+}
+
+/**
+ * Attach this process's login token to the phone target, keeping a display
+ * copy without it: the token is what the phone trades for a session cookie,
+ * and a settings page must not print it into a screenshot.
+ * @param connection - the carrier that mints authenticated URLs.
+ * @param access - the resolved phone target and blocker.
+ */
+function phoneOf(
+  connection: ConnectionRoute,
+  access: ReturnType<typeof phoneAccess>,
+): PocketPhoneAccess {
+  const base = {
+    trusted: access.trusted,
+    ...(access.blocker !== undefined ? { blocker: access.blocker } : {}),
+  }
+  if (access.target === undefined) return base
+  const url = connection.authenticatedUrl(access.target)
+  return { ...base, url, display: url.replace(/([?&]token=)[^&]*/u, '$1…') }
 }
 
 /** Validate and persist one subscription; the reply carries the VAPID public key. */

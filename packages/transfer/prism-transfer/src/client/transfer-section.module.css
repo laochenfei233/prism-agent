@@ -6,27 +6,6 @@
   color: var(--dsw-alias-label-primary);
 }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.intro {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--dsw-alias-label-tertiary);
-  max-width: 60ch;
-}
-
 .card {
   display: flex;
   flex-direction: column;

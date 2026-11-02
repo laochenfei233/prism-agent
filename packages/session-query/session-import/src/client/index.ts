@@ -1,7 +1,7 @@
 /**
- * Browser half: registers the Import settings section and its dictionaries.
- * The section calls the Host import routes directly; it needs no Remote
- * namespace of its own.
+ * Browser half: registers the cross-agent import page inside the 数据 settings
+ * section and its dictionaries. The page calls the Host import routes
+ * directly; it needs no Remote namespace of its own.
  *
  * @module @prism/prism-session-import/client
  */
@@ -10,8 +10,9 @@
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the ctx.slots Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-// Type-only: the settings.section SlotMap merge.
+// Type-only: the 数据 section's `settings.data.page` SlotMap merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@prism/prism-data/client'
 import type { Context } from '@deepseek-ai/cordis'
 import { ImportSection } from './ImportSection.tsx'
 import { en, zh, type ImportLocaleKey } from './locales.ts'
@@ -33,17 +34,14 @@ export const NS = 'settings.sessionImport'
 export const inject = ['slots', 'locale']
 
 /**
- * Register the import page.
+ * Register the cross-agent import page.
  * @param ctx - browser plugin context.
  */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'session-import: dictionaries')
-  const t = ctx.locale.bind(NS)
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'import',
-    order: 25,
-    label: () => t('nav'),
+  ctx.slots.inject('settings.data.page', () => ctx.slots.register({
+    name: 'settings.data.page',
+    id: 'cross-agent',
     locale: NS,
   }, ImportSection))
 }

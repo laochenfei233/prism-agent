@@ -23,7 +23,7 @@ A client-side patch plugin — zero changes to the web app itself. Every adaptat
 
 **Remote access over Tailscale**:
 
-- The Pocket settings section detects the local Tailscale (MagicDNS name + 100.x address), reports the server bind surface, verifies the current connection passes the trust fence, and renders copyable commands: bind the Tailscale IP directly (`--host`), or proxy through `tailscale serve` and trust the ts.net domain (`--trusted-host`, `--public-url`). The kernel trust policy is read, never modified.
+- The Pocket settings section probes the local Tailscale and answers one question: can a phone open this now? It requests the advertised address instead of inferring from configuration, so a fence refusal and a missing proxy read differently; when the answer is yes it offers the authenticated link to copy — the login token is what the phone trades for a session cookie — and otherwise the steps still missing, `tailscale serve` for the loopback port and the `trustedHosts` entry that admits the ts.net authority in the profile patch. The kernel trust policy is read, never modified.
 
 **PWA install**: manifest, icon, and service worker served by the plugin; the browser half injects the tags at runtime, so a phone browser can add Prism to the home screen.
 
@@ -32,9 +32,11 @@ A client-side patch plugin — zero changes to the web app itself. Every adaptat
 The desktop runtime ships the plugin automatically. For a source web profile:
 
 ```sh
-pnpm --filter @prism/prism-pocket... build   # or: cd plugins/prism-pocket && pnpm build
-prism plugin --profile web add <absolute path to plugins/prism-pocket>
+cd plugins/prism-pocket && node ../../node_modules/tsdown/dist/run.mjs --config tsdown.config.ts
+prism plugin --profile web add link:<absolute path to plugins/prism-pocket>
 ```
+
+Install with `link:` so the profile reads this checkout; a bare path installs a copy instead, and a copy taken before the build has no `lib/` to import.
 
 ## Configuration (`cordis.yml`)
 

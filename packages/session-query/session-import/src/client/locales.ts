@@ -1,7 +1,6 @@
 /** Copy for the cross-agent import settings section. */
 
 export const en = {
-  nav: 'Import',
   title: 'Import conversations',
   intro: 'Bring conversations from other coding agents into this app. Sources are read-only; imported chats appear in the sidebar and keep their folder as a project.',
   refresh: 'Rescan',
@@ -47,7 +46,6 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<keyof typeof en, string> = {
-  nav: '导入',
   title: '导入对话',
   intro: '把其他编码 Agent 的对话带进本应用。来源只读；导入的对话会出现在侧栏，并以原文件夹作为项目。',
   refresh: '重新扫描',

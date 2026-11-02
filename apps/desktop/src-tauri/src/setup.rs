@@ -8,19 +8,86 @@ use std::path::{Path, PathBuf};
 use serde_yaml::Value as Yaml;
 use tauri::{AppHandle, Manager};
 
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A9.
-/// Prism's harness home: `$PRISM_HOME` when set, otherwise the fork's default
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A17.
+/// Prism's harness home: `$PRISM_HOME` when set, otherwise the home the
+/// Settings page recorded in `~/.prism-data-home`, otherwise the fork's default
 /// `~/.prism` — the same root this fork's `prism` CLI defaults to — never a
 /// deepseek-harness build's `~/.dsh`.
+///
+/// Resolved once per shell process: the shell seeds profiles, spawns the child
+/// with `DSH_HOME`, and later reads its server record at this path, so a
+/// Settings-page relocation must not move those calls mid-run.
 pub fn dsh_home() -> PathBuf {
-    std::env::var("PRISM_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            let base = std::env::var("USERPROFILE")
-                .or_else(|_| std::env::var("HOME"))
-                .unwrap_or_default();
-            PathBuf::from(base).join(".prism")
-        })
+    static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    HOME.get_or_init(|| {
+        let base = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_default();
+        resolve_home(std::env::var("PRISM_HOME").ok(), Path::new(&base))
+    })
+    .clone()
+}
+
+/// Read the launch pointer a Settings-page relocation writes.
+///
+/// The pointer is read once per launch, before any service captures the home;
+/// the child receives this value as `DSH_HOME`. A blank or relative record is
+/// ignored, so a damaged file never moves the home somewhere unexpected.
+fn resolve_home(override_home: Option<String>, base: &Path) -> PathBuf {
+    if let Some(home) = override_home {
+        return PathBuf::from(home);
+    }
+    if let Ok(raw) = fs::read_to_string(base.join(".prism-data-home")) {
+        let recorded = PathBuf::from(raw.trim());
+        if recorded.is_absolute() {
+            return recorded;
+        }
+    }
+    base.join(".prism")
+}
+
+#[cfg(test)]
+mod home_tests {
+    use super::resolve_home;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// A scratch operating-system home for one case, under the crate's build directory.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target").join("home-tests").join(name);
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("scratch home");
+        dir
+    }
+
+    #[test]
+    fn explicit_override_wins_over_the_pointer() {
+        let base = scratch("override");
+        fs::write(base.join(".prism-data-home"), "/ignored/pointer\n").expect("pointer");
+        let resolved = resolve_home(Some("/explicit/home".to_string()), &base);
+        assert_eq!(resolved, PathBuf::from("/explicit/home"));
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn an_absolute_pointer_selects_the_home() {
+        let base = scratch("pointer");
+        let recorded = base.join("elsewhere");
+        fs::write(base.join(".prism-data-home"), format!("{}\n", recorded.display())).expect("pointer");
+        assert_eq!(resolve_home(None, &base), recorded);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_missing_blank_or_relative_pointer_keeps_the_default() {
+        let base = scratch("default");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        fs::write(base.join(".prism-data-home"), "   \n").expect("blank pointer");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        fs::write(base.join(".prism-data-home"), "relative/home\n").expect("relative pointer");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        let _ = fs::remove_dir_all(&base);
+    }
 }
 
 fn profile_web_dir(home: &Path) -> PathBuf {

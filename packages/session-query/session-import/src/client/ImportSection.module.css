@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 14px;
   max-width: 760px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -15,7 +17,7 @@
 
 .title {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
 }
 

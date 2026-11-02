@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for data-settings.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/data-settings.md
+/:
+  en: 979e0869f6cbdec3
+  zh: 979e0869f6cbdec3
+/data-settings:
+  en: eef862086d24ea9c
+  zh: df034be3734d99ed
+/data-settings/report:
+  en: 624cd257e0f67a08
+  zh: ba51353f4895d9cd
+/data-settings/s1-problem:
+  en: fb433c9c398449db
+  zh: 681ee53c47d0d4e9
+/data-settings/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/data-settings/s2-design/workspace-override:
+  en: 43bbdf31a88034c0
+  zh: f5a9fa4411441b1f
+/data-settings/s2-design/s2-1-one-section-with-three-tabs:
+  en: 32694476fcdf1be6
+  zh: 60832ea0b42c7fd6
+/data-settings/s2-design/s2-2-where-the-data-lives-and-what-changing-it-means:
+  en: bd173e5722e12b39
+  zh: cb611c9f76d420f9
+/data-settings/s2-design/s2-3-launch-pointer:
+  en: 70c4c8d80b8b5c58
+  zh: 768ccdc3869c07fb
+/data-settings/s2-design/s2-4-host-route-contract:
+  en: 522bb322e28b8cee
+  zh: 40999a1591da71d0
+/data-settings/s2-design/s2-5-relocation-rules:
+  en: 7c460051de87c668
+  zh: 033e24cd41d807b5
+/data-settings/s2-design/s2-6-storage-page:
+  en: 8d13ffe138073d02
+  zh: f4286469543673c1
+/data-settings/s2-design/s2-7-copy-and-presentation-limits:
+  en: 3f69550058be1b7e
+  zh: c0831ade51b1ab9f
+/data-settings/s3-scope:
+  en: a166cbcb541adf31
+  zh: 6fbfaa5c4055bbd5
+/data-settings/tasks:
+  en: b3f22fb98194349c
+  zh: 313568866e7a54ca
+/data-settings/s4-acceptance:
+  en: 4035b1557a356412
+  zh: acdf5cf82f8cf9fa

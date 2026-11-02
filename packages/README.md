@@ -74,6 +74,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 | [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form |
 | [`backup/`](backup/README.md) | Archives configuration, memory, and project folders to WebDAV, SMB, or S3 |
 | [`transfer/`](transfer/README.md) | Moves projects and settings between installs as archive files |
+| [`data/`](data/README.md) | 数据 settings page and harness-home relocation |
 | [`workspace/`](workspace/README.md) | Workspace entity |
 | [`sdk/`](sdk/README.md) | Out-of-process SDK: JSON-RPC protocol and TypeScript client/server |
 | [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server |

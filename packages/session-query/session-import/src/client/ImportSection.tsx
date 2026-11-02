@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { SESSION_IMPORT_CANDIDATES_ROUTE, SESSION_IMPORT_ROUTE } from '../routes.ts'
 import { isImportSourceId } from '../source-ids.ts'
 import type {
@@ -35,8 +35,8 @@ import {
 } from './state.ts'
 import css from './ImportSection.module.css'
 
-/** Props bound by the settings renderer. */
-export type ImportSectionProps = PropsRuntime<'settings.section'> & PropsLocale<'settings.sessionImport'>
+/** Props bound by the settings renderer: copy only, as a leaf page inside the 数据 section's tab. */
+export type ImportSectionProps = PropsLocale<'settings.sessionImport'>
 
 type Phase = 'sources' | 'planning' | 'preview' | 'importing' | 'done'
 
@@ -300,7 +300,7 @@ export function ImportSection({ t }: ImportSectionProps) {
   return <section className={css.section}>
     <header className={css.header}>
       <div>
-        <h2 className={css.title}>{t('title')}</h2>
+        <h3 className={css.title}>{t('title')}</h3>
         <p className={css.intro}>{t('intro')}</p>
       </div>
       <Button variant="outline" size="sm" onClick={loadSources} disabled={importing || planning}>

@@ -4964,6 +4964,7 @@ export type ImportSourceId =
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/experimental/webhook/src/index.ts`](../packages/experimental/webhook/src/index.ts) |
 | `@deepseek-ai/dsh-workspace` | `storageDomain` · `sessionPersistence` | [`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts) |
+| `@prism/prism-data` | `connection` | [`packages/data/prism-data/src/index.ts`](../packages/data/prism-data/src/index.ts) |
 | `@prism/prism-transfer` | `connection` · `sessionPersistence` · `workspaceRegistry` · `attachments` · `settings` | [`packages/transfer/prism-transfer/src/index.ts`](../packages/transfer/prism-transfer/src/index.ts) |
 <!-- END GENERATED config-catalog:no-config -->
 

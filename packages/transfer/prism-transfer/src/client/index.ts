@@ -1,7 +1,7 @@
 /**
- * Browser half: registers the transfer settings section and its dictionaries.
- * The section calls the Host transfer routes directly and needs no Remote
- * namespace of its own.
+ * Browser half: registers the import/export page inside the 数据 settings
+ * section and its dictionaries. The page calls the Host transfer routes
+ * directly and needs no Remote namespace of its own.
  *
  * @module @prism/prism-transfer/client
  */
@@ -10,12 +10,13 @@
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the ctx.slots merge.
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-// Type-only: the settings.section SlotMap entry.
+// Type-only: the 数据 section's `settings.data.page` SlotMap entry.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: the ctx.workspaces merge.
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 // Type-only: the ctx.remote merge that carries remote.directoryPicker.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@prism/prism-data/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { TransferSection, type TransferFace } from './TransferSection.tsx'
 import { zh, en, type TransferLocaleKey } from './locales.ts'
@@ -38,12 +39,11 @@ export const NS = 'settings.transfer'
 export const inject = ['slots', 'locale', 'workspaces', 'remote', 'remote.directoryPicker']
 
 /**
- * Register the transfer section once the shell's settings slot is declared.
+ * Register the import/export page inside the 数据 settings section.
  * @param ctx - browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'prism-transfer: dictionaries')
-  const t = ctx.locale.bind(NS)
   const face: TransferFace = {
     workspaces: ctx.workspaces,
     // Wrapped: the face carries the structural surface and unwraps the wire
@@ -56,11 +56,9 @@ export function apply(ctx: ClientContext): void {
       },
     },
   }
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
+  ctx.slots.inject('settings.data.page', () => ctx.slots.register({
+    name: 'settings.data.page',
     id: 'transfer',
-    order: 30,
-    label: () => t('nav'),
     locale: NS,
     inject: () => face,
   }, TransferSection))

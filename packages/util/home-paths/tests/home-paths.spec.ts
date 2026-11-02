@@ -4,19 +4,24 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AGENTS_HOME_DIR_NAME,
+  DATA_HOME_POINTER_FILE_NAME,
   DEFAULT_AGENTS_HOME_DISPLAY,
   DEFAULT_DSH_HOME_DISPLAY,
   DSH_HOME_DIR_NAME,
   agentsHomeDisplay,
   canonicalizeWatchPath,
+  clearDataHomePointer,
+  dataHomePointerPath,
   defaultAgentsHome,
   defaultDshHome,
   dshCachePath,
   dshHomeDisplay,
   dshHomePath,
   expandHomePath,
+  readDataHomePointer,
   resolveAgentsHome,
   resolveDshHome,
+  writeDataHomePointer,
 } from '@deepseek-ai/dsh-home-paths'
 
 afterEach(() => {
@@ -130,6 +135,55 @@ describe('dsh path helpers', () => {
       await expect(canonicalizeWatchPath(join(file, 'child'))).rejects.toMatchObject({ code: 'ENOTDIR' })
     } finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('data home launch pointer', () => {
+  it('sits beside the default home and stays absent until one is written', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      expect(dataHomePointerPath(home)).toBe(join(home, DATA_HOME_POINTER_FILE_NAME))
+      expect(DATA_HOME_POINTER_FILE_NAME).toBe('.prism-data-home')
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('round-trips an absolute root and clears it again', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    const root = join(home, 'elsewhere', 'prism')
+    try {
+      writeDataHomePointer(root, home)
+      expect(readDataHomePointer(home)).toBe(root)
+      clearDataHomePointer(home)
+      expect(readDataHomePointer(home)).toBeUndefined()
+      clearDataHomePointer(home)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('ignores a relative or blank recorded path instead of following it', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      await writeFile(dataHomePointerPath(home), '  relative/prism  \n')
+      expect(readDataHomePointer(home)).toBeUndefined()
+      await writeFile(dataHomePointerPath(home), '   \n')
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to record a relative root', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      expect(() => { writeDataHomePointer('relative/prism', home) }).toThrow(/absolute/)
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
     }
   })
 })

@@ -63,6 +63,7 @@
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-storage-json": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
+    "@prism/prism-data": "workspace:*",
     "react": "^18.2.0"
   },
   "dsh": {

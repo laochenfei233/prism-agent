@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-pocket.md
 /:
-  en: a5c312b9373f3bcb
-  zh: a5c312b9373f3bcb
+  en: e6336961804a3224
+  zh: e6336961804a3224
 /prism-pocket:
   en: 2a9eb80f4497fe69
   zh: f775c44d7c90a909
@@ -33,8 +33,8 @@
   en: 1fac8c60be3a3f52
   zh: 24cf0982154d4483
 /prism-pocket/s2-design/s2-6-tailscale-remote-access-node-half-settings-page:
-  en: 1a28f3e634e8973f
-  zh: bde7c79427190353
+  en: a6fd82f1a66aef77
+  zh: 9120fa63c0fc7a2a
 /prism-pocket/s2-design/s2-7-pwa-install:
   en: 46cb5c22336859a4
   zh: 86378499a6a9d1ad

@@ -23,6 +23,7 @@
     { "path": "../../client/ui-renderer" },
     { "path": "../../client/ui-settings/tsconfig.client.json" },
     { "path": "../../client/ui-slots" },
-    { "path": "../../credentials/credentials" }
+    { "path": "../../credentials/credentials" },
+    { "path": "../../data/prism-data/tsconfig.client.json" }
   ]
 }
