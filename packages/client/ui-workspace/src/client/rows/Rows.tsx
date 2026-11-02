@@ -35,14 +35,16 @@ type RowTranslate = WorkspaceBrowserProps['t']
 
 /**
  * Child-seat renderer threaded from the browser root: the row's action lists,
- * its leading decoration, and its hover-card section. The leading seat is
- * rendered only while the row's primary state is idle, so a status dot and a
- * leading occupant never share the row; the hover seat only while the row's
- * card is open.
+ * its leading decoration, its hover-card section, and the second line a row
+ * with a pending interaction renders. The leading seat is rendered only while
+ * the row's primary state is idle, so a status dot and a leading occupant
+ * never share the row; the hover seat only while the row's card is open; the
+ * pending line only while the row holds a pending interaction.
  */
 type RowRenderSlots = PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.session.pending'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
 >['renderSlot']
@@ -575,6 +577,8 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
  * keeps that cell and renders no seat, so an ambient automation mark never
  * appears beside the row's own state dot. An archived row keeps the cell blank:
  * neither marker renders there, and its live status stays on the hover card.
+ * A row holding a pending interaction gains a second line the waiting package
+ * fills; every other row stays one line tall.
  * @param props.node - derived session node.
  * @param props.currentId - selected session id (row highlight).
  * @param props.now - epoch ms for relative-time formatting.
@@ -582,7 +586,7 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
  * @param props.onRenameRequest - open the rename dialog from a title double-click (id + current title).
  * @param props.renderSlot - child-seat renderer for the row's action lists
  * (`sidebar.workspaces.session.menu.item` / `sidebar.workspaces.session.row.action`),
- * its leading decoration, and its hover-card section.
+ * its leading decoration, its hover-card section, and its pending second line.
  * @param props.onReveal - scroll this row into view after search navigation, then acknowledge it.
  * @param props.drag - optional row-drag target wiring; blank rows cannot start a drag.
  * @param props.t - the browser root's locale seat.
@@ -605,6 +609,7 @@ export function SessionNodeItem({
 } & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.session.pending'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
 >) {
@@ -614,6 +619,10 @@ export function SessionNodeItem({
   const statuses = sessionStatuses(node, t)
   const primaryStatus = statuses[0]
   const showStatus = primaryStatus.state !== 'idle'
+  // The pending line serves every interaction kind; the occupant decides what
+  // the wait shows and answers it. Archived and blank rows render neither the
+  // status cell nor the row verbs, so they render no pending line either.
+  const pending = !row.archived && !row.blank && node.pendingInteraction !== undefined
   // Archived rows hold their in-place grayed slot, so manual reorder cannot
   // move them. Pinned rows drag within the pinned block: the browser gates
   // their drop targets to fellow pinned rows.
@@ -644,7 +653,7 @@ export function SessionNodeItem({
       data-row-key={`session:${node.id}`}
       className={clsx(
         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
-        row.archived && css.archived,
+        row.archived && css.archived, pending && css.withPending,
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
@@ -743,6 +752,13 @@ export function SessionNodeItem({
           </Menu>
           {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
         </span>
+      )}
+      {/* The second line takes the full row width, so the title, time, and
+          action cells keep the first line to themselves while it renders. */}
+      {pending && (
+        <div className={css.pendingLine}>
+          {renderSlot('sidebar.workspaces.session.pending', { sessionId: node.id, displayTitle: row.title })}
+        </div>
       )}
       {!row.blank && (
         <ContextMenu state={contextMenu}>

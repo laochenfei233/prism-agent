@@ -6,6 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApprovalPanel } from '../src/client/ApprovalPanel.tsx'
+import { RowApproval } from '../src/client/RowApproval.tsx'
 import type { ApprovalComposerProps, ApprovalInjected } from '../src/client/contract/slots.ts'
 import { PendingApproval } from '../src/client/contract/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -23,6 +24,20 @@ type ApprovalListener = (
   next: () => Promise<'unavailable'>,
 ) => Promise<unknown>
 
+interface Registration<Options> {
+  readonly options: Options
+  readonly component: unknown
+}
+
+interface ComposerOptions {
+  select: (props: { pendingInteraction: PendingApproval | undefined }) => PendingApproval | null
+  inject: () => ApprovalInjected
+}
+
+interface RowOptions {
+  inject: () => ApprovalInjected
+}
+
 interface PluginBench {
   readonly ctx: Context
   readonly listener: ApprovalListener
@@ -33,25 +48,15 @@ interface PluginBench {
   readonly register: ReturnType<typeof vi.fn>
   readonly injectSlot: ReturnType<typeof vi.fn>
   releasePending(): Promise<void>
-  registration(): {
-    options: {
-      select(props: { pendingInteraction: PendingApproval | undefined }): PendingApproval | null
-      inject(): ApprovalInjected
-    }
-    component: unknown
-  }
+  registration(): Registration<ComposerOptions>
+  rowRegistration(): Registration<RowOptions>
 }
 
 async function setupPlugin(): Promise<PluginBench> {
   const ctx = new Context()
   let listener: ApprovalListener | undefined
-  let registration: {
-    options: {
-      select(props: { pendingInteraction: PendingApproval | undefined }): PendingApproval | null
-      inject(): ApprovalInjected
-    }
-    component: unknown
-  } | undefined
+  let composer: Registration<ComposerOptions> | undefined
+  let row: Registration<RowOptions> | undefined
   const disposeSlot = vi.fn()
   const disposeLocale = vi.fn()
   const pending = new Map<PendingApproval, () => Promise<void>>()
@@ -64,10 +69,15 @@ async function setupPlugin(): Promise<PluginBench> {
     return () => { pending.delete(value) }
   })
   const register = vi.fn((
-    options: NonNullable<typeof registration>['options'],
+    options: { name: string } & (ComposerOptions | RowOptions),
     component: unknown,
   ) => {
-    registration = { options, component }
+    if (options.name === 'conversation.composer') {
+      composer = { options: options as ComposerOptions, component }
+    }
+    if (options.name === 'sidebar.workspaces.session.pending') {
+      row = { options, component }
+    }
     return disposeSlot
   })
   const injectSlot = vi.fn((_name: string, mount: () => () => void) => {
@@ -106,8 +116,12 @@ async function setupPlugin(): Promise<PluginBench> {
       await Promise.allSettled(delegates.map(delegate => delegate()))
     },
     registration: () => {
-      if (registration === undefined) throw new Error('approval slot was not registered')
-      return registration
+      if (composer === undefined) throw new Error('approval composer slot was not registered')
+      return composer
+    },
+    rowRegistration: () => {
+      if (row === undefined) throw new Error('approval row slot was not registered')
+      return row
     },
   }
 }
@@ -210,7 +224,7 @@ describe('approval Remote Event consumer', () => {
       .resolves.toBe('unavailable')
     expect(next).toHaveBeenCalledOnce()
     expect(bench.pending.getSnapshot()).toEqual([])
-    expect(bench.register).toHaveBeenCalledOnce()
+    expect(bench.register).toHaveBeenCalledTimes(2)
   })
 
   it('publishes one scoped takeover, returns the answer, and keeps stable registrations', async () => {
@@ -230,8 +244,10 @@ describe('approval Remote Event consumer', () => {
     const { options, component } = bench.registration()
 
     expect(component).toBe(ApprovalPanel)
+    expect(bench.rowRegistration().component).toBe(RowApproval)
     expect(pending.displayReason).toEqual({ en: 'Display reason', zh: '展示原因' })
     expect(options.inject().resolveReason(pending.displayReason!)).toBe('Display reason')
+    expect(bench.rowRegistration().options.inject().resolveReason(pending.displayReason!)).toBe('Display reason')
     expect(options.select({ pendingInteraction: undefined })).toBeNull()
     expect(options.select({ pendingInteraction: pending })).toBe(pending)
     expect(pending).toMatchObject({
@@ -247,7 +263,7 @@ describe('approval Remote Event consumer', () => {
     await expect(result).resolves.toBe('allowed-once')
     expect(next).not.toHaveBeenCalled()
     expect(bench.pending.getSnapshot()).toEqual([])
-    expect(bench.register).toHaveBeenCalledOnce()
+    expect(bench.register).toHaveBeenCalledTimes(2)
     expect(bench.disposeSlot).not.toHaveBeenCalled()
     await scope.fiber.dispose()
   })
@@ -307,7 +323,7 @@ describe('approval Remote Event consumer', () => {
   it('removes stable registrations with the plugin lifetime', async () => {
     const bench = await setupPlugin()
     await bench.ctx.fiber.dispose()
-    expect(bench.disposeSlot).toHaveBeenCalledOnce()
+    expect(bench.disposeSlot).toHaveBeenCalledTimes(2)
     expect(bench.disposeLocale).toHaveBeenCalledOnce()
   })
 })

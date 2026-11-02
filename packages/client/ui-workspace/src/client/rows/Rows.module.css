@@ -116,6 +116,23 @@
   margin: 0 6px 0 4px;
 }
 
+/* A row holding a pending interaction grows a second full-width line. The
+   first line keeps the single-line cell layout, and the pending line starts at
+   the title's left edge, so the wait reads as part of the Session it blocks. */
+.sessionRow.withPending {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 32px;
+  padding-block: 4px;
+  row-gap: 2px;
+}
+
+.pendingLine {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding-inline-start: 20px;
+}
+
 .slot {
   flex: none;
   width: 16px;
