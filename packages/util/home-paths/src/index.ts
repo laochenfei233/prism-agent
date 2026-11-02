@@ -4,9 +4,10 @@
  * @module @deepseek-ai/dsh-home-paths
  */
 
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { opendir, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A9.
 // Upstream defaults the harness home to `~/.dsh`; this fork defaults to `~/.prism`
@@ -28,6 +29,10 @@ export const DEFAULT_AGENTS_HOME_DISPLAY = `~/${AGENTS_HOME_DIR_NAME}`
 
 /** Environment variable that overrides the default shared agent configuration root. */
 export const AGENTS_HOME_ENV = 'DSH_AGENTS_HOME'
+
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A17.
+/** Launcher pointer file, a sibling of the default home that names the selected one. */
+export const DATA_HOME_POINTER_FILE_NAME = '.prism-data-home'
 
 /**
  * Give a native filesystem watcher one canonical spelling of a path, even
@@ -197,4 +202,52 @@ export function dshHomeDisplay(resolvedHome: string): string {
  */
 export function agentsHomeDisplay(resolvedHome: string): string {
   return rootDisplay(resolvedHome, defaultAgentsHome(), DEFAULT_AGENTS_HOME_DISPLAY, AGENTS_HOME_ENV)
+}
+
+/**
+ * Locate the launcher pointer beside the default home.
+ *
+ * The pointer names the harness home a launch should use after the settings
+ * page moves it. It never lives inside the home it selects, so reading it
+ * cannot depend on its own value.
+ * @param home - operating-system home directory the pointer sits in.
+ * @returns the absolute pointer path.
+ */
+export function dataHomePointerPath(home: string = homedir()): string {
+  return join(home, DATA_HOME_POINTER_FILE_NAME)
+}
+
+/**
+ * Read the home the launcher pointer names.
+ * @param home - operating-system home directory the pointer sits in.
+ * @returns the recorded absolute path, or `undefined` when the pointer is
+ * absent, unreadable, blank, or names a relative path.
+ */
+export function readDataHomePointer(home: string = homedir()): string | undefined {
+  try {
+    const recorded = readFileSync(dataHomePointerPath(home), 'utf8').trim()
+    return isAbsolute(recorded) ? recorded : undefined
+  } catch (_pointerUnavailable) {
+    // No pointer, or one this process may not read: the launch keeps its default.
+    return undefined
+  }
+}
+
+/**
+ * Record the home the next launch should use.
+ * @param root - absolute harness home to select.
+ * @param home - operating-system home directory the pointer sits in.
+ * @throws when `root` is not absolute, or the pointer cannot be written.
+ */
+export function writeDataHomePointer(root: string, home: string = homedir()): void {
+  if (!isAbsolute(root)) throw new Error(`data home pointer requires an absolute path: ${JSON.stringify(root)}`)
+  writeFileSync(dataHomePointerPath(home), `${root}\n`, 'utf8')
+}
+
+/**
+ * Drop the launcher pointer so the next launch returns to the default home.
+ * @param home - operating-system home directory the pointer sits in.
+ */
+export function clearDataHomePointer(home: string = homedir()): void {
+  rmSync(dataHomePointerPath(home), { force: true })
 }

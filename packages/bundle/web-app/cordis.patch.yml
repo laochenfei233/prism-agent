@@ -120,6 +120,11 @@
           .DS_Store
         maxBackups: 10
 
+    # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+    # Data: the 数据 settings section, its storage tab, and the launch-pointer route.
+    - id: prism-data
+      name: '@prism/prism-data'
+
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application
     # renders no button). Two halves: the host routes and the browser surface.

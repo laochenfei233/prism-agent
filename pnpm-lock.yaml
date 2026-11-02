@@ -1825,6 +1825,9 @@ importers:
       '@deepseek-ai/dsh-storage-json':
         specifier: workspace:*
         version: link:../../storage/storage-json
+      '@prism/prism-data':
+        specifier: workspace:*
+        version: link:../../data/prism-data
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -3047,6 +3050,9 @@ importers:
       '@prism/prism-backup':
         specifier: workspace:~
         version: link:../../backup/prism-backup
+      '@prism/prism-data':
+        specifier: workspace:~
+        version: link:../../data/prism-data
       '@prism/prism-session-import':
         specifier: workspace:~
         version: link:../../session-query/session-import
@@ -7660,6 +7666,46 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
+
+  packages/data/prism-data:
+    dependencies:
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
+      '@deepseek-ai/dsh-app-boot':
+        specifier: workspace:*
+        version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-client-connection':
+        specifier: workspace:*
+        version: link:../../client/connection
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@deepseek-ai/dsh-client-test-runtime':
+        specifier: workspace:*
+        version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: workspace:*
+        version: link:../../client/ui-primitives
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: workspace:*
+        version: link:../../client/ui-settings
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
 
   packages/deliverables/tool-present:
     dependencies:
@@ -12513,6 +12559,9 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: workspace:*
         version: link:../../workspace/workspace
+      '@prism/prism-data':
+        specifier: workspace:*
+        version: link:../../data/prism-data
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -15397,6 +15446,9 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: workspace:*
         version: link:../../workspace/workspace
+      '@prism/prism-data':
+        specifier: workspace:*
+        version: link:../../data/prism-data
       react:
         specifier: ^18.2.0
         version: 18.3.1

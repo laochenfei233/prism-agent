@@ -1,33 +1,85 @@
 /**
- * Remote-access command generation, shared by the node half's status route
- * and the settings page (which re-derives the same commands from the status
- * body). The text mirrors the trust fence: the listener bind IP is accepted
- * without `--trusted-host`, while a proxied authority must join the list and
- * match the advertised public URL.
+ * Remote-access facts and command generation, shared by the node half's status
+ * route and the settings page (which re-derives the same commands from the
+ * status body).
+ *
+ * The deployment these commands describe is the desktop application, which
+ * starts `dsh web` on a loopback port with fixed arguments: it can bind no
+ * other address and can pass no trust flag. Exposing it to a phone therefore
+ * goes through a `tailscale serve` proxy over the loopback listener, and the
+ * MagicDNS authority joins the fence through the profile patch.
  *
  * @module @prism/prism-pocket/commands
  */
 
-import type { PocketRemoteCommands, PocketServerSurface, PocketTailscaleInfo } from './types.ts'
+import type { PocketPhoneAccess, PocketRemoteCommands, PocketServerSurface, PocketTailscaleInfo } from './types.ts'
 
 /**
- * Render the copyable remote-access commands for this deployment.
+ * Render the copyable deployment steps for this deployment.
  * @param surface - the webserver bind surface and trust list.
  * @param tailscale - the local Tailscale probe result.
- * @returns the direct-IP command when a Tailscale address exists, and the
- * MagicDNS command set when a MagicDNS name exists.
+ * @returns the proxy command and the fence patch when a MagicDNS name exists,
+ * and the CLI trust flag for a server the user starts themselves.
  */
 export function remoteCommands(surface: PocketServerSurface, tailscale: PocketTailscaleInfo): PocketRemoteCommands {
-  const commands: PocketRemoteCommands = {}
-  if (tailscale.ipv4 !== undefined) {
-    commands.directIp = `prism --profile web --host ${tailscale.ipv4}`
+  if (tailscale.dnsName === undefined) return {}
+  return {
+    serve: `tailscale serve --bg --https=443 http://127.0.0.1:${surface.port}`,
+    trust: `- id: connection\n  config:\n    trustedHosts:\n      - ${tailscale.dnsName}`,
+    trustedHost: `--trusted-host ${tailscale.dnsName}`,
   }
-  if (tailscale.dnsName !== undefined) {
-    commands.serve = `tailscale serve --bg --https=443 http://127.0.0.1:${surface.port}`
-    commands.trustedHost = `--trusted-host ${tailscale.dnsName}`
-    commands.publicUrl = `--public-url https://${tailscale.dnsName}/`
+}
+
+/**
+ * Resolve the address a phone should open and whether the configured trust
+ * list already admits it.
+ *
+ * This is the cheap answer: it reads the bind surface and the Tailscale probe
+ * and never touches the network. A proxied address that the list does not name
+ * is reported as `untrusted` until the caller probes it, because only a real
+ * request through the proxy tells the fence answer from a missing proxy.
+ * @param surface - the webserver bind surface and trust list.
+ * @param tailscale - the local Tailscale probe result.
+ * @returns the address to open, whether its authority passes the fence, and
+ * the blocker when no address exists at all.
+ */
+export function phoneAccess(
+  surface: PocketServerSurface,
+  tailscale: PocketTailscaleInfo,
+): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
+  const target = phoneTarget(surface, tailscale)
+  if (target === undefined) {
+    return { blocker: tailscale.available ? 'loopback' : 'no-tailscale', trusted: false }
   }
-  return commands
+  const trusted = isOriginTrusted(originOf(target), surface)
+  return trusted ? { target, trusted } : { target, trusted, blocker: 'untrusted' }
+}
+
+/**
+ * Classify one request to the phone address.
+ *
+ * The Host/Origin fence answers before the session layer, so `403` is the
+ * fence refusing this authority and every other answer means the request
+ * reached the server. A 2xx and a 401 are therefore equally good news.
+ * @param status - the HTTP status the address answered with.
+ * @returns `untrusted` when the fence refused, `accepted` otherwise.
+ */
+export function probeVerdict(status: number): 'untrusted' | 'accepted' {
+  return status === 403 ? 'untrusted' : 'accepted'
+}
+
+/**
+ * The URL a phone should open, before authentication is added.
+ * @param surface - the webserver bind surface.
+ * @param tailscale - the local Tailscale probe result.
+ * @returns the advertised public URL, the MagicDNS root, or the direct bind
+ * address; undefined when the server listens on loopback with no Tailscale.
+ */
+export function phoneTarget(surface: PocketServerSurface, tailscale: PocketTailscaleInfo): string | undefined {
+  if (surface.publicUrl !== undefined) return surface.publicUrl
+  if (tailscale.dnsName !== undefined) return `https://${tailscale.dnsName}/`
+  if (isLoopbackHostname(normalizeHost(surface.host))) return undefined
+  return `http://${normalizeHost(surface.host)}:${surface.port}/`
 }
 
 /**
@@ -56,6 +108,15 @@ export function isOriginTrusted(
     const { port } = splitAuthority(authority)
     return entryHost === hostname && entryPort === port
   })
+}
+
+/** The origin of an absolute URL, so the fence check sees only scheme and authority. */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin
+  } catch {
+    return url
+  }
 }
 
 /** Mirror of the fence's `isLoopbackHostname`: localhost, `[::1]`, or 127/8. */

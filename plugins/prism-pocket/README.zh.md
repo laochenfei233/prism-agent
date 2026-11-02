@@ -23,7 +23,7 @@
 
 **Tailscale 远程访问**：
 
-- 「口袋」设置分区探测本机 Tailscale（MagicDNS 域名 + 100.x 地址），报告服务器绑定面，校验当前连接是否通过信任围栏，并给出可复制的命令：直接绑定 Tailscale IP（`--host`），或经 `tailscale serve` 反代并信任 ts.net 域名（`--trusted-host`、`--public-url`）。内核信任策略只读不改。
+- 「口袋」设置分区探测本机 Tailscale，只回答一个问题：手机现在能不能打开？它直接请求对外地址而不是从配置推断，因此围栏拒绝和代理缺失会读出不同结论；能打开时给出可复制的已登录链接——手机用其中的登录令牌换取会话 Cookie——打不开时列出还缺的步骤：用 `tailscale serve` 代理本机端口，以及在 profile 里把 ts.net 域加进 `trustedHosts`。内核信任策略只读不改。
 
 **PWA 安装**：manifest、图标与 service worker 由插件自身路由提供，浏览器半在运行时注入标签，手机浏览器即可把 Prism 添加到主屏幕。
 
@@ -32,9 +32,11 @@
 桌面运行时自动携带本插件。源码 web profile 手动安装：
 
 ```sh
-pnpm --filter @prism/prism-pocket... build   # or: cd plugins/prism-pocket && pnpm build
-prism plugin --profile web add <absolute path to plugins/prism-pocket>
+cd plugins/prism-pocket && node ../../node_modules/tsdown/dist/run.mjs --config tsdown.config.ts
+prism plugin --profile web add link:<absolute path to plugins/prism-pocket>
 ```
+
+用 `link:` 安装时 profile 直接读取当前检出；只写路径会装入一份副本，而构建前生成的副本没有可导入的 `lib/`。
 
 ## 配置（`cordis.yml`）
 

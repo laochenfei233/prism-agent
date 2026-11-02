@@ -1,18 +1,20 @@
 /**
- * The backup page's browser half: one `settings.section` entry rendered by
- * {@link BackupSection}. The page edits the `prism-backup` settings namespace
- * through the shared configuration forms, drives the run and test calls over
- * the plugin's POST route, and manages passwords through the credential
- * surface. It owns no shell chrome and supplies all of its own copy.
+ * The backup page's browser half: one `settings.data.page` entry rendered by
+ * {@link BackupSection} inside the 数据 settings page's 备份 tab. The page
+ * edits the `prism-backup` settings namespace through the shared configuration
+ * forms, drives the run and test calls over the plugin's POST route, and
+ * manages passwords through the credential surface. It owns no page chrome and
+ * supplies all of its own copy.
  */
 
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: the ctx.configForms merge and the shell's `settings.section` SlotMap entry.
+// Type-only: the ctx.configForms merge and the 数据 section's `settings.data.page` SlotMap entry.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: the ctx.remote merge and the forwarded-event key face for credentials.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@prism/prism-data/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { BackupSection } from './BackupSection.tsx'
 import { BACKUP_ENTRY_ID, createBackupSection, type BackupSectionFace, type BackupSettings } from './page-controller.ts'
@@ -47,18 +49,15 @@ export function createBackupFace(ctx: ClientContext): BackupSectionFace {
 }
 
 /**
- * Register the backup section once the shell's settings slot is declared.
+ * Register the backup page inside the 数据 settings section.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
-  const t = ctx.locale.bind(NS)
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'prism-backup: dictionaries')
   const face = createBackupFace(ctx)
-  ctx.effect(() => ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
+  ctx.effect(() => ctx.slots.inject('settings.data.page', () => ctx.slots.register({
+    name: 'settings.data.page',
     id: 'backup',
-    order: 25,
-    label: () => t('nav'),
     locale: NS,
     inject: () => face,
   }, BackupSection)), 'prism-backup: settings page')

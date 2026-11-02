@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-/** What the browser half registers: one settings section, its label, and its teardown. */
+/** What the browser half registers: one data page, its face, and its teardown. */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
-import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { TransferSection, type TransferFace, type TransferSectionProps } from '../src/client/TransferSection.tsx'
@@ -36,7 +35,7 @@ async function bench(options: { pickResult?: unknown } = {}): Promise<{ ctx: Con
   const slots = ctx.get('slots') as SlotRegistry
   slots.register({
     name: 'root',
-    children: { 'settings.section': { kind: 'list', scope: 'root' } },
+    children: { 'settings.data.page': { kind: 'list', scope: 'root' } },
   } as never, () => null)
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
@@ -49,34 +48,16 @@ async function bench(options: { pickResult?: unknown } = {}): Promise<{ ctx: Con
 }
 
 describe('transfer client', () => {
-  it('registers one transfer settings section and removes it on disposal', async () => {
+  it('registers one import/export page and removes it on disposal', async () => {
     const { ctx, slots } = await bench()
     try {
       const fiber = ctx.plugin({ inject, apply })
       await fiber.await()
-      const entries = slots.entries('settings.section')
+      const entries = slots.entries('settings.data.page')
       expect(entries).toHaveLength(1)
-      expect(entries[0]?.options).toMatchObject({ id: 'transfer', order: 30 })
+      expect(entries[0]?.options).toMatchObject({ id: 'transfer' })
       await fiber.dispose()
-      expect(slots.entries('settings.section')).toHaveLength(0)
-    } finally {
-      await ctx.fiber.dispose()
-    }
-  })
-
-  it('labels the nav row from the active locale dictionary', async () => {
-    const { ctx, slots, locale } = await bench()
-    try {
-      const fiber = ctx.plugin({ inject, apply })
-      await fiber.await()
-      const entry = slots.entries('settings.section')[0]
-      expect(entry).toBeDefined()
-      // The label is a thunk over the bound namespace, so it follows the
-      // locale runtime without re-registration.
-      expect(resolveSlotLabel(entry?.options.label)).toBe(zh.nav)
-      locale.setLocale('en')
-      expect(resolveSlotLabel(entry?.options.label)).toBe(en.nav)
-      await fiber.dispose()
+      expect(slots.entries('settings.data.page')).toHaveLength(0)
     } finally {
       await ctx.fiber.dispose()
     }
@@ -92,7 +73,7 @@ describe('transfer client', () => {
     try {
       const fiber = ctx.plugin({ inject, apply })
       await fiber.await()
-      const entry = slots.entries('settings.section')[0]
+      const entry = slots.entries('settings.data.page')[0]
       // The inject thunk hands the section the face with the unwrapping picker.
       const face = (entry?.inject as unknown as () => TransferFace)()
       const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
@@ -117,7 +98,7 @@ describe('transfer client', () => {
     try {
       const fiber = ctx.plugin({ inject, apply })
       await fiber.await()
-      const face = (slots.entries('settings.section')[0]?.inject as unknown as () => TransferFace)()
+      const face = (slots.entries('settings.data.page')[0]?.inject as unknown as () => TransferFace)()
       const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
       render(<TransferSection {...{
         close: vi.fn(),

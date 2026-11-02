@@ -3,12 +3,17 @@
  * choose the model that orders results. The model list is read from Models, so
  * this card never names a provider or a model of its own.
  *
+ * The layout follows the app's settings pages: one 720px column, a 16/24 title
+ * with a tertiary intro, settings-material cards, and one primary save action.
+ *
  * @module @prism/prism-search/client/SearchSection
  */
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactElement } from 'react'
 import type { BridgeResult, ModelOption, SaveRequest, SearchSettingsView } from './bridge.ts'
+import { ENGINE_LABELS } from './engine-labels.ts'
 import type { SearchLocaleKey } from './locales.ts'
+import { SEARCH_CSS } from './styles.ts'
 
 /** Props the slot renderer binds. */
 export interface SearchSectionProps {
@@ -25,6 +30,12 @@ interface ModelGroup {
   readonly name: string
   readonly options: readonly ModelOption[]
 }
+
+/** Engine names shown before the coverage line ellipsizes. */
+const COVERAGE_PREVIEW = 5
+
+/** Names of every engine the provider queries, for the coverage line's tooltip. */
+const ENGINE_TITLES = ENGINE_LABELS.map(engine => engine.label).join(' · ')
 
 /** Stable identity of one selectable route. */
 function keyOf(option: ModelOption): string {
@@ -49,12 +60,18 @@ function groupModels(view: SearchSettingsView): ModelGroup[] {
   return [...groups.values()]
 }
 
+/** A rejected bridge call's message; the bridge itself reports `{ ok: false }` results. */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 /**
  * Render the section.
  * @param props - translator and the data operations bound by the plugin body.
  * @returns the section element.
  */
 export function SearchSection({ t, load, save }: SearchSectionProps): ReactElement {
+  const selectId = useId()
   const [view, setView] = useState<SearchSettingsView | undefined>(undefined)
   const [loadError, setLoadError] = useState('')
   const [enabled, setEnabled] = useState(false)
@@ -118,77 +135,89 @@ export function SearchSection({ t, load, save }: SearchSectionProps): ReactEleme
     })
   }
 
+  const coverage = `${ENGINE_LABELS.slice(0, COVERAGE_PREVIEW).map(engine => engine.label).join(' · ')} …`
+
   return (
-    <div style={styles.section}>
-      <div style={styles.title}>{t('title')}</div>
-      <div style={styles.hint}>{t('description')}</div>
-      {loadError !== '' && <div style={styles.error}>{t('error.load', { message: loadError })}</div>}
+    <section className="ps-section" aria-label={t('title')}>
+      <style>{SEARCH_CSS}</style>
+      <header className="ps-head">
+        <h2 className="ps-title">{t('title')}</h2>
+        <p className="ps-intro">{t('intro')}</p>
+        <p className="ps-engines" title={ENGINE_TITLES}>
+          {t('engines', { count: ENGINE_LABELS.length, list: coverage })}
+        </p>
+      </header>
+
+      {loadError !== '' && <p className="ps-alert" role="alert">{t('error.load', { message: loadError })}</p>}
+
+      {view === undefined && loadError === '' && <p className="ps-hint">{t('status.loading')}</p>}
+
       {view !== undefined && (
         <>
-          <label style={styles.row}>
-            <input
-              type="checkbox"
-              checked={enabled}
-              disabled={!writable || saving}
-              onChange={(event) => { setEnabled(event.target.checked); setSaved(false) }}
-            />
-            <span>{t('provider.enable')}</span>
-          </label>
-          <div style={styles.hint}>
-            {t('provider.current', { provider: view.currentProvider.length === 0 ? t('provider.composed') : view.currentProvider })}
-            {' · '}
-            {t('provider.enableHint')}
+          <div className="ps-card">
+            <div className="ps-row">
+              <div className="ps-rowText">
+                <div className="ps-rowTitle">{t('source.title')}</div>
+                <p className="ps-rowDesc">
+                  <span className="ps-dot" data-on={enabled} aria-hidden="true" />
+                  {t('source.current')}
+                  <span className="ps-mono">
+                    {view.currentProvider.length === 0 ? t('source.default') : view.currentProvider}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                aria-label={t('source.enable')}
+                className="ps-switch"
+                disabled={!writable || saving}
+                onClick={() => { setEnabled(value => !value); setSaved(false) }}
+              >
+                <span className="ps-thumb" />
+              </button>
+            </div>
+            <p className="ps-hint">{t('source.hint')}</p>
           </div>
-          <label style={styles.row}>
-            <span>{t('model.label')}</span>
-            <select
-              value={selected}
-              disabled={!writable || saving || view.models.length === 0}
-              onChange={(event) => { setSelected(event.target.value); setSaved(false) }}
-              style={styles.select}
-            >
-              <option value="">{t('model.none')}</option>
-              {groups.map(group => (
-                <optgroup key={group.name} label={group.name}>
-                  {group.options.map(option => (
-                    <option key={keyOf(option)} value={keyOf(option)}>{option.modelName}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-          <div style={styles.hint}>
-            {view.catalogError !== ''
-              ? t('model.unavailable', { message: view.catalogError })
-              : view.models.length === 0 ? t('model.empty') : t('model.hint', { count: view.models.length })}
+
+          <div className="ps-card">
+            <div className="ps-field">
+              <label className="ps-label" htmlFor={selectId}>{t('model.title')}</label>
+              <select
+                id={selectId}
+                className="ps-select"
+                value={selected}
+                disabled={!writable || saving || view.models.length === 0}
+                onChange={(event) => { setSelected(event.target.value); setSaved(false) }}
+              >
+                <option value="">{t('model.none')}</option>
+                {groups.map(group => (
+                  <optgroup key={group.name} label={group.name}>
+                    {group.options.map(option => (
+                      <option key={keyOf(option)} value={keyOf(option)}>{option.modelName}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <p className={view.catalogError !== '' ? 'ps-alert' : 'ps-hint'}>
+              {view.catalogError !== ''
+                ? t('model.unavailable', { message: view.catalogError })
+                : view.models.length === 0 ? t('model.empty') : t('model.hint', { count: view.models.length })}
+            </p>
           </div>
-          <div style={styles.row}>
-            <button type="button" disabled={!writable || !dirty || saving} onClick={commit} style={styles.button}>
+
+          <div className="ps-actions">
+            <button type="button" className="ps-primary" disabled={!writable || !dirty || saving} onClick={commit}>
               {saving ? t('action.saving') : t('action.save')}
             </button>
-            {saved && <span style={styles.ok}>{t('status.saved')}</span>}
-            {saveError !== '' && <span style={styles.error}>{t('error.save', { message: saveError })}</span>}
-            {!writable && <span style={styles.error}>{t('error.unwritable')}</span>}
+            <span className="ps-status" role="status" aria-live="polite">{saved ? t('status.saved') : ''}</span>
+            {saveError !== '' && <span className="ps-alert" role="alert">{t('error.save', { message: saveError })}</span>}
+            {!writable && <span className="ps-hint">{t('error.unwritable')}</span>}
           </div>
         </>
       )}
-    </div>
+    </section>
   )
-}
-
-/** Section styles; neutral inline rules that inherit the app theme. */
-const styles: Record<string, CSSProperties> = {
-  section: { display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' },
-  title: { fontSize: 16, fontWeight: 600 },
-  row: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  hint: { fontSize: 12, opacity: 0.7, lineHeight: 1.5 },
-  select: { minWidth: 260, maxWidth: 420 },
-  button: { cursor: 'pointer' },
-  ok: { fontSize: 12, opacity: 0.8 },
-  error: { fontSize: 12, color: 'var(--dsw-alias-state-error-primary)', overflowWrap: 'anywhere' },
-}
-
-/** A rejected bridge call's message; the bridge itself reports `{ ok: false }` results. */
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

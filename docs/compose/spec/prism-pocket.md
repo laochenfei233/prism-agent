@@ -1,7 +1,7 @@
 ---
 feature: prism-pocket
 status: delivered
-updated: 2026-10-30
+updated: 2026-11-02
 branch: feat/prism-pocket
 commits: 8c5ed274ee..2f3a5b8ca1
 ---
@@ -54,12 +54,11 @@ When the page is closed, the node half delivers: Web Push (RFC 8291 `aes128gcm` 
 
 ### S2.6 Tailscale remote access (node half + settings page)
 
-The node half detects Tailscale (`tailscale status --json --peers=false`, Windows path `C:\Program Files\Tailscale\tailscale.exe` included) and reports self MagicDNS name and 100.x addresses. The settings section renders the server surface (bind host, port, public URL, trusted hosts from the `webStartup`-fed connection row), marks the current origin trusted (the authenticated call itself is the proof), and offers copyable commands:
+The node half detects Tailscale (`tailscale status --json --peers=false`, Windows path `C:\Program Files\Tailscale\tailscale.exe` included) and reports self MagicDNS name and 100.x addresses. The settings section answers one question — can a phone open this now — and answers it by request rather than by configuration: the desktop application starts `dsh web` on a loopback port with fixed arguments, so `webStartup` carries no bind address the fence accepts and no trusted authority, and a page mirroring those flags reported a blocked phone on a deployment that works. The node half therefore requests the advertised address's `/api/pocket/remote` from the host itself: no answer means nothing proxies the port yet, `403` is the fence refusing the authority, and any other answer means the request reached the server.
 
-- Direct IP: `prism --profile web --host <tailscale-ip>` — the fence accepts the listener bind IP without `--trusted-host`.
-- MagicDNS: `tailscale serve --bg --https=443 http://127.0.0.1:3080` plus `--trusted-host <machine>.<tailnet>.ts.net` and `--public-url https://<machine>.<tailnet>.ts.net/` — TLS terminates at tailscale, the loopback transport stays HTTP, and the ts.net authority must join `trustedHosts`.
+When that answer is yes the page offers `connection.authenticatedUrl(<ts.net root>)` to copy — the phone trades the embedded launch token for a session cookie by opening it — and displays the same URL with its token elided. Otherwise it lists the steps still missing, in order: `tailscale serve --bg --https=443 http://127.0.0.1:<port>` for the loopback listener, and the `trustedHosts` entry that admits the ts.net authority, which the desktop application takes from the profile patch instead of a flag.
 
-The kernel trust policy (`packages/client/connection/src/api-request-trust.ts`), the webserver wildcard rejection, and all CLI flags remain untouched; the plugin only reads them and explains them. A connection that fails the fence is a 403 from the existing code, and the page explains which command was missed.
+The kernel trust policy (`packages/client/connection/src/api-request-trust.ts`), the webserver wildcard rejection, and all CLI flags remain untouched; the plugin only reads them and explains them, and `--trusted-host` stays the CLI spelling of the same grant.
 
 ### S2.7 PWA install
 

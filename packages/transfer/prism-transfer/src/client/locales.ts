@@ -1,9 +1,6 @@
 /** Copy for the transfer settings section (zh is the key-set source of truth). */
 
 export const zh = {
-  nav: '导入导出',
-  title: '导入导出项目与配置',
-  intro: '把项目（文件夹加会话）和设置值导出为文件，或从文件导回。导入永不覆盖已有数据。',
   emptyProjects: '还没有登记的项目',
   exportTitle: '导出',
   exportHint: '勾选要导出的项目；压缩包含项目文件夹与其挂接的全部会话。',
@@ -63,9 +60,6 @@ export const zh = {
 
 /** English mirror, typed against the zh key set. */
 export const en: Record<keyof typeof zh, string> = {
-  nav: 'Import & Export',
-  title: 'Transfer projects and settings',
-  intro: 'Export projects (folder plus sessions) and settings values to files, and import them back. Import never overwrites existing data.',
   emptyProjects: 'No registered projects yet',
   exportTitle: 'Export',
   exportHint: 'Pick the projects to export; the archive carries the folder and every attached session.',

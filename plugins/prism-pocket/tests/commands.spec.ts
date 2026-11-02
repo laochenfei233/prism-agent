@@ -1,11 +1,12 @@
 /**
- * Remote-access command generation and the origin check.
+ * Remote-access facts: the deployment steps, the phone target, and the origin
+ * check.
  *
- * Spec: docs/compose/spec/prism-pocket.md S2.6 — the commands mirror the
- * trust fence, so every acceptance path here rejects a fence-invalid case.
+ * Spec: docs/compose/spec/prism-pocket.md S2.6 — the steps mirror the trust
+ * fence, so every acceptance path here rejects a fence-invalid case.
  */
 import { describe, expect, it } from 'vitest'
-import { isOriginTrusted, remoteCommands } from '../src/commands.ts'
+import { isOriginTrusted, phoneAccess, phoneTarget, probeVerdict, remoteCommands } from '../src/commands.ts'
 import type { PocketServerSurface, PocketTailscaleInfo } from '../src/types.ts'
 
 const surface: PocketServerSurface = { host: '127.0.0.1', port: 3080, trustedHosts: [] }
@@ -15,30 +16,65 @@ function tailscale(overrides: Partial<PocketTailscaleInfo>): PocketTailscaleInfo
 }
 
 describe('remoteCommands', () => {
-  it('offers the direct-IP command for a Tailscale address', () => {
-    const commands = remoteCommands(surface, tailscale({ ipv4: '100.64.0.3' }))
-    expect(commands.directIp).toBe('prism --profile web --host 100.64.0.3')
-    expect(commands.serve).toBeUndefined()
-  })
-
-  it('offers the MagicDNS set bound to the actual listen port', () => {
+  it('renders the proxy command and the fence patch for a MagicDNS name', () => {
     // The parser strips the CLI's trailing dot before the name reaches here.
     const commands = remoteCommands(surface, tailscale({ dnsName: 'box.tail1234.ts.net' }))
     expect(commands.serve).toBe('tailscale serve --bg --https=443 http://127.0.0.1:3080')
+    expect(commands.trust).toBe('- id: connection\n  config:\n    trustedHosts:\n      - box.tail1234.ts.net')
     expect(commands.trustedHost).toBe('--trusted-host box.tail1234.ts.net')
-    expect(commands.publicUrl).toBe('--public-url https://box.tail1234.ts.net/')
-    expect(commands.directIp).toBeUndefined()
   })
 
-  it('offers both paths when the node has an address and a name', () => {
-    const commands = remoteCommands(surface, tailscale({ ipv4: '100.64.0.3', dnsName: 'box.tail.ts.net' }))
-    expect(commands.directIp).toBeDefined()
-    expect(commands.serve).toBeDefined()
+  it('offers nothing without a MagicDNS name: an address alone names no remote URL', () => {
+    expect(remoteCommands(surface, tailscale({ ipv4: '100.64.0.3' }))).toEqual({})
+    expect(remoteCommands(surface, { available: false })).toEqual({})
+  })
+})
+
+describe('phoneTarget', () => {
+  it('prefers the advertised public URL', () => {
+    expect(phoneTarget({ ...surface, publicUrl: 'https://app.example/' }, tailscale({ dnsName: 'box.tail.ts.net' })))
+      .toBe('https://app.example/')
   })
 
-  it('offers nothing without Tailscale', () => {
-    const commands = remoteCommands(surface, { available: false })
-    expect(commands).toEqual({})
+  it('uses the MagicDNS root when a name exists', () => {
+    expect(phoneTarget(surface, tailscale({ dnsName: 'box.tail.ts.net' }))).toBe('https://box.tail.ts.net/')
+  })
+
+  it('falls back to a non-loopback bind address', () => {
+    expect(phoneTarget({ ...surface, host: '100.64.0.3' }, { available: false })).toBe('http://100.64.0.3:3080/')
+    expect(phoneTarget({ ...surface, host: '[::1]' }, { available: false })).toBeUndefined()
+  })
+})
+
+describe('phoneAccess', () => {
+  it('reports a loopback server with no tailnet route', () => {
+    expect(phoneAccess(surface, tailscale({}))).toEqual({ blocker: 'loopback', trusted: false })
+    expect(phoneAccess(surface, { available: false })).toEqual({ blocker: 'no-tailscale', trusted: false })
+  })
+
+  it('offers the MagicDNS address as untrusted until the fence names it', () => {
+    expect(phoneAccess(surface, tailscale({ dnsName: 'box.tail.ts.net' })))
+      .toEqual({ target: 'https://box.tail.ts.net/', trusted: false, blocker: 'untrusted' })
+  })
+
+  it('reports the address as ready once the fence names it', () => {
+    const fenced = { ...surface, trustedHosts: ['box.tail.ts.net'] }
+    expect(phoneAccess(fenced, tailscale({ dnsName: 'box.tail.ts.net' })))
+      .toEqual({ target: 'https://box.tail.ts.net/', trusted: true })
+  })
+
+  it('treats a direct bind address as already trusted', () => {
+    expect(phoneAccess({ ...surface, host: '100.64.0.3' }, { available: false }))
+      .toEqual({ target: 'http://100.64.0.3:3080/', trusted: true })
+  })
+})
+
+describe('probeVerdict', () => {
+  it('reads the fence refusal apart from every answer that got through', () => {
+    // The fence answers before the session layer, so 401 is a reachable server.
+    expect(probeVerdict(403)).toBe('untrusted')
+    expect(probeVerdict(401)).toBe('accepted')
+    expect(probeVerdict(200)).toBe('accepted')
   })
 })
 

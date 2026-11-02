@@ -8,19 +8,86 @@ use std::path::{Path, PathBuf};
 use serde_yaml::Value as Yaml;
 use tauri::{AppHandle, Manager};
 
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A9.
-/// Prism's harness home: `$PRISM_HOME` when set, otherwise the fork's default
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A17.
+/// Prism's harness home: `$PRISM_HOME` when set, otherwise the home the
+/// Settings page recorded in `~/.prism-data-home`, otherwise the fork's default
 /// `~/.prism` — the same root this fork's `prism` CLI defaults to — never a
 /// deepseek-harness build's `~/.dsh`.
+///
+/// Resolved once per shell process: the shell seeds profiles, spawns the child
+/// with `DSH_HOME`, and later reads its server record at this path, so a
+/// Settings-page relocation must not move those calls mid-run.
 pub fn dsh_home() -> PathBuf {
-    std::env::var("PRISM_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            let base = std::env::var("USERPROFILE")
-                .or_else(|_| std::env::var("HOME"))
-                .unwrap_or_default();
-            PathBuf::from(base).join(".prism")
-        })
+    static HOME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    HOME.get_or_init(|| {
+        let base = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_default();
+        resolve_home(std::env::var("PRISM_HOME").ok(), Path::new(&base))
+    })
+    .clone()
+}
+
+/// Read the launch pointer a Settings-page relocation writes.
+///
+/// The pointer is read once per launch, before any service captures the home;
+/// the child receives this value as `DSH_HOME`. A blank or relative record is
+/// ignored, so a damaged file never moves the home somewhere unexpected.
+fn resolve_home(override_home: Option<String>, base: &Path) -> PathBuf {
+    if let Some(home) = override_home {
+        return PathBuf::from(home);
+    }
+    if let Ok(raw) = fs::read_to_string(base.join(".prism-data-home")) {
+        let recorded = PathBuf::from(raw.trim());
+        if recorded.is_absolute() {
+            return recorded;
+        }
+    }
+    base.join(".prism")
+}
+
+#[cfg(test)]
+mod home_tests {
+    use super::resolve_home;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// A scratch operating-system home for one case, under the crate's build directory.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target").join("home-tests").join(name);
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("scratch home");
+        dir
+    }
+
+    #[test]
+    fn explicit_override_wins_over_the_pointer() {
+        let base = scratch("override");
+        fs::write(base.join(".prism-data-home"), "/ignored/pointer\n").expect("pointer");
+        let resolved = resolve_home(Some("/explicit/home".to_string()), &base);
+        assert_eq!(resolved, PathBuf::from("/explicit/home"));
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn an_absolute_pointer_selects_the_home() {
+        let base = scratch("pointer");
+        let recorded = base.join("elsewhere");
+        fs::write(base.join(".prism-data-home"), format!("{}\n", recorded.display())).expect("pointer");
+        assert_eq!(resolve_home(None, &base), recorded);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn a_missing_blank_or_relative_pointer_keeps_the_default() {
+        let base = scratch("default");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        fs::write(base.join(".prism-data-home"), "   \n").expect("blank pointer");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        fs::write(base.join(".prism-data-home"), "relative/home\n").expect("relative pointer");
+        assert_eq!(resolve_home(None, &base), base.join(".prism"));
+        let _ = fs::remove_dir_all(&base);
+    }
 }
 
 fn profile_web_dir(home: &Path) -> PathBuf {
@@ -53,14 +120,21 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
         Err(_) => return Ok(()), // dev without bundled plugins: nothing to preinstall
     };
 
+    // A copy that mirrors an older installation keeps its old manifest and
+    // build, and the loader skips the bundle when that manifest names peers
+    // the running dsh no longer satisfies. Every launcher-owned copy is
+    // therefore reconciled with the installation that is running now.
+    let refresh_all = installation_changed(&home, &runtime_plugins);
     // dsh-plugin is an npm-distributed bundle (dsh.bundle.patch + dsh.client).
     // Copy it into the launcher-maintained flat module fallback so the bare
     // name resolves from the profile ("bundles come from the installation"),
     // and insert it under that name: the client module registry resolves the
     // entry name to serve the plugin-center tab. A path-based row loads the
     // server half but leaves the entry unresolvable by the registry.
-    ensure_market_bundle(&home, &runtime_plugins)?;
-    let mut bundle_layers = ensure_local_bundles(&home, &runtime_plugins)?;
+    let mut copies_current = ensure_market_bundle(&home, &runtime_plugins, refresh_all)?;
+    let (mut bundle_layers, local_current) =
+        ensure_local_bundles(&home, &runtime_plugins, refresh_all)?;
+    copies_current &= local_current;
     for bundle in ["@deepseek-ai/dsh-experimental-voice-input-bundle"] {
         if runtime_bundle_present(&runtime_plugins, bundle) {
             bundle_layers.push(bundle.to_string());
@@ -75,10 +149,15 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
     let win_present = win_src.exists();
     if win_present {
         let dest = profile.join("plugins").join("dsh-win-terminal-inspector");
-        if !dest.exists() {
-            fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
-            copy_dir(&win_src, &dest)?;
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
+        copies_current &= place_launcher_copy(&win_src, &dest, refresh_all)?;
+    }
+    // The installation version is recorded only once every copy matches it, so
+    // a copy this pass could not replace keeps the next launch retrying.
+    if copies_current {
+        record_installation(&home, &runtime_plugins);
     }
 
     let patch_path = profile.join("cordis.patch.yml");
@@ -151,30 +230,38 @@ const MCP_TEMPLATE: &str = r#"
 /// Copy the bundled dsh-plugin package into the profile module fallback
 /// (`$DSH_HOME/profiles/node_modules`) so bare `dsh-plugin` resolves from the
 /// profile through the ordinary parent-walk, exactly like an in-box bundle.
-fn ensure_market_bundle(home: &Path, runtime_plugins: &Path) -> Result<(), String> {
+///
+/// Returns whether the copy matches the installation.
+fn ensure_market_bundle(
+    home: &Path,
+    runtime_plugins: &Path,
+    refresh_all: bool,
+) -> Result<bool, String> {
     let src = runtime_plugins
         .join("dsh-plugin")
         .join("node_modules")
         .join("dsh-plugin");
     if !src.exists() {
-        return Ok(());
+        return Ok(true);
     }
     let dest = home
         .join("profiles")
         .join("node_modules")
         .join("dsh-plugin");
-    if dest.exists() {
-        return Ok(());
-    }
-    fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
-    copy_dir(&src, &dest)
+    place_launcher_copy(&src, &dest, refresh_all)
 }
 
 /// Copy every local bundle shipped under the runtime's `plugins/` directory
 /// into the profile-level module fallback and return the package names that
-/// must be selected as bundle layers.
-fn ensure_local_bundles(home: &Path, runtime_plugins: &Path) -> Result<Vec<String>, String> {
+/// must be selected as bundle layers, plus whether every copy matches the
+/// installation.
+fn ensure_local_bundles(
+    home: &Path,
+    runtime_plugins: &Path,
+    refresh_all: bool,
+) -> Result<(Vec<String>, bool), String> {
     let mut names = Vec::new();
+    let mut copies_current = true;
     for entry in fs::read_dir(runtime_plugins).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if !entry.file_type().map_err(|e| e.to_string())?.is_dir() {
@@ -205,17 +292,12 @@ fn ensure_local_bundles(home: &Path, runtime_plugins: &Path) -> Result<Vec<Strin
             .join("profiles")
             .join("node_modules")
             .join(package_name);
-        if !destination.exists() {
-            if let Some(parent) = destination.parent() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            copy_dir(&entry.path(), &destination)?;
-        }
+        copies_current &= place_launcher_copy(&entry.path(), &destination, refresh_all)?;
         names.push(package_name.to_string());
     }
     names.sort();
     names.dedup();
-    Ok(names)
+    Ok((names, copies_current))
 }
 
 /// Local bundles this shell seeded into profiles and no longer ships.
@@ -368,4 +450,377 @@ fn copy_dir(src: &Path, dest: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// The file a package declares as its entry (`main`, else Node's `index.js`),
+/// resolved inside the package directory. A launcher-owned copy without it
+/// cannot be imported, so it is never mistaken for a usable copy.
+fn declared_entry(package_dir: &Path) -> Option<PathBuf> {
+    let raw = fs::read_to_string(package_dir.join("package.json")).ok()?;
+    let manifest: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let main = manifest
+        .get("main")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("index.js");
+    Some(package_dir.join(main))
+}
+
+/// Whether `path` is a link rather than a directory of its own: a pnpm `link:`
+/// projection or a junction a developer made. Writing through one would land in
+/// another checkout, so such a path is never replaced.
+fn is_link(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT: junctions are reparse points that
+        // `is_symlink` does not report.
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Whether a launcher-owned copy must be rebuilt from the installation.
+///
+/// A build without its declared entry has nothing to place: it neither creates
+/// a copy nor replaces one, so an unbuilt package cannot mask a usable copy or
+/// seed a directory the loader cannot import. Everything else reconciles with
+/// what the installation ships.
+fn copy_is_stale(source: &Path, dest: &Path, refresh_all: bool) -> bool {
+    if !declared_entry(source).is_some_and(|entry| entry.exists()) {
+        return false;
+    }
+    // A link is checked before existence: `exists` follows the link, so a
+    // dangling projection would otherwise look like a fresh destination and be
+    // written through.
+    if is_link(dest) {
+        return false;
+    }
+    if !dest.exists() {
+        return true;
+    }
+    if !declared_entry(dest).is_some_and(|entry| entry.exists()) {
+        return true;
+    }
+    if refresh_all {
+        return true;
+    }
+    fs::read(source.join("package.json")).ok() != fs::read(dest.join("package.json")).ok()
+}
+
+/// Replace a directory with the installation's build: copy into a sibling
+/// directory first, move the old copy aside, then put the new one in place. One
+/// rename follows the copy, and a failed swap restores the old copy, so no
+/// failure leaves a partially deleted or missing bundle.
+fn replace_dir(source: &Path, dest: &Path) -> Result<(), String> {
+    let name = dest
+        .file_name()
+        .ok_or_else(|| format!("{} has no directory name", dest.display()))?;
+    let sibling = |suffix: &str| dest.with_file_name(format!("{}.{suffix}", name.to_string_lossy()));
+    let staging = sibling("incoming");
+    let displaced = sibling("previous");
+    fs::remove_dir_all(&staging).ok();
+    copy_dir(source, &staging)?;
+    fs::remove_dir_all(&displaced).ok();
+    fs::rename(dest, &displaced).map_err(|e| e.to_string())?;
+    if let Err(error) = fs::rename(&staging, dest) {
+        fs::rename(&displaced, dest).ok();
+        return Err(error.to_string());
+    }
+    fs::remove_dir_all(&displaced).ok();
+    Ok(())
+}
+
+/// Seed or refresh one launcher-owned copy from the installation.
+///
+/// A copy that is not there yet must be created, so its failure stops startup:
+/// the profile selects the bundle and cannot run without it. Replacing an
+/// existing copy is best-effort, because another process may hold a file; the
+/// old copy then stays loadable and the returned `false` keeps the installation
+/// unrecorded, so the next launch retries.
+fn place_launcher_copy(source: &Path, dest: &Path, refresh_all: bool) -> Result<bool, String> {
+    if !copy_is_stale(source, dest, refresh_all) {
+        return Ok(true);
+    }
+    if !dest.exists() {
+        return copy_dir(source, dest).map(|()| true);
+    }
+    Ok(replace_dir(source, dest).is_ok())
+}
+
+/// The version of the installation this launch runs from. Every packaged
+/// runtime that ships new plugin builds carries a different one.
+fn installation_version(runtime_plugins: &Path) -> Option<String> {
+    let manifest = runtime_plugins.parent()?.join("prism").join("package.json");
+    let raw = fs::read_to_string(manifest).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+}
+
+/// Where the installation of the last complete reconciliation is recorded.
+fn installation_record(home: &Path) -> PathBuf {
+    home.join("profiles").join(".seeded-runtime")
+}
+
+/// Whether this launch runs an installation the copies have not seen: every
+/// launcher-owned copy is then refreshed, including one whose manifest and
+/// build happen to match an older release.
+fn installation_changed(home: &Path, runtime_plugins: &Path) -> bool {
+    let Some(version) = installation_version(runtime_plugins) else {
+        return false;
+    };
+    fs::read_to_string(installation_record(home))
+        .ok()
+        .as_deref()
+        .map(str::trim)
+        != Some(version.as_str())
+}
+
+/// Record the installation whose copies all match, so the next launch of the
+/// same installation only compares manifests and entries.
+fn record_installation(home: &Path, runtime_plugins: &Path) {
+    let Some(version) = installation_version(runtime_plugins) else {
+        return;
+    };
+    let record = installation_record(home);
+    if let Some(parent) = record.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    fs::write(record, format!("{version}\n")).ok();
+}
+
+#[cfg(test)]
+mod seed_tests {
+    use super::{
+        copy_is_stale, ensure_local_bundles, installation_changed, place_launcher_copy,
+        record_installation,
+    };
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    /// A scratch directory for one case, emptied so a rerun starts clean. It
+    /// lives under the crate's build directory: the harness denies the system
+    /// temporary directory to the test binary on some hosts.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("seed-tests")
+            .join(name);
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir)
+            .unwrap_or_else(|error| panic!("scratch dir {}: {error}", dir.display()));
+        dir
+    }
+
+    /// Write a plugin package whose manifest names `peers` as its dsh peers,
+    /// with its declared entry present only when `built`.
+    fn plugin(dir: &Path, peers: &str, built: bool) {
+        fs::create_dir_all(dir).expect("plugin dir");
+        fs::write(
+            dir.join("package.json"),
+            format!(
+                "{{\"name\":\"@prism/example\",\"version\":\"0.1.0\",\"main\":\"lib/index.js\",\"peerDependencies\":{peers}}}"
+            ),
+        )
+        .expect("manifest");
+        if built {
+            fs::create_dir_all(dir.join("lib")).expect("lib dir");
+            fs::write(dir.join("lib").join("index.js"), "export {}\n").expect("entry");
+        }
+    }
+
+    /// The manifest bytes of a package.
+    fn manifest(dir: &Path) -> String {
+        fs::read_to_string(dir.join("package.json")).expect("manifest readable")
+    }
+
+    #[test]
+    fn a_missing_copy_is_seeded_from_the_installation() {
+        let root = scratch("seed");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+
+        assert!(place_launcher_copy(&source, &dest, false).expect("seeded"));
+        assert!(dest.join("lib").join("index.js").exists());
+    }
+
+    #[test]
+    fn a_stale_manifest_replaces_the_copy_wholesale() {
+        let root = scratch("stale");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        plugin(&dest, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
+        fs::write(dest.join("lib").join("removed.js"), "export {}\n").expect("dropped file");
+
+        assert!(copy_is_stale(&source, &dest, false));
+        assert!(place_launcher_copy(&source, &dest, false).expect("refreshed"));
+        assert_eq!(manifest(&dest), manifest(&source));
+        assert!(!dest.join("lib").join("removed.js").exists());
+    }
+
+    #[test]
+    fn an_unbuilt_installation_keeps_the_working_copy() {
+        let root = scratch("unbuilt");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, false);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        plugin(&dest, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
+
+        assert!(!copy_is_stale(&source, &dest, false));
+        assert!(place_launcher_copy(&source, &dest, false).expect("kept"));
+        assert!(manifest(&dest).contains("0.1.7-rc.1"));
+        assert!(dest.join("lib").join("index.js").exists());
+    }
+
+    #[test]
+    fn an_unbuilt_installation_seeds_nothing() {
+        let root = scratch("unbuilt-fresh");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, false);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+
+        assert!(place_launcher_copy(&source, &dest, true).expect("skipped"));
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn a_bundle_this_installation_cannot_build_is_still_selected() {
+        let root = scratch("selected");
+        let runtime_plugins = root.join("runtime").join("plugins");
+        let source = runtime_plugins.join("example");
+        fs::create_dir_all(&source).expect("plugin dir");
+        fs::write(
+            source.join("package.json"),
+            "{\"name\":\"@prism/example\",\"version\":\"0.1.0\",\"main\":\"lib/index.js\",\
+             \"dsh\":{\"bundle\":{\"patch\":\"./cordis.patch.yml\"}}}",
+        )
+        .expect("manifest");
+
+        let (names, current) = ensure_local_bundles(&root, &runtime_plugins, false).expect("selected");
+        assert_eq!(names, vec!["@prism/example".to_string()]);
+        assert!(current);
+        assert!(!root
+            .join("profiles")
+            .join("node_modules")
+            .join("@prism")
+            .join("example")
+            .exists());
+    }
+
+    #[test]
+    fn a_dangling_link_is_never_written_through() {
+        let root = scratch("dangling");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let target = root.join("checkout").join("example");
+        plugin(&target, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        fs::create_dir_all(dest.parent().expect("parent")).expect("parent dir");
+        make_dir_link(&target, &dest).expect("junction");
+        fs::remove_dir_all(&target).expect("target removed");
+
+        assert!(!copy_is_stale(&source, &dest, true));
+        assert!(place_launcher_copy(&source, &dest, true).expect("kept"));
+        assert!(!dest.join("lib").join("index.js").exists());
+    }
+
+    #[test]
+    fn a_copy_without_its_entry_is_replaced() {
+        let root = scratch("entryless");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        plugin(&dest, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, false);
+
+        assert!(copy_is_stale(&source, &dest, false));
+        assert!(place_launcher_copy(&source, &dest, false).expect("repaired"));
+        assert!(dest.join("lib").join("index.js").exists());
+    }
+
+    #[test]
+    fn a_link_is_never_replaced() {
+        let root = scratch("linked");
+        let source = root.join("plugins").join("example");
+        plugin(&source, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        let target = root.join("checkout").join("example");
+        plugin(&target, r#"{"@deepseek-ai/dsh-llm":"0.1.7-rc.1"}"#, true);
+        let dest = root.join("profiles").join("node_modules").join("@prism").join("example");
+        fs::create_dir_all(dest.parent().expect("parent")).expect("parent dir");
+        // A junction is the link pnpm projects into the profile, and NTFS
+        // creates one without a privilege.
+        make_dir_link(&target, &dest).expect("junction");
+
+        assert!(!copy_is_stale(&source, &dest, true));
+        assert!(place_launcher_copy(&source, &dest, true).expect("kept"));
+        assert!(manifest(&dest).contains("0.1.7-rc.1"));
+    }
+
+    #[test]
+    fn a_new_installation_refreshes_every_copy_once() {
+        let root = scratch("upgrade");
+        let runtime = root.join("runtime");
+        let runtime_plugins = runtime.join("plugins");
+        fs::create_dir_all(&runtime.join("prism")).expect("runtime");
+        fs::write(
+            runtime.join("prism").join("package.json"),
+            "{\"name\":\"prism-agent\",\"version\":\"0.2.1-rc.4\"}\n",
+        )
+        .expect("runtime manifest");
+        plugin(&runtime_plugins.join("example"), r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+
+        assert!(installation_changed(&root, &runtime_plugins));
+        record_installation(&root, &runtime_plugins);
+        assert!(!installation_changed(&root, &runtime_plugins));
+
+        fs::write(
+            runtime.join("prism").join("package.json"),
+            "{\"name\":\"prism-agent\",\"version\":\"0.2.1-rc.5\"}\n",
+        )
+        .expect("runtime manifest");
+        assert!(installation_changed(&root, &runtime_plugins));
+        let identical = root.join("profiles").join("node_modules").join("@prism").join("example");
+        plugin(&identical, r#"{"@deepseek-ai/dsh-llm":"0.2.1-rc.4"}"#, true);
+        assert!(copy_is_stale(&runtime_plugins.join("example"), &identical, true));
+        record_installation(&root, &runtime_plugins);
+        assert!(!installation_changed(&root, &runtime_plugins));
+    }
+
+    /// A directory link for the guard case. A junction needs no privilege, and
+    /// pnpm's link projections are the same kind of reparse point.
+    fn make_dir_link(target: &Path, link: &Path) -> std::io::Result<()> {
+        #[cfg(windows)]
+        {
+            let status = std::process::Command::new("cmd")
+                .args([
+                    "/c",
+                    "mklink",
+                    "/J",
+                    &link.display().to_string(),
+                    &target.display().to_string(),
+                ])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()?;
+            if status.success() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other("mklink /J failed"))
+            }
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link)
+        }
+    }
 }

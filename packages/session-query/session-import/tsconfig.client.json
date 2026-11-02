@@ -36,6 +36,9 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../../data/prism-data/tsconfig.client.json"
     }
   ]
 }

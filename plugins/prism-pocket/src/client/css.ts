@@ -90,71 +90,158 @@ html.prism-active [data-slot="main"] table {
   pointer-events: none;
 }
 
-/* The Pocket settings section: theme-agnostic translucency, app-like radii. */
-.prism-section {
-  display: grid;
-  gap: 20px;
-  max-width: 560px;
-  font: 400 13px/1.6 system-ui, sans-serif;
-}
-.prism-section section { display: grid; gap: 8px; }
-.prism-section h3 {
-  margin: 0;
+/* The Pocket page: the settings material the surrounding pages use — card
+   surface, card stroke, and the 13/20 row type — with one colored edge as the
+   only accent. The verdict strip is the page's single bold element; every
+   other surface stays quiet. */
+.prism-page {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 14px;
-  font-weight: 700;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+  color: var(--dsw-alias-label-primary);
 }
-.prism-section h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; opacity: 0.8; }
-.prism-section p { margin: 0; }
-.prism-section code {
-  font: 500 12px/1.5 ui-monospace, monospace;
-  background: rgb(127 127 127 / 0.14);
-  padding: 2px 6px;
-  border-radius: 6px;
+.prism-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l1));
+  border-radius: var(--dsw-radius-xl, 12px);
+  background: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-1));
+}
+.prism-panel-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.prism-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--dsw-alias-state-idle-primary);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-2);
+}
+.prism-verdict[data-tone='ok'] { border-left-color: var(--dsw-alias-state-success-primary); }
+.prism-verdict[data-tone='wait'] { border-left-color: var(--dsw-alias-state-warn-primary); }
+.prism-verdict[data-tone='blocked'] { border-left-color: var(--dsw-alias-state-error-primary); }
+.prism-verdict-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+.prism-address {
+  font: 500 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dsw-alias-label-secondary);
   overflow-wrap: anywhere;
 }
-.prism-commands { display: grid; gap: 10px; }
-.prism-command {
-  display: grid;
-  grid-template-columns: minmax(88px, auto) 1fr auto;
-  gap: 8px;
-  align-items: center;
+.prism-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
-@media (max-width: 480px) {
-  /* The settings content column is narrow next to its nav; stack the row. */
-  .prism-command { grid-template-columns: 1fr auto; }
-  .prism-command-label { grid-column: 1 / -1; }
+.prism-steps-title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
 }
-.prism-command-label { font-size: 12px; opacity: 0.75; }
-.prism-command button,
-.prism-actions button {
-  border: 1px solid rgb(127 127 127 / 0.35);
-  background: none;
-  color: inherit;
-  border-radius: 8px;
-  padding: 4px 10px;
-  font: inherit;
+.prism-step { display: flex; gap: 10px; }
+.prism-step-number {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+.prism-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.prism-step-label { font-size: 13px; line-height: 20px; }
+.prism-step-hint { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+.prism-code {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-markdown-code-block, var(--dsw-alias-bg-layer-2));
+  font: 500 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prism-code-inline { display: inline; padding: 2px 6px; }
+.prism-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+.prism-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prism-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.prism-page-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+.prism-page-message[data-tone='error'] { color: var(--dsw-alias-state-error-primary); }
+.prism-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 0.5px solid transparent;
+  border-radius: var(--dsw-radius-md, 8px);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
   cursor: pointer;
 }
-.prism-badge,
-.prism-badge-ok,
-.prism-badge-warn {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgb(127 127 127 / 0.15);
+.prism-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
 }
-.prism-badge-ok { background: rgb(60 160 90 / 0.2); }
-.prism-badge-warn { background: rgb(200 90 60 / 0.22); }
-.prism-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.prism-note { font-size: 12px; opacity: 0.8; }
-.prism-section-loading,
-.prism-section-error { font: 400 13px/1.6 system-ui, sans-serif; opacity: 0.7; }
+.prism-button-primary {
+  background: var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary));
+  color: var(--dsw-alias-label-primary-inverted, var(--dsw-alias-brand-primary-invert));
+}
+.prism-button-primary:hover { background: var(--dsw-alias-button-primary-hover, var(--dsw-alias-brand-primary)); }
+.prism-button-quiet {
+  border-color: var(--dsw-alias-border-l4);
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+}
+.prism-button-quiet:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
 .prism-card {
   pointer-events: auto;
   display: flex;

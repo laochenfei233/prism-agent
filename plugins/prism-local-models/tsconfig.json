@@ -1,7 +1,10 @@
 {
   // Out of tree and self-contained: host services are typed structurally (see
-  // src/host-context.d.ts and src/client/externals.d.ts), so typecheck needs no
-  // built workspace artifacts and no tsconfig paths facade.
+  // src/host-context.d.ts and src/client/externals.d.ts). The one workspace
+  // edge is `ui-primitives`, whose declarations are borrowed from the
+  // checkout's BUILT output — run `pnpm run build` there first, as
+  // `prism-memory` documents; an unbuilt checkout fails this typecheck with a
+  // missing module rather than a type error.
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],
@@ -17,7 +20,10 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }

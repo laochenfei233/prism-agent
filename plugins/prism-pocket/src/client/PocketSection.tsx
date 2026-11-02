@@ -1,7 +1,7 @@
 /**
- * The Pocket settings section: remote-access facts and commands, push state
- * with subscribe/test, and the PWA install hint. It calls the host routes
- * directly over the authenticated channel.
+ * The Pocket settings section: the phone verdict and its copyable link, the
+ * deployment steps still missing, push state, and the PWA install hint. It
+ * calls the host routes directly over the authenticated channel.
  *
  * @module @prism/prism-pocket/client/PocketSection
  */
@@ -9,12 +9,19 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
-import { isOriginTrusted, remoteCommands } from '../commands.ts'
+import { remoteCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
+import type { PocketLocaleKey } from './locales.ts'
 import type { PocketRemoteStatus } from '../types.ts'
 
 /** Section props bound by the settings shell. */
 export type PocketSectionProps = PropsRuntime<'settings.section'> & PropsLocale<'pocket.settings'>
+
+/** One copyable deployment step: ordered, so the numbered marker carries information. */
+interface Step {
+  key: PocketLocaleKey
+  code: string
+}
 
 /** Read one JSON route; failures surface as text. */
 async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
@@ -90,88 +97,127 @@ export function PocketSection({ t }: PocketSectionProps) {
       .catch((cause: unknown) => { setPushNote(cause instanceof Error ? cause.message : String(cause)) })
   }
 
-  if (error !== null) {
-    return <div className='prism-section-error'>{error}</div>
-  }
-  if (status === null) {
-    return <div className='prism-section-loading'>…</div>
+  if (error !== null) return <p className='prism-page-message' data-tone='error'>{error}</p>
+  // A Host half that predates the phone block answers without one; claim nothing.
+  if (status === null || (status.phone.url === undefined && status.phone.blocker === undefined)) {
+    return <p className='prism-page-message'>{t('phone.title')}</p>
   }
 
-  const trusted = isOriginTrusted(window.location.origin, status.server)
-  const generated = remoteCommands(status.server, status.tailscale)
-  const commands: ReadonlyArray<{ label: string; text: string | undefined }> = [
-    { label: t('remote.commands.directIp'), text: generated.directIp },
-    { label: t('remote.commands.serve'), text: generated.serve },
-    { label: t('remote.commands.trustedHost'), text: generated.trustedHost },
-    { label: t('remote.commands.publicUrl'), text: generated.publicUrl },
-  ]
+  const commands = remoteCommands(status.server, status.tailscale)
+  const { phone } = status
+  const verdict = verdictOf(phone)
+
+  const steps: Step[] = []
+  if (commands.serve !== undefined && phone.blocker === 'not-serving') {
+    steps.push({ key: 'step.serve', code: commands.serve })
+  }
+  if (commands.trust !== undefined && phone.blocker === 'untrusted') {
+    steps.push({ key: 'step.trust', code: commands.trust })
+  }
 
   return (
-    <div className='prism-section'>
-      <section>
-        <h3>
-          {t('remote.title')}
-          {' '}
-          <span className={trusted ? 'prism-badge-ok' : 'prism-badge-warn'}>{trusted ? t('remote.trusted') : t('remote.untrusted')}</span>
-        </h3>
-        <p>
-          {t('remote.server')}: <code>{`${status.server.host}:${status.server.port}`}</code>
-          {status.server.publicUrl !== undefined && (
-            <>
-              {' · '}
-              {t('remote.publicUrl')}: <code>{status.server.publicUrl}</code>
-            </>
-          )}
-        </p>
-        <p>
-          {t('remote.tailscale.available')}
-          {': '}
-          {status.tailscale.available
-            ? <code>{[status.tailscale.dnsName, status.tailscale.ipv4].filter(Boolean).join(' · ')}</code>
-            : t('remote.tailscale.unavailable')}
-        </p>
-        {status.tailscale.available && (
-          <div className='prism-commands'>
-            <h4>{t('remote.commands.title')}</h4>
-            {commands.filter(command => command.text !== undefined).map(command => (
-              <div key={command.label} className='prism-command'>
-                <span className='prism-command-label'>{command.label}</span>
-                <code>{command.text}</code>
-                <button type='button' onClick={() => copy(command.label, command.text ?? '')}>
-                  {copied === command.label ? t('remote.commands.copied') : t('remote.commands.copy')}
-                </button>
+    <div className='prism-page'>
+      <section className='prism-panel'>
+        <h3 className='prism-panel-title'>{t('phone.title')}</h3>
+        <div className='prism-verdict' data-tone={verdict}>
+          <p className='prism-verdict-text'>{t(verdict === 'ok' ? 'phone.ready' : blameKey(phone.blocker))}</p>
+          {phone.display !== undefined && <code className='prism-address'>{phone.display}</code>}
+        </div>
+        {phone.url !== undefined && (
+          <button
+            type='button'
+            className='prism-button prism-button-primary'
+            onClick={() => copy('phone', phone.url ?? '')}
+          >
+            {copied === 'phone' ? t('phone.copied') : t('phone.copy')}
+          </button>
+        )}
+        {steps.length > 0 && (
+          <div className='prism-steps'>
+            <h4 className='prism-steps-title'>{t('phone.steps')}</h4>
+            {steps.map((step, index) => (
+              <div key={step.key} className='prism-step'>
+                <span className='prism-step-number'>{index + 1}</span>
+                <div className='prism-step-body'>
+                  <span className='prism-step-label'>{t(step.key)}</span>
+                  <code className='prism-code'>{step.code}</code>
+                  {step.key === 'step.trust' && <span className='prism-step-hint'>{t('step.trust.hint')}</span>}
+                  <button
+                    type='button'
+                    className='prism-button prism-button-quiet'
+                    onClick={() => copy(step.key, step.code)}
+                  >
+                    {copied === step.key ? t('phone.copied') : t('phone.copy')}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
+        {steps.some(step => step.key === 'step.trust') && commands.trustedHost !== undefined && (
+          <p className='prism-note'>
+            {t('step.trust.cli')} <code className='prism-code prism-code-inline'>{commands.trustedHost}</code>
+          </p>
+        )}
       </section>
-      <section>
-        <h3>
-          {t('push.title')}
-          {' '}
-          <span className='prism-badge'>{status.pocket.pushEnabled ? t('push.state.on') : t('push.state.off')}</span>
-          {' '}
-          <span className='prism-badge'>{status.pocket.barkConfigured ? t('push.bark.on') : t('push.bark.off')}</span>
-        </h3>
-        <p>{t('push.subscriptions').replace('{n}', String(status.pocket.subscriptions))}</p>
+
+      <section className='prism-panel'>
+        <h3 className='prism-panel-title'>{t('push.title')}</h3>
+        <p className='prism-facts'>
+          <span>{status.pocket.pushEnabled ? t('push.state.on') : t('push.state.off')}</span>
+          <span aria-hidden='true'>·</span>
+          <span>{status.pocket.barkConfigured ? t('push.bark.on') : t('push.bark.off')}</span>
+          <span aria-hidden='true'>·</span>
+          <span>{t('push.subscriptions').replace('{n}', String(status.pocket.subscriptions))}</span>
+        </p>
         <div className='prism-actions'>
-          <button type='button' onClick={subscribe}>{t('push.subscribe')}</button>
-          <button type='button' onClick={test}>{t('push.test')}</button>
+          <button type='button' className='prism-button prism-button-primary' onClick={subscribe}>{t('push.subscribe')}</button>
+          <button type='button' className='prism-button prism-button-quiet' onClick={test}>{t('push.test')}</button>
         </div>
         {pushNote !== null && <p className='prism-note'>{pushNote}</p>}
       </section>
-      <section>
-        <h3>{t('pwa.title')}</h3>
-        <p>{t('pwa.hint')}</p>
+
+      <section className='prism-panel'>
+        <h3 className='prism-panel-title'>{t('pwa.title')}</h3>
+        <p className='prism-note'>{t('pwa.hint')}</p>
         {installEvent !== null && (
           <div className='prism-actions'>
-            <button type='button' onClick={() => { void promptInstall(installEvent) }}>{t('pwa.title')}</button>
+            <button
+              type='button'
+              className='prism-button prism-button-quiet'
+              onClick={() => { void promptInstall(installEvent) }}
+            >
+              {t('pwa.title')}
+            </button>
           </div>
         )}
       </section>
     </div>
   )
 }
+
+/** The verdict tone the stylesheet colors the strip with. */
+type Verdict = 'ok' | 'wait' | 'blocked'
+
+/** Map the host's blocker to one tone: fixed, one step left, or no route at all. */
+function verdictOf(phone: PocketRemoteStatus['phone']): Verdict {
+  if (phone.blocker === undefined) return 'ok'
+  if (phone.blocker === 'not-serving' || phone.blocker === 'untrusted') return 'wait'
+  return 'blocked'
+}
+
+/** The sentence explaining the current blocker. */
+function blameKey(blocker: PocketRemoteStatus['phone']['blocker']): PocketLocaleKey {
+  switch (blocker) {
+    case 'loopback': return 'phone.blocked.loopback'
+    case 'no-tailscale': return 'phone.blocked.noTailscale'
+    case 'not-serving': return 'phone.blocked.notServing'
+    case 'untrusted': return 'phone.blocked.untrusted'
+    default: return 'phone.ready'
+  }
+}
+
+const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'not-serving', 'untrusted'])
 
 /**
  * Narrow the status body field by field without trusting the wire; a
@@ -182,10 +228,16 @@ function readStatus(value: unknown): PocketRemoteStatus {
   const server = objectOf(root?.server)
   const tailscale = objectOf(root?.tailscale)
   const pocket = objectOf(root?.pocket)
+  const phone = objectOf(root?.phone)
   const publicUrl = stringOf(server?.publicUrl)
   const dnsName = stringOf(tailscale?.dnsName)
   const ipv4 = stringOf(tailscale?.ipv4)
   const detail = stringOf(tailscale?.detail)
+  const blocker = typeof phone?.blocker === 'string' && BLOCKERS.has(phone.blocker)
+    ? phone.blocker as NonNullable<PocketRemoteStatus['phone']['blocker']>
+    : undefined
+  const phoneUrl = stringOf(phone?.url)
+  const phoneDisplay = stringOf(phone?.display)
   const vapidPublicKey = stringOf(pocket?.vapidPublicKey)
   return {
     server: {
@@ -199,6 +251,12 @@ function readStatus(value: unknown): PocketRemoteStatus {
       ...(dnsName !== undefined ? { dnsName } : {}),
       ...(ipv4 !== undefined ? { ipv4 } : {}),
       ...(detail !== undefined ? { detail } : {}),
+    },
+    phone: {
+      trusted: phone?.trusted === true,
+      ...(blocker !== undefined ? { blocker } : {}),
+      ...(phoneUrl !== undefined ? { url: phoneUrl } : {}),
+      ...(phoneDisplay !== undefined ? { display: phoneDisplay } : {}),
     },
     pocket: {
       pushEnabled: pocket?.pushEnabled === true,

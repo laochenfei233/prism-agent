@@ -115,7 +115,6 @@ function renderPage(form: Partial<BackupFormState> = {}, run: Partial<BackupRunS
 describe('BackupSection', () => {
   it('renders the destination, the content switches, and the history heading', () => {
     renderPage()
-    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
     expect(screen.getByText(en.warning)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'WebDAV' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByLabelText(en.webdavUrl)).toBeTruthy()

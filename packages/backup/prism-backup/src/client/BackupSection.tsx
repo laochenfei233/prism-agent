@@ -12,15 +12,17 @@ import {
   Tag, fileSizeText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { BackupLocaleKey } from './locales.ts'
 import type { BackupSectionFace, BackupSecretTexts } from './page-controller.ts'
 import css from './BackupSection.module.css'
 
-/** Props the renderer binds for the backup page. */
+/**
+ * Props the renderer binds for the backup page. The page is a leaf inside the
+ * 数据 section's tab, so it receives copy and its own face, not section chrome.
+ */
 export type BackupSectionProps =
-  PropsRuntime<'settings.section'>
-  & PropsLocale<'settings.backup'>
+  PropsLocale<'settings.backup'>
   & InjectFace<BackupSectionFace>
 
 /**
@@ -152,9 +154,7 @@ export function BackupSection(props: BackupSectionProps): ReactNode {
   const target = form.fields.targetType.text
   const phase = run.phase
   return (
-    <section className={css.section} aria-labelledby="prism-backup-title">
-      <h2 id="prism-backup-title" className={css.title}>{t('title')}</h2>
-      <p className={css.intro}>{t('lead')}</p>
+    <section className={css.section}>
       <p className={css.notice}>{t('warning')}</p>
       <SettingsForm
         labels={formLabels(t)}

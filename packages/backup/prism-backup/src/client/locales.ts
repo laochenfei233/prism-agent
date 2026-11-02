@@ -7,9 +7,6 @@
 
 /** Every user-visible string the backup page renders. */
 export const zh = {
-  nav: '备份',
-  title: '备份',
-  lead: '把配置、记忆和项目文件夹打包复制到你自己的服务器。',
   warning: '备份包内含 Harness 主目录下的 .env 与 .credentials.yaml。请只备份到你信任的服务器。',
 
   destination: '备份目标',
@@ -75,9 +72,6 @@ export const zh = {
 
 /** English mirror of {@link zh}. */
 export const en: Record<keyof typeof zh, string> = {
-  nav: 'Backup',
-  title: 'Backup',
-  lead: 'Copy your configuration, memory, and project folders to a server you control.',
   warning: 'The archive contains .env and .credentials.yaml from your Harness home. Back up only to a server you trust.',
 
   destination: 'Destination',

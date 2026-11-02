@@ -38,11 +38,11 @@ const CHILD_NAMES = Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>
 
 /**
  * Section ids the web-app roster registers, in nav order: this package, then
- * ui-theme, ui-settings-models, ui-settings-plugins, ui-agent-preset, the
- * backup section, and session-import. A plugin adding a section changes this
- * list.
+ * ui-theme, ui-settings-models, ui-settings-plugins, ui-agent-preset, and the
+ * 数据 section that hosts backup, import/export, and cross-agent import. A
+ * plugin adding a section changes this list.
  */
-const PRODUCT_SECTIONS: readonly string[] = ['general', 'appearance', 'models', 'plugins', 'agent-presets', 'backup', 'import']
+const PRODUCT_SECTIONS: readonly string[] = ['general', 'appearance', 'models', 'plugins', 'agent-presets', 'data']
 /** Onboarding steps the web-app roster registers, in coordinator order; both come from ui-settings-models. */
 const PRODUCT_ONBOARDING: readonly { id: string; order: number }[] = [
   { id: 'welcome-notice', order: -100 },

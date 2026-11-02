@@ -1,7 +1,7 @@
 ---
 feature: prism-pocket
 status: delivered
-updated: 2026-10-30
+updated: 2026-11-02
 branch: feat/prism-pocket
 commits: 8c5ed274ee..2f3a5b8ca1
 ---
@@ -54,12 +54,11 @@ agent 请求批准、提出用户问题、运行失败时，在插件自有的 p
 
 ### S2.6 Tailscale 远程访问（节点半 + 设置页）
 
-节点半探测 Tailscale（`tailscale status --json --peers=false`，包含 Windows 路径 `C:\Program Files\Tailscale\tailscale.exe`），报告自身 MagicDNS 域名与 100.x 地址。设置分区渲染服务面（绑定地址、端口、公网 URL、来自 `webStartup` 供给的 connection 行的 trusted hosts），并标注当前 origin 已受信任（这次已认证调用本身就是证明），同时给出可复制的命令：
+节点半探测 Tailscale（`tailscale status --json --peers=false`，包含 Windows 路径 `C:\Program Files\Tailscale\tailscale.exe`），报告自身 MagicDNS 域名与 100.x 地址。设置分区只回答一个问题——手机现在能不能打开——并且用请求而不是配置来回答：桌面应用以固定参数在本机回环端口启动 `dsh web`，`webStartup` 既没有围栏接受的绑定地址也没有受信任的 authority，而按这些旗标推断的页面会把一个其实可用的部署报成打不开。因此节点半从主机侧请求对外地址的 `/api/pocket/remote`：没有回应说明还没人代理这个端口，`403` 是围栏拒绝了该 authority，其余任何回应都说明请求已经到达服务器。
 
-- 直接 IP：`prism --profile web --host <tailscale-ip>` —— 围栏直接接受监听绑定 IP，无需 `--trusted-host`。
-- MagicDNS：`tailscale serve --bg --https=443 http://127.0.0.1:3080` 加 `--trusted-host <machine>.<tailnet>.ts.net` 与 `--public-url https://<machine>.<tailnet>.ts.net/` —— TLS 由 tailscale 终结，回环传输保持 HTTP，ts.net authority 必须加入 `trustedHosts`。
+结论为「能打开」时，页面给出 `connection.authenticatedUrl(<ts.net 根地址>)` 供复制——手机打开它即用其中的登录令牌换取会话 Cookie——并展示把令牌隐去后的同一 URL。否则按顺序列出还缺的步骤：先用 `tailscale serve --bg --https=443 http://127.0.0.1:<port>` 代理回环监听，再把 ts.net authority 加进 `trustedHosts`，桌面应用从 profile 补丁而不是旗标取得这一项。
 
-内核信任策略（`packages/client/connection/src/api-request-trust.ts`）、webserver 的通配符拒绝、全部 CLI 旗标一律不动；插件只读取并解释它们。未过围栏的连接本来就是现有代码的 403，页面会说明漏掉了哪条命令。
+内核信任策略（`packages/client/connection/src/api-request-trust.ts`）、webserver 的通配符拒绝、全部 CLI 旗标一律不动；插件只读取并解释它们，`--trusted-host` 仍是同一授权的命令行写法。
 
 ### S2.7 PWA 安装
 

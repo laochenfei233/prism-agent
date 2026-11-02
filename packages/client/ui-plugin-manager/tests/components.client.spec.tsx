@@ -1353,6 +1353,9 @@ describe('PluginManagerPage', () => {
     // An incompatibility reads from its structured packages in the dictionary's words, one sentence per package.
     set({ packages: [pkg({ error: { code: 'incompatible-version', incompatible: [INCOMPATIBLE, { ...INCOMPATIBLE, name: 'other' }] } })] })
     expect(within(detail).getByText(`${en.reasonLabel}: ${incompatibleText()} ${incompatibleText('other')} ${en.reasonIncompatibleInstalled}`)).toBeTruthy()
+    // A bundle the profile does not own is supplied by the app, so the remedy is updating it rather than reinstalling.
+    set({ packages: [pkg({ installed: false, error: { code: 'incompatible-version', incompatible: [INCOMPATIBLE] } })] })
+    expect(within(detail).getByText(`${en.reasonLabel}: ${incompatibleText()} ${en.reasonIncompatibleAppProvided}`)).toBeTruthy()
     set({ packages: [pkg({ error: { code: 'incompatible-version' } })] })
     expect(within(detail).getByText(`${en.reasonLabel}: ${en.reasonIncompatibleVersionUnnamed} ${en.reasonIncompatibleInstalled}`)).toBeTruthy()
     fireEvent.click(within(detail).getByRole('button', { name: en.backToList }))

@@ -1,15 +1,16 @@
 /**
- * Settings section that transfers projects and settings through archive
- * files. The export card picks projects and streams a download; the import
- * card uploads an archive and follows the background job to its outcome.
- * All copy is dictionary-owned; failures surface the typed host code.
+ * Page inside the 数据 settings section that transfers projects and settings
+ * through archive files. The export card picks projects and streams a
+ * download; the import card uploads an archive and follows the background job
+ * to its outcome. All copy is dictionary-owned; failures surface the typed
+ * host code.
  *
  * @module @prism/prism-transfer/client/TransferSection
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Checkbox } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { TRANSFER_EXPORT_PATH, TRANSFER_IMPORT_PATH, TRANSFER_JOB_PATH } from '../routes.ts'
 import type { TransferJobSnapshot } from '../types.ts'
@@ -32,10 +33,12 @@ export interface TransferFace {
   }
 }
 
-/** Props bound by the settings renderer. */
+/**
+ * Props bound by the settings renderer: copy and the page's own services. The
+ * page is a leaf inside the 数据 section's tab and renders no section chrome.
+ */
 export type TransferSectionProps =
-  PropsRuntime<'settings.section'>
-  & PropsLocale<'settings.transfer'>
+  PropsLocale<'settings.transfer'>
   & InjectFace<TransferFace>
 
 type Translate = (key: TransferLocaleKey, params?: Record<string, unknown>) => string
@@ -264,13 +267,6 @@ export function TransferSection({ t, workspaces, directoryPicker }: TransferSect
   const importAllowed = file !== null && !starting && !running
 
   return <section className={css.section}>
-    <header className={css.header}>
-      <div>
-        <h2 className={css.title}>{t('title')}</h2>
-        <p className={css.intro}>{t('intro')}</p>
-      </div>
-    </header>
-
     <section className={css.card} aria-label={t('exportTitle')}>
       <div className={css.cardHead}>
         <h3 className={css.cardTitle}>{t('exportTitle')}</h3>
