@@ -1,7 +1,7 @@
 # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 [package]
 name = "dsh-desktop"
-version = "0.2.1-rc.4-alpha1"
+version = "0.2.1-rc.4-alpha2"
 description = "Prism Agent desktop shell (Tauri 2)"
 authors = ["dsh-desktop contributors"]
 license = "MIT"
