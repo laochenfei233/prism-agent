@@ -1,12 +1,14 @@
 ; PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 ; Vendored from tauri-apps/tauri tag `tauri-cli-v2.11.4`
 ; (crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi) — the version
-; the pinned @tauri-apps/cli@2.11.4 embeds. The only delta from upstream is
-; the Reinstall page's Upgrading branch: the in-place upgrade is offered
-; first and the clean uninstall second (stock preselects uninstall-first),
-; mirrored in PageLeaveReinstall's mapping. Keep this file in sync with the
-; pinned CLI version when it is bumped; tauri.conf.json points at it via
-; bundle > windows > nsis > template.
+; the pinned @tauri-apps/cli@2.11.4 embeds. Two deltas from upstream: the
+; Reinstall page's Upgrading branch offers the in-place upgrade first and the
+; clean uninstall second (stock preselects uninstall-first), mirrored in
+; PageLeaveReinstall's mapping; and this file includes `Win\RestartManager.nsh`,
+; which tauri 2.11's copy omits while the NSIS 3.11 toolchain it downloads
+; defines `CheckIfAppIsRunning` only in that header (tauri added the include in
+; 2.12). Keep this file in sync with the pinned CLI version when it is bumped;
+; tauri.conf.json points at it via bundle > windows > nsis > template.
 Unicode true
 ManifestDPIAware true
 ; Add in `dpiAwareness` `PerMonitorV2` to manifest for Windows 10 1607+ (note this should not affect lower versions since they should be able to ignore this and pick up `dpiAware` `true` set by `ManifestDPIAware true`)
@@ -36,6 +38,7 @@ ManifestDPIAwareness PerMonitorV2
 !include "FileAssociation.nsh"
 !include "Win\COM.nsh"
 !include "Win\Propkey.nsh"
+!include "Win\RestartManager.nsh"
 !include "StrFunc.nsh"
 ${StrCase}
 ${StrLoc}
