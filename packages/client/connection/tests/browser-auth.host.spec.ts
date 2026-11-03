@@ -92,11 +92,12 @@ function exchange(
   auth: BrowserAuth,
   authority = '127.0.0.1:3080',
   secure = false,
+  cookie?: string,
 ): { cookie: string; launchUrl: string; state: ResponseState } {
   const launchUrl = auth.authenticatedUrl(`http://${authority}`)
   const target = new URL(launchUrl)
   const res = response()
-  expect(auth.authorizeIndex(request(`${target.pathname}${target.search}`, authority), res.value, secure)).toBe(false)
+  expect(auth.authorizeIndex(request(`${target.pathname}${target.search}`, authority, { cookie }), res.value, secure)).toBe(false)
   return { cookie: mintCookie(res.state).split(';', 1)[0]!, launchUrl, state: res.state }
 }
 
@@ -240,8 +241,11 @@ describe('BrowserAuth', () => {
     expect(restarted.authorizeIndex(request('/', authority, { cookie: plain.cookie }), denied.value, true)).toBe(false)
     expect(denied.state.status).toBe(401)
 
-    const tls = exchange(restarted, authority, true)
+    const tls = exchange(restarted, authority, true, 'dsh-auth-earlier-port=v1.legacy.legacy')
     expect(mintCookie(tls.state)).toContain('; Secure')
+    // The prune cookie mirrors the listener protocol, so the browser accepts the deletion of a Secure cookie too.
+    expect(setCookies(tls.state)[1]).toContain('dsh-auth-earlier-port=; Max-Age=0')
+    expect(setCookies(tls.state)[1]!.endsWith('; Secure')).toBe(true)
     expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }), true)).toBe(true)
     expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }))).toBe(false)
     const tlsName = tls.cookie.slice(0, tls.cookie.indexOf('='))
