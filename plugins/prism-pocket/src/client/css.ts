@@ -1,5 +1,8 @@
 /**
- * The pocket adaptation stylesheet, injected once while active.
+ * The Pocket stylesheets, split by lifetime: {@link POCKET_CSS} styles the
+ * settings page and the notification cards and stays injected on every
+ * surface; {@link POCKET_ADAPTATION_CSS} carries the mobile adaptation and
+ * injects only while active (`html.prism-active`).
  *
  * Every selector anchors on a `[data-slot="<key>"]` wrapper the app renders
  * for its slots — the documented addressable seam — or on the plugin's own
@@ -9,8 +12,8 @@
  * @module @prism/prism-pocket/client/css
  */
 
-/** The complete pocket stylesheet, active only under `html.prism-active`. */
-export const POCKET_CSS = `
+/** The adaptation stylesheet, injected only while active (`html.prism-active`). */
+export const POCKET_ADAPTATION_CSS = `
 html.prism-active {
   touch-action: manipulation;
   overscroll-behavior-y: none;
@@ -78,6 +81,10 @@ html.prism-active [data-slot="main"] table {
   overflow-x: auto;
 }
 
+`
+
+/** The always-on stylesheet: the Pocket page and the notification cards. */
+export const POCKET_CSS = `
 /* The plugin's own notification cards. */
 .prism-cards {
   position: fixed;

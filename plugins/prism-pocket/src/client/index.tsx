@@ -19,6 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { watchActivation } from './activate.ts'
 import { installAdapter, type LayoutLike } from './adapter.ts'
+import { POCKET_CSS } from './css.ts'
 import { en, NS, zh, type PocketLocaleKey } from './locales.ts'
 import { installNotify } from './notify.tsx'
 import { installPwa } from './pwa.ts'
@@ -41,6 +42,15 @@ export const inject = ['slots', 'locale', 'remote', 'layout']
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'pocket: dictionaries')
   const t = ctx.locale.bind(NS)
+
+  // The page styles stay on every surface; the adaptation sheet is active-gated.
+  ctx.effect(() => {
+    const style = document.createElement('style')
+    style.dataset.plugin = 'prism-pocket'
+    style.textContent = POCKET_CSS
+    document.head.append(style)
+    return () => { style.remove() }
+  }, 'pocket: page stylesheet')
 
   installPwa()
   ctx.effect(() => installNotify(ctx, t), 'pocket: page notifications')

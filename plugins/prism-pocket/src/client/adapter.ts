@@ -11,7 +11,7 @@
  * @module @prism/prism-pocket/client/adapter
  */
 
-import { POCKET_CSS } from './css.ts'
+import { POCKET_ADAPTATION_CSS } from './css.ts'
 import { edgeSwipeAction } from './pure.ts'
 
 /** The layout seam the drawer drives. */
@@ -26,7 +26,7 @@ const KEYBOARD_THRESHOLD_PX = 140
 export function installAdapter(layout: LayoutLike): () => void {
   const style = document.createElement('style')
   style.dataset.plugin = 'prism-pocket'
-  style.textContent = POCKET_CSS
+  style.textContent = POCKET_ADAPTATION_CSS
   document.head.append(style)
   const backdrop = document.createElement('div')
   backdrop.className = 'prism-backdrop'

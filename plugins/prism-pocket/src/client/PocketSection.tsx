@@ -343,7 +343,7 @@ function ChannelCard(props: {
         <div className='prism-channel-actions'>
           {running
             ? <button type='button' className='prism-button prism-button-quiet' disabled={busy} onClick={() => { run('stop') }}>{t('bots.stop')}</button>
-            : <button type='button' className='prism-button prism-button-primary' disabled={busy} onClick={() => { run('start') }}>{t('bots.start')}</button>}
+            : <button type='button' className='prism-button prism-button-quiet' disabled={busy} onClick={() => { run('start') }}>{t('bots.start')}</button>}
           <button type='button' className='prism-button prism-button-quiet' disabled={busy} onClick={() => { run('test') }}>{t('bots.test')}</button>
           <button
             type='button'
