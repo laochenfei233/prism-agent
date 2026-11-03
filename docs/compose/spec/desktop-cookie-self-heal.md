@@ -1,14 +1,59 @@
 ---
 feature: desktop-cookie-self-heal
-status: in-progress
+status: delivered
 updated: 2026-11-03
 branch: feat/desktop-cookie-self-heal
-commits: ee497b0bc4..(pending)
+commits: ee497b0bc4..5d6bd12029
 ---
 
 # Desktop cookie self-heal
 
 ## Report
+
+**What was built** — The desktop web-authentication wedge is fixed at both ends of the
+failure chain. `BrowserAuth` now expires every other `dsh-auth-` cookie the request
+still carries whenever it mints (`authorizeIndex` token exchange, `authorizeConnect`),
+so one domain keeps at most the mint cookie per surface no matter how the desktop's
+loopback port churns across launches. The web listener (`dsh-host-webserver`, HTTP and
+HTTPS) binds a fixed 64 KiB `maxHeaderSize` above Node's 16 KiB default, so an install
+already wedged past the old default delivers its next token-bearing request to the mint
+path and prunes itself back to one cookie on the first launch after upgrading — no
+manual deletion of the browser profile's Cookies store.
+
+`ConnectionIndexResponse.writeHead` widened its headers record to accept `string[]`
+values (mutable arrays, so node's `ServerResponse` stays structurally compatible).
+Regression coverage: prune assertions in `browser-auth.host.spec.ts` (HTTP and TLS,
+browser and API cookies), oversized-Cookie-header requests served by the real webserver
+over HTTP and TLS, and an end-to-end heal through the real frontend-static composition
+(80 stale cookies → 303 with 81 Set-Cookie headers → next request authenticates with
+only the mint cookie).
+
+**Verification** — Focused suites in the worktree: `pnpm vitest run` over
+browser-auth.host.spec, node-half.host.spec, webserver.spec, frontend-static.spec,
+gateway.host.spec, operator-connect.host.spec — 6 files, 115 tests, 0 failures. The
+end-to-end heal test fails on unfixed master at the 431 (failing-first). `pnpm run
+typecheck` — 5/5 gates pass. Doc gates: the two edited README pairs (en+zh) pass every
+summary/model-experience/concrete-terms check; the remaining `test:docs` failures
+reproduce identically on master (pre-existing). Pre-commit lefthook died with the
+sandbox msys `0xc0000142` limitation; oxlint (staged config), `git diff --cached
+--check`, and the vendor manifest guard were run by hand — all clean.
+
+**Journey log** —
+- A server-side prune alone cannot recover a wedged install: once the header crosses
+  the parser bound, Node answers 431 before any handler runs. Prevention and the
+  raised listener bound have to ship together.
+- Widening the response headers with `readonly string[]` broke `ServerResponse`
+  compatibility — `OutgoingHttpHeaders` accepts only mutable arrays.
+- `gen-cordis-catalog` is broken at this fork's baseline (24 pre-existing cron
+  type-link coverage violations, reproducible on master), so the generated catalog
+  entry for the changed declaration was hand-projected in the generator's format
+  (member JSDoc is never recorded); regenerate when the baseline is fixed.
+- The desktop's port churn comes from `select_port()`'s occupied-default fallback
+  scan, not truly random ports; the cookie mechanism accumulates either way, so the
+  Rust side was correctly left untouched.
+- The reviewer's cross-instance note: on a shared public hostname, authenticating to
+  instance B expires instance A's cookie in that browser — token-gated,
+  self-inflicted, and the accepted "one cookie per domain" design.
 
 ## [S1] Problem
 
@@ -37,9 +82,10 @@ deletes those cookies, so one domain keeps at most one browser cookie plus one A
 cookie no matter how ports churn. Deleting never touches the signing secret, so it
 also clears cookies from older secrets and versions.
 
-`ConnectionIndexResponse.writeHead` widens its headers value to the same
-`string | readonly string[]` form `ConnectionTrustRequest` already uses, so the mint
-responses can carry several `Set-Cookie` values.
+`ConnectionIndexResponse.writeHead` widens its headers record to accept array values —
+mutable `string[]`, because `OutgoingHttpHeaders` rejects readonly arrays and node's
+`ServerResponse` must keep satisfying the interface — so the mint responses can carry
+several `Set-Cookie` values.
 
 ### S2.2 Listener header bound above the legacy bloat
 
@@ -60,15 +106,15 @@ wedged installs do not heal, `dsh web` browser users gain nothing).
 
 ## Tasks
 
-- [ ] T1: widen `ConnectionIndexResponse.writeHead` headers type (depends: none)
-- [ ] T2: prune stale `dsh-auth-` cookies in `authorizeIndex` mint branch and `authorizeConnect` (depends: T1)
-- [ ] T3: fixed 64 KiB `maxHeaderSize` on the WebServer HTTP and HTTPS listeners (depends: none)
-- [ ] T4: regression tests — prune behavior (browser-auth spec), oversized-cookie request reaches the mint path (webserver spec) (depends: T2, T3)
-- [ ] T5: package README + changelog entry (depends: T2, T3)
+- [x] T1: widen `ConnectionIndexResponse.writeHead` headers type (depends: none)
+- [x] T2: prune stale `dsh-auth-` cookies in `authorizeIndex` mint branch and `authorizeConnect` (depends: T1)
+- [x] T3: fixed 64 KiB `maxHeaderSize` on the WebServer HTTP and HTTPS listeners (depends: none)
+- [x] T4: regression tests — prune behavior (browser-auth spec), oversized-cookie request reaches the mint path (webserver spec) (depends: T2, T3)
+- [x] T5: package README + changelog entry (depends: T2, T3)
 
 ## [S4] Acceptance
 
-- [ ] Minting after requests carried cookies for other ports answers with expired `Set-Cookie` headers exactly for the stale names, and the mint cookie for the current authority.
-- [ ] A request whose `Cookie` header exceeds Node's 16 KiB default still reaches the route handler on a real `WebServer` listener (no 431), over HTTP and TLS.
-- [ ] A wedged cookie store heals end-to-end: oversized header → token exchange → 303 + prune headers → next request carries one `dsh-auth-` cookie and authenticates.
-- [ ] Existing suites for both packages stay green.
+- [x] Minting after requests carried cookies for other ports answers with expired `Set-Cookie` headers exactly for the stale names, and the mint cookie for the current authority.
+- [x] A request whose `Cookie` header exceeds Node's 16 KiB default still reaches the route handler on a real `WebServer` listener (no 431), over HTTP and TLS.
+- [x] A wedged cookie store heals end-to-end: oversized header → token exchange → 303 + prune headers → next request carries one `dsh-auth-` cookie and authenticates.
+- [x] Existing suites for both packages stay green.
