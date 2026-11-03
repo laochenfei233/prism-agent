@@ -45,8 +45,8 @@ export function readTelegramUpdate(value: unknown): TelegramUpdate | undefined {
   const chat = typeof record.chat === 'object' && record.chat !== null ? record.chat : undefined
   const id = chat === undefined ? undefined : (chat as { id?: unknown }).id
   if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined
-  const sender = typeof record.from === 'object' && record.from !== null ? record.from as { first_name?: unknown; bot?: unknown } : undefined
-  if (sender?.bot === true) return undefined
+  const sender = typeof record.from === 'object' && record.from !== null ? record.from as { first_name?: unknown; is_bot?: unknown } : undefined
+  if (sender?.is_bot === true) return undefined
   const senderName = typeof sender?.first_name === 'string' ? sender.first_name : undefined
   return {
     updateId: update.update_id,

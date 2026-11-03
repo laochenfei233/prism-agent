@@ -154,7 +154,7 @@ export const createQqAdapter: BotAdapterFactory = (config, hooks) => {
       accessToken = await token()
       /** Gateway URLs are issued per session, so every dial re-fetches one. */
       const mintUrl = async (): Promise<WebSocket> => {
-        const accessTokenNow = accessToken ?? await token()
+        const accessTokenNow = await token()
         const gateway = stringField(await fetchBotJson(`${QQ_API_BASE}/gateway`, {
           headers: { Authorization: `QQBot ${accessTokenNow}` },
         }), 'url')
