@@ -9,6 +9,9 @@
 /** Server surface, tailscale facts, and pocket feature state. */
 export const POCKET_REMOTE_PATH = '/api/pocket/remote'
 
+/** The bot channels' list/action route. */
+export const POCKET_BOTS_PATH = '/api/pocket/bots'
+
 /** Store one browser push subscription. */
 export const POCKET_PUSH_SUBSCRIBE_PATH = '/api/pocket/push/subscribe'
 

@@ -64,7 +64,7 @@ describe('telegram', () => {
       message: { chat: { id: 42 }, from: { first_name: 'Chen' }, text: ' hello ' },
     })
     expect(update).toEqual({ updateId: 7, chatId: '42', senderName: 'Chen', text: 'hello' })
-    expect(readTelegramUpdate({ update_id: 8, message: { chat: { id: 1 }, text: 'x', bot: true } })).toBeUndefined()
+    expect(readTelegramUpdate({ update_id: 8, message: { chat: { id: 1 }, from: { bot: true }, text: 'x' } })).toBeUndefined()
     expect(readTelegramUpdate({ update_id: 9, message: { chat: { id: 1 } } })).toBeUndefined()
   })
 

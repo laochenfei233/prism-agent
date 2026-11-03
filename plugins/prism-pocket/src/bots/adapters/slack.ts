@@ -79,17 +79,23 @@ export const createSlackAdapter: BotAdapterFactory = (config, hooks) => {
   const { botToken, appToken } = config as { botToken: string; appToken: string }
   let ws: ReconnectingWs | undefined
 
+  /** Mint one Socket Mode URL; the platform issues them single-use, so every dial re-mints. */
+  const mintUrl = async (): Promise<WebSocket> => {
+    const connected = await fetchBotJson(`${SLACK_API_BASE}/apps.connections.open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${appToken}` },
+    })
+    const url = stringField(connected, 'url')
+    if (url === undefined) throw new Error('Socket Mode URL missing from apps.connections.open')
+    return new WebSocket(url)
+  }
+
   return {
     async start() {
       hooks.onStatus('starting')
-      const connected = await fetchBotJson(`${SLACK_API_BASE}/apps.connections.open`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${appToken}` },
-      })
-      const url = stringField(connected, 'url')
-      if (url === undefined) throw new Error('Socket Mode URL missing from apps.connections.open')
+      await mintUrl().then(socket => socket.close())
       ws = new ReconnectingWs(
-        () => new WebSocket(url),
+        () => mintUrl(),
         {
           onOpen: () => {
             hooks.onStatus('online')

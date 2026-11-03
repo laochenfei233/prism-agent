@@ -170,6 +170,11 @@ export class BotAskRelay {
     return this.pending.has(sessionId)
   }
 
+  /** Expire every pending ask and clear the timers; plugin disposal. */
+  dispose(): void {
+    for (const sessionId of [...this.pending.keys()]) this.expire(sessionId)
+  }
+
   /** Expire one ask on timeout: drop it so the caller delegates. */
   private expire(sessionId: string): void {
     const ask = this.pending.get(sessionId)

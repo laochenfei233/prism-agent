@@ -175,7 +175,19 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
       onBound: () => { /* the binding lives in the store; the routes read it there. */ },
     },
   })
-  const relay = new BotAskRelay({ targetOf: sessionId => conversations.targetOf(sessionId), send })
+  // The relay's sends are prompt deliveries inside a synchronous observer; a
+  // platform failure must stay a log line, not an unhandled rejection (the
+  // harness's fail-loud policy would exit the process).
+  const relay = new BotAskRelay({
+    targetOf: sessionId => conversations.targetOf(sessionId),
+    send: async (channel, chatId, text) => {
+      try {
+        await send(channel, chatId, text)
+      } catch (cause: unknown) {
+        warn(cause instanceof Error ? cause.message : String(cause))
+      }
+    },
+  })
   const outbox = new BotOutbox({
     targetOf: sessionId => conversations.targetOf(sessionId),
     handleOf: channel => supervisor.handle(channel),
@@ -227,6 +239,7 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
   })
 
   ctx.effect(() => async () => {
+    relay.dispose()
     await supervisor.dispose()
   }, 'pocket: bots disposal')
 }

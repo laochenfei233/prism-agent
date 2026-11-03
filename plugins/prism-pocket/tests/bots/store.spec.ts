@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BotStore } from '../../src/bots/store.ts'
-import { readBotConfig, summarizeConfig, reviveBotConfig, BotConfigError } from '../../src/bots/validate.ts'
+import { readBotConfig, summarizeConfig, reviveBotConfig, mergeBotConfig, BotConfigError } from '../../src/bots/validate.ts'
 import { BOT_CHANNELS, botCallbackPath, type BotChannelId } from '../../src/bots/types.ts'
 
 const DIRECTORIES: string[] = []
@@ -64,6 +64,27 @@ describe('readBotConfig', () => {
   it('summarizes fields as set flags only, never values', () => {
     const config = readBotConfig('telegram', { botToken: 'super-secret' })
     expect(summarizeConfig(config)).toEqual([{ name: 'botToken', set: true }])
+  })
+})
+
+describe('mergeBotConfig', () => {
+  it('fills omitted and empty fields from the stored config', () => {
+    const stored = readBotConfig('slack', { botToken: 'xoxb-stored', appToken: 'xapp-stored' })
+    const merged = mergeBotConfig('slack', { botToken: 'xoxb-new' }, stored)
+    expect(merged).toEqual({ channel: 'slack', fields: { botToken: 'xoxb-new', appToken: 'xapp-stored' } })
+    const blank = mergeBotConfig('slack', { botToken: ' ', appToken: '' }, stored)
+    expect(blank).toEqual({ channel: 'slack', fields: { botToken: 'xoxb-stored', appToken: 'xapp-stored' } })
+  })
+
+  it('still rejects a malformed value even with a stored fallback', () => {
+    const stored = readBotConfig('feishu', { appId: 'i', appSecret: 's', region: 'feishu' })
+    expect(() => mergeBotConfig('feishu', { region: 'weixin' }, stored)).toThrow(BotConfigError)
+  })
+
+  it('keeps the region when the card edit omits it', () => {
+    const stored = readBotConfig('feishu', { appId: 'i', appSecret: 's', region: 'lark' })
+    const merged = mergeBotConfig('feishu', { appId: 'i2' }, stored)
+    expect(merged).toEqual({ channel: 'feishu', fields: { appId: 'i2', appSecret: 's', region: 'lark' } })
   })
 })
 

@@ -58,7 +58,10 @@ export class BotOutbox {
         if (piece === undefined) return
         queue.pieces = queue.pieces.slice(1)
         const handle = this.deps.handleOf(queue.channel)
-        if (handle === undefined) return
+        if (handle === undefined) {
+          this.deps.warn(`${queue.channel} is not running; dropped a queued reply`)
+          return
+        }
         await handle.send(queue.chatId, piece)
       }
     } catch (cause: unknown) {

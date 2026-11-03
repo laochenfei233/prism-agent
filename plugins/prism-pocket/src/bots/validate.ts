@@ -114,6 +114,24 @@ export function readBotConfig(channel: BotChannelId, value: unknown): BotConfig 
 }
 
 /**
+ * Merge a posted config over the stored one, then validate strictly. Fields
+ * the post omits or leaves empty keep the stored value — the card promises
+ * that a stored secret survives an edit that leaves it blank.
+ * @param channel - the channel the config belongs to.
+ * @param posted - the request body's `config` value.
+ * @param stored - the stored fields to fall back to.
+ * @returns the merged, strictly validated config.
+ */
+export function mergeBotConfig(channel: BotChannelId, posted: unknown, stored: BotConfig): BotConfig {
+  const base: Record<string, unknown> = { ...stored.fields }
+  const incoming = typeof posted === 'object' && posted !== null ? posted as Record<string, unknown> : {}
+  for (const [name, value] of Object.entries(incoming)) {
+    if (typeof value === 'string' && value.trim().length > 0) base[name] = value.trim()
+  }
+  return readBotConfig(channel, base)
+}
+
+/**
  * Re-validate a persisted config with the same strictness as the route; a
  * store body edited by hand that fails validation reads as no config.
  * @param channel - the channel the entry belongs to.

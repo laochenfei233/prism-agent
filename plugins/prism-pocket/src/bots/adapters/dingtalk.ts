@@ -113,14 +113,16 @@ export const createDingtalkAdapter: BotAdapterFactory = (config, hooks) => {
   return {
     async start() {
       hooks.onStatus('starting')
-      const opened = await postBotJson(DINGTALK_OPEN_API, buildDingtalkOpenRequest(clientId, clientSecret))
-      const endpoint = opened as { endpoint?: unknown; ticket?: unknown }
-      if (typeof endpoint.endpoint !== 'string' || typeof endpoint.ticket !== 'string') {
-        throw new Error('connections/open did not return endpoint and ticket')
-      }
-      const url = `${endpoint.endpoint}?ticket=${encodeURIComponent(endpoint.ticket)}`
       ws = new ReconnectingWs(
-        () => new WebSocket(url),
+        async () => {
+          // Stream tickets are single-use, so every dial opens a fresh connection.
+          const opened = await postBotJson(DINGTALK_OPEN_API, buildDingtalkOpenRequest(clientId, clientSecret))
+          const endpoint = opened as { endpoint?: unknown; ticket?: unknown }
+          if (typeof endpoint.endpoint !== 'string' || typeof endpoint.ticket !== 'string') {
+            throw new Error('connections/open did not return endpoint and ticket')
+          }
+          return new WebSocket(`${endpoint.endpoint}?ticket=${encodeURIComponent(endpoint.ticket)}`)
+        },
         {
           onOpen: () => {
             hooks.onStatus('online')

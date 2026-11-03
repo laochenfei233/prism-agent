@@ -152,12 +152,17 @@ export const createQqAdapter: BotAdapterFactory = (config, hooks) => {
     async start() {
       hooks.onStatus('starting')
       accessToken = await token()
-      const gateway = stringField(await fetchBotJson(`${QQ_API_BASE}/gateway`, {
-        headers: { Authorization: `QQBot ${accessToken}` },
-      }), 'url')
-      if (gateway === undefined) throw new Error('gateway URL missing from /gateway')
+      /** Gateway URLs are issued per session, so every dial re-fetches one. */
+      const mintUrl = async (): Promise<WebSocket> => {
+        const accessTokenNow = accessToken ?? await token()
+        const gateway = stringField(await fetchBotJson(`${QQ_API_BASE}/gateway`, {
+          headers: { Authorization: `QQBot ${accessTokenNow}` },
+        }), 'url')
+        if (gateway === undefined) throw new Error('gateway URL missing from /gateway')
+        return new WebSocket(gateway)
+      }
       ws = new ReconnectingWs(
-        () => new WebSocket(gateway),
+        () => mintUrl(),
         {
           onOpen: () => {
             hooks.onStatus('online')

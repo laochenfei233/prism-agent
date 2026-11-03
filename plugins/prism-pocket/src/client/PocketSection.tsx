@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
+import { POCKET_BOTS_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
 import { remoteCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
@@ -32,6 +32,7 @@ interface BotView {
   readonly status: 'off' | 'starting' | 'online' | 'error'
   readonly detail?: string
   readonly setFields: ReadonlySet<string>
+  readonly values: Readonly<Record<string, string>>
   readonly callback?: boolean
 }
 
@@ -61,7 +62,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const refresh = useCallback(async (seq: number): Promise<void> => {
     const [remote, botsBody] = await Promise.all([
       requestJson(POCKET_REMOTE_PATH),
-      requestJson('/api/pocket/bots').catch(() => undefined),
+      requestJson(POCKET_BOTS_PATH).catch(() => undefined),
     ])
     if (requestSeq.current !== seq) return
     setStatus(readStatus(remote))
@@ -96,7 +97,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   }
 
   const act = (channel: string, action: string, config?: unknown): Promise<void> =>
-    requestJson('/api/pocket/bots', {
+    requestJson(POCKET_BOTS_PATH, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config === undefined ? { channel, action } : { channel, action, config, enabled: true }),
@@ -277,7 +278,7 @@ function ChannelCard(props: {
   const { meta, view, t, copied, onCopy, act, publicOrigin } = props
   const [expanded, setExpanded] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
-  const [region, setRegion] = useState<'feishu' | 'lark'>('feishu')
+  const [region, setRegion] = useState<'feishu' | 'lark'>(view.values.region === 'lark' ? 'lark' : 'feishu')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -495,6 +496,18 @@ function readStatus(value: unknown): PocketRemoteStatus {
   }
 }
 
+/** Narrow one stored-values record; only string fields survive. */
+function readValues(value: unknown): Readonly<Record<string, string>> {
+  const record = objectOf(value)
+  if (record === undefined) return {}
+  const values: Record<string, string> = {}
+  for (const [name, entry] of Object.entries(record)) {
+    const text = stringOf(entry)
+    if (text !== undefined) values[name] = text
+  }
+  return values
+}
+
 /** Narrow the bots list body; a malformed body reads as an empty list. */
 function readBots(value: unknown): readonly BotView[] {
   const bots = objectOf(value)?.bots
@@ -519,6 +532,7 @@ function readBots(value: unknown): readonly BotView[] {
       status,
       ...(detail !== undefined ? { detail } : {}),
       setFields,
+      values: readValues(record?.values),
       ...(stringOf(record?.callbackPath) !== undefined ? { callback: true } : {}),
     }]
   })

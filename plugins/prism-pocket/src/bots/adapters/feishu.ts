@@ -185,26 +185,32 @@ export const createFeishuAdapter: BotAdapterFactory = (config, hooks) => {
   return {
     async start() {
       hooks.onStatus('starting')
-      const endpoint = buildLarkEndpointRequest(appId, appSecret, domain)
-      const body = await postBotJson(endpoint.url, JSON.parse(endpoint.body), endpoint.headers)
-      const code = (body as { code?: unknown }).code
-      if (code !== 0) throw new Error(`endpoint request rejected: ${JSON.stringify(body)}`)
-      const data = (body as { data?: unknown }).data
-      const url = stringField(data, 'URL')
-      if (url === undefined) throw new Error('connect URL missing from endpoint response')
-      const clientConfig = (data as { ClientConfig?: unknown }).ClientConfig
-      const pingInterval = (clientConfig as { PingInterval?: unknown } | undefined)?.PingInterval
-      const service = new URL(url).searchParams.get('service_id')
-      serviceId = service === null ? 1 : Number.parseInt(service, 10)
+      let pingIntervalMs = 120_000
+      /** The endpoint URL is issued per connection, so every dial re-pulls it. */
+      const mintUrl = async (): Promise<WebSocket> => {
+        const endpoint = buildLarkEndpointRequest(appId, appSecret, domain)
+        const body = await postBotJson(endpoint.url, JSON.parse(endpoint.body), endpoint.headers)
+        const code = (body as { code?: unknown }).code
+        if (code !== 0) throw new Error(`endpoint request rejected: ${JSON.stringify(body)}`)
+        const data = (body as { data?: unknown }).data
+        const url = stringField(data, 'URL')
+        if (url === undefined) throw new Error('connect URL missing from endpoint response')
+        const clientConfig = (data as { ClientConfig?: unknown }).ClientConfig
+        const pingInterval = (clientConfig as { PingInterval?: unknown } | undefined)?.PingInterval
+        const service = new URL(url).searchParams.get('service_id')
+        serviceId = service === null ? 1 : Number.parseInt(service, 10)
+        pingIntervalMs = typeof pingInterval === 'number' && pingInterval > 0 ? pingInterval * 1000 : 120_000
+        return new WebSocket(url)
+      }
       ws = new ReconnectingWs(
-        () => new WebSocket(url),
+        () => mintUrl(),
         {
           onOpen: () => {
             hooks.onStatus('online')
             clearPing()
             pingTimer = setInterval(() => {
               ws?.send(Buffer.from(buildLarkPing(serviceId)).toString('base64'))
-            }, typeof pingInterval === 'number' && pingInterval > 0 ? pingInterval * 1000 : 120_000)
+            }, pingIntervalMs)
           },
           onMessage: (data) => {
             const raw = typeof data === 'string' ? new TextEncoder().encode(data) : data

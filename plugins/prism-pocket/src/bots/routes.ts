@@ -11,10 +11,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { BotChannelId } from './types.ts'
-import { BOT_CHANNELS, BOT_CHANNEL_KINDS, botCallbackPath } from './types.ts'
+import { BOT_CHANNELS, BOT_CHANNEL_KINDS, BOT_SECRET_FIELDS, botCallbackPath } from './types.ts'
 import type { BotStore } from './store.ts'
 import type { BotSupervisor } from './supervisor.ts'
-import { readBotConfig, summarizeConfig } from './validate.ts'
+import { mergeBotConfig, readBotConfig, summarizeConfig } from './validate.ts'
 import { readWechatCallback, verifyWechatCallback, resolveWechatVerifyEcho } from './adapters/wechat.ts'
 import { readWecomCallback, resolveWecomVerifyEcho } from './adapters/wecom.ts'
 import { readWhatsappMessages, resolveWhatsappVerifyChallenge, verifyWhatsappSignature } from './adapters/whatsapp.ts'
@@ -22,8 +22,8 @@ import type { WechatConfig, WecomConfig, WhatsappConfig } from './types.ts'
 import { callbackSignature, timestampFresh } from './shared/sign.ts'
 import { readXmlField } from './shared/xml.ts'
 
-/** The authenticated list/action route. */
-export const POCKET_BOTS_PATH = '/api/pocket/bots'
+/** The authenticated list/action route (defined in `src/routes.ts` beside its siblings). */
+export { POCKET_BOTS_PATH } from '../routes.ts'
 
 /** One channel's view as the list route renders it. */
 export interface BotChannelView {
@@ -33,6 +33,8 @@ export interface BotChannelView {
   readonly status: string
   readonly detail?: string
   readonly fields: readonly { readonly name: string; readonly set: boolean }[]
+  /** Stored values of the non-secret fields, so the form can reflect them. */
+  readonly values: Readonly<Record<string, string>>
   readonly sessionId?: string
   readonly chatId?: string
   readonly callbackPath?: string
@@ -65,12 +67,24 @@ export function listView(deps: Pick<BotRouteDeps, 'store' | 'supervisor'>): BotL
         status: state.status,
         ...(state.detail !== undefined ? { detail: state.detail } : {}),
         fields: config === undefined ? [] : summarizeConfig(config),
+        values: plainValues(channel, config),
         ...(entry?.sessionId !== undefined ? { sessionId: entry.sessionId } : {}),
         ...(entry?.chatId !== undefined ? { chatId: entry.chatId } : {}),
         ...(BOT_CHANNEL_KINDS[channel] === 'callback' ? { callbackPath: botCallbackPath(channel) } : {}),
       }
     }),
   }
+}
+
+/** The stored values of the non-secret fields, for the form to reflect. */
+function plainValues(channel: BotChannelId, config: import('./types.ts').BotConfig | undefined): Readonly<Record<string, string>> {
+  if (config === undefined) return {}
+  const secrets = new Set(BOT_SECRET_FIELDS[channel])
+  const values: Record<string, string> = {}
+  for (const [name, value] of Object.entries({ ...config.fields })) {
+    if (!secrets.has(name) && typeof value === 'string' && value.length > 0) values[name] = value
+  }
+  return values
 }
 
 /** The actions the POST route accepts. */
@@ -110,9 +124,12 @@ export function readBotAction(value: unknown): BotActionRequest {
 export async function runBotAction(request: BotActionRequest, deps: BotRouteDeps): Promise<unknown> {
   const { channel, action } = request
   if (action === 'config') {
-    const config = readBotConfig(channel, request.config)
+    const stored = deps.store.config(channel)
+    const config = stored === undefined
+      ? readBotConfig(channel, request.config)
+      : mergeBotConfig(channel, request.config, stored)
     deps.store.setConfig(config)
-    if (request.enabled === true) {
+    if (request.enabled === true || deps.supervisor.handle(channel) !== undefined) {
       if (!deps.store.setEnabled(channel, true)) throw new Error('enable requires a stored config')
       await deps.supervisor.start(channel, config)
     }
@@ -147,11 +164,18 @@ export async function runBotAction(request: BotActionRequest, deps: BotRouteDeps
   return listView(deps)
 }
 
-/** Collect one webserver request body as UTF-8 text. */
+/** Largest callback body accepted; platform deliveries stay far below it. */
+const CALLBACK_BODY_LIMIT_BYTES = 1024 * 1024
+
+/** Collect one webserver request body as UTF-8 text, refusing oversized bodies. */
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
+  let total = 0
   for await (const chunk of request) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk)
+    const piece = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk
+    total += piece.byteLength
+    if (total > CALLBACK_BODY_LIMIT_BYTES) throw new Error('callback body exceeds 1 MiB')
+    chunks.push(piece)
   }
   return Buffer.concat(chunks).toString('utf8')
 }
@@ -212,7 +236,9 @@ export function registerBotCallbackRoutes(
     if (request.method === 'GET') {
       const echo = url.searchParams.get('echostr') ?? ''
       const encrypt = echo
-      if (callbackSignatureOf(config.token, timestamp, nonce, encrypt) !== msgSignature) return { status: 403, body: 'signature mismatch' }
+      if (callbackSignatureOf(config.token, timestamp, nonce, encrypt) !== msgSignature || !timestampFresh(timestamp)) {
+        return { status: 403, body: 'signature mismatch' }
+      }
       const decrypted = resolveWecomVerifyEcho(config, echo)
       if (decrypted === undefined) return { status: 403, body: 'decrypt failed' }
       return { status: 200, body: decrypted }

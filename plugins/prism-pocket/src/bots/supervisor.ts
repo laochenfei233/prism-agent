@@ -26,6 +26,7 @@ export interface BotChannelState {
 export class BotSupervisor {
   private readonly handles = new Map<BotChannelId, BotHandle>()
   private readonly states = new Map<BotChannelId, BotChannelState>()
+  private readonly starts = new Map<BotChannelId, Promise<void>>()
 
   /**
    * @param hooks - the upward hooks.
@@ -47,25 +48,35 @@ export class BotSupervisor {
   }
 
   /**
-   * Start (or restart after a config change) one channel.
+   * Start (or restart after a config change) one channel; concurrent starts
+   * on one channel run in submission order, so no handle is orphaned.
    * @param channel - the channel to start.
    * @param config - the channel's validated config.
    */
   async start(channel: BotChannelId, config: BotConfig): Promise<void> {
-    await this.stop(channel)
-    this.record(channel, 'starting')
-    const handle = this.adapters[channel](config.fields, this.adapterHooks(channel))
-    this.handles.set(channel, handle)
+    const previous = this.starts.get(channel) ?? Promise.resolve()
+    const current = previous.catch(() => undefined).then(async () => {
+      await this.stop(channel)
+      this.record(channel, 'starting')
+      const handle = this.adapters[channel](config.fields, this.adapterHooks(channel))
+      this.handles.set(channel, handle)
+      try {
+        await handle.start()
+      } catch (cause: unknown) {
+        const detail = cause instanceof Error ? cause.message : String(cause)
+        this.record(channel, 'error', detail)
+        this.handles.delete(channel)
+        // A failed start is a state, not a throw: the page shows the detail.
+        return
+      }
+      if (this.handles.get(channel) === handle) this.record(channel, 'online')
+    })
+    this.starts.set(channel, current)
     try {
-      await handle.start()
-    } catch (cause: unknown) {
-      const detail = cause instanceof Error ? cause.message : String(cause)
-      this.record(channel, 'error', detail)
-      this.handles.delete(channel)
-      // A failed start is a state, not a throw: the page shows the detail.
-      return
+      await current
+    } finally {
+      if (this.starts.get(channel) === current) this.starts.delete(channel)
     }
-    if (this.handles.get(channel) === handle) this.record(channel, 'online')
   }
 
   /**

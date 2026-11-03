@@ -1,8 +1,10 @@
 /**
  * Reconnecting WebSocket for the outbound bot channels: capped exponential
  * backoff, reset on a successful open, and a heartbeat timer the adapter
- * arms per platform. IO only — every frame transformation stays in the
- * adapter's pure functions.
+ * arms per platform. `connect` runs per attempt — platforms that mint
+ * one-time or short-lived URLs (Slack Socket Mode, DingTalk and Feishu
+ * stream tickets, QQ gateways) re-mint inside it. IO only — every frame
+ * transformation stays in the adapter's pure functions.
  *
  * @module @prism/prism-pocket/bots/shared
  */
@@ -33,6 +35,9 @@ export interface ManagedWs {
   close(): void
 }
 
+/** Build one fresh WebSocket; the URL may be re-minted per attempt. */
+export type WsConnect = () => WebSocket | Promise<WebSocket>
+
 /**
  * A WebSocket that reconnects with capped exponential backoff until
  * {@link ManagedWs.close} or {@link ReconnectingWs.stop} stops it.
@@ -43,15 +48,18 @@ export class ReconnectingWs {
   private heartbeat: ReturnType<typeof setInterval> | undefined
   private attempt = 0
   private stopping = false
+  private connecting = false
+  /** Rejects sockets dialed by a superseded attempt (slow mint racing a stop). */
+  private generation = 0
 
   /**
-   * @param connect - builds one fresh WebSocket; called per attempt so platform URLs can rotate.
+   * @param connect - builds one fresh WebSocket; awaited when it returns a promise.
    * @param hooks - the adapter's IO hooks.
    * @param heartbeatMs - heartbeat interval, when the platform requires one.
    * @param onHeartbeat - heartbeat tick callback, when armed.
    */
   constructor(
-    private readonly connect: () => WebSocket,
+    private readonly connect: WsConnect,
     private readonly hooks: ManagedWsHooks,
     private readonly heartbeatMs?: number,
     private readonly onHeartbeat?: () => void,
@@ -60,12 +68,13 @@ export class ReconnectingWs {
   /** Open the first connection. */
   start(): void {
     this.stopping = false
-    this.reopen()
+    void this.dial()
   }
 
   /** Stop reconnecting and close any open socket. */
   stop(): void {
     this.stopping = true
+    this.generation += 1
     this.clearTimers()
     this.socket?.close()
     this.socket = undefined
@@ -89,17 +98,33 @@ export class ReconnectingWs {
     this.heartbeat = undefined
   }
 
-  private reopen(): void {
-    if (this.stopping) return
+  /** One dial attempt: mint, guard the generation, wire the listeners. */
+  private async dial(): Promise<void> {
+    if (this.stopping || this.connecting) return
+    this.connecting = true
+    const gen = ++this.generation
     let socket: WebSocket
     try {
-      socket = this.connect()
+      socket = await this.connect()
     } catch (cause: unknown) {
+      this.connecting = false
+      if (this.stopping || gen !== this.generation) return
       this.hooks.onError(cause instanceof Error ? cause.message : String(cause))
       this.scheduleReconnect()
       return
     }
+    if (this.stopping || gen !== this.generation) {
+      this.connecting = false
+      socket.close()
+      return
+    }
+    this.connecting = false
     this.socket = socket
+    this.wire(socket)
+  }
+
+  /** Attach the lifecycle listeners of one accepted socket. */
+  private wire(socket: WebSocket): void {
     socket.addEventListener('open', () => {
       if (this.socket !== socket) return
       this.attempt = 0
@@ -136,7 +161,7 @@ export class ReconnectingWs {
     this.attempt += 1
     this.timer = setTimeout(() => {
       this.timer = undefined
-      this.reopen()
+      void this.dial()
     }, delay)
   }
 
@@ -145,6 +170,7 @@ export class ReconnectingWs {
       send: (text) => { socket.send(text) },
       close: () => {
         this.stopping = true
+        this.generation += 1
         this.clearTimers()
         socket.close()
         this.socket = undefined

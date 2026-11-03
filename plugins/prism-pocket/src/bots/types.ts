@@ -99,7 +99,7 @@ export type BotConfig =
   | { readonly channel: 'wechat'; readonly fields: WechatConfig }
   | { readonly channel: 'whatsapp'; readonly fields: WhatsappConfig }
 
-/** Names of the secret fields per channel; route reads mask exactly these. */
+/** Names of the secret fields per channel; these are never echoed as values — the route masks every field, and reports only whether a value is stored. */
 export const BOT_SECRET_FIELDS: Readonly<Record<BotChannelId, readonly string[]>> = {
   telegram: ['botToken'],
   discord: ['botToken'],
@@ -156,9 +156,10 @@ export interface BotHandle {
   /** Close the connection and stop every timer. */
   stop(): Promise<void>
   /**
-   * Deliver one text message to one chat.
+   * Deliver one text message to one chat, chunking it to the platform's
+   * per-message limit.
    * @param chatId - the platform chat identity from an inbound message.
-   * @param text - the text to deliver, already chunked by the caller.
+   * @param text - the text to deliver.
    */
   send(chatId: string, text: string): Promise<void>
   /** Probe the credentials without sending; rejects with the failure detail. */
