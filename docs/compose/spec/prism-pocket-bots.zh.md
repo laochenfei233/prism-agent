@@ -1,9 +1,9 @@
 ---
 feature: prism-pocket-bots
-status: designed
+status: delivered
 updated: 2026-11-03
 branch: feat/pocket-bots
-commits: ba06d2162f..TBD
+commits: ba06d2162f..9b11180d41
 ---
 
 # Prism Pocket Bots
@@ -11,6 +11,12 @@ commits: ba06d2162f..TBD
 [English](prism-pocket-bots.md) | 中文
 
 ## Report
+
+**构建内容** — `plugins/prism-pocket` 新增九个聊天 bot 渠道与重设计的口袋页。Node 半（`src/bots/`）每渠道一个适配器——Telegram（长轮询）、Discord（Gateway v10）、Slack（Socket Mode）、飞书/Lark 与钉钉与 QQ（流式 WebSocket 长连接，一次性 URL 每次拨号重新换取）、微信/企业微信/WhatsApp（webserver 上的平台签名回调路由，AES/HMAC 校验、应答握手、无凭据时 404）。supervisor 持有全部连接，按渠道串行启动并实时上报状态；每个 bot 绑定一个会话（`/new`、`/stop`、`/help` 命令，首条消息自动绑定）；助手回复按各平台限制分块回到聊天；待处理的审批和用户提问以编号选项送达聊天，回复即 resolve，120 秒沉默则交回应用自身界面。凭据持久化在 `pocket/bots.json`（0600），保存时服务端合并，绝不出现在路由响应里。浏览器半把页面铺在应用的设置材质上：本地生成的带 token 手机链接二维码、九张回显已存值的渠道凭据卡片，以及推送与 PWA 面板——全部文案走词典。页面样式表现在常驻每个表面（此前搭在移动适配的激活门上，桌面端一直渲染无样式裸 HTML）；只有适配样式保持激活门控。新增一个构建期根 devDependency `qrcode-generator`，内联进 client bundle。
+
+**验证** — `tsc -p tsconfig.json --noEmit` 干净；`vitest run` 97/97（存储持久化与权限、配置合并与区域保持、supervisor 状态迁移、每渠道协议逻辑——帧、签名、微信家族 AES 往返、分块——问答转发 resolve 与超时、入站命令）；双面 tsdown 构建成功且 qrcode-generator 已内联；真实 web profile 冒烟走了一遍路由（`GET /api/pocket/bots` 列出九个脱敏渠道、config/start/stop 循环、未知渠道 400、无凭据回调 404），combo bundle 带二维码与渠道 UI，手机与桌面视口截图均人工检查；`verify-translation-pairing`、`verify-md-links`（2105 文件）与改动文档的 `verify-md-wrap` 通过。评审第 1 轮返回 REQUEST_CHANGES（四个 critical：部分保存往返断裂、飞书区域静默重置、转发层裸 send 撞上 fail-loud 策略、重连复用一次性 WS URL）；四项全部修复后，新评审人返回 COMMENT（可合并）并附两个一行跟进——Telegram 的 `is_bot` 字段名与 QQ 重连的 token 刷新——均已落在 9b11180d41。
+
+**历程记录** — 「丑页面」有结构性根因：整张样式表搭在移动适配的激活门上，桌面设置页一直是无样式 HTML；样式表按生命周期拆分，而非按插件拆分。飞书长连接说 protobuf（`pbbp2.Frame`），不是 JSON——文档页是 JS 渲染拿不到，但 npm/PyPI registry 上的官方 SDK 包给出了确切协议；registry 包是本环境下国内平台协议的可靠来源。宿主的 fail-loud `unhandledRejection` 策略意味着观察者路径里的每个 `void promise()` 都要在注入点包一层捕获——问答转发的提示发送若不包，一次寻常的 Telegram 抖动就会让进程退出。脱敏凭据视图使服务端合并成为部分保存的唯一正确形态：客户端无法重发它从未收到的值，「留空保持已存值」必须由路由兑现。
 
 ## [S1] Problem
 
@@ -27,7 +33,7 @@ Pocket 设置区目前用一个可复制链接回答"手机能不能打开这里
 设置区对齐应用自身的设置页:一条 720px 纵列、16/24 的区块标题配三级色引言、settings-material 卡片(`--dsw-alias-settings-card-*` token)、13/20 行文、字重 ≤ 500、可见的 `:focus-visible` 圈。四个面板:
 
 1. **手机访问** — 二维码卡(左)与判定条、带复制动作的鉴权链接、缺失步骤列表(右)并排。二维码编码带 token 的手机链接,全程本地生成;token 除二维码本体与复制动作外不离页。560px 以下收拢为单列。
-2. **Bot 渠道** — 九张渠道卡片,响应式栅格。每张卡带品牌色 logo 徽标、渠道名及区域标签(如有:飞书/Lark)、状态点与状态文字、可展开的凭据表单、启动/停止/测试动作。回调型渠道额外展示公网回调地址与可达性提示。
+2. **Bot 渠道** — 九张渠道卡片,单列纵向排布。每张卡带品牌色 logo 徽标、渠道名及区域标签(如有:飞书/Lark)、状态点与状态文字、可展开的凭据表单、启动/停止/测试动作。表单回显已保存的非敏感字段值(含飞书/Lark 区域);保存时留空的已存字段保持原值,由服务端合并。回调型渠道额外展示公网回调地址与可达性提示。
 3. **通知** — 现有推送面板,套用同样的卡片材质。
 4. **安装到主屏幕** — 现有 PWA 面板,同样重排。
 
@@ -73,7 +79,7 @@ Node 半观察 `session/event`;`assistant/message` 事件所属会话绑定了 b
 
 ### S2.9 路由
 
-鉴权 `/api` 通道上:`GET /api/pocket/bots`、`PUT /api/pocket/bots/:channel`(配置 + 启用)、`POST /api/pocket/bots/:channel/start|stop|test`。`test` 执行各渠道最便宜的凭据探测(`getMe`、`/gateway/bot`、`apps.connections.open`、tenant token、stream ticket、网关 ticket,回调渠道适用时探测回调),只报结果不发送聊天消息。误配置大声失败:配置不全时启动返回 400,绝不静默跳过。
+鉴权 `/api` 通道上单个端点承载列表与全部动作:`GET /api/pocket/bots`,以及携带 `{ channel, action: 'config' | 'start' | 'stop' | 'test' }` 的 `POST /api/pocket/bots`(config 动作携带提交的字段与是否启用)。config 提交在已存凭据之上合并——省略或留空的字段保持原值——且对运行中的渠道保存后即刻重启,让新凭据生效。`test` 执行各渠道最便宜的凭据探测(`getMe`、`/gateway/bot`、`apps.connections.open`、tenant token、stream ticket、网关 ticket),只报结果不发送聊天消息;已停止的渠道为探测临时启动一次再停止,开关状态不变。误配置大声失败:未知渠道或动作、任何未通过严格校验的配置,都以 400 返回并指明出错字段。
 
 ### S2.10 文案归属
 
@@ -86,15 +92,15 @@ Node 半观察 `session/event`;`assistant/message` 事件所属会话绑定了 b
 
 ## Tasks
 
-- [ ] T1: bots 地基 — `types.ts` 渠道/配置/状态判别联合,`bots.json` 存储(0600、串行写),supervisor 生命周期(启动拉起、配置变更重启、有上限退避、销毁)(covers: S2.3, S2.4)
-- [ ] T2: 出站适配器 — telegram、discord、slack、feishu/lark、dingtalk、qq,纯协议函数 + 薄 IO(covers: S2.3)
-- [ ] T3: 回调适配器 — wechat、wecom、whatsapp:签名/加密纯函数、webserver 回调路由、发送 API(covers: S2.3, S2.8)
-- [ ] T4: 会话绑定、入站命令、带分块的回复 outbox、审批与提问转发(covers: S2.5, S2.6, S2.7)
-- [ ] T5: 鉴权路由(list/config/start/stop/test),按渠道严格校验与脱敏读取(covers: S2.4, S2.9)
-- [ ] T6: 客户端重设计 — 720px 设置页,内联 `qrcode-generator` 的二维码面板,九张渠道卡片(表单与动作),推送与 PWA 面板重排,响应式收拢,焦点圈,zh/en 词典(covers: S2.2, S2.3, S2.10)
-- [ ] T7: 测试 — 存储持久化与权限,supervisor 状态迁移,每个适配器的协议逻辑(帧、签名、AES 往返、分块),问答转发的 resolve 与超时,绑定命令,客户端纯逻辑(covers: S2.3–S2.7)
-- [ ] T8: 验证 — tsc、vitest、tsdown 双面构建,真实 web profile 启动并含 bots 路由,手机视口浏览器检查重设计页(covers: S4)
-- [ ] T9: 文档 — README en+zh,spec en+zh 配对并记录哈希,changelog 条目(covers: S2.10)
+- [x] T1: bots 地基 — `types.ts` 渠道/配置/状态判别联合,`bots.json` 存储(0600、串行写),supervisor 生命周期(启动拉起、配置变更重启、有上限退避、销毁)(covers: S2.3, S2.4)
+- [x] T2: 出站适配器 — telegram、discord、slack、feishu/lark、dingtalk、qq,纯协议函数 + 薄 IO(covers: S2.3)
+- [x] T3: 回调适配器 — wechat、wecom、whatsapp:签名/加密纯函数、webserver 回调路由、发送 API(covers: S2.3, S2.8)
+- [x] T4: 会话绑定、入站命令、带分块的回复 outbox、审批与提问转发(covers: S2.5, S2.6, S2.7)
+- [x] T5: 鉴权路由(list/config/start/stop/test),按渠道严格校验与脱敏读取(covers: S2.4, S2.9)
+- [x] T6: 客户端重设计 — 720px 设置页,内联 `qrcode-generator` 的二维码面板,九张渠道卡片(表单与动作),推送与 PWA 面板重排,响应式收拢,焦点圈,zh/en 词典(covers: S2.2, S2.3, S2.10)
+- [x] T7: 测试 — 存储持久化与权限,配置合并与区域保持,supervisor 状态迁移,每个适配器的协议逻辑(帧、签名、AES 往返、分块),问答转发的 resolve 与超时,入站命令判定(covers: S2.3–S2.7)
+- [x] T8: 验证 — tsc、vitest、tsdown 双面构建,真实 web profile 启动并含 bots 路由,手机视口浏览器检查重设计页(covers: S4)
+- [x] T9: 文档 — README en+zh,spec en+zh 配对并记录哈希,changelog 条目(covers: S2.10)
 
 ## [S4] Acceptance
 

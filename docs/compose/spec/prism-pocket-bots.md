@@ -1,9 +1,9 @@
 ---
 feature: prism-pocket-bots
-status: designed
+status: delivered
 updated: 2026-11-03
 branch: feat/pocket-bots
-commits: ba06d2162f..TBD
+commits: ba06d2162f..9b11180d41
 ---
 
 # Prism Pocket Bots
@@ -11,6 +11,14 @@ commits: ba06d2162f..TBD
 English | [中文](prism-pocket-bots.zh.md)
 
 ## Report
+
+**What was built** — `plugins/prism-pocket` gains nine chat-bot channels and a redesigned Pocket page. The node half (`src/bots/`) carries one adapter per channel — Telegram (long polling), Discord (Gateway v10), Slack (Socket Mode), 飞书/Lark and DingTalk and QQ (stream WebSocket connections whose one-time URLs re-mint per dial), and 微信/企业微信/WhatsApp (platform-signed callback routes on the webserver, AES/HMAC verified, handshakes answered, 404 without credentials). A supervisor owns every connection with per-channel serialized starts and live status; a bot drives one bound session (`/new`, `/stop`, `/help` commands, first-message auto-binding); assistant replies return to the chat chunked to each platform's limit; pending approvals and user questions reach the chat as numbered choices, resolved by reply, delegating to the app's own surfaces after 120s. Credentials persist in `pocket/bots.json` (0600), merge server-side on save, and never leave a route response. The browser half renders the page on the app's settings material: a locally generated QR of the tokenized phone link, nine channel cards with credential forms that reflect stored values, and the push and PWA panels — all copy through the locale dictionaries. The page stylesheet now stays injected on every surface (previously it rode the mobile-adapter gate and desktop rendered unstyled); only the adaptation sheet remains active-gated. One build-time root devDependency, `qrcode-generator`, is inlined into the client bundle.
+
+**Verification** — `tsc -p tsconfig.json --noEmit` clean; `vitest run` 97/97 (store persistence and permissions, config merge and region keeping, supervisor transitions, per-channel protocol logic — frames, signatures, WeChat-family AES round-trip, chunking — ask-relay resolution and timeout, inbound commands); both tsdown faces build with qrcode-generator inlined; a live web-profile smoke exercised the routes (`GET /api/pocket/bots` listing nine masked channels, config/start/stop cycles, 400 on an unknown channel, callback 404-without-credentials), served the combo bundle carrying the QR and channel UI, and phone- and desktop-viewport screenshots were inspected; `verify-translation-pairing`, `verify-md-links` (2105 files), and `verify-md-wrap` pass for the changed docs. Review round 1 returned REQUEST_CHANGES (four critical: broken partial-save round trip, silent Feishu region reset, unguarded relay sends against the fail-loud policy, one-time WS URLs reused on reconnect); all four were fixed and a fresh reviewer returned COMMENT (mergeable) with two one-line follow-ups — Telegram's `is_bot` field name and QQ's reconnect token refresh — both landed in 9b11180d41.
+
+**Journey log** — the "ugly page" had a structural cause: the entire stylesheet rode the mobile-adapter's active gate, so the desktop settings page was unstyled HTML; split sheets by lifetime, not by plugin. Feishu's long connection speaks protobuf (`pbbp2.Frame`), not JSON — the docs pages are JS-rendered, but the official SDK tarballs on the npm/PyPI registries yield the exact protocol; registry tarballs are the reliable protocol source for CN platforms here. The harness's fail-loud `unhandledRejection` policy means every `void promise()` inside an observer path needs a catching wrapper at the injection site — the ask relay's prompt sends would otherwise have exited the process on a routine Telegram blip. Masked credential views make server-side merges the only correct partial-save shape: the client cannot resend what it never receives, so "keep empty to keep the stored value" must be honored by the route.
+
+## [S1] Problem
 
 ## [S1] Problem
 
@@ -27,7 +35,7 @@ The feature extends the existing `@prism/prism-pocket` out-of-tree plugin; no ne
 The section follows the app's settings pages: one 720px column, a 16/24 section title with a tertiary intro, settings-material cards (`--dsw-alias-settings-card-*` tokens), 13/20 rows, weights ≤ 500, and visible `:focus-visible` rings. Four panels:
 
 1. **手机访问** — a QR card (left) beside the verdict strip, the authenticated link with its copy action, and the missing-steps list (right). The QR encodes the tokenized phone URL and is generated locally; the token never leaves the page except inside the QR itself and the copy action. The layout collapses to one column under 560px.
-2. **Bot 渠道** — nine channel cards in a responsive grid. Each card carries a brand-colored logo chip, the channel name with its region tag where one exists (飞书/Lark), a status dot with status text, an expandable credential form, and start/stop/test actions. Callback channels additionally show their public callback URL and the reachability hint.
+2. **Bot channels** — nine channel cards in one vertical list. Each card carries a brand-colored logo chip, the channel name with its region tag where one exists (飞书/Lark), a status dot with status text, an expandable credential form, and start/stop/test actions. The form reflects the stored non-secret values (the 飞书/Lark region among them); a save that leaves a stored secret blank keeps the stored value, merged server-side. Callback channels additionally show their public callback URL and the reachability hint.
 3. **通知** — the existing push panel, restyled onto the same card material.
 4. **安装到主屏幕** — the existing PWA panel, restyled.
 
@@ -73,7 +81,7 @@ The three callback channels register unauthenticated webserver routes (`/pocket/
 
 ### S2.9 Routes
 
-On the authenticated `/api` channel: `GET /api/pocket/bots`, `PUT /api/pocket/bots/:channel` (config + enabled), `POST /api/pocket/bots/:channel/start|stop|test`. `test` performs the channel's cheapest credential probe (`getMe`, `/gateway/bot`, `apps.connections.open`, tenant token, stream-ticket open, gateway ticket, callback echo when applicable) and reports the outcome without sending a chat message. Misconfiguration fails loud: starting a channel with an incomplete config is a 400, not a silent skip.
+On the authenticated `/api` channel one endpoint carries the list and every action: `GET /api/pocket/bots`, and `POST /api/pocket/bots` with `{ channel, action: 'config' | 'start' | 'stop' | 'test' }` (the config action carries the posted fields and whether to enable). A `config` post merges over the stored credentials — omitted or blank fields keep the stored values — and a save to a running channel restarts it so the new credentials take effect. `test` performs the channel's cheapest credential probe (`getMe`, `/gateway/bot`, `apps.connections.open`, tenant token, stream-ticket open, gateway ticket) and reports the outcome without sending a chat message; a stopped channel starts once to probe and stops again, leaving the switch untouched. Misconfiguration fails loud: an unknown channel or action, and any config that fails strict validation, answer 400 with the offending field named.
 
 ### S2.10 Locale ownership
 
@@ -86,15 +94,15 @@ All page copy routes through `ctx.locale` with zh/en dictionaries; the nine chan
 
 ## Tasks
 
-- [ ] T1: bots foundation — `types.ts` channel/config/status discriminated unions, `bots.json` store (0600, serialized writes), supervisor lifecycle (boot start, config-change restart, capped backoff, disposal) (covers: S2.3, S2.4)
-- [ ] T2: outbound adapters — telegram, discord, slack, feishu/lark, dingtalk, qq with pure protocol functions and thin IO (covers: S2.3)
-- [ ] T3: callback adapters — wechat, wecom, whatsapp: signature/encrypt pure functions, webserver callback routes, send APIs (covers: S2.3, S2.8)
-- [ ] T4: session binding, inbound commands, reply outbox with chunking, ask relay for approvals and questions (covers: S2.5, S2.6, S2.7)
-- [ ] T5: authenticated routes (list/config/start/stop/test) with strict per-channel validation and masked reads (covers: S2.4, S2.9)
-- [ ] T6: client redesign — 720px settings page, QR panel via inlined `qrcode-generator`, nine channel cards with forms and actions, push and PWA panels restyled, responsive collapse, focus rings, zh/en dictionaries (covers: S2.2, S2.3, S2.10)
-- [ ] T7: tests — store persistence and permissions, supervisor transitions, every adapter's protocol logic (frames, signatures, AES round-trip, chunking), ask relay resolution and timeout, binding commands, client pure logic (covers: S2.3–S2.7)
-- [ ] T8: verification — tsc, vitest, tsdown both faces, live web-profile boot with the bots routes and the redesigned page in a phone-viewport browser (covers: S4)
-- [ ] T9: docs — README en+zh, spec en+zh pairing with recorded hashes, changelog note (covers: S2.10)
+- [x] T1: bots foundation — `types.ts` channel/config/status discriminated unions, `bots.json` store (0600, serialized writes), supervisor lifecycle (boot start, config-change restart, capped backoff, disposal) (covers: S2.3, S2.4)
+- [x] T2: outbound adapters — telegram, discord, slack, feishu/lark, dingtalk, qq with pure protocol functions and thin IO (covers: S2.3)
+- [x] T3: callback adapters — wechat, wecom, whatsapp: signature/encrypt pure functions, webserver callback routes, send APIs (covers: S2.3, S2.8)
+- [x] T4: session binding, inbound commands, reply outbox with chunking, ask relay for approvals and questions (covers: S2.5, S2.6, S2.7)
+- [x] T5: authenticated routes (list/config/start/stop/test) with strict per-channel validation and masked reads (covers: S2.4, S2.9)
+- [x] T6: client redesign — 720px settings page, QR panel via inlined `qrcode-generator`, nine channel cards with forms and actions, push and PWA panels restyled, responsive collapse, focus rings, zh/en dictionaries (covers: S2.2, S2.3, S2.10)
+- [x] T7: tests — store persistence and permissions, config merge and region keeping, supervisor transitions, every adapter's protocol logic (frames, signatures, AES round-trip, chunking), ask relay resolution and timeout, inbound command decisions (covers: S2.3–S2.7)
+- [x] T8: verification — tsc, vitest, tsdown both faces, live web-profile boot with the bots routes and the redesigned page in a phone-viewport browser (covers: S4)
+- [x] T9: docs — README en+zh, spec en+zh pairing with recorded hashes, changelog note (covers: S2.10)
 
 ## [S4] Acceptance
 
