@@ -20,8 +20,6 @@ English | [中文](prism-pocket-bots.zh.md)
 
 ## [S1] Problem
 
-## [S1] Problem
-
 The Pocket settings section answers "can a phone open this" with a copyable link, but the page is spartan: three text panels, no QR code, and no way to reach the workspace from a chat app. Upstream's `@xmanrui/dsh-im` plugin (dsh-plugin.org) shows the mature shape: a remote-control surface with a QR code for the phone link and bot channels for WeChat, 飞书, 钉钉, 企业微信, QQ, Slack, Telegram, Discord, and WhatsApp, each connecting a chat bot to the workspace with streaming replies and ask-relay. Prism Pocket should look and behave at that level while staying fork-native, dependency-free at runtime, and honest about which channels can work without public callback infrastructure.
 
 ## [S2] Design
