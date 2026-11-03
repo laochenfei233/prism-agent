@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server — `node:https` once `tls` names a certificate and key — where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.
+Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server — `node:https` once `tls` names a certificate and key — where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. Request headers are bounded at a fixed 64 KiB, above Node's 16 KiB default, so a browser cookie store that kept one session cookie per past loopback port is served instead of rejected with 431 in the parser. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.
 
 ## Table of Contents
 

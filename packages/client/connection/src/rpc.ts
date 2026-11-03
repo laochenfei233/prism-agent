@@ -111,7 +111,8 @@ export interface ConnectionIndexRequest extends ConnectionTrustRequest {
 
 /** Root/index response operations owned by the browser-token exchange. */
 export interface ConnectionIndexResponse {
-  writeHead(status: number, headers?: Readonly<Record<string, string>>): unknown
+  /** `string[]` rather than `readonly string[]` so node's ServerResponse satisfies this interface. */
+  writeHead(status: number, headers?: Readonly<Record<string, string | string[] | undefined>>): unknown
   end(body?: string): unknown
 }
 

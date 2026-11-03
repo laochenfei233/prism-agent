@@ -160,6 +160,11 @@ async function request(
   return { status: response.status, body: (await response.text()).slice(0, 80), headers: response.headers }
 }
 
+/** A Cookie header over Node's 16 KiB default, as a browser store keeps after one session cookie per past loopback port. */
+function oversizedCookieHeader(): string {
+  return Array.from({ length: 80 }, (_, at) => `dsh-auth-stale-${String(at)}=${'x'.repeat(220)}`).join('; ')
+}
+
 /** Open one raw upgrade request and return after the handler writes its response. */
 async function upgrade(listenerPort: number | undefined, path: string): Promise<ReturnType<typeof connect>> {
   const port = boundPort(listenerPort)
@@ -188,6 +193,7 @@ function tlsRequest(
   path: string,
   ca?: string,
   agent?: Agent,
+  headers?: Record<string, string>,
 ): Promise<{ status: number; body: string }> {
   const { promise, resolve, reject } = Promise.withResolvers<{ status: number; body: string }>()
   const request = httpsRequest({
@@ -196,6 +202,7 @@ function tlsRequest(
     path,
     ...(ca === undefined ? {} : { ca }),
     ...(agent === undefined ? {} : { agent }),
+    ...(headers === undefined ? {} : { headers }),
   }, (response) => {
     let body = ''
     response.setEncoding('utf8')
@@ -604,6 +611,16 @@ describe('real Loader composition', () => {
     await expect(tlsRequest(server.port, '/tls', fixture.ca)).rejects.toThrow()
   })
 
+  it('serves oversized Cookie headers over TLS too', { timeout: 60_000 }, async () => {
+    const fixture = await tlsFixture()
+    const loaded = await loadComposition(0, false, '127.0.0.1', { certFile: fixture.certFile, keyFile: fixture.keyFile })
+    const server = loaded.webServer
+    server.register({ kind: 'exact', path: '/big', handler: (_req, res) => { res.writeHead(200); res.end('BIG') } })
+    const cookie = oversizedCookieHeader()
+    expect(cookie.length).toBeGreaterThan(16 * 1024)
+    expect(await tlsRequest(server.port, '/big', fixture.ca, undefined, { cookie })).toEqual({ status: 200, body: 'BIG' })
+  })
+
   it('treats an explicit null tls as no TLS and keeps serving plain HTTP', { timeout: 60_000 }, async () => {
     // A user's `tls:` with no value reaches the service as null through the schema.
     const loaded = await loadComposition(0, false, '127.0.0.1', null)
@@ -613,6 +630,15 @@ describe('real Loader composition', () => {
     server.register({ kind: 'exact', path: '/plain', handler: (_req, res) => { res.writeHead(200); res.end('PLAIN') } })
     expect(await request(server.port, '/plain')).toMatchObject({ status: 200, body: 'PLAIN' })
     await expect(tlsRequest(server.port, '/plain')).rejects.toThrow()
+  })
+
+  it('serves plain HTTP requests whose Cookie header exceeds the Node default header bound', async () => {
+    const loaded = await loadComposition()
+    const server = loaded.webServer
+    server.register({ kind: 'exact', path: '/big', handler: (_req, res) => { res.writeHead(200); res.end('BIG') } })
+    const cookie = oversizedCookieHeader()
+    expect(cookie.length).toBeGreaterThan(16 * 1024)
+    expect(await request(server.port, '/big', { headers: { cookie } })).toMatchObject({ status: 200, body: 'BIG' })
   })
 
   it('rejects unusable TLS material at activation, before the listener binds', { timeout: 60_000 }, async () => {

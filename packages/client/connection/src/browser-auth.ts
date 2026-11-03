@@ -127,6 +127,18 @@ function cookieValue(headerValue: string, name: string): string | undefined {
   return undefined
 }
 
+/** Session-cookie names the request still carries for other authorities; minting expires them. */
+function staleCookieNames(rawCookie: string, keepName: string): string[] {
+  const stale = new Set<string>()
+  for (const segment of rawCookie.split(';')) {
+    const at = segment.indexOf('=')
+    if (at === -1) continue
+    const name = segment.slice(0, at).trim()
+    if (name !== keepName && name.startsWith(COOKIE_PREFIX)) stale.add(name)
+  }
+  return [...stale]
+}
+
 /** Serialize the fixed browser-session attributes; generated names and values are cookie-safe base64url. */
 function sessionCookie(
   name: string,
@@ -201,7 +213,9 @@ async function initializeSecret(credentials: CredentialProvider): Promise<Buffer
 /**
  * Process launch-token exchange and persistent signed-cookie verification.
  * Connection loads the credential provider's signing secret during activation
- * and retains it for synchronous request authentication.
+ * and retains it for synchronous request authentication. Minting expires the
+ * request's other session cookies, so a browser store stays at one cookie per
+ * authority even when the loopback port churns across launches.
  */
 export class BrowserAuth {
   private readonly launchToken: string
@@ -248,8 +262,9 @@ export class BrowserAuth {
   }
 
   /**
-   * Authenticate an index request. A valid root query token mints the cookie
-   * and redirects to the directory-relative clean `./`; a valid cookie lets
+   * Authenticate an index request. A valid root query token mints the cookie —
+   * expiring every other session cookie the request still carries — and
+   * redirects to the directory-relative clean `./`; a valid cookie lets
    * the caller serve the index; every other request receives the same minimal
    * 401 response.
    * @param req - incoming root or configured-index request.
@@ -280,9 +295,7 @@ export class BrowserAuth {
           'cache-control': 'no-store',
           'location': './',
           'referrer-policy': 'no-referrer',
-          'set-cookie': sessionCookie(
-            cookieName(authority), value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure,
-          ),
+          'set-cookie': this.sessionCookies(authority, value, expiresAt, secure, header(req.headers, 'cookie')),
         })
         res.end()
         return false
@@ -340,9 +353,7 @@ export class BrowserAuth {
       'cache-control': 'no-store',
       'location': './api/remote.mux',
       'referrer-policy': 'no-referrer',
-      'set-cookie': sessionCookie(
-        cookieName(authority), value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure,
-      ),
+      'set-cookie': this.sessionCookies(authority, value, expiresAt, secure, header(req.headers, 'cookie')),
     })
     res.end()
   }
@@ -366,6 +377,33 @@ export class BrowserAuth {
   authenticateApi(request: ConnectionTrustRequest, secure = false): PeerId | undefined {
     const payload = this.authenticate(request, secure)
     return payload?.version === 2 ? payload.id : undefined
+  }
+
+  /**
+   * Serialize the mint cookie plus one expired cookie per other session-cookie
+   * name the request still carries. Cookies ignore ports, so a browser store
+   * keeps one name per past loopback authority, and those stale cookies would
+   * eventually push every request past the listener's header bound.
+   * @param authority - the mint cookie's audience.
+   * @param value - signed cookie payload.
+   * @param expiresAt - absolute mint expiry timestamp.
+   * @param secure - whether the minted and expired cookies carry `Secure`.
+   * @param rawCookie - the request's Cookie header, when present.
+   * @returns the Set-Cookie values to write.
+   */
+  private sessionCookies(
+    authority: string,
+    value: string,
+    expiresAt: number,
+    secure: boolean,
+    rawCookie: string | undefined,
+  ): string[] {
+    const name = cookieName(authority)
+    return [
+      sessionCookie(name, value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure),
+      ...staleCookieNames(rawCookie ?? '', name)
+        .map(stale => sessionCookie(stale, '', 0, 0, secure)),
+    ]
   }
 
   private authenticate(request: ConnectionTrustRequest, secure: boolean): CookiePayload | undefined {

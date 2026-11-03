@@ -107,6 +107,14 @@ const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
+/**
+ * Fixed request-header bound, above Node's 16 KiB default: cookies ignore
+ * ports, so a browser store that accumulated one session cookie per past
+ * loopback port crosses the default, and a parser-level 431 would keep the
+ * launch-token exchange that prunes those cookies from ever running.
+ */
+const MAX_REQUEST_HEADER_BYTES = 64 * 1024
+
 interface ResolvedConfig extends Config {
   compression: 'none' | 'gzip'
   compressionLevel: number
@@ -459,7 +467,7 @@ export class WebServer extends Service {
     // Disposal waits for in-flight acquisition and closes any listener it produces.
     await this.ctx.effect(async () => {
       if (tls === undefined) {
-        this.server = createServer(listener)
+        this.server = createServer({ maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
       } else {
         const certFile = resolve(tls.certFile)
         const keyFile = resolve(tls.keyFile)
@@ -468,7 +476,7 @@ export class WebServer extends Service {
           readTlsFile('keyFile', keyFile),
         ])
         try {
-          this.server = createSecureServer({ cert, key }, listener)
+          this.server = createSecureServer({ cert, key, maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
         } catch (error) {
           throw new Error(`webserver: tls.certFile ${certFile} and tls.keyFile ${keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
         }

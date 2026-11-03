@@ -235,4 +235,26 @@ describe('real Loader composition', () => {
     expect((await request(port, '/no/such/route')).status).toBe(404)
     expect(() => server.registerFallback(() => {})).not.toThrow()
   })
+
+  it('heals a cookie store bloated by the cookies of past loopback ports', { timeout: 60_000 }, async () => {
+    const loaded = await loadComposition()
+    const server = loaded.webServer
+    const port = server.port
+    const launchUrl = loaded.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`)
+    // Past launches on other loopback ports left same-domain session cookies
+    // the browser still sends; the header crosses Node's default bound.
+    const stale = Array.from({ length: 80 }, (_, at) => `dsh-auth-stale-${String(at)}=${'x'.repeat(220)}`).join('; ')
+    expect(stale.length).toBeGreaterThan(16 * 1024)
+    const exchange = await fetch(`http://127.0.0.1:${String(port)}${new URL(launchUrl).search}`, {
+      redirect: 'manual',
+      headers: { cookie: stale },
+    })
+    expect(exchange.status).toBe(303)
+    const cookies = exchange.headers.getSetCookie()
+    expect(cookies).toHaveLength(81)
+    expect(cookies.filter(cookie => cookie.includes('Max-Age=0'))).toHaveLength(80)
+    // With only the mint cookie left, the next desktop request authenticates.
+    const mint = cookies.find(cookie => !cookie.includes('Max-Age=0'))!.split(';', 1)[0]!
+    expect((await request(port, '/', { headers: { cookie: mint } })).status).toBe(200)
+  })
 })

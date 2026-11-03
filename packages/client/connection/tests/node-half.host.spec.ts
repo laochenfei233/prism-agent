@@ -72,13 +72,13 @@ function fakeRawPost(headers: Record<string, string>, url: string, body: string)
 /** Response recorder compatible with both the fence's short-circuit and the bridge. */
 function fakeResponse(): {
   response: ServerResponse
-  state: { status?: number; headers?: Record<string, string>; body?: unknown }
+  state: { status?: number; headers?: Record<string, string | readonly string[]>; body?: unknown }
 } {
-  const state: { status?: number; headers?: Record<string, string>; body?: unknown } = {}
+  const state: { status?: number; headers?: Record<string, string | readonly string[]>; body?: unknown } = {}
   const chunks: Buffer[] = []
   const response = Object.assign(new EventEmitter(), {
     writableEnded: false,
-    writeHead(value: number, headers?: Record<string, string>) {
+    writeHead(value: number, headers?: Record<string, string | readonly string[]>) {
       state.status = value
       if (headers !== undefined) state.headers = headers
       return this
@@ -131,9 +131,11 @@ function browserCookie(connection: HostConnectionHandle, authority: string): str
     fakeRequest({ host: authority }, `${url.pathname}${url.search}`),
     exchanged.response,
   )
+  // The mint cookie leads the array; prune cookies may follow.
   const setCookie = exchanged.state.headers?.['set-cookie']
-  if (setCookie === undefined) throw new Error('browser token exchange did not set a cookie')
-  return setCookie.split(';', 1)[0]!
+  const mint = Array.isArray(setCookie) ? setCookie[0] : setCookie
+  if (mint === undefined) throw new Error('browser token exchange did not set a cookie')
+  return mint.split(';', 1)[0]!
 }
 
 describe('connection node half', () => {
@@ -256,11 +258,12 @@ describe('connection node half', () => {
           exchanged.response,
         )
         const setCookie = exchanged.state.headers?.['set-cookie']
-        expect(setCookie?.endsWith('; Secure'), protocol).toBe(secure)
-        if (setCookie === undefined) throw new Error('browser token exchange did not set a cookie')
+        const mint = Array.isArray(setCookie) ? setCookie[0] : setCookie
+        expect(mint?.endsWith('; Secure'), protocol).toBe(secure)
+        if (mint === undefined) throw new Error('browser token exchange did not set a cookie')
         expect(connection.requestRejection(fakeRequest({
           host: '127.0.0.1:3080',
-          cookie: setCookie.split(';', 1)[0]!,
+          cookie: mint.split(';', 1)[0]!,
         }))).toBeUndefined()
       } finally {
         await dispose()
@@ -695,7 +698,10 @@ describe('operator-scoped connect', () => {
     await host.routes.find(route => route.path === '/connect')!.handler(
       fakeRequest({ host: 'localhost', ...headers }, `/connect${token}${query}`), response.response,
     )
-    return { cookie: response.state.headers?.['set-cookie']?.split(';', 1)[0] ?? '', state: response.state }
+    // The mint cookie leads the array; prune cookies may follow.
+    const setCookie = response.state.headers?.['set-cookie']
+    const mint = Array.isArray(setCookie) ? setCookie[0] : setCookie
+    return { cookie: mint?.split(';', 1)[0] ?? '', state: response.state }
   }
 
   function admitted(connection: HostConnectionHandle, cookie: string): PeerScope {
