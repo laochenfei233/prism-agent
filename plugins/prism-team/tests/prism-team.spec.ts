@@ -178,6 +178,11 @@ describe('write scope matching', () => {
     expect(PrismTeam.withinScopes(ROOT, 'docs/a.md', ['src'])).toBe(false)
     expect(PrismTeam.withinScopes(ROOT, '../../outside.ts', ['src'])).toBe(false)
   })
+
+  it('compares a path inside a teammate worktree against the same scopes', () => {
+    expect(PrismTeam.withinScopes(ROOT, '.worktrees/team-01234567-one/src/a.ts', ['src'])).toBe(true)
+    expect(PrismTeam.withinScopes(ROOT, '.worktrees/team-01234567-one/docs/a.md', ['src'])).toBe(false)
+  })
 })
 
 describe('report ledger', () => {

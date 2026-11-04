@@ -179,6 +179,18 @@ function relativeTo(root: string, target: string): string | undefined {
 }
 
 /**
+ * Drop a teammate worktree prefix, so a path inside `.worktrees/<checkout>/`
+ * compares against the same scopes as the file in the shared checkout.
+ *
+ * @param path - a workspace-relative path.
+ * @returns the path with any `.worktrees/<checkout>/` prefix removed.
+ */
+function withoutWorktree(path: string): string {
+  const parts = path.split('/')
+  return parts[0] === '.worktrees' && parts.length > 2 ? parts.slice(2).join('/') : path
+}
+
+/**
  * Whether one path is covered by any of a task's write scopes.
  *
  * @param root - the session working directory the scopes are relative to.
@@ -189,9 +201,10 @@ function relativeTo(root: string, target: string): string | undefined {
 export function withinScopes(root: string, target: string, scopes: readonly string[]): boolean {
   const path = relativeTo(root, target)
   if (path === undefined) return false
+  const normalized = withoutWorktree(path)
   return scopes.some((scope) => {
     const prefix = scope.replace(/\/+$/u, '')
-    return path === prefix || path.startsWith(`${prefix}/`)
+    return normalized === prefix || normalized.startsWith(`${prefix}/`)
   })
 }
 

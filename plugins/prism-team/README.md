@@ -58,6 +58,8 @@ A teammate that writes through a configured write tool is checked against the `w
 
 The task board calls write scopes advisory, and they stay advisory for everything the bundle does not intercept: bash, formatters, code generators, and any direct external writer bypass this check. The check closes the write-tool path only.
 
+A path inside a teammate's own worktree (`.worktrees/<checkout>/…`) compares against the same scopes as the file in the shared checkout, so working in the worktree does not turn every write into an approval.
+
 ## The worktree
 
 On a teammate's creation the bundle prepares `<Lead cwd>/.worktrees/team-<team>-<name>` on branch `team/<team>/<name>` and writes `*` into `.worktrees/.gitignore` when the checkout does not ignore that directory yet. Failure to prepare is reported in the member's section and never blocks the member — the Team service has already created it.
