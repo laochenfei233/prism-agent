@@ -1,8 +1,9 @@
 ---
 feature: pocket-remote-providers
-status: in-progress
+status: delivered
 updated: 2026-11-04
 branch: feat/pocket-remote-providers
+commits: 50ff54bd96..d8b9f2ff1f
 ---
 
 # Pocket remote transports
@@ -11,7 +12,11 @@ English | [中文](pocket-remote-providers.zh.md)
 
 ## Report
 
-Delivered at finalize; see the sections below for the design under implementation.
+**What was built** — The Pocket phone panel now offers two transports behind one selector: Tailscale (unchanged probe, MagicDNS target, `tailscale serve` step, ts.net trust patch) and a stable tunnel, a user-stored `https` hostname served by `cloudflared` or any reverse proxy. The selection persists host-side in the DSH home's `pocket/remote.json`; `POST /api/pocket/remote` validates the body (https, no credentials, no fragment, no surrounding whitespace), writes the file atomically with mode 0600, and answers with a fresh status body, so the page never reconstructs state the host owns. `GET` reports both CLI probes, the resolved tunnel URL, and the phone address for the selected transport; the tunnel address shares the Tailscale path's readiness measurement, so it counts as ready only after it answers the probe without a fence refusal. The page prints the `cloudflared tunnel run <name>` and `--url` steps, the probe result with its version, the trust patch, and the `--trusted-host` flag for the stored hostname.
+
+**Verification** — In the worktree: `vitest run` in `plugins/prism-pocket` — 13 files, 115 tests, 0 failures (new: `tests/remote-prefs.spec.ts` 7, `tests/tunnel.spec.ts` 5, `tests/commands.spec.ts` 20 including the tunnel command set and the per-transport access matrix); `tsc --noEmit` over the plugin sources against the main checkout's built declarations — clean; `tsdown` built both faces; `oxlint` on the plugin sources and tests — 0 warnings, 0 errors; `verify-md-links` (2108 files) and `verify-client-ui-i18n` (1117 files) pass, and `verify-translation-pairing` passes for the changed spec and README pairs. Repo-wide `verify-md-wrap`, `verify-export-jsdoc`, and `verify-translation-pairing` fail only on pre-existing master content (`docs/compose/specs/*`, `packages/transfer`, `packages/client/ui-theme`, `packages/host/webserver`). Review round 1 returned no critical findings and five fixable gaps — the tunnel steps and `--trusted-host` flag were never rendered, a whitespace-padded stored URL skipped the readiness probe, the save button posted an empty value, the failed-switch note was hidden, and the input lacked a label — all fixed in `d8b9f2ff1f` and re-verified.
+
+**Journey log** — The phone client is a browser, so a real P2P transport would need a service worker request proxy or native clients with a relay; a stable HTTPS hostname over the existing loopback listener is the smallest change that actually reaches the phone, and the fence's exact-authority rule rules out random quick-tunnel hostnames. The plugin still starts no daemon, so the page explains `cloudflared` rather than running it. Tooling: in a linked worktree, `pnpm install` lifecycle scripts and vite's Windows realpath probe both spawn children with piped stdio, which this sandbox denies; tests ran through the `.pnpm` vitest entry with escalated access, and pointing the worktree's `node_modules` at the main checkout let `pnpm exec` rewrite the main checkout's workspace links — repaired with a reinstall there, and pnpm must run only in the checkout that owns `node_modules`.
 
 ## [S1] Problem
 
@@ -27,7 +32,7 @@ The selection names which transport the page explains and which address the phon
 
 ### S2.2 The tunnel transport is a stable HTTPS hostname
 
-The route is the stored `tunnelUrl`, falling back to the `--public-url` value the webserver surface already carries. It must be an `https:` URL with no credentials; a path is preserved (a prefix-stripping proxy is legitimate), a fragment is rejected. The plugin never starts, stops, or configures the tunnel process: like `tailscale serve`, the tunnel is the user's daemon, and the plugin only explains the step and the fence entry it needs.
+The route is the stored `tunnelUrl`, falling back to the `--public-url` value the webserver surface already carries. It must be an `https:` URL with no credentials, no fragment, and no surrounding whitespace; a path is preserved (a prefix-stripping proxy is legitimate). The plugin never starts, stops, or configures the tunnel process: like `tailscale serve`, the tunnel is the user's daemon, and the plugin only explains the step and the fence entry it needs.
 
 ### S2.3 cloudflared detection
 
@@ -43,7 +48,7 @@ The node half probes `cloudflared --version` on PATH (5 s timeout, the same fail
 
 ### S2.6 Commands
 
-For `tailscale` the commands are unchanged. For `tunnel` the page prints: `cloudflared tunnel run <name>` (a named tunnel keeps the hostname stable), `cloudflared tunnel --url http://127.0.0.1:<port>` (a first-run test whose hostname is random and therefore not fenced), the trust patch for the stored hostname, and the `--trusted-host <host>` flag for a CLI-started server. A hostname that is not yet stored hides the host-dependent steps.
+For `tailscale` the commands are unchanged. For `tunnel` the page prints: `cloudflared tunnel run <name>` (a named tunnel keeps the hostname stable), `cloudflared tunnel --url http://127.0.0.1:<port>` (a first-run test whose hostname is random and therefore not fenced), the trust patch for the stored hostname, and the `--trusted-host <host>` flag for a CLI-started server. The two run steps show in every blocked tunnel state, including before a hostname is stored; only the host-dependent steps (the patch and the flag) wait for one.
 
 ### S2.7 Settings surface
 
@@ -55,21 +60,21 @@ The plugin validates the stored URL at the trust boundary, never fetches anythin
 
 ### S2.9 Tests
 
-Unit tests cover URL validation (scheme, credentials, fragment, path), the per-transport target and blocker matrix, the tunnel command set, the cloudflared version probe parsing, and the prefs store's default/corrupt-file behavior. The settings page's pure logic stays in `commands.ts` and the new modules, so no browser harness is needed.
+Unit tests cover URL validation (scheme, credentials, fragment, path, surrounding whitespace), the per-transport target and blocker matrix, the tunnel command set, the cloudflared version probe parsing, and the prefs store's default/corrupt-file behavior. The settings page's pure logic stays in `commands.ts` and the new modules, so no browser harness is needed.
 
 ## [S3] Scope
 
 - In scope: `pocket/remote.json` prefs store, `POST /api/pocket/remote`, cloudflared probe, per-transport phone access and commands, the status wire fields, the settings selector and hostname field, zh/en copy, README section, unit tests, changelog fragment.
-- Out of scope: starting or supervising `cloudflared`, `tailscale serve`, or `tailscale funnel`; reading `~/.cloudflared`; wildcard or dynamic trust; WebRTC or a bespoke relay; a fourth transport (ngrok, frp) beyond the generic stable-hostname arm.
+- Out of scope: starting or supervising `cloudflared`, `tailscale serve`, or `tailscale funnel`; reading `~/.cloudflared`; wildcard or dynamic trust; WebRTC or a bespoke relay; a fourth transport (ngrok, frp) beyond the generic stable-hostname arm; clearing a stored hostname from the page.
 
 ## Tasks
 
-- [ ] T1: prefs store + validation + `POST` route (covers: S2.1, S2.2, S2.5)
-- [ ] T2: cloudflared probe (covers: S2.3)
-- [ ] T3: per-transport access, blockers, and commands (covers: S2.4, S2.6, S2.8)
-- [ ] T4: status wire composition and probing (covers: S2.5)
-- [ ] T5: settings selector, tunnel field, steps, zh/en copy (covers: S2.7)
-- [ ] T6: tests, README, changelog (covers: S2.9)
+- [x] T1: prefs store + validation + `POST` route (covers: S2.1, S2.2, S2.5)
+- [x] T2: cloudflared probe (covers: S2.3)
+- [x] T3: per-transport access, blockers, and commands (covers: S2.4, S2.6, S2.8)
+- [x] T4: status wire composition and probing (covers: S2.5)
+- [x] T5: settings selector, tunnel field, steps, zh/en copy (covers: S2.7)
+- [x] T6: tests, README, changelog (covers: S2.9)
 
 ## [S4] Acceptance
 
