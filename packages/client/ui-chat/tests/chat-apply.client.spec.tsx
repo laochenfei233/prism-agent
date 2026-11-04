@@ -25,6 +25,7 @@ import type {
   ChatFlowInjected, ChatNodeInjected, ChatSnapshot, TranscriptViewRowInjected, UseChatNodeTurnData, UseDisclosure,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { QuotaNoticeInjected } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { UsagePriceEditorInjected } from '../src/client/contract/usage.ts'
 import type { PerformanceUsageRowInjected } from '../src/client/settings/PerformanceUsageRow.tsx'
 import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../src/chat-settings.ts'
 import { ActivityPill, UsagePill } from '../src/client/chat/StatsPills.tsx'
@@ -189,6 +190,29 @@ describe('Chat apply wiring', () => {
     expect(winners()).toEqual({ activity: PluginActivity, usage: UsagePill })
     dispose()
     expect(winners()).toEqual({ activity: ActivityPill, usage: UsagePill })
+  })
+
+  it('shares one price store between the header cost reading and the completed-Turn row, and drops both with Chat', async () => {
+    const b = await bench()
+    onTestFinished(() => { localStorage.clear() })
+    const headerIds = (): (string | undefined)[] => b.runtime.slots
+      .entries('conversation.session.header.actions').map(entry => entry.options.id)
+    const header = b.runtime.slots.entries('conversation.session.header.actions')
+      .find(entry => entry.options.id === 'usage-cost')!
+    const tail = b.runtime.slots.entries('conversation.chat.node')
+      .find(entry => entry.options.key === 'turn-tail')!
+    const face = (header.inject as unknown as () => UsagePriceEditorInjected)()
+    const tailFace = (tail.inject as unknown as () => { hooks: { unitPrices: { getSnapshot: () => unknown } } })()
+    expect(face.hooks.unitPrices).toBe(tailFace.hooks.unitPrices)
+    expect(face.hooks.unitPrices.getSnapshot()).toEqual({})
+
+    face.setUnitPrice('deepseek-flash', { miss: 1, hit: 0.5, output: 2 })
+    expect(face.hooks.unitPrices.getSnapshot()).toEqual({ 'deepseek-flash': { miss: 1, hit: 0.5, output: 2 } })
+
+    expect(headerIds()).toContain('usage-cost')
+    await b.chat.dispose()
+    expect(headerIds()).not.toContain('usage-cost')
+    expect(b.runtime.slots.entries('conversation.chat.node')).toHaveLength(0)
   })
 
   it.each([

@@ -43,6 +43,13 @@ describe('stored price parsing', () => {
     expect(parseUnitPriceOverrides('[]')).toEqual({})
     expect(parseUnitPriceOverrides('42')).toEqual({})
   })
+
+  it('keeps a stored __proto__ key as data instead of rewriting the map prototype', () => {
+    const parsed = parseUnitPriceOverrides('{"__proto__":{"miss":1,"hit":0.1,"output":2},"ok":{"miss":1,"hit":0.1,"output":2}}')
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype)
+    expect(Object.hasOwn(parsed, '__proto__')).toBe(true)
+    expect(parsed.ok).toEqual(PRICE)
+  })
 })
 
 describe('price policy', () => {

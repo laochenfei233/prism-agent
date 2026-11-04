@@ -80,11 +80,11 @@ Assistant 尝试结束且没有可见消息时，Chat 隐藏已发布的 Node，
 <a id="cost-display"></a>
 ## 费用展示
 
-一个 `conversation.session.header.actions` 条目（`usage-cost`，order 30）在会话头部与其他操作并列显示本次会话的预计费用，并打开费用仪表盘。只有会话已有计费用量、且当前模型有单价时该胶囊才渲染；它随 `tokenUsage` 投影的增长重新渲染，因此进行中的轮次费用会实时累加。仪表盘列出每个计费 token 桶、当前计费档、内置费率表以及自定义单价的编辑区。
+一个 `conversation.session.header.actions` 条目（`usage-cost`，order 30）在会话头部与其他操作并列显示本次会话的预计费用，并打开费用仪表盘。只要会话已有计费用量，该胶囊就渲染；它随 `tokenUsage` 投影的增长重新渲染，因此进行中的轮次费用会实时累加。路由没有单价时胶囊显示「未收录单价」而不是隐藏，仪表盘随即提供编辑区供填写。仪表盘列出每个计费 token 桶、当前计费档、带高峰倍数的内置费率表以及自定义单价的编辑区。
 
-单价为 DeepSeek 官方 USD／百万 token 价格（`https://api-docs.deepseek.com/quick_start/pricing`）：`deepseek-flash` 未命中 0.15、命中 0.003、输出 0.6；`deepseek-v4-pro` 0.66、0.022、1.98。高峰时段按上表两倍计价；高峰为 UTC 周一至周五的 01:00–04:00 与 06:00–10:00，其余时段（含周六、周日全天）为低谷。缓存写入 token 按未命中价计费，因为服务方没有单独的写入价格。费率表、档位规则与算术由 `usage-pricing.ts` 负责。
+单价为 DeepSeek 官方 USD／百万 token 价格（`https://api-docs.deepseek.com/quick_start/pricing`）：`deepseek-flash` 未命中 0.15、命中 0.003、输出 0.6；`deepseek-v4-pro` 0.66、0.022、1.98。高峰时段按上表两倍计价；高峰为 UTC 周一至周五的 01:00–04:00 与 06:00–10:00，其余时段（含周六、周日全天）为低谷。缓存写入 token 按未命中价计费，因为服务方没有单独的写入价格。费率表、档位规则与算术由 `usage-pricing.ts` 负责；原型成员名不会被当作单价，因此 `toString` 这类模型 id 不会解析出函数。
 
-每轮用量行按该轮唯一记录的路由和轮次结束时刻所处的档位计价；路由不止一个、或模型没有单价时保留纯 token 展示。自定义单价替换某个模型的内置价，保存在浏览器存储 `dsh.usage-billing.prices.v1`；读取时会丢弃格式错误的条目，存储写入失败时已生效的值仍在本页有效。仪表盘的编辑区只通过注册注入的 `setUnitPrice` 写入。
+每轮用量行按该轮唯一记录的路由和轮次结束时刻所处的档位计价；路由不止一个、或模型没有单价时保留纯 token 展示。自定义单价替换某个模型的内置价，保存在浏览器存储 `dsh.usage-billing.prices.v1`；读取时会丢弃格式错误的条目，存储中的 `__proto__` 键保持惰性，存储写入失败时已生效的值仍在本页有效。仪表盘的编辑区只通过注册注入的 `setUnitPrice` 写入。
 
 <a id="completed-turn-footer"></a>
 ## 已完成轮次的页脚

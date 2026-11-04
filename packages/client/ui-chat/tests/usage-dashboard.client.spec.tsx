@@ -6,11 +6,12 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { UsageDashboard } from '../src/client/chat/UsageDashboard.tsx'
 import type { UsageCost } from '../src/client/chat/usage-pricing.ts'
+import type { UnitPriceOverrides } from '../src/client/contract/usage.ts'
 import { en } from '../src/client/locale.ts'
 
 const t = makeTranslate(en, commonEn)
 
-/** Off-peak Tuesday (UTC) estimate for one cheap Turn. */
+/** Off-peak estimate for one cheap session. */
 const COST: UsageCost = {
   model: 'deepseek-flash',
   tier: 'offPeak',
@@ -25,10 +26,13 @@ const COST: UsageCost = {
 
 afterEach(cleanup)
 
-function renderDashboard(overrides: Parameters<typeof UsageDashboard>[0]['overrides'] = {}, setUnitPrice = vi.fn()) {
-  const view = render(
-    <UsageDashboard cost={COST} overrides={overrides} setUnitPrice={setUnitPrice} t={t} />,
-  )
+function renderDashboard(
+  cost: UsageCost | undefined = COST,
+  overrides: UnitPriceOverrides = {},
+  model = COST.model,
+  setUnitPrice = vi.fn(),
+) {
+  const view = render(<UsageDashboard cost={cost} model={model} overrides={overrides} setUnitPrice={setUnitPrice} t={t} />)
   return { view, setUnitPrice }
 }
 
@@ -42,13 +46,15 @@ describe('UsageDashboard', () => {
     expect(buckets.textContent).toContain('Cached input2,000,000 tok$0.0060')
     expect(buckets.textContent).toContain('Cache write0 tok$0.00')
     expect(buckets.textContent).toContain('Output1,000,000 tok$0.60')
-    expect(view.getByText('deepseek-flash')).toBeDefined()
-    expect(view.getByText('deepseek-v4-pro')).toBeDefined()
+    expect(view.getByRole('rowheader', { name: /deepseek-flash/ })).toBeDefined()
+    expect(view.getByRole('rowheader', { name: 'deepseek-v4-pro' })).toBeDefined()
+    expect(view.getByText('(current)')).toBeDefined()
+    expect(view.getByText('Peak hours bill at twice these rates.')).toBeDefined()
     expect(view.container.textContent).toContain('Custom unit prices (USD per million tok)')
   })
 
   it('marks the peak multiplier beside the tier', () => {
-    const view = render(<UsageDashboard cost={{ ...COST, tier: 'peak' }} overrides={{}} setUnitPrice={vi.fn()} t={t} />)
+    const view = render(<UsageDashboard cost={{ ...COST, tier: 'peak' }} model={COST.model} overrides={{}} setUnitPrice={vi.fn()} t={t} />)
     expect(view.getByText('Peak hours')).toBeDefined()
     expect(view.getByText('×2')).toBeDefined()
   })
@@ -70,7 +76,7 @@ describe('UsageDashboard', () => {
     fireEvent.change(input, { target: { value: '-1' } })
     const save = view.getByRole('button', { name: 'Save' })
     expect(save.hasAttribute('disabled')).toBe(true)
-    expect(view.getByText('Enter non-negative numbers')).toBeDefined()
+    expect(view.getByRole('alert').textContent).toBe('Enter non-negative numbers')
     fireEvent.click(save)
     expect(setUnitPrice).not.toHaveBeenCalled()
     fireEvent.change(input, { target: { value: '' } })
@@ -83,8 +89,24 @@ describe('UsageDashboard', () => {
     expect(remove.hasAttribute('disabled')).toBe(true)
     cleanup()
 
-    const custom = renderDashboard({ 'deepseek-flash': { miss: 1, hit: 1, output: 1 } })
+    const custom = renderDashboard(COST, { 'deepseek-flash': { miss: 1, hit: 1, output: 1 } })
     fireEvent.click(custom.view.getByRole('button', { name: 'Use built-in price' }))
     expect(custom.setUnitPrice).toHaveBeenCalledWith('deepseek-flash', null)
+  })
+
+  it('offers the editor for an unpriced model instead of a total', () => {
+    const setUnitPrice = vi.fn()
+    const view = render(<UsageDashboard cost={undefined} model="unlisted" overrides={{}} setUnitPrice={setUnitPrice} t={t} />)
+    expect(view.getByText('No price yet')).toBeDefined()
+    expect(view.container.querySelector('[data-usage-cost-buckets]')).toBeNull()
+    expect(view.getByText(/Set a unit price for unlisted/)).toBeDefined()
+    const editor = view.container.querySelector('[data-usage-price-editor="unlisted"]') as HTMLElement
+    const inputs = [...editor.querySelectorAll('input')]
+    expect(inputs.map(input => input.value)).toEqual(['', '', ''])
+    fireEvent.change(inputs[0]!, { target: { value: '4' } })
+    fireEvent.change(inputs[1]!, { target: { value: '0.5' } })
+    fireEvent.change(inputs[2]!, { target: { value: '8' } })
+    fireEvent.click(view.getByRole('button', { name: 'Save' }))
+    expect(setUnitPrice).toHaveBeenCalledWith('unlisted', { miss: 4, hit: 0.5, output: 8 })
   })
 })

@@ -53,13 +53,17 @@ export function tierMultiplier(tier: BillingTier): number {
 
 /**
  * Resolve the unit price one model bills at.
+ *
+ * Own-property lookup keeps a model id that collides with an object member
+ * (`toString`, `constructor`) unpriced instead of resolving to a prototype function.
  * @param model - model id the Session's requests used.
  * @param overrides - stored custom prices, which replace a built-in price.
  * @returns the unit price, or undefined when the model is unpriced.
  */
 export function resolveUnitPrice(model: string | undefined, overrides: UnitPriceOverrides): ModelUnitPrice | undefined {
   if (model === undefined) return undefined
-  return overrides[model] ?? BUILTIN_UNIT_PRICES[model]
+  if (Object.hasOwn(overrides, model)) return overrides[model]
+  return Object.hasOwn(BUILTIN_UNIT_PRICES, model) ? BUILTIN_UNIT_PRICES[model] : undefined
 }
 
 /** Disjoint token buckets a price bills. */

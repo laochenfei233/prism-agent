@@ -26,16 +26,19 @@ export type UsageCostPillProps =
  * @param props.unitPrices - live custom unit prices.
  * @param props.setUnitPrice - write face handed to the dashboard editor.
  * @param props.t - Chat locale seat.
- * @returns the pill, or null while the Session has no priced usage.
+ * @returns the pill, or null while the Session has no billable tokens or no route.
  */
 export function UsageCostPill({ useProjection, useUnitPrices, setUnitPrice, t }: UsageCostPillProps) {
   const [open, setOpen] = useState(false)
   const usage = useProjection('tokenUsage')
   const selection = useProjection('modelSelection')
   const overrides = useUnitPrices(value => value)
-  const cost = usage === undefined ? undefined : sessionCost(usage, selection?.next?.model, new Date(), overrides)
+  const model = selection?.next?.model
+  const billable = usage !== undefined
+    && usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens + usage.outputTokens > 0
+  if (!billable || model === undefined) return null
+  const cost = sessionCost(usage, model, new Date(), overrides)
   const amount = cost === undefined ? undefined : t('cost.usd', { amount: formatUsd(cost.totalUsd) })
-  if (cost === undefined || amount === undefined) return null
   return (
     <span className={css.root}>
       <button
@@ -43,11 +46,11 @@ export function UsageCostPill({ useProjection, useUnitPrices, setUnitPrice, t }:
         className={css.trigger}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={t('cost.pillAria', { amount })}
+        aria-label={amount === undefined ? t('cost.pillAriaUnpriced', { model }) : t('cost.pillAria', { amount })}
         onClick={() => { setOpen(!open) }}
       >
         <IconDataOutlineRegular />
-        <span className={css.label}>{t('cost.approx', { amount })}</span>
+        <span className={css.label}>{amount === undefined ? t('cost.unpriced') : t('cost.approx', { amount })}</span>
       </button>
       <Modal
         open={open}
@@ -55,7 +58,7 @@ export function UsageCostPill({ useProjection, useUnitPrices, setUnitPrice, t }:
         title={t('cost.dialog.title')}
         closeLabel={t('cost.dialog.close')}
       >
-        <UsageDashboard cost={cost} overrides={overrides} setUnitPrice={setUnitPrice} t={t} />
+        <UsageDashboard cost={cost} model={model} overrides={overrides} setUnitPrice={setUnitPrice} t={t} />
       </Modal>
     </span>
   )

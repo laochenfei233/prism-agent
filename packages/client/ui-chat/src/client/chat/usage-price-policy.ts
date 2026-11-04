@@ -43,12 +43,13 @@ export function parseUnitPriceOverrides(raw: string | null): UnitPriceOverrides 
     return {}
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
-  const overrides: Record<string, ModelUnitPrice> = {}
+  const accepted: [string, ModelUnitPrice][] = []
   for (const [model, entry] of Object.entries(parsed)) {
     if (model === '' || !isUnitPrice(entry)) continue
-    overrides[model] = { miss: entry.miss, hit: entry.hit, output: entry.output }
+    accepted.push([model, { miss: entry.miss, hit: entry.hit, output: entry.output }])
   }
-  return overrides
+  // fromEntries defines own properties, so a stored "__proto__" key cannot rewrite the map prototype.
+  return Object.fromEntries(accepted)
 }
 
 /** Storage face the policy needs; absent when the browser exposes none. */
@@ -61,6 +62,10 @@ function browserStorage(): Storage | undefined {
  *
  * A failed read yields no overrides and a failed write keeps the in-memory
  * value: storage problems never break the display.
+ *
+ * shortcut: overrides live in this browser's storage rather than the Host
+ * settings document, so they do not follow the account across browsers; move
+ * them into a settings namespace when multi-browser totals matter.
  */
 export class UsagePricePolicy {
   /** Current overrides; every entry replaces the built-in price for its model. */

@@ -42,7 +42,9 @@ export function TurnUsagePanel({ usage, at, overrides, t }: TurnUsagePanelProps)
     : formatCacheHitPercent(usage.cacheReadTokens, usage.totalTokens - usage.outputTokens, 1)
   const total = formatCompactCount(usage.totalTokens, t)
   const cost = turnCost(usage, new Date(at), overrides)
-  const costText = cost === undefined ? undefined : t('cost.usd', { amount: formatUsd(cost.totalUsd) })
+  const costText = cost === undefined
+    ? undefined
+    : t('cost.approx', { amount: t('cost.usd', { amount: formatUsd(cost.totalUsd) }) })
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
 
   return (

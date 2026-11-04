@@ -47,12 +47,16 @@ function props(
 }
 
 describe('UsageCostPill', () => {
-  it('renders nothing for an unpriced or usage-free session', () => {
-    const unpriced = render(<UsageCostPill {...props(USAGE, 'unlisted')} />)
-    expect(unpriced.container.innerHTML).toBe('')
-    cleanup()
+  it('renders nothing without billable usage, an unpriced pill while no price is recorded', () => {
     const empty = render(<UsageCostPill {...props(undefined, 'deepseek-flash')} />)
     expect(empty.container.innerHTML).toBe('')
+    cleanup()
+    const unpriced = render(<UsageCostPill {...props(USAGE, 'unlisted')} />)
+    const trigger = unpriced.getByRole('button', { name: 'No unit price recorded for unlisted' })
+    expect(trigger.textContent).toBe('No price yet')
+    fireEvent.click(trigger)
+    // The dashboard still offers the editor, so the model can be priced from here.
+    expect(unpriced.getByRole('dialog').querySelector('[data-usage-price-editor="unlisted"]')).toBeTruthy()
   })
 
   it('shows the estimated session cost and opens the dashboard', () => {
@@ -77,9 +81,8 @@ describe('UsageCostPill', () => {
     const view = render(<UsageCostPill {...props(USAGE, 'deepseek-flash', { 'deepseek-flash': { miss: 2, hit: 0, output: 0 } }, setUnitPrice)} />)
     expect(view.getByRole('button', { name: 'Estimated cost for this session: $2.00' })).toBeDefined()
     fireEvent.click(view.getByRole('button'))
-    const editor = view.container.querySelector('[data-usage-price-editor]')
-    expect(editor).toBeNull() // the editor lives in the portaled modal, not the trigger's subtree
     const dialog = view.getByRole('dialog')
+    expect(dialog.querySelector('[data-usage-price-editor="deepseek-flash"]')).toBeTruthy()
     fireEvent.change(dialog.querySelectorAll('input')[0]!, { target: { value: '3' } })
     fireEvent.click(view.getByRole('button', { name: 'Save' }))
     expect(setUnitPrice).toHaveBeenCalledWith('deepseek-flash', { miss: 3, hit: 0, output: 0 })

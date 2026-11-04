@@ -69,10 +69,10 @@ describe('TurnUsagePanel', () => {
     }
     const view = renderPanel(usage)
     const trigger = view.getByRole('button')
-    expect(trigger.textContent).toBe('Usage 2M tok · $0.75')
+    expect(trigger.textContent).toBe('Usage 2M tok · ≈$0.75')
     fireEvent.click(trigger)
     const cost = view.getByRole('dialog').querySelector('[data-turn-usage-cost]') as HTMLElement
-    expect(cost.textContent).toBe('$0.75')
+    expect(cost.textContent).toBe('≈$0.75')
   })
 
   it('uses a stored custom price in place of the built-in one', () => {
@@ -83,7 +83,7 @@ describe('TurnUsagePanel', () => {
       routes: [{ provider: 'deepseek-official', model: 'deepseek-flash' }],
     }
     const view = renderPanel(usage, { 'deepseek-flash': { miss: 2, hit: 0, output: 0 } })
-    expect(view.getByRole('button').textContent).toBe('Usage 1M tok · $2.00')
+    expect(view.getByRole('button').textContent).toBe('Usage 1M tok · ≈$2.00')
   })
 
   it('omits unavailable optional facts instead of inventing values', () => {

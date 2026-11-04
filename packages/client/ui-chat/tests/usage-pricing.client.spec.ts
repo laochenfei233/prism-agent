@@ -59,6 +59,12 @@ describe('unit prices', () => {
     expect(resolveUnitPrice('unlisted', {})).toBeUndefined()
     expect(resolveUnitPrice(undefined, {})).toBeUndefined()
   })
+
+  it('keeps prototype member names unpriced instead of resolving a function', () => {
+    expect(resolveUnitPrice('toString', {})).toBeUndefined()
+    expect(resolveUnitPrice('constructor', {})).toBeUndefined()
+    expect(resolveUnitPrice('__proto__', {})).toBeUndefined()
+  })
 })
 
 describe('bucket pricing', () => {
