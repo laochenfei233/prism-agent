@@ -43,18 +43,6 @@ function credentialsStub(): unknown {
   }
 }
 
-/** The meeting service the routes read, holding no records. */
-const _meetingStub = {
-  name: 'meeting-stub',
-  apply(ctx: Context): void {
-    ctx.provide('meetingMinutes', {
-      list: () => [],
-      get: () => { throw new Error('the composition probe reads no meeting') },
-      speech: () => ({ providers: [], selected: '' }),
-    })
-  },
-}
-
 let root: string | undefined
 let context: Context | undefined
 
@@ -68,9 +56,9 @@ afterEach(async () => {
 /**
  * Boot one Loader composition from a cordis.yml body.
  * @param rows - entry rows the profile composes, in order.
- * @returns the booted context and its still-inactive entry names.
+ * @returns the lifecycle state of each composed entry, in profile order.
  */
-async function boot(rows: readonly string[]): Promise<string[]> {
+async function boot(rows: readonly string[]): Promise<number[]> {
   root = await mkdtemp(join(tmpdir(), 'dsh-prism-meeting-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [...rows, ''].join('\n'))

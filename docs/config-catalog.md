@@ -2809,6 +2809,48 @@ export interface Config {
 
 Source: [`packages/speech/speech-to-text-dashscope/src/index.ts:42`](../packages/speech/speech-to-text-dashscope/src/index.ts)
 
+<a id="deepseek-aidsh-speech-to-text-http"></a>
+
+## `@deepseek-ai/dsh-speech-to-text-http`
+
+Requires: `speechToText`
+
+```ts config-catalog
+/** Plugin configuration; every entry becomes one registered recognizer. */
+export interface Config {
+  /** Third-party services to register, in configuration order. */
+  services: HttpServiceConfig[]
+}
+
+/** One configured third-party transcription service. */
+export interface HttpServiceConfig {
+  /** Registration identity this recognizer occupies. */
+  providerId: string
+  /** Operator-facing display name; omitted names show the model. */
+  name?: string
+  /** Complete POST URL of the transcription endpoint. */
+  endpoint: string
+  /** Literal API key; prefer {@link HttpServiceConfig.apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference holding the bearer key. */
+  apiKeyEnv: string
+  /** Transcription model named in the form. */
+  model: string
+  /** Language hints this recognizer accepts, including `auto`. */
+  languages: string[]
+  /** Top-level JSON response field carrying the recognized text. */
+  textField: string
+  /** Rejected recording size in bytes. */
+  maxAudioBytes: number
+  /** Rejected recording duration in seconds. */
+  maxDurationSeconds: number
+  /** Deadline, in milliseconds, covering upload and answer. */
+  timeoutMs: number
+}
+```
+
+Source: [`packages/speech/speech-to-text-http/src/index.ts:55`](../packages/speech/speech-to-text-http/src/index.ts)
+
 <a id="deepseek-aidsh-spill-local"></a>
 
 ## `@deepseek-ai/dsh-spill-local`
@@ -4166,7 +4208,7 @@ export interface Config {
 
 Depends on: `Volatile` (`@deepseek-ai/cordis`)
 
-Source: [`packages/prism/prism-meeting/src/index.ts:35`](../packages/prism/prism-meeting/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/index.ts:38`](../packages/prism/prism-meeting/src/index.ts)
 
 ## Loadable plugins with no config
 

@@ -408,6 +408,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-speech-to-text` | yes | Speech recognition with independently selectable providers |
 | `@deepseek-ai/dsh-speech-to-text-dashscope` | yes | DashScope realtime duplex transcription provider for the DeepSeek Harness speech capability seam (ctx.speechToText) |
+| `@deepseek-ai/dsh-speech-to-text-http` | yes | Config-driven HTTP transcription providers for the DeepSeek Harness speech capability seam (ctx.speechToText): OpenAI-compatible /audio/transcriptions services and any endpoint answering JSON text |
 
 ## spill
 

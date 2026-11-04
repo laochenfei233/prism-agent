@@ -2,7 +2,7 @@
 
 English | [中文](voice-input.zh.md)
 
-Voice input has three roles: the [Service Definition](../../packages/speech/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, the [DashScope provider](../../packages/speech/speech-to-text-dashscope/README.md) owns online inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes all of them with the microphone UI, selecting the local recognizer by default and offering the online one as a preference.
+Voice input has these roles: the [Service Definition](../../packages/speech/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, the [DashScope provider](../../packages/speech/speech-to-text-dashscope/README.md) owns online inference, the [HTTP provider](../../packages/speech/speech-to-text-http/README.md) registers configured third-party services, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes all of them with the microphone UI, selecting the local recognizer by default and offering the online one as a preference.
 
 ## Provider selection
 
