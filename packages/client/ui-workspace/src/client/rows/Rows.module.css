@@ -254,6 +254,46 @@
   color: var(--dsw-alias-label-caption);
 }
 
+/* Annotation marks sit between the title and the trailing time cell: a glyph
+   pair and, for a non-default priority, its number. */
+.annotationMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 16px;
+  margin-left: 4px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.priorityMark {
+  border-radius: var(--dsw-radius-sm);
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Batch-mode checkbox cell, leading the row ahead of the status slot. */
+.selectCell {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+}
+
+.selectBox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
+
 /* Archived rows stay in place but read as inactive: titles drop to
    the caption label step (one step above dimmed, which reads as too faint
    over the sidebar fill). Archived search rows drop their meta line to the

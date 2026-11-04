@@ -28,7 +28,7 @@ import type {
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { RemoteEndpoint } from '@deepseek-ai/dsh-api-remote-access/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { readClipboard, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the Controller service merges.
@@ -42,16 +42,22 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type BatchAction, type BatchResult, type ForkSessionInjected,
+  menuOpenStateFactory, type PinSessionInjected,
+  type SessionAnnotationDialogInjected, type SessionAnnotationInjected, type SessionAnnotationTarget,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type SessionIdInjected, type SessionPathInjected, type SessionSettingsInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected,
 } from './contract/slots.ts'
+import { DEFAULT_PRIORITY, NO_ANNOTATIONS, type SessionAnnotation } from './annotations.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './rows/WorkspaceBrowser.tsx'
+import {
+  AnnotateSessionMenuItem, FavoriteSessionMenuItem, ReviewLaterSessionMenuItem, SessionAnnotationDialog,
+} from './session-actions/AnnotateSession.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
 import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
@@ -279,6 +285,76 @@ export function apply(ctx: Context): void {
       ctx.shortcuts.invoke('settings.open' as ShortcutCommandId, { region: 'page', modal: null, target: null })
     },
   })
+  // Annotations: one observable over the viewing store's annotation table, so
+  // the row toggles, the dialog, and the row marks read the same source.
+  const annotations = derive(viewInstance.store, state => state.annotations ?? NO_ANNOTATIONS)
+  const annotationRequest = createSnapshotStore<SessionAnnotationTarget | null>(null)
+  const annotationOf = (sessionId: SessionId): SessionAnnotation =>
+    viewInstance.store.getSnapshot().annotations?.[sessionId] ?? {}
+  const setAnnotation = (sessionId: SessionId, annotation: SessionAnnotation): void => {
+    viewInstance.actions.setAnnotation(sessionId, annotation)
+  }
+  const annotationInjected = (): SessionAnnotationInjected => ({
+    hooks: { annotations },
+    setAnnotation,
+    requestAnnotation: (sessionId, displayTitle) => { annotationRequest.set({ sessionId, displayTitle }) },
+  })
+  const annotationDialogInjected = (): SessionAnnotationDialogInjected => ({
+    hooks: { annotations, annotationRequest },
+    settleSessionAnnotation: () => { annotationRequest.set(null) },
+    setAnnotation,
+    copyAnnotationPrompt: writeClipboard,
+    readAnnotationClipboard: readClipboard,
+  })
+  // Batch actions share one executor: Host-backed actions await the controller,
+  // annotation actions write the viewing store, and one rejected Session never
+  // stops the rest.
+  const applyBatchAction = async (sessionId: SessionId, action: BatchAction): Promise<void> => {
+    switch (action.kind) {
+      case 'archive':
+        await uiWorkspace.archiveSession(sessionId)
+        return
+      case 'unarchive':
+        await uiWorkspace.unarchiveSession(sessionId)
+        return
+      case 'favorite':
+      case 'unfavorite':
+        setAnnotation(sessionId, { ...annotationOf(sessionId), favorite: action.kind === 'favorite' })
+        return
+      case 'reviewLater':
+      case 'unreview':
+        setAnnotation(sessionId, { ...annotationOf(sessionId), reviewLater: action.kind === 'reviewLater' })
+        return
+      case 'priority': {
+        const next: SessionAnnotation = { ...annotationOf(sessionId) }
+        if (action.priority === DEFAULT_PRIORITY) delete next.priority
+        else next.priority = action.priority
+        setAnnotation(sessionId, next)
+        return
+      }
+      case 'clearTags': {
+        const next: SessionAnnotation = { ...annotationOf(sessionId) }
+        delete next.tags
+        setAnnotation(sessionId, next)
+        return
+      }
+    }
+  }
+  const applyBatch: WorkspaceBrowserInjected['applyBatch'] = async (sessionIds, action) => {
+    let ok = 0
+    let failed = 0
+    for (const sessionId of sessionIds) {
+      try {
+        await applyBatchAction(sessionId, action)
+        ok += 1
+      } catch (error: unknown) {
+        failed += 1
+        console.warn('batch action rejected:', error)
+      }
+    }
+    notify({ kind: 'batchDone', ok, failed })
+    return { ok, failed } satisfies BatchResult
+  }
   const renameInjected = (): RenameSessionInjected => ({ requestSessionRename })
   const renameDialogInjected = (): SessionRenameDialogInjected => ({
     hooks: { renameRequest },
@@ -321,6 +397,7 @@ export function apply(ctx: Context): void {
       }
     },
     unarchiveSession: async (sessionId) => { await uiWorkspace.unarchiveSession(sessionId) },
+    applyBatch,
     revealWorkspace: (path) => {
       void ctx.remote.session.openWorkspacePath({ path, action: 'reveal' })
         .then((result) => { if (!result.ok) notify({ kind: 'revealFailed' }) })
@@ -366,7 +443,10 @@ export function apply(ctx: Context): void {
   // entries leave with it. Explicit orders leave room for plugin entries.
   ctx.slots.inject('sidebar.workspaces.session.menu.item', function* () {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'pin', order: 100, locale: NS, inject: pinInjected }, PinSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'favorite', order: 150, locale: NS, inject: annotationInjected }, FavoriteSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'review-later', order: 160, locale: NS, inject: annotationInjected }, ReviewLaterSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'rename', order: 200, locale: NS, inject: renameInjected }, RenameSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'annotate', order: 250, locale: NS, inject: annotationInjected }, AnnotateSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'session-id', order: 450, locale: NS, inject: sessionIdInjected }, SessionIdMenuItem)
@@ -387,6 +467,9 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({
       name: 'shell.overlay', id: 'workspace.session-archive', locale: NS, inject: archiveConfirmInjected,
     }, SessionArchiveConfirmDialog)
+    yield ctx.slots.register({
+      name: 'shell.overlay', id: 'workspace.session-annotation', locale: NS, inject: annotationDialogInjected,
+    }, SessionAnnotationDialog)
     yield ctx.slots.register({
       name: 'shell.overlay', id: 'workspace.row-toast', inject: rowToastInjected,
       children: { 'workspace.toast': { kind: 'keyed', scope: 'root' } },

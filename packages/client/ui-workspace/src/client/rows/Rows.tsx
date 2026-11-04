@@ -18,14 +18,15 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   ContextMenu, HoverCard, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular,
   IconDownloadOutlineRegular, IconEditOutlineRegular,
-  IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
-  IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
+  IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular, IconLikeFillRegular,
+  IconNewChatOutlineRegular, IconPinFillRegular, IconQueueOutlineRegular, IconTrashOutlineRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
   useContextMenu,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
+import { DEFAULT_PRIORITY, type SessionAnnotation } from '../annotations.ts'
 import type { MenuOpenState, WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
@@ -466,6 +467,45 @@ function PinnedIndicator({ t }: { t: RowTranslate }) {
   )
 }
 
+/** One Session's batch-mode selection: whether it is chosen and how to flip that. */
+export interface SessionSelection {
+  selected: boolean
+  toggle: () => void
+}
+
+/**
+ * The row's annotation marks — favorite, review-later, and a non-default
+ * priority number. Decorative to the row's single open action, so each mark is
+ * a labelled image rather than a control.
+ * @param props.annotation - the row's annotation, or none.
+ * @param props.t - Workspace-browser translation seat.
+ * @returns the marks, or null when nothing is annotated.
+ */
+function AnnotationMarks({ annotation, t }: { annotation: SessionAnnotation | undefined; t: RowTranslate }) {
+  if (annotation === undefined) return null
+  const priority = annotation.priority ?? DEFAULT_PRIORITY
+  const priorityLabel = t('annotation.priority', { n: priority })
+  return (
+    <>
+      {annotation.favorite === true && (
+        <span className={css.annotationMark} role="img" aria-label={t('annotation.favorite')} title={t('annotation.favorite')}>
+          <IconLikeFillRegular size={12} />
+        </span>
+      )}
+      {annotation.reviewLater === true && (
+        <span className={css.annotationMark} role="img" aria-label={t('annotation.reviewLater')} title={t('annotation.reviewLater')}>
+          <IconQueueOutlineRegular size={12} />
+        </span>
+      )}
+      {priority !== DEFAULT_PRIORITY && (
+        <span className={clsx(css.annotationMark, css.priorityMark)} role="img" aria-label={priorityLabel} title={priorityLabel}>
+          {priority}
+        </span>
+      )}
+    </>
+  )
+}
+
 /**
  * Hover-card body: full title, relative time, the Session's own scheduled-task
  * section, and every relevant live status. The task section sits above the
@@ -545,6 +585,7 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
           )}
         </span>
         <span className={css.searchResultTitle}>{result.title || t('session.untitled')}</span>
+        <AnnotationMarks annotation={result.annotation} t={t} />
         {result.archived && (
           <span className={css.rowActions}>
             <Tooltip label={t('actions.unarchive')} side="bottom" align="end" delayMs={500} portal>
@@ -589,11 +630,12 @@ export function SearchResultItem({ result, currentId, onOpen, onUnarchive, t }: 
  * its leading decoration, its hover-card section, and its pending second line.
  * @param props.onReveal - scroll this row into view after search navigation, then acknowledge it.
  * @param props.drag - optional row-drag target wiring; blank rows cannot start a drag.
+ * @param props.selection - batch-mode selection state; absent while batch mode is off.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
 export function SessionNodeItem({
-  node, currentId, now, onOpen, onRenameRequest, renderSlot, onReveal, drag, t,
+  node, currentId, now, onOpen, onRenameRequest, renderSlot, onReveal, drag, selection, t,
 }: {
   node: SessionNode
   currentId: string | undefined
@@ -605,6 +647,8 @@ export function SessionNodeItem({
   onReveal?: (() => void) | undefined
   /** Present on reorderable-list rows so every row can remain a drop target. */
   drag?: RowDragProps | undefined
+  /** Present while the browser is in batch mode; the row then carries a checkbox. */
+  selection?: SessionSelection | undefined
   t: RowTranslate
 } & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
@@ -689,6 +733,19 @@ export function SessionNodeItem({
           drag.drop(rowHalf(e))
         }}
     >
+      {/* Batch mode replaces no cell: the checkbox leads the row and the
+          status/decoration cell keeps its own slot beside it. */}
+      {selection !== undefined && (
+        <span className={css.selectCell} onClick={(e) => { e.stopPropagation() }}>
+          <input
+            type="checkbox"
+            className={css.selectBox}
+            checked={selection.selected}
+            aria-label={t('batch.selectOne', { name: title })}
+            onChange={() => { selection.toggle() }}
+          />
+        </span>
+      )}
       {/* Pending interaction and own or descendant activity outrank the
           finished-but-unviewed reminder, which returns after activity stops
           and is cleared by opening the session. Archived rows keep the slot
@@ -708,6 +765,7 @@ export function SessionNodeItem({
       >
         {title}
       </span>
+      <AnnotationMarks annotation={row.annotation} t={t} />
       {/* A blank New Session row is a provisional placeholder: nothing has
           happened in it yet, so a "now" timestamp and the row verbs
           (rename/fork/archive) would all act on content that does not

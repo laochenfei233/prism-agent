@@ -54,6 +54,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
 import type { StartSessionOptions } from '../navigation.ts'
+import type { SessionAnnotation, SessionPriority } from '../annotations.ts'
 import type {} from './toast.ts'
 import type { createWorkspaceViewStore } from '../stores.ts'
 
@@ -284,6 +285,12 @@ export type WorkspaceBrowserInjected = {
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /** Show one Workspace directory in the Host file manager. */
   revealWorkspace: (path: string) => void
+  /**
+   * Run one batch action over the given Sessions, one at a time, and raise the
+   * result notice. A rejected Session counts as failed and leaves the others
+   * untouched.
+   */
+  applyBatch: (sessionIds: readonly SessionId[], action: BatchAction) => Promise<BatchResult>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
 }
@@ -319,6 +326,8 @@ export type RowToast =
   | { kind: 'defaultWorkspaceFailed' }
   | { kind: 'forkRequiresOpen'; sessionId: SessionId }
   | { kind: 'shortcutForkFailed'; reason: 'unavailable' | 'failed' }
+  /** A batch run finished; both counts are stated so a partial failure is visible. */
+  | { kind: 'batchDone'; ok: number; failed: number }
   /**
    * An explicit New Session request that failed. `message` is untranslated:
    * a Host refusal as `code: message` — the stable code stays in the copy so
@@ -434,6 +443,74 @@ export interface SessionSettingsInjected {
   /** Open the product settings surface. */
   openSettings: () => void
 }
+
+/** A Session annotation edit requested from a row; the dialog entry opens on it. */
+export interface SessionAnnotationTarget {
+  /** Session the annotation belongs to. */
+  sessionId: SessionId
+  /** Row display title, named in the dialog. */
+  displayTitle: string
+}
+
+/**
+ * Annotation share (menu row toggles and the editor row). The callbacks carry
+ * the whole behavior; the hook is every stored annotation keyed by Session, so
+ * one row reads its own record with a lookup.
+ */
+export interface SessionAnnotationInjected {
+  hooks: {
+    /** Stored annotations by Session id. */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Replace one Session's annotation; an empty record clears it. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Ask for the editor dialog on this Session. */
+  requestAnnotation: (sessionId: SessionId, displayTitle: string) => void
+}
+
+/** Editor dialog share: the pending request, its settlement, and the clipboard round-trip. */
+export interface SessionAnnotationDialogInjected {
+  hooks: {
+    /** The edit asked for, until the dialog consumes or cancels it. */
+    annotationRequest: HostObservable<SessionAnnotationTarget | null>
+    /** Stored annotations by Session id (the draft's seed). */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Consume or cancel the pending request. */
+  settleSessionAnnotation: () => void
+  /** Replace one Session's annotation. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Write the prepared prompt to the clipboard; resolves false when the browser refused. */
+  copyAnnotationPrompt: (text: string) => Promise<boolean>
+  /** Read the clipboard for an import; rejects when the browser refuses. */
+  readAnnotationClipboard: () => Promise<string>
+}
+
+/** One batch action the browser can request across the selected Sessions. */
+export type BatchAction =
+  | { readonly kind: 'archive' }
+  | { readonly kind: 'unarchive' }
+  | { readonly kind: 'favorite' }
+  | { readonly kind: 'unfavorite' }
+  | { readonly kind: 'reviewLater' }
+  | { readonly kind: 'unreview' }
+  | { readonly kind: 'priority'; readonly priority: SessionPriority }
+  | { readonly kind: 'clearTags' }
+
+/** How a batch run ended, per Session. */
+export interface BatchResult {
+  /** Sessions the action applied to. */
+  ok: number
+  /** Sessions the action rejected or skipped. */
+  failed: number
+}
+
+/** Props of the annotation editor entry in `shell.overlay`. */
+export type SessionAnnotationDialogProps =
+  PropsRuntime<'shell.overlay'>
+  & PropsLocale<'workspace'>
+  & Omit<SessionAnnotationDialogInjected, 'hooks'>
+  & PropsHooks<SessionAnnotationDialogInjected['hooks']>
 
 /** A Session rename the rename action asked for; the dialog entry opens on it. */
 export interface SessionRenameTarget {

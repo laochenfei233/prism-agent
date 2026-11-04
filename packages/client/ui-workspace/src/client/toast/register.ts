@@ -106,6 +106,16 @@ export function registerToasts(
       }),
     }, ToastEntry<PropsRuntime<'workspace.toast', 'forkRequiresOpen'>>)
     yield ctx.slots.register({
+      name: 'workspace.toast', key: 'batchDone', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'batchDone'> => ({
+        display: (notice, t) => ({
+          text: t('toast.batchDone', { ok: notice.ok, failed: notice.failed }),
+          tone: notice.failed === 0 ? 'success' : 'warning',
+          holdMs: 6000,
+        }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'batchDone'>>)
+    yield ctx.slots.register({
       name: 'workspace.toast', key: 'archived', locale: 'workspace', store: viewStore,
       inject: (): ArchiveToastInjected => ({
         display: (notice, t, dismiss) => ({
