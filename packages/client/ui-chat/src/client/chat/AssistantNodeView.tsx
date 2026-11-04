@@ -1,10 +1,15 @@
 import { memo, useCallback, useMemo } from 'react'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ChatNodeViewProps, PresentationInjected, TurnTailOwnerProps } from '../contract/slots.ts'
+import type {
+  ChatNodeViewProps, PresentationInjected, TurnTailOwnerProps,
+} from '../contract/slots.ts'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
+import type { MessageMenuExtras } from './chat-message-actions.tsx'
 
 type AssistantNodeViewProps = ChatNodeViewProps<'assistant-step'> & InjectFace<PresentationInjected>
-  & PropsRenderSlots<'conversation.chat.reasoning.body' | 'conversation.chat.message.images'>
+  & PropsRenderSlots<
+    'conversation.chat.reasoning.body' | 'conversation.chat.message.images' | 'conversation.chat.message.menu.item'
+  >
 
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
@@ -31,10 +36,17 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     && turnProcess.spec.inlineReasoning
     && !turnProcess.open
   const revealProcess = useCallback(() => { turnProcess?.setOpen(true) }, [turnProcess])
+  // Only a settled message owns a durable id, so only it offers plugin rows.
+  const messageId = data.finalNode?.messageId
+  const menuExtras = useMemo<MessageMenuExtras | undefined>(
+    () => messageId === undefined ? undefined : { messageId, renderSlot },
+    [messageId, renderSlot],
+  )
   return (
     <AssistantMarkdown
       blocks={data.blocks}
       groupPart={groupPart}
+      menuExtras={menuExtras}
       useDisclosure={useDisclosure}
       streaming={data.status === 'running'}
       interrupted={data.status === 'interrupted'}

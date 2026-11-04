@@ -18,7 +18,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { MessageId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { MessageFeedbackItem, MessageFeedbackVersion } from '@deepseek-ai/dsh-message-feedback/types'
 import type { CommandDecoration } from '@deepseek-ai/dsh-client-ui-commands/client'
-import type { FeedbackDialogInjected, MessageFeedbackInjected } from '../src/client/slots.ts'
+import type { FeedbackDialogInjected, MessageFeedbackInjected, MessageFeedbackMenuInjected } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
@@ -75,6 +75,7 @@ async function bench(options: { recordResult?: unknown; recordCarrier?: unknown 
     name: 'root',
     children: {
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
+      'conversation.chat.message.menu.item': { kind: 'list', scope: 'session' },
       'conversation.input.overlay': { kind: 'list', scope: 'session' },
     },
   } as never, (() => null) as never)
@@ -108,6 +109,15 @@ async function bench(options: { recordResult?: unknown; recordCarrier?: unknown 
         ...entry.options,
         locale: entry.locale,
         inject: entry.inject as unknown as ((sessionId: SessionId) => FeedbackDialogInjected) | undefined,
+      }
+    },
+    menuEntry: () => {
+      const entry = ctx.slots.entries('conversation.chat.message.menu.item')[0]
+      if (entry === undefined) return undefined
+      return {
+        ...entry.options,
+        locale: entry.locale,
+        inject: entry.inject as unknown as ((sessionId: SessionId) => MessageFeedbackMenuInjected) | undefined,
       }
     },
   }
@@ -144,6 +154,22 @@ describe('ui-message-feedback browser plugin', () => {
     const face = b.dialogEntry()!.inject!(sid('s1'))
     expect(face.hooks.dialog.getSnapshot()).toMatchObject({ target: null, toast: 0 })
     expect(face.dismissFailure).toBeTypeOf('function')
+  })
+
+  it('registers the message-menu feedback rows with the documented id and order', async () => {
+    const b = await bench()
+    await b.fiber.await()
+
+    expect(b.menuEntry()).toMatchObject({ id: 'feedback', order: 10, locale: 'feedback' })
+  })
+
+  it('opens the shared message dialog from the menu rows', async () => {
+    const b = await bench()
+    await b.fiber.await()
+
+    const dialog = b.dialogEntry()!.inject!(sid('s1'))
+    b.menuEntry()!.inject!(sid('s1')).openDialog(MSG, 'negative')
+    expect(dialog.hooks.dialog.getSnapshot().target).toEqual({ kind: 'message', messageId: MSG, rating: 'negative' })
   })
 
   it('opens one dialog per Session from the message entry and the decoration', async () => {
@@ -309,6 +335,7 @@ describe('ui-message-feedback browser plugin', () => {
     await b.fiber.dispose()
 
     expect(b.ctx.slots.entries('conversation.chat.assistant-actions')).toHaveLength(0)
+    expect(b.ctx.slots.entries('conversation.chat.message.menu.item')).toHaveLength(0)
     expect(b.ctx.slots.entries('conversation.input.overlay')).toHaveLength(0)
     expect(b.decorations.size).toBe(0)
     expect(dialog.hooks.dialog.getSnapshot().target).toBeNull()

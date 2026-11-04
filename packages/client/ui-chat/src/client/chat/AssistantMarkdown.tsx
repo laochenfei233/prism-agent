@@ -10,6 +10,7 @@ import type { AssistantBlock } from '../contract/snapshot.ts'
 import { markdownLabels } from '../markdown-labels.ts'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import { useMessageContextMenu } from './chat-message-actions.tsx'
+import type { MessageMenuExtras } from './chat-message-actions.tsx'
 import css from './AssistantMarkdown.module.css'
 
 /**
@@ -34,6 +35,8 @@ export interface AssistantMarkdownProps extends
   Pick<ChatNodeOwnerProps, 'loadImage'> {
   /** Render only the requested business portion, preserving original block indexes. */
   groupPart?: string | undefined
+  /** Render the settled message's plugin menu rows; absent while streaming. */
+  menuExtras?: MessageMenuExtras | undefined
   /** Stable Hook forwarded to each independently expandable reasoning block. */
   useDisclosure: UseDisclosure
   blocks: readonly AssistantBlock[]
@@ -56,13 +59,13 @@ export interface AssistantMarkdownProps extends
 
 /** Renders non-blank reasoning blocks as independent disclosures alongside the response. */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, streaming, interrupted, loadImage, groupPart, useDisclosure,
+  blocks, streaming, interrupted, loadImage, groupPart, useDisclosure, menuExtras,
   reasoningHidden = false, usePresentation, revealProcess, mentions, renderSlot, useGroupAction, t,
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
   const labels = useMemo(() => markdownLabels(t), [t])
-  const contextMenu = useMessageContextMenu(t)
+  const contextMenu = useMessageContextMenu(t, menuExtras)
   // MarkdownText memoizes its vocabulary; keep its identity stable across renders.
   const pathImages = useMemo<MarkdownPathImages>(() => {
     return { resolve: value => localPathMediaUrl(document.baseURI, value) }

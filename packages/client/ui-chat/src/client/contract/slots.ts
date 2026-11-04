@@ -65,6 +65,26 @@ export interface AssistantActionOwnerProps {
   messageId: MessageId
 }
 
+/** The message menu's open state as the press-point owner holds it. */
+export type MessageMenuOpenState = readonly [open: boolean, setOpen: (open: boolean) => void]
+
+/**
+ * Hook every message-menu entry receives. Entries render only while the menu
+ * is open, so an entry reads it for the setter: `setOpen(false)` dismisses the
+ * menu the entry sits in.
+ */
+export type UseMessageMenuOpenState = () => MessageMenuOpenState
+
+/**
+ * Bind the message body's render occurrence into its menu entries' hook:
+ * the body supplies its open-state pair as the occurrence's `hookContext`.
+ * @param _standard - framework standard props (unused).
+ * @param state - the menu's open-state pair from the render occurrence.
+ * @returns the hook the entry calls.
+ */
+export const messageMenuOpenStateFactory: SlotHookFactory<'conversation.chat.message.menu.item', UseMessageMenuOpenState> =
+  (_standard, state) => () => state
+
 /** Stable quota failure codes retained in the Session log; both raise the frame-wide notice. */
 export type QuotaNoticeCode = 'QUOTA' | 'ACCOUNT_QUOTA'
 
@@ -442,6 +462,24 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * that entry. With no entries, the standard action row remains unchanged.
      */
     'conversation.chat.assistant-actions': { kind: 'list'; scope: 'session'; owner: AssistantActionOwnerProps }
+    /**
+     * Rows appended to one settled assistant message's secondary-press menu,
+     * after the shipped copy, quote, and side-conversation rows. Each entry
+     * receives the durable message id, renders one `role="menuitem"` button
+     * (the shipped entries of the Session row menu use ui-primitives'
+     * `MenuItemButton`), and dismisses the menu through the injected
+     * `useMenuOpenState` hook after acting. Streaming and user messages carry
+     * no durable message id, so their menus render no such entries.
+     */
+    'conversation.chat.message.menu.item': {
+      kind: 'list'
+      scope: 'session'
+      owner: AssistantActionOwnerProps
+      hookContext: MessageMenuOpenState
+      inject: { hooks: {
+        menuOpenState: SlotHookFactory<'conversation.chat.message.menu.item', UseMessageMenuOpenState>
+      } }
+    }
     /**
      * Frame-wide quota notice chain. The Chat-owned host in `shell.overlay`
      * offers the one live notice; the first entry whose selector claims its

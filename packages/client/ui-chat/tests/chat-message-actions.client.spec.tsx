@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-/** Message-body context menu: selection fallback, copy, quote, side conversation. */
+/** Message-body context menu: selection fallback, copy, quote, side conversation, plugin rows. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { zh } from '../src/client/locale.ts'
 import { ChatMessageActionsProvider, useMessageContextMenu } from '../src/client/chat/chat-message-actions.tsx'
 import type { ChatMessageActions } from '../src/client/chat/chat-message-actions.tsx'
@@ -97,4 +98,27 @@ it('does nothing when the pressed body holds no text', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: zh['context.copy'] }))
     expect(writeText).not.toHaveBeenCalled()
   } finally { restore() }
+})
+
+it('renders the plugin rows a settled message supplies, after the shipped rows', () => {
+  const onPlugin = vi.fn()
+  function BodyWithPlugins(): React.JSX.Element {
+    const renderSlot = ((name: string) => name === 'conversation.chat.message.menu.item'
+      ? <MenuItemButton onSelect={onPlugin}>plugin row</MenuItemButton>
+      : null) as never
+    const menu = useMessageContextMenu(t, { messageId: 'm-1' as never, renderSlot })
+    return (
+      <div ref={menu.ref} data-testid="body" onContextMenu={menu.onContextMenu}>
+        {menu.menu}
+        first line
+      </div>
+    )
+  }
+  render(<BodyWithPlugins />)
+  fireEvent.contextMenu(screen.getByTestId('body'), { clientX: 10, clientY: 10 })
+
+  const labels = screen.getAllByRole('menuitem').map(item => item.textContent)
+  expect(labels).toEqual([zh['context.copy'], zh['context.addToTask'], zh['context.askSide'], 'plugin row'])
+  fireEvent.click(screen.getByRole('menuitem', { name: 'plugin row' }))
+  expect(onPlugin).toHaveBeenCalledTimes(1)
 })
