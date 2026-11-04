@@ -1,14 +1,24 @@
 ---
 feature: prism-team
-status: designed
+status: delivered
 updated: 2026-11-04
 branch: feat/prism-team
-commits: 50ff54bd96..50ff54bd96
+commits: 50ff54bd96..933c30fa6a
 ---
 
 # Prism Team
 
 ## Report
+
+**What was built** — `plugins/prism-team`，一个 Host-only 出树插件，把四条能力装进实验性 Agent Teams 而不改动 `packages/**`：`team_report` 工具把 teammate 的进展变成一条结构化消息送进 Lead 收件箱并记入插件台账；`/team` 把 `blocked/failed/ready/waiting` 排在 `progress` 之前、健康时只输出一行；每个 teammate 在创建时拿到自己的 `git worktree` 与分支 `team/<team>/<name>`，路径写进它的段落；`tools/pre-execute` 上的写入门闸按该成员已认领任务的 `writeScopes` 判定，范围外默认 `ask`、`observe` 下只记录。装载走 `agent/created` + `ctx.agentTeams.tryMembership`，非团队成员零行为。
+
+**Verification** — `tsc -p tsconfig.verify.json --noEmit`（借主 checkout 的已构建声明）exit 0；`vitest run --config vitest.config.ts` 16/16 通过，其中 worktree 用例在临时 git 仓库里断言两个 teammate 拿到不同路径与分支、Lead 没有 worktree、`git worktree list` 承认两者；`tsdown` 构建产出 `lib/index.js` 16.78 kB；`oxlint`（staged）0 warning 0 error；`git diff --cached --check` 干净。`capability.e2e.spec.ts` 未跑：它自己的脚本是 `npm run build && …`，本次没有产出仓库级构建。
+
+**Journey log** —
+
+- compose 一开始写在团队插件里，验证时确认「skill 变插件」是通用能力而非团队专属，于是移到 `prism-guardrails/src/compose.ts`；否则同一件事会有两个家，且 solo 会话拿不到。
+- 首版测试把假 Agent 的 `ctx` 指到根上下文，两个成员注册同名 section/工具立刻冲突；改成 `createScope` 铸出的作用域 + 真 `Session`，`/team` 的日志写入也才成立。
+- worktree 只能劝告：会话 cwd 在创建时就固定，团队包不提供逐成员目录，所以成员必须用绝对路径；这条写进 README 而不是藏起来。
 
 ## [S1] Problem
 
@@ -143,24 +153,24 @@ git worktree add <root>/.worktrees/team-<teamShort>-<name> -b team/<teamShort>/<
 
 ## Tasks
 
-- [ ] T1: 脚手架（manifest、tsconfig、tsdown、vitest、cordis.patch.yml、README 骨架）(depends: none)
-- [ ] T2: 配置校验与台账（`Config`、`resolveConfig`、环形 `Map<TeamId, Report[]>`）(depends: T1) covers: S2.7
-- [ ] T3: `agent/created` 装载与 scoped 卸载 (depends: T2) covers: S2.1
-- [ ] T4: `team_report` 工具与 `/team` 清单 (depends: T3) covers: S2.2, S2.3
-- [ ] T5: worktree 准备与段落注入 (depends: T3) covers: S2.4
-- [ ] T6: 写入门闸（enforce/observe）(depends: T3) covers: S2.5
-- [ ] T7: README（限制、observe 的安全后果、worktree 只是劝告）与单测收尾 (depends: T4, T5, T6)
+- [x] T1: 脚手架（manifest、tsconfig、tsdown、vitest、cordis.patch.yml、README 骨架）(depends: none)
+- [x] T2: 配置校验与台账（`Config`、`resolveConfig`、环形 `Map<TeamId, Report[]>`）(depends: T1) covers: S2.7
+- [x] T3: `agent/created` 装载与 scoped 卸载 (depends: T2) covers: S2.1
+- [x] T4: `team_report` 工具与 `/team` 清单 (depends: T3) covers: S2.2, S2.3
+- [x] T5: worktree 准备与段落注入 (depends: T3) covers: S2.4
+- [x] T6: 写入门闸（enforce/observe）(depends: T3) covers: S2.5
+- [x] T7: README（限制、observe 的安全后果、worktree 只是劝告）与单测收尾 (depends: T4, T5, T6)
 
 ## [S4] Acceptance
 
-- [ ] A1 非团队成员 Agent 上，插件不注册任何工具、命令或 section（断言注册数为 0）。
-- [ ] A2 teammate 调用 `team_report` 后，Lead 收到一条形如 `Report from <name> [blocked]: …` 的消息，台账多一条，收据里的状态与传入一致。
-- [ ] A3 Lead 调用 `team_report` 不产生自消息，只入台账。
-- [ ] A4 `/team` 在有一条 `blocked` 汇报时，`needs a person` 段出现在 `working` 段之前；全部健康时只输出一行。
-- [ ] A5 同一团队两个 teammate 各自拿到不同的 worktree 路径与分支，路径在 `.worktrees/` 下，且都被 `git worktree list` 承认。
-- [ ] A6 非 git 仓库里创建 teammate，成员照样创建成功，且 `/team` 或段落里说明没有隔离。
-- [ ] A7 `mode: enforce` 下，teammate 写未认领任务之外的路径得到 `ask`；写自己已认领任务的 `writeScopes` 内路径直接放行。
-- [ ] A8 `mode: observe` 下同一次越界写入放行，且 `/team` 出现一条 `observed` 记录。
-- [ ] A9 配置非法值（`mode: 'on'`、`maxReports: -1`）在装载时抛错，错误文本指向键名。
-- [ ] A10 `tsc -p tsconfig.json --noEmit` 与 `vitest run` 通过。
-- [ ] A11 模式路由（ponytail / compose-next）在 teammate 会话上可用——由 [compose-next-mode.md](compose-next-mode.md) 的验收覆盖，本规格只确认成员是 Agent、拿到同一个 section。
+- [x] A1 非团队成员 Agent 上，插件不注册任何工具、命令或 section（断言注册数为 0）。
+- [x] A2 teammate 调用 `team_report` 后，Lead 收到一条形如 `Report from <name> [blocked]: …` 的消息，台账多一条，收据里的状态与传入一致。
+- [x] A3 Lead 调用 `team_report` 不产生自消息，只入台账。
+- [x] A4 `/team` 在有一条 `blocked` 汇报时，`needs a person` 段出现在 `working` 段之前；全部健康时只输出一行。
+- [x] A5 同一团队两个 teammate 各自拿到不同的 worktree 路径与分支，路径在 `.worktrees/` 下，且都被 `git worktree list` 承认。
+- [x] A6 非 git 仓库里创建 teammate，成员照样创建成功，且 `/team` 或段落里说明没有隔离。
+- [x] A7 `mode: enforce` 下，teammate 写未认领任务之外的路径得到 `ask`；写自己已认领任务的 `writeScopes` 内路径直接放行。
+- [x] A8 `mode: observe` 下同一次越界写入放行，且 `/team` 出现一条 `observed` 记录。
+- [x] A9 配置非法值（`mode: 'on'`、`maxReports: -1`）在装载时抛错，错误文本指向键名。
+- [x] A10 `tsc -p tsconfig.json --noEmit` 与 `vitest run` 通过。
+- [x] A11 模式路由（ponytail / compose-next）在 teammate 会话上可用——由 [compose-next-mode.md](compose-next-mode.md) 的验收覆盖，本规格只确认成员是 Agent、拿到同一个 section。

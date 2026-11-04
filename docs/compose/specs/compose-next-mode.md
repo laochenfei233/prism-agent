@@ -1,14 +1,23 @@
 ---
 feature: compose-next-mode
-status: designed
+status: delivered
 updated: 2026-11-04
 branch: feat/prism-team
-commits: 50ff54bd96..50ff54bd96
+commits: 50ff54bd96..933c30fa6a
 ---
 
 # Compose Next As A Mode
 
 ## Report
+
+**What was built** — `plugins/prism-guardrails/src/compose.ts`：与 `ponytail.ts` 同构的模式条目。等级 `off | lite | full`（`lite` 五阶段、`full` 九阶段），一段按会话解析的 system-prompt 段落，一条 `/compose-next off|lite|full|auto` 命令，以及按累计步数自动进入 `lite` 的规则（`autoLongTaskSteps` 默认 20，`0` 关闭）。bundle patch 里加了 `prism-guardrails-compose` 一行，`package.json` 加了 `./compose` 导出，`tsdown` 加了入口。默认 `level: off`，长任务靠自动规则进入。
+
+**Verification** — `tsc -p tsconfig.verify.json --noEmit` exit 0；`vitest` 的 `compose.spec.ts` 9/9 通过，同目录既有的 `ponytail.spec.ts` 18/18 与 `prism-guardrails.spec.ts` 144/144 全绿（合计 171，回归门）；`tsdown` 产出 `lib/compose.js` 9.51 kB；`oxlint`（staged）0 warning 0 error。
+
+**Journey log** —
+
+- 规格初稿把 compose 写成「只给团队成员的闩锁，指向 skill 本体」；用户要求把 skill 本身变成插件能力，于是改为承载阶段正文（与 ponytail 承载其规则同一做法），由 `prism-guardrails` 提供给每个 profile。
+- 自动进入与 skill 自身「只在明确要求时进入」的规则冲突；按用户要求默认开启，冲突与关闭方式写进 README，而不是悄悄改规则。
 
 ## [S1] Problem
 
@@ -66,16 +75,16 @@ commits: 50ff54bd96..50ff54bd96
 
 ## Tasks
 
-- [ ] T1: `src/compose.ts`（等级、自动规则、段落、命令）(depends: none)
-- [ ] T2: 装载（`cordis.patch.yml` 行、`package.json` 导出、`tsdown` 入口）(depends: T1)
-- [ ] T3: `tests/compose.spec.ts` (depends: T1)
-- [ ] T4: README 的 compose 段与冲突说明 (depends: T2)
+- [x] T1: `src/compose.ts`（等级、自动规则、段落、命令）(depends: none)
+- [x] T2: 装载（`cordis.patch.yml` 行、`package.json` 导出、`tsdown` 入口）(depends: T1)
+- [x] T3: `tests/compose.spec.ts` (depends: T1)
+- [x] T4: README 的 compose 段与冲突说明 (depends: T2)
 
 ## [S4] Acceptance
 
-- [ ] A1 默认配置下（`level: off` 且未到阈值）段落为空。
-- [ ] A2 `level: lite` 的段落含五个阶段且不含 Grill；`level: full` 含九个阶段与 Finish。
-- [ ] A3 `autoLongTaskSteps: 3` 时第 2 步不切、第 3 步切到 `lite`；设为 `0` 时永不切换。
-- [ ] A4 `/compose-next full` 立刻改写段落，`off` 清空，`auto` 回到自动规则。
-- [ ] A5 非法 `level` 与非法步数在装载时抛错，错误文本指向键名。
-- [ ] A6 `prism-guardrails` 既有的 ponytail 与 rail 用例全绿（回归门）。
+- [x] A1 默认配置下（`level: off` 且未到阈值）段落为空。
+- [x] A2 `level: lite` 的段落含五个阶段且不含 Grill；`level: full` 含九个阶段与 Finish。
+- [x] A3 `autoLongTaskSteps: 3` 时第 2 步不切、第 3 步切到 `lite`；设为 `0` 时永不切换。
+- [x] A4 `/compose-next full` 立刻改写段落，`off` 清空，`auto` 回到自动规则。
+- [x] A5 非法 `level` 与非法步数在装载时抛错，错误文本指向键名。
+- [x] A6 `prism-guardrails` 既有的 ponytail 与 rail 用例全绿（回归门）。
