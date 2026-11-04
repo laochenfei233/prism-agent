@@ -37,7 +37,7 @@ export function readTunnelUrl(value: unknown): string | undefined {
 export function readRemotePrefs(value: unknown): PocketRemotePrefs | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const candidate = value as { provider?: unknown; tunnelUrl?: unknown }
-  if (candidate.provider !== 'tailscale' && candidate.provider !== 'tunnel') return undefined
+  if (candidate.provider !== 'lan' && candidate.provider !== 'tailscale' && candidate.provider !== 'tunnel') return undefined
   const provider: PocketProvider = candidate.provider
   if (candidate.tunnelUrl === undefined) return { provider }
   const tunnelUrl = readTunnelUrl(candidate.tunnelUrl)
@@ -76,7 +76,7 @@ function readPrefsFile(file: string): PocketRemotePrefs {
   try {
     parsed = JSON.parse(readFileSync(file, 'utf8'))
   } catch {
-    return { provider: 'tailscale' }
+    return { provider: 'lan' }
   }
-  return readRemotePrefs(parsed) ?? { provider: 'tailscale' }
+  return readRemotePrefs(parsed) ?? { provider: 'lan' }
 }

@@ -33,6 +33,7 @@ describe('readTunnelUrl', () => {
 
 describe('readRemotePrefs', () => {
   it('accepts each known transport with and without a hostname', () => {
+    expect(readRemotePrefs({ provider: 'lan' })).toEqual({ provider: 'lan' })
     expect(readRemotePrefs({ provider: 'tailscale' })).toEqual({ provider: 'tailscale' })
     expect(readRemotePrefs({ provider: 'tunnel', tunnelUrl: 'https://prism.example.com' }))
       .toEqual({ provider: 'tunnel', tunnelUrl: 'https://prism.example.com' })
@@ -48,9 +49,9 @@ describe('readRemotePrefs', () => {
 })
 
 describe('RemotePrefsStore', () => {
-  it('defaults to the tailscale transport without a file', () => {
+  it('defaults to the local-network transport without a file', () => {
     const dir = mkdtempSync(join(tmpdir(), 'prism-pocket-prefs-'))
-    expect(new RemotePrefsStore(join(dir, 'remote.json')).read()).toEqual({ provider: 'tailscale' })
+    expect(new RemotePrefsStore(join(dir, 'remote.json')).read()).toEqual({ provider: 'lan' })
   })
 
   it('persists a selection and reads it back', () => {
@@ -71,10 +72,10 @@ describe('RemotePrefsStore', () => {
     const dir = mkdtempSync(join(tmpdir(), 'prism-pocket-prefs-'))
     const corrupt = join(dir, 'corrupt.json')
     writeFileSync(corrupt, 'not json')
-    expect(new RemotePrefsStore(corrupt).read()).toEqual({ provider: 'tailscale' })
+    expect(new RemotePrefsStore(corrupt).read()).toEqual({ provider: 'lan' })
 
     const edited = join(dir, 'edited.json')
     writeFileSync(edited, JSON.stringify({ version: 1, provider: 'ngrok', tunnelUrl: 'http://plain.example' }))
-    expect(new RemotePrefsStore(edited).read()).toEqual({ provider: 'tailscale' })
+    expect(new RemotePrefsStore(edited).read()).toEqual({ provider: 'lan' })
   })
 })

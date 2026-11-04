@@ -22,6 +22,8 @@ export type PocketLocaleKey =
   | 'phone.qr'
   | 'phone.qr.unavailable'
   | 'phone.steps'
+  | 'step.bind'
+  | 'step.bind.hint'
   | 'step.serve'
   | 'step.run'
   | 'step.quick'
@@ -29,6 +31,7 @@ export type PocketLocaleKey =
   | 'step.trust.hint'
   | 'step.trust.cli'
   | 'remote.provider'
+  | 'remote.provider.lan'
   | 'remote.provider.tailscale'
   | 'remote.provider.tunnel'
   | 'tunnel.label'
@@ -38,6 +41,8 @@ export type PocketLocaleKey =
   | 'tunnel.installed'
   | 'tunnel.missing'
   | 'tunnel.hint'
+  | 'phone.blocked.noLan'
+  | 'phone.blocked.notBound'
   | 'phone.blocked.noTunnelUrl'
   | 'bots.title'
   | 'bots.intro'
@@ -131,6 +136,8 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.qr': 'Scan to open this workspace',
   'phone.qr.unavailable': 'No link to encode yet — resolve the blockers below first',
   'phone.steps': 'Still needed',
+  'step.bind': 'Bind the server to the local-network address',
+  'step.bind.hint': 'The desktop app always starts on loopback. Run this command from the CLI, then open the link again.',
   'step.serve': 'Proxy the port to Tailscale',
   'step.run': 'Run the named tunnel',
   'step.quick': 'Or start a quick test tunnel (random hostname)',
@@ -138,6 +145,7 @@ export const en: Record<PocketLocaleKey, string> = {
   'step.trust.hint': 'Add it to the profile cordis.patch.yml, then restart the app.',
   'step.trust.cli': 'Starting the server from the command line instead? Pass this flag:',
   'remote.provider': 'Route',
+  'remote.provider.lan': 'Local network',
   'remote.provider.tailscale': 'Tailscale',
   'remote.provider.tunnel': 'Cloudflare tunnel',
   'tunnel.label': 'Public hostname',
@@ -147,6 +155,8 @@ export const en: Record<PocketLocaleKey, string> = {
   'tunnel.installed': 'cloudflared is installed',
   'tunnel.missing': 'cloudflared was not found on PATH',
   'tunnel.hint': 'A named tunnel keeps this hostname stable; add it to the trust list so the server accepts it.',
+  'phone.blocked.notBound': 'The server listens on loopback only: restart it bound to the local-network address',
+  'phone.blocked.noLan': 'No local-network address was found on this machine',
   'phone.blocked.noTunnelUrl': 'No tunnel hostname yet: enter the https address your tunnel serves',
   'bots.title': 'Bot channels',
   'bots.intro': 'Connect a chat bot on any channel below; messages you send the bot drive this workspace, replies come back to the chat, and pending approvals or questions reach you as numbered choices.',
@@ -241,6 +251,8 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.qr': '扫码直达这个工作区',
   'phone.qr.unavailable': '还没有可编码的链接——先解决下面的阻塞步骤',
   'phone.steps': '还需要做到',
+  'step.bind': '把服务绑定到局域网地址',
+  'step.bind.hint': '桌面版固定启动在本机回环上；请用命令行执行这条命令，再重新打开链接。',
   'step.serve': '把这个端口代理到 Tailscale',
   'step.run': '运行命名隧道',
   'step.quick': '或先起一个临时测试隧道（域名随机）',
@@ -248,6 +260,7 @@ export const zh: Record<PocketLocaleKey, string> = {
   'step.trust.hint': '写进 profile 的 cordis.patch.yml 后重启应用。',
   'step.trust.cli': '如果是命令行启动的服务，改用这个参数：',
   'remote.provider': '通道',
+  'remote.provider.lan': '局域网',
   'remote.provider.tailscale': 'Tailscale',
   'remote.provider.tunnel': 'Cloudflare 隧道',
   'tunnel.label': '公网域名',
@@ -257,6 +270,8 @@ export const zh: Record<PocketLocaleKey, string> = {
   'tunnel.installed': '已检测到 cloudflared',
   'tunnel.missing': 'PATH 上没找到 cloudflared',
   'tunnel.hint': '命名隧道才能让这个域名稳定；把它加进可信列表，服务才会接受。',
+  'phone.blocked.notBound': '服务只监听本机：需要绑定到局域网地址再启动',
+  'phone.blocked.noLan': '这台机器上没有找到局域网地址',
   'phone.blocked.noTunnelUrl': '还没有隧道域名：填入隧道对外提供的 https 地址',
   'bots.title': 'Bot 渠道',
   'bots.intro': '在下面的任一渠道接入聊天机器人：你在聊天里发的消息会驱动这个工作区，回复直接回到聊天，待处理的审批和提问会以编号选项送达。',

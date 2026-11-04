@@ -6,4 +6,4 @@
  * @module @prism/prism-pocket/remote-status
  */
 
-export { isOriginTrusted, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './commands.ts'
+export { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './commands.ts'

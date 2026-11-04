@@ -21,9 +21,10 @@ import { installPocketTriggers, type PocketDeliverer } from './push/triggers.ts'
 import { SubscriptionStore } from './push/store.ts'
 import { detectTailscale } from './tailscale.ts'
 import { detectCloudflared } from './tunnel.ts'
+import { detectLanAddress } from './lan.ts'
 import { RemotePrefsStore, readRemotePrefs } from './remote-prefs.ts'
 import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
-import { phoneAccess, probeVerdict, tunnelAccess } from './commands.ts'
+import { lanAccess, phoneAccess, probeVerdict, tunnelAccess } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
 import { BotStore } from './bots/store.ts'
 import { BotSupervisor } from './bots/supervisor.ts'
@@ -34,9 +35,10 @@ import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, r
 import type { BotChannelId, BotInbound } from './bots/types.ts'
 
 export { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
-export { isOriginTrusted, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './remote-status.ts'
+export { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './remote-status.ts'
 export { detectTailscale, parseTailscaleStatus } from './tailscale.ts'
 export { detectCloudflared, versionOf } from './tunnel.ts'
+export { detectLanAddress } from './lan.ts'
 export { RemotePrefsStore, readRemotePrefs, readTunnelUrl } from './remote-prefs.ts'
 export { encryptPushPayload } from './push/encrypt.ts'
 export { generateVapidKeys, loadOrCreateVapidKeys, vapidAuthorization } from './push/keys.ts'
@@ -336,17 +338,21 @@ async function remoteResponse(request: Request, runtime: PocketRuntime): Promise
   return jsonResponse(await statusOf(runtime))
 }
 
-/** Assemble the remote-status body: surface facts, both probes, and the selected transport. */
+/** Assemble the remote-status body: surface facts, the probes, and the selected transport. */
 async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
   const [tailscale, cloudflared] = await Promise.all([detectTailscale(), detectCloudflared()])
+  const lan = detectLanAddress()
   const remote = runtime.prefs.read()
   const tunnelUrl = remote.tunnelUrl ?? runtime.surface.publicUrl
   const access = remote.provider === 'tunnel'
     ? tunnelAccess(runtime.surface, tunnelUrl)
-    : phoneAccess(runtime.surface, tailscale)
+    : remote.provider === 'lan'
+      ? lanAccess(runtime.surface, lan.ipv4)
+      : phoneAccess(runtime.surface, tailscale)
   const phone = await resolvePhone(access)
   return {
     server: runtime.surface,
+    lan,
     tailscale,
     cloudflared,
     remote: { provider: remote.provider, ...(tunnelUrl !== undefined ? { tunnelUrl } : {}) },

@@ -7,7 +7,7 @@
  * rejects a fence-invalid case.
  */
 import { describe, expect, it } from 'vitest'
-import { isOriginTrusted, phoneAccess, phoneTarget, probeVerdict, remoteCommands, tunnelAccess, tunnelCommands } from '../src/commands.ts'
+import { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, probeVerdict, remoteCommands, tunnelAccess, tunnelCommands } from '../src/commands.ts'
 import type { PocketServerSurface, PocketTailscaleInfo } from '../src/types.ts'
 
 const surface: PocketServerSurface = { host: '127.0.0.1', port: 3080, trustedHosts: [] }
@@ -107,6 +107,30 @@ describe('isOriginTrusted', () => {
     expect(isOriginTrusted('https://evil.tail.ts.net', fenced)).toBe(false)
     expect(isOriginTrusted('https://other.tail.ts.net:9999', { ...surface, trustedHosts: ['other.tail.ts.net:8443'] })).toBe(false)
     expect(isOriginTrusted('https://127.0.0.1:3080', { ...surface, host: '100.64.0.3', trustedHosts: [] })).toBe(false)
+  })
+})
+
+describe('lanCommands', () => {
+  it('prints the bind command and nothing without an address', () => {
+    expect(lanCommands(surface, '192.168.1.23').bind).toBe('prism web --host 192.168.1.23 --port 3080')
+    expect(lanCommands(surface, undefined)).toEqual({})
+  })
+})
+
+describe('lanAccess', () => {
+  it('names the missing local address', () => {
+    expect(lanAccess(surface, undefined)).toEqual({ blocker: 'no-lan', trusted: false })
+  })
+
+  it('reports the listener bound elsewhere as not bound, not as a trust miss', () => {
+    // A loopback listener never receives a request for the LAN address.
+    expect(lanAccess(surface, '192.168.1.23'))
+      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: false, blocker: 'not-bound' })
+  })
+
+  it('reports the address as ready once the listener binds it', () => {
+    expect(lanAccess({ ...surface, host: '192.168.1.23' }, '192.168.1.23'))
+      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: true })
   })
 })
 

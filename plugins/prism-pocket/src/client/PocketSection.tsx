@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { POCKET_BOTS_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
-import { remoteCommands, tunnelCommands } from '../commands.ts'
+import { lanCommands, remoteCommands, tunnelCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
 import { phoneQrSvg } from './qr.ts'
@@ -171,14 +171,20 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   }
 
   const chosen = status.remote.provider
-  const commands = chosen === 'tunnel'
-    ? tunnelCommands(status.server, status.remote.tunnelUrl)
-    : remoteCommands(status.server, status.tailscale)
+  const commands = chosen === 'lan'
+    ? lanCommands(status.server, status.lan.ipv4)
+    : chosen === 'tunnel'
+      ? tunnelCommands(status.server, status.remote.tunnelUrl)
+      : remoteCommands(status.server, status.tailscale)
   const { phone } = status
   const verdict = verdictOf(phone)
 
   const steps: Step[] = []
-  if (chosen === 'tunnel') {
+  if (chosen === 'lan') {
+    if (commands.bind !== undefined && phone.blocker !== undefined) {
+      steps.push({ key: 'step.bind', code: commands.bind })
+    }
+  } else if (chosen === 'tunnel') {
     // The run steps are how the transport comes up, so they matter most in
     // the states that are still blocked (including "no hostname stored yet").
     if (phone.blocker !== undefined) {
@@ -199,7 +205,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       <section className='prism-panel'>
         <h3 className='prism-panel-title'>{t('phone.title')}</h3>
         <div className='prism-actions' role='group' aria-label={t('remote.provider')}>
-          {(['tailscale', 'tunnel'] as const).map(option => (
+          {(['lan', 'tailscale', 'tunnel'] as const).map(option => (
             <button
               key={option}
               type='button'
@@ -207,7 +213,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
               aria-pressed={chosen === option}
               onClick={() => { choose(option) }}
             >
-              {t(option === 'tailscale' ? 'remote.provider.tailscale' : 'remote.provider.tunnel')}
+              {t(option === 'lan' ? 'remote.provider.lan' : option === 'tailscale' ? 'remote.provider.tailscale' : 'remote.provider.tunnel')}
             </button>
           ))}
         </div>
@@ -276,6 +282,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
                       <span className='prism-step-label'>{t(step.key)}</span>
                       <code className='prism-code'>{step.code}</code>
                       {step.key === 'step.trust' && <span className='prism-step-hint'>{t('step.trust.hint')}</span>}
+                      {step.key === 'step.bind' && <span className='prism-step-hint'>{t('step.bind.hint')}</span>}
                       {step.key === 'step.trust' && commands.trustedHost !== undefined && (
                         <>
                           <span className='prism-step-hint'>{t('step.trust.cli')}</span>
@@ -534,6 +541,8 @@ function blameKey(blocker: PocketRemoteStatus['phone']['blocker']): PocketLocale
   switch (blocker) {
     case 'loopback': return 'phone.blocked.loopback'
     case 'no-tailscale': return 'phone.blocked.noTailscale'
+    case 'no-lan': return 'phone.blocked.noLan'
+    case 'not-bound': return 'phone.blocked.notBound'
     case 'no-tunnel-url': return 'phone.blocked.noTunnelUrl'
     case 'not-serving': return 'phone.blocked.notServing'
     case 'untrusted': return 'phone.blocked.untrusted'
@@ -541,7 +550,7 @@ function blameKey(blocker: PocketRemoteStatus['phone']['blocker']): PocketLocale
   }
 }
 
-const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'no-tunnel-url', 'not-serving', 'untrusted'])
+const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'no-lan', 'not-bound', 'no-tunnel-url', 'not-serving', 'untrusted'])
 
 const STATUSES: ReadonlySet<string> = new Set(['off', 'starting', 'online', 'error'])
 
@@ -552,12 +561,15 @@ const STATUSES: ReadonlySet<string> = new Set(['off', 'starting', 'online', 'err
 function readStatus(value: unknown): PocketRemoteStatus {
   const root = objectOf(value)
   const server = objectOf(root?.server)
+  const lan = objectOf(root?.lan)
   const tailscale = objectOf(root?.tailscale)
   const cloudflared = objectOf(root?.cloudflared)
   const remote = objectOf(root?.remote)
   const pocket = objectOf(root?.pocket)
   const phone = objectOf(root?.phone)
   const publicUrl = stringOf(server?.publicUrl)
+  const lanIpv4 = stringOf(lan?.ipv4)
+  const lanDetail = stringOf(lan?.detail)
   const dnsName = stringOf(tailscale?.dnsName)
   const ipv4 = stringOf(tailscale?.ipv4)
   const detail = stringOf(tailscale?.detail)
@@ -577,6 +589,11 @@ function readStatus(value: unknown): PocketRemoteStatus {
       ...(publicUrl !== undefined ? { publicUrl } : {}),
       trustedHosts: Array.isArray(server?.trustedHosts) ? server.trustedHosts.filter(entry => typeof entry === 'string') : [],
     },
+    lan: {
+      available: lan?.available === true,
+      ...(lanIpv4 !== undefined ? { ipv4: lanIpv4 } : {}),
+      ...(lanDetail !== undefined ? { detail: lanDetail } : {}),
+    },
     tailscale: {
       available: tailscale?.available === true,
       ...(dnsName !== undefined ? { dnsName } : {}),
@@ -589,7 +606,7 @@ function readStatus(value: unknown): PocketRemoteStatus {
       ...(cloudflaredDetail !== undefined ? { detail: cloudflaredDetail } : {}),
     },
     remote: {
-      provider: remote?.provider === 'tunnel' ? 'tunnel' : 'tailscale',
+      provider: remote?.provider === 'tunnel' ? 'tunnel' : remote?.provider === 'tailscale' ? 'tailscale' : 'lan',
       ...(tunnelUrl !== undefined ? { tunnelUrl } : {}),
     },
     phone: {

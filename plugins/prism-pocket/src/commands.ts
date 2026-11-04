@@ -51,6 +51,16 @@ export function tunnelCommands(surface: PocketServerSurface, tunnelUrl: string |
 }
 
 /**
+ * Render the copyable step that puts the listener on the LAN address.
+ * @param surface - the webserver bind surface and trust list.
+ * @param ipv4 - the local-network address, when one exists.
+ * @returns the bind command, or nothing without an address to bind.
+ */
+export function lanCommands(surface: PocketServerSurface, ipv4: string | undefined): PocketRemoteCommands {
+  return ipv4 === undefined ? {} : { bind: `prism web --host ${ipv4} --port ${surface.port}` }
+}
+
+/**
  * Resolve the address a phone should open and whether the configured trust
  * list already admits it.
  *
@@ -88,6 +98,27 @@ export function tunnelAccess(
   if (tunnelUrl === undefined) return { blocker: 'no-tunnel-url', trusted: false }
   const trusted = isOriginTrusted(originOf(tunnelUrl), surface)
   return trusted ? { target: tunnelUrl, trusted } : { target: tunnelUrl, trusted, blocker: 'untrusted' }
+}
+
+/**
+ * Resolve the local-network transport's phone address and what still blocks it.
+ *
+ * The fence admits the listener's own bind address on any port, so a server
+ * bound here needs no trust entry; a server bound elsewhere is not listening
+ * on this interface at all, which is the blocker rather than a trust miss.
+ * @param surface - the webserver bind surface and trust list.
+ * @param ipv4 - the local-network address, when one exists.
+ * @returns the address, whether the listener is bound to it, and the blocker.
+ */
+export function lanAccess(
+  surface: PocketServerSurface,
+  ipv4: string | undefined,
+): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
+  if (ipv4 === undefined) return { blocker: 'no-lan', trusted: false }
+  const target = `http://${ipv4}:${surface.port}/`
+  return normalizeHost(surface.host) === ipv4
+    ? { target, trusted: true }
+    : { target, trusted: false, blocker: 'not-bound' }
 }
 
 /**
