@@ -10,7 +10,7 @@ import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts
 import { HoverCardGroup, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { menuOpenStateFactory } from '../src/client/contract/slots.ts'
-import type { MenuOpenState, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
+import type { MenuOpenState, ProjectMenuOpenState, ProjectRowOwnerProps, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { RowDragProps } from '../src/client/rows/Rows.tsx'
 import {
@@ -1280,25 +1280,46 @@ it('keeps the browser menu on a blank provisional row', () => {
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-it('runs every project context row and keeps export disabled', () => {
+it('runs every project context row and lets plugins add rows', () => {
   const onCreate = vi.fn()
   const moveToTop = vi.fn()
   const moveToBottom = vi.fn()
   const reveal = vi.fn()
   const rename = vi.fn()
   const onDelete = vi.fn()
+  const rendered = vi.fn()
+  const onEntry = vi.fn()
   const group: GroupNode = {
     key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
     sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
   }
+  const renderSlot = ((
+    name: 'sidebar.workspaces.project.menu.item',
+    owner: ProjectRowOwnerProps,
+    opts?: { hookContext?: unknown },
+  ) => {
+    rendered(name, owner, opts?.hookContext)
+    if (name !== 'sidebar.workspaces.project.menu.item') return null
+    const [open, setMenuOpen] = opts?.hookContext as ProjectMenuOpenState
+    return (
+      <MenuItemButton onSelect={() => { setMenuOpen(false); onEntry(owner, open) }}>Export project</MenuItemButton>
+    )
+  }) as Parameters<typeof ProjectRowItem>[0]['renderSlot']
   render(<ProjectRowItem
     group={group} onToggle={vi.fn()} onCreate={onCreate}
-    actions={{ rename, delete: onDelete, moveToTop, moveToBottom, reveal }} t={t}
+    actions={{ rename, delete: onDelete, moveToTop, moveToBottom, reveal }} renderSlot={renderSlot} t={t}
   />)
   const open = (): void => { fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 5, clientY: 5 }) }
   open()
-  expect(screen.getByRole('menuitem', { name: '导出（开发中）' })).toHaveProperty('disabled', true)
-  fireEvent.click(screen.getByRole('menuitem', { name: '新建会话' }))
+  expect(rendered).toHaveBeenCalledWith(
+    'sidebar.workspaces.project.menu.item',
+    { workspaceId: 'project', displayTitle: 'Project' },
+    [true, expect.any(Function)],
+  )
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Export project' }))
+  expect(onEntry).toHaveBeenCalledWith({ workspaceId: 'project', displayTitle: 'Project' }, true)
+  expect(screen.queryByRole('menu')).toBeNull()
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '新建会话' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '置底' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '在资源管理器中打开' }))

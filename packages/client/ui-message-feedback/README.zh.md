@@ -39,7 +39,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-本包贡献 `conversation.chat.assistant-actions` 的 `feedback` 条目（order 10），由 ui-conversation 声明并渲染在已定稿助手消息的 IconActions 行内；同时贡献 `conversation.input.overlay` 的 `feedback-dialog` 条目（order 2），它通过 body portal 渲染 Modal 与 Toast 基元，并让 toast 以其所在的输入框卡片为中心。`feedbackUi.openSession(sessionId)` Client 服务打开同一个 Session 级弹窗，不记录反馈；标题栏菜单和命令装饰共用此方法。`/feedback` 装饰是经 `ctx.commandUi.decorate` 注册的 `action`，因此菜单选中或不带参数的回车会消费触发 token 并打开弹窗，而带参数的命令行仍到达宿主命令。
+本包贡献 `conversation.chat.assistant-actions` 的 `feedback` 条目（order 10），由 ui-conversation 声明并渲染在已定稿助手消息的 IconActions 行内；同一 id 也注册到 `conversation.chat.message.menu.item`，为已定稿助手消息的右键菜单在复制、引用、侧边对话之后追加两行；同时贡献 `conversation.input.overlay` 的 `feedback-dialog` 条目（order 2），它通过 body portal 渲染 Modal 与 Toast 基元，并让 toast 以其所在的输入框卡片为中心。菜单里的两行只为被按下的消息打开该弹窗，不撤销已记录的评分；撤销仍在操作行上单击完成。`feedbackUi.openSession(sessionId)` Client 服务打开同一个 Session 级弹窗，不记录反馈；标题栏菜单和命令装饰共用此方法。`/feedback` 装饰是经 `ctx.commandUi.decorate` 注册的 `action`，因此菜单选中或不带参数的回车会消费触发 token 并打开弹窗，而带参数的命令行仍到达宿主命令。
 
 每个 Session 有一个 `MessageFeedbackController` 支撑所有消息控件，以及一个 `FeedbackDialogController` 拥有弹窗草稿、提交与 toast 序号。消息控制器只读取一次 `messageFeedback.list`，且延迟到首次 hover 或 focus 才发起，而非挂载时触发；变更串行执行，每次都携带最后观察到的版本，`version-conflict` 响应带回权威条目，据此对账视图而不重新拉取。任一评分操作执行前，该行都会检查已提交条目：评分相同则调用 `retract`，它会在串行队列内重新检查评分并在并发变更后变为无操作；其他状态则携带所选评分打开弹窗。弹窗控制器按目标提交：消息目标通过消息控制器 put 一条带弹窗备注与分类的对应评分，Session 目标通过 `ctx.remote.sessionFeedback` 记录。成功会关闭草稿并弹出确认 toast；被替换的旧草稿迟到的成功只弹确认 toast、不关闭新草稿；失败会保留弹窗并弹出停留时间更长的警告 toast。
 

@@ -141,6 +141,7 @@ Factory: conversation.content [ConversationContent]
 │     │        │  └─ calls Factory: conversation.chat.user.content
 │     │        ├─ key=assistant-step [AssistantNodeView / AssistantMarkdown]
 │     │        │  ├─ conversation.chat.message.images [MessageImages]
+│     │        │  ├─ conversation.chat.message.menu.item
 │     │        │  └─ conversation.chat.reasoning.body [DefaultReasoningBody]
 │     │        │     └─ calls Factory: conversation.chat.reasoning.content
 │     │        ├─ key=tool-call [ToolCallTree]

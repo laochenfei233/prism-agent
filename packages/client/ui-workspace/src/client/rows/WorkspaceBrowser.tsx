@@ -387,6 +387,7 @@ type SessionTreeProps = Pick<
   | 'insertWorkspaceBefore' | 'revealWorkspace' | 't' | 'usePanelInfo'
 > & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
+  | 'sidebar.workspaces.project.menu.item'
   | 'sidebar.workspaces.session.row.action'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
@@ -704,6 +705,7 @@ function SessionTree({
           group={group}
           containsCurrentDescendant={currentAncestors.has(group.key)}
           home={home}
+          renderSlot={renderSlot}
           t={t}
           onToggle={() => {
             if (group.expanded) dropWatermarks(key => withinGroup(key, group.key))
