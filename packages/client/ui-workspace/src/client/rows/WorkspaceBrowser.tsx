@@ -781,7 +781,7 @@ function SessionTree({
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               drag={dragProps}
-              selection={batch === undefined
+              selection={batch === undefined || node.blank
                 ? undefined
                 : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
               t={t}
@@ -909,7 +909,7 @@ function FlatList({
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
-              selection={batch === undefined
+              selection={batch === undefined || node.blank
                 ? undefined
                 : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
               drag={{
@@ -1603,7 +1603,10 @@ export function WorkspaceBrowser({
             <button
               type="button"
               className={css.batchAction}
-              onClick={() => { setSelectedSessionIds(filteredSessionIds(list, rowState)) }}
+              onClick={() => {
+                // The provisional blank row is not an archive or marking target.
+                setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
+              }}
             >
               {t('batch.selectAll')}
             </button>
