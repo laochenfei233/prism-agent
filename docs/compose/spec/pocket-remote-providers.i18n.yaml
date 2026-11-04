@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/pocket-remote-providers.md
 /:
-  en: d4455188348b400f
-  zh: d4455188348b400f
+  en: bb9f079849ae02c2
+  zh: bb9f079849ae02c2
 /pocket-remote-transports:
   en: 2bf88f75bcd331c8
-  zh: 5423891ca6788fec
+  zh: 5b65e155166d7699
 /pocket-remote-transports/report:
-  en: fad07ea11b9ca2b8
-  zh: a63500e05060c34a
+  en: 4b8468d4dc5481a7
+  zh: 9e67a85bc597c280
 /pocket-remote-transports/s1-problem:
-  en: 4fb533e095debfa5
-  zh: 4be63edfe5a3ee93
+  en: 61ea9c3f382b4ff8
+  zh: 3984c20e83765fcb
 /pocket-remote-transports/s2-design:
   en: ecbb0dbfa14686f0
   zh: 3c4e147edaa36f87
-/pocket-remote-transports/s2-design/s2-1-two-transports-one-selected:
-  en: c811c1b88a6d5af0
-  zh: 60135be080b86f2d
+/pocket-remote-transports/s2-design/s2-1-three-transports-one-selected:
+  en: 36b7a6f6d10069fb
+  zh: bd9418fd8cc4521c
 /pocket-remote-transports/s2-design/s2-2-the-tunnel-transport-is-a-stable-https-hostname:
   en: bd0606ae28eff2b4
   zh: 5bfa64c5eea7fbf0
@@ -27,29 +27,32 @@
   en: de61bd5070d61914
   zh: dad0fabb319e2cb6
 /pocket-remote-transports/s2-design/s2-4-phone-access-per-provider:
-  en: 6c1a8a48583d8f80
-  zh: 488176d867aca715
+  en: f0bc0a6bed36c517
+  zh: b8d48bd9ea5e1074
 /pocket-remote-transports/s2-design/s2-5-wire:
-  en: 9f4800511a5e93b7
-  zh: f20e1df53d5d3d73
+  en: aa3bf68012b49362
+  zh: f858a9ea7b59ade2
 /pocket-remote-transports/s2-design/s2-6-commands:
-  en: cb8e8ccd42d8d7af
-  zh: 9cdefe564263fbb3
+  en: 2e35b6915bcdb0f8
+  zh: 2a4b3f1004b6a6b1
 /pocket-remote-transports/s2-design/s2-7-settings-surface:
   en: ce37b7931cde5ca3
-  zh: 236323513a7dbdfb
+  zh: 237f0cd23e957ef9
 /pocket-remote-transports/s2-design/s2-8-trust-and-security-unchanged:
   en: dc376c39cf0ffc9c
   zh: aa16bc9bd94daa27
 /pocket-remote-transports/s2-design/s2-9-tests:
-  en: c62f36ce3ee00dca
-  zh: ca3fe0495796b982
+  en: eec85b559da6205f
+  zh: 9a8a16197f82e55f
+/pocket-remote-transports/s2-design/s2-10-the-local-network-is-the-default-transport:
+  en: ff11b61a5a48da1c
+  zh: 32c0e974d63e4211
 /pocket-remote-transports/s3-scope:
-  en: b352543772f6116f
-  zh: 296401b20cf2cb1e
+  en: f8a8aca26155ea3b
+  zh: 9b65a78e1c7b0385
 /pocket-remote-transports/tasks:
-  en: 0e8ec48369273d93
-  zh: bb369f3203eaae0f
+  en: 393b8be7715c4725
+  zh: 9c49602aa1faf423
 /pocket-remote-transports/s4-acceptance:
-  en: 40cf26b2a7bb89b7
-  zh: 97caa78239c882ee
+  en: dbc5d63fbab669e8
+  zh: 0ba81f6c88407514

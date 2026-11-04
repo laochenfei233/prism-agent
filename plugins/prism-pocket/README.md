@@ -28,9 +28,9 @@ A client-side patch plugin — zero changes to the web app itself. Every adaptat
 - A bot drives one bound session: its first message creates it, `/new` rebinds, `/stop` stops the turn when the agent exposes the affordance, `/help` lists the commands. The assistant's replies return to the chat, chunked to the channel's limit; a pending approval or user question reaches the chat as numbered choices — `1`/`y` approves, `2`/`n` rejects, a number picks a question's option, and 120s of silence delegates to the app's own surfaces.
 - Credentials live in the DSH home's `pocket/bots.json` (mode 0600), never leave a route response, and each channel's card reports per-field whether a value is stored. `Test` probes the cheapest credential check without sending a message.
 
-**Remote access: Tailscale or a stable tunnel**:
+**Remote access: local network first, Tailscale or a stable tunnel as the fallback**:
 
-- The Pocket settings section offers two transports and describes the one you select. The selection is stored host-side in the DSH home's `pocket/remote.json`; both probes are reported either way.
+- The Pocket settings section offers three transports and starts on the local network: it finds the machine's private IPv4 address (192.168 first), and a listener bound to that address gives the phone `http://<address>:<port>/` directly — the fence already admits the listener's own bind address, so no trust entry is needed. When the server listens on loopback only, the page reports `not-bound` and prints `prism web --host <address> --port <port>` instead of a link; the desktop app always starts on loopback.
 - Tailscale: it probes the local CLI and answers whether a phone can open this now, requests the advertised address instead of inferring from configuration, so a fence refusal and a missing proxy read differently, and offers the authenticated link to copy — the login token is what the phone trades for a session cookie — with the missing steps (`tailscale serve`, the `trustedHosts` entry for the ts.net authority) when the answer is no.
 - Cloudflare tunnel or any stable HTTPS hostname: enter the public address your named tunnel serves. The page reports the cloudflared probe, prints `cloudflared tunnel run <name>` and a first-run `cloudflared tunnel --url http://127.0.0.1:<port>` test, and prints the `trustedHosts` entry for that hostname; the address counts as ready only after it answers the probe without a fence refusal. The kernel trust policy is read, never modified.
 
@@ -59,6 +59,7 @@ pocket:
 ## Notes and limits
 
 - The webserver rejects wildcard binds and unknown Host/Origin authorities by design; the settings page explains the exact command for the path you choose. Tailscale `serve` and a named tunnel both provide HTTPS, which browsers require for push and service workers on non-localhost origins.
+- Binding the local-network address exposes the whole app to that network; the login token in the link is the only gate. A phone opened over plain `http` also gets no service worker, push, or home-screen install — those need the HTTPS of Tailscale or the tunnel.
 - The plugin never starts, stops, or configures Tailscale or the tunnel process, and reads no tunnel credentials; a random quick-tunnel hostname cannot pass the fence, so the stable name of a named tunnel is what the page stores.
 - iOS home-screen icons fall back to a screenshot (SVG touch icons are unsupported there); PNG icons are a follow-up.
 - The service worker keeps its own small zh/en text table because it lives outside the client context.
