@@ -3,7 +3,7 @@ feature: side-chat-panel
 status: delivered
 updated: 2026-11-04
 branch: feat/side-chat-panel (worktree .worktrees/side-chat-panel)
-commits: 50ff54bd96..HEAD
+commits: 50ff54bd96..57ce788948
 ---
 
 # Side Chat Panel
