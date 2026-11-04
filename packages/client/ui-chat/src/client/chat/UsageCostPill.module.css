@@ -1,0 +1,43 @@
+/* Session-header cost pill: the same compact reading the header's other
+   actions use, seated beside them. */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger:focus-visible,
+.trigger[aria-expanded='true'] {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.trigger svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

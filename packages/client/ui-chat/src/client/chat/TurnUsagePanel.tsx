@@ -3,14 +3,20 @@
 import { createPortal } from 'react-dom'
 import { IconDatabaseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TurnTokenUsage } from '../contract/chat-nodes.ts'
+import type { UnitPriceOverrides } from '../contract/usage.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
+import { formatUsd, turnCost } from './usage-pricing.ts'
 import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
 import css from './TurnUsagePanel.module.css'
 import dialogCss from './stat-dialog.module.css'
 
 export interface TurnUsagePanelProps {
   usage: TurnTokenUsage
+  /** Turn end time in epoch milliseconds; its billing tier prices this Turn. */
+  at: number
+  /** Custom unit prices that replace the built-in price for their model. */
+  overrides: UnitPriceOverrides
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -25,16 +31,18 @@ function formatExactCount(value: number, t: ChatViewSlotProps['t']): string {
 
 /**
  * Turn-usage IconActions pill with a click-open Turn-usage details dialog.
- * @param props - Turn usage buckets and locale seat.
+ * @param props - Turn usage buckets, the Turn end time, custom prices, and the locale seat.
  * @returns The trigger and, while open, its portaled dialog anchored above the trigger.
  */
-export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
+export function TurnUsagePanel({ usage, at, overrides, t }: TurnUsagePanelProps) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
 
   const cacheHit = usage.cacheReadTokens === undefined
     ? null
     : formatCacheHitPercent(usage.cacheReadTokens, usage.totalTokens - usage.outputTokens, 1)
   const total = formatCompactCount(usage.totalTokens, t)
+  const cost = turnCost(usage, new Date(at), overrides)
+  const costText = cost === undefined ? undefined : t('cost.usd', { amount: formatUsd(cost.totalUsd) })
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
 
   return (
@@ -47,7 +55,10 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
         onClick={() => { setOpen(!open) }}
       >
         <IconDatabaseOutlineRegular />
-        <span className={css.label}>{t('message.turnUsage.consumed', { total })}</span>
+        <span className={css.label}>
+          {t('message.turnUsage.consumed', { total })}
+          {costText !== undefined && <>{t('message.turnProcess.separator')}{costText}</>}
+        </span>
       </button>
       {open && createPortal(
         <div
@@ -101,6 +112,12 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
                 </span>
               )}
             </dd>
+            {costText !== undefined && (
+              <>
+                <dt>{t('message.turnUsage.cost')}</dt>
+                <dd data-turn-usage-cost>{costText}</dd>
+              </>
+            )}
           </dl>
         </div>,
         document.body,

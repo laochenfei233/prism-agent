@@ -1,0 +1,87 @@
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render } from '@testing-library/react'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
+import type { UsageCostPillProps } from '../src/client/chat/UsageCostPill.tsx'
+import { UsageCostPill } from '../src/client/chat/UsageCostPill.tsx'
+import type { UnitPriceOverrides } from '../src/client/contract/usage.ts'
+import { en } from '../src/client/locale.ts'
+
+const t = makeTranslate(en, commonEn)
+
+/** Off-peak Monday (UTC) instant the pill prices at; the pill reads `new Date()`. */
+const OFF_PEAK = new Date('2026-11-02T05:00:00Z')
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+const USAGE: TokenUsageProjection = {
+  uncachedInputTokens: 1_000_000,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  outputTokens: 1_000_000,
+}
+
+function props(
+  usage: TokenUsageProjection | undefined,
+  model: string | undefined,
+  overrides: UnitPriceOverrides = {},
+  setUnitPrice = vi.fn(),
+): UsageCostPillProps {
+  const selection = model === undefined ? null : { provider: 'deepseek-official', model }
+  function useProjection(key: string): unknown {
+    if (key === 'tokenUsage') return usage
+    if (key === 'modelSelection') return { lastUsed: selection, next: selection }
+    return undefined
+  }
+  function useUnitPrices<T>(select: (value: UnitPriceOverrides) => T): T {
+    return select(overrides)
+  }
+  return { sessionId: 'session' as SessionId, useProjection, useUnitPrices, setUnitPrice, t } as UsageCostPillProps
+}
+
+describe('UsageCostPill', () => {
+  it('renders nothing for an unpriced or usage-free session', () => {
+    const unpriced = render(<UsageCostPill {...props(USAGE, 'unlisted')} />)
+    expect(unpriced.container.innerHTML).toBe('')
+    cleanup()
+    const empty = render(<UsageCostPill {...props(undefined, 'deepseek-flash')} />)
+    expect(empty.container.innerHTML).toBe('')
+  })
+
+  it('shows the estimated session cost and opens the dashboard', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(OFF_PEAK)
+    const view = render(<UsageCostPill {...props(USAGE, 'deepseek-flash')} />)
+    const trigger = view.getByRole('button', { name: 'Estimated cost for this session: $0.75' })
+    expect(trigger.textContent).toBe('≈$0.75')
+    fireEvent.click(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    const dialog = view.getByRole('dialog')
+    expect(dialog.getAttribute('aria-label')).toBe('Usage and cost')
+    expect(dialog.textContent).toContain('$0.75')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(view.queryByRole('dialog')).toBeNull()
+  })
+
+  it('prices with a stored custom price and forwards the editor write', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(OFF_PEAK)
+    const setUnitPrice = vi.fn()
+    const view = render(<UsageCostPill {...props(USAGE, 'deepseek-flash', { 'deepseek-flash': { miss: 2, hit: 0, output: 0 } }, setUnitPrice)} />)
+    expect(view.getByRole('button', { name: 'Estimated cost for this session: $2.00' })).toBeDefined()
+    fireEvent.click(view.getByRole('button'))
+    const editor = view.container.querySelector('[data-usage-price-editor]')
+    expect(editor).toBeNull() // the editor lives in the portaled modal, not the trigger's subtree
+    const dialog = view.getByRole('dialog')
+    fireEvent.change(dialog.querySelectorAll('input')[0]!, { target: { value: '3' } })
+    fireEvent.click(view.getByRole('button', { name: 'Save' }))
+    expect(setUnitPrice).toHaveBeenCalledWith('deepseek-flash', { miss: 3, hit: 0, output: 0 })
+  })
+})

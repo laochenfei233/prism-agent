@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { PerformanceUsageMode } from '../../chat-settings.ts'
+import type { UnitPriceOverrides } from '../contract/usage.ts'
 import type { ChatPresentationPolicy } from '../presentation-policy.ts'
 import { NS } from '../locale.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
@@ -22,11 +23,13 @@ import { TurnTriggerNodeView } from './TurnTriggerNodeView.tsx'
  * @param ctx - owning UI Conversation context.
  * @param performanceUsage - live statistics detail preference.
  * @param presentation - live presentation policy.
+ * @param unitPrices - live custom unit prices for the completed-Turn cost.
  */
 export function registerChatNodeRenderers(
   ctx: Context,
   performanceUsage: ObservableSnapshot<PerformanceUsageMode>,
   presentation: ObservableSnapshot<ChatPresentationPolicy>,
+  unitPrices: ObservableSnapshot<UnitPriceOverrides>,
 ): void {
   ctx.effect(() => ctx.slots.registerFactory({
     name: 'conversation.chat.reasoning.content',
@@ -79,7 +82,7 @@ export function registerChatNodeRenderers(
     name: 'conversation.chat.node',
     key: 'turn-tail',
     locale: NS,
-    inject: () => ({ hooks: { performanceUsage } }),
+    inject: () => ({ hooks: { performanceUsage, unitPrices } }),
     children: {
       'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },

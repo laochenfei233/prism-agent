@@ -22,6 +22,7 @@ A secondary press on a message body copies the selected text (or the whole messa
 - [Hidden Chat rows](#system-prompt-row)
 - [Command and failure rows](#command-and-failure-rows)
 - [Turn token usage](#turn-token-usage)
+- [Cost display](#cost-display)
 - [Completed-turn footer](#completed-turn-footer)
 - [Turn Process Folding](#turn-process-folding)
 - [Grouped rendering](#grouped-rendering)
@@ -75,6 +76,15 @@ The composer statistics are two `conversation.composer.dock` list entries: `acti
 Explicit selections update every consumer immediately; accepted Host settings reconcile the live value, so a refused or pending write keeps the selected mode until the Host answers.
 
 Preference menus restore focus to their trigger without scrolling before publishing a new selection.
+
+<a id="cost-display"></a>
+## Cost display
+
+A `conversation.session.header.actions` entry (`usage-cost`, order 30) shows the Session's estimated cost beside the header's other actions and opens a cost dashboard. The pill renders only while the Session has billable tokens and a priced model; it re-renders as the `tokenUsage` projection grows, so the current Turn's cost accrues while it streams. The dashboard lists every priced token bucket, the active billing tier, the built-in rate table, and the editor for custom unit prices.
+
+Prices are the official DeepSeek rates in USD per one million tokens (`https://api-docs.deepseek.com/quick_start/pricing`): `deepseek-flash` 0.15 cache-miss / 0.003 cache-hit / 0.6 output and `deepseek-v4-pro` 0.66 / 0.022 / 1.98. A peak hour bills at twice those rates; peak hours are 01:00–04:00 and 06:00–10:00 UTC on a Monday–Friday, and every other hour — including both weekend days — is off-peak. A cache-write token bills at the cache-miss rate because the provider has no separate write price. `usage-pricing.ts` owns the table, the tier rule, and the arithmetic.
+
+The per-Turn usage row prices a completed Turn at its single recorded route and the tier active at the Turn's end time; a Turn whose attempts span routes, or whose model has no price, keeps the token-only presentation. Custom unit prices replace the built-in price of one model and persist in browser storage under `dsh.usage-billing.prices.v1`; malformed stored entries are dropped on read, and a storage failure leaves the accepted value live for the rest of the page. The dashboard's editor writes only through the registration's injected `setUnitPrice`.
 
 <a id="completed-turn-footer"></a>
 ## Completed-turn footer
@@ -195,6 +205,10 @@ None; Chat presentation does not assemble or mutate provider requests.
 
 - **The transcript reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation is wider than the window: the rail merges the loaded Turns with the host `turnOutline` projection, so every started Turn gets a fixed-pitch mark (10px apart; a ladder taller than the frame scrolls inside it with gradient fades), and activating an unloaded mark pages history through the Turn's `turn/start` seq before landing on its row. Without the projection (assemblies not mounting `dsh-session-turn-outline`) the rail falls back to loaded Turns only.
 - **Rail previews are card-sized** — one prompt line (50 characters) and up to three response lines (120), on loaded and unloaded Turns alike; an unloaded Turn's response arrives from the outline only once the Turn settled, so an open Turn previews its prompt (or just the Turn number) until then.
+
+- **The Session cost is an estimate** — the `tokenUsage` projection carries no time or route split, so the header figure prices the whole log at the Session's current model and the tier active at render time. A Session that switched models, or that ran across a tier boundary, differs from the official per-interval bill. Only the per-Turn row is priced per recorded route.
+- **Chinese public holidays are not modeled** — a holiday weekday bills as peak; the pricing rule's holiday exclusion needs a shipped calendar.
+- **Custom unit prices are browser-local** — overrides live in this browser's storage rather than the Host settings document, so they do not follow the account across browsers.
 
 
 <a id="dev-note"></a>

@@ -1,0 +1,185 @@
+/* Cost dashboard body inside the shared Modal: one reading, one bucket list,
+   the built-in rate table, and the custom-price editor. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(420px, calc(100vw - 96px));
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.total {
+  color: var(--dsw-alias-label-primary);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 26px;
+}
+
+.tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.multiplier {
+  padding: 0 4px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.buckets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.bucket {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bucket dt,
+.bucket dd {
+  margin: 0;
+}
+
+.bucket dd {
+  display: inline-flex;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tokens {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.usd {
+  min-width: 64px;
+  text-align: right;
+}
+
+.note {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rates {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rates th,
+.rates td {
+  padding: 3px 8px;
+  font-weight: 400;
+}
+
+.rates thead th {
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 500;
+}
+
+.rates tbody th {
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+}
+
+.rateCurrent th,
+.rateCurrent td {
+  color: var(--dsw-alias-label-primary);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.editorTitle {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.fields {
+  display: flex;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.input {
+  box-sizing: border-box;
+  width: 96px;
+  padding: 3px 6px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-base, transparent);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action {
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.action:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
+.hint {
+  color: var(--dsw-alias-state-error-primary);
+}

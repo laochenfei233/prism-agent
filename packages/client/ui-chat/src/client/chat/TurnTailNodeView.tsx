@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ChatNodeViewProps, PerformanceUsageInjected, TurnTailOwnerProps } from '../contract/slots.ts'
+import type { UsagePriceInjected } from '../contract/usage.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { TurnUsagePanel } from './TurnUsagePanel.tsx'
 import { assistantText } from './turn-assistant.ts'
@@ -12,6 +13,7 @@ import css from './TurnTailNodeView.module.css'
 type TurnTailNodeViewProps = ChatNodeViewProps<'turn-tail'>
   & PropsRenderSlots<'conversation.chat.turnTail' | 'conversation.chat.assistant-actions'>
   & InjectFace<PerformanceUsageInjected>
+  & InjectFace<UsagePriceInjected>
 
 function lastContent(snapshot: ChatSnapshot, turn: number, skipWarning: boolean): ChatNode | undefined {
   const keys = snapshot.locations.getTurn(turn)
@@ -26,9 +28,10 @@ function lastContent(snapshot: ChatSnapshot, turn: number, skipWarning: boolean)
 
 /** Turn-local actions and feature tail over the Location index, independent of Assistant placement. */
 export const TurnTailNodeView = memo(function TurnTailNodeView({
-  node, openFile, forkAt, renderSlot, t, useAccess, useChat, usePerformanceUsage,
+  node, openFile, forkAt, renderSlot, t, useAccess, useChat, usePerformanceUsage, useUnitPrices,
 }: TurnTailNodeViewProps) {
   const detailed = usePerformanceUsage(mode => mode) === 'detailed'
+  const overrides = useUnitPrices(value => value)
   const forkAllowed = useAccess('session/fork')
   const data = node.data
   const hasLaterChatNode = useChat(snapshot =>
@@ -72,7 +75,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         className={css.actions}
         extraActions={assistantActions}
         usageAction={detailed && data.tokenUsage !== undefined
-          ? <TurnUsagePanel usage={data.tokenUsage} t={t} />
+          ? <TurnUsagePanel usage={data.tokenUsage} at={data.time} overrides={overrides} t={t} />
           : null}
         t={t}
       />

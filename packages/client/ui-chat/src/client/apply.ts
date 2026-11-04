@@ -34,6 +34,9 @@ import { ChatFlow } from './chat/ChatFlow.tsx'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
+import { UsageCostPill } from './chat/UsageCostPill.tsx'
+import { UsagePricePolicy } from './chat/usage-price-policy.ts'
+import type { UsagePriceEditorInjected } from './contract/usage.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
 import { en, NS, zh } from './locale.ts'
@@ -170,7 +173,8 @@ export function apply(ctx: Context): void {
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose() })
   const performanceUsage = performancePolicy.mode
-  registerChatNodeRenderers(ctx, performanceUsage, presentation)
+  const usagePrices = new UsagePricePolicy()
+  registerChatNodeRenderers(ctx, performanceUsage, presentation, usagePrices.prices)
   ctx.slots.registerFactory({
     name: 'conversation.chat.user.content', scope: 'session', locale: NS,
     children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },
@@ -336,6 +340,16 @@ export function apply(ctx: Context): void {
       name: 'conversation.composer.dock', id: 'usage', order: 1, locale: NS, inject: statPillInject,
     }, UsagePill)
   })
+
+  // The cost reading sits in the session header band beside the header's other
+  // actions; its dashboard opens from the same registration.
+  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
+    name: 'conversation.session.header.actions', id: 'usage-cost', order: 30, locale: NS,
+    inject: (): UsagePriceEditorInjected => ({
+      hooks: { unitPrices: usagePrices.prices },
+      setUnitPrice: (model, price) => { usagePrices.set(model, price) },
+    }),
+  }, UsageCostPill))
 
   ctx.slots.inject('conversation.approval.detail', () =>
     ctx.slots.register({ name: 'conversation.approval.detail' }, ApprovalCommand))

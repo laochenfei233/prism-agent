@@ -59,6 +59,9 @@ import { renderReasoningSlot } from './reasoning-component-fixture.tsx'
 import { createUserContentFixture } from './user-content-component-fixture.tsx'
 import { ConversationGroupStore } from '../../ui-conversation/src/client/conversation/group-store.ts'
 
+/** The harness Session stores no custom unit prices, so Turn costs use the built-in rates. */
+const useHarnessUnitPrices: React.ComponentProps<typeof TurnTailNodeView>['useUnitPrices'] = select => select({})
+
 function installGroupedSnapshot(
   builder: ChatSnapshotBuilder, state: ProcessState, groups: ConversationGroupStore<ProcessGroupData>, source: ChatSnapshot,
 ): ChatSnapshot {
@@ -338,7 +341,7 @@ function HarnessChatNode({ standard, owner, hookContext, usePerformanceUsage, to
       return <SystemPromptNodeView {...nodeProps} node={owner.node} />
     case 'turn-tail':
       return <TurnTailNodeView {...nodeProps} node={owner.node}
-        usePerformanceUsage={usePerformanceUsage} renderSlot={renderTurnTailSlot} />
+        usePerformanceUsage={usePerformanceUsage} useUnitPrices={useHarnessUnitPrices} renderSlot={renderTurnTailSlot} />
     case 'unknown':
       return <UnknownNodeView {...nodeProps} node={owner.node} />
     case 'tool-call': {

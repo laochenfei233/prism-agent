@@ -13,6 +13,7 @@ import { en, NS, zh } from '../src/client/locale.ts'
 import { derivePresentationPolicy, type CollapseTiming } from '../src/client/presentation-policy.ts'
 import { registerChatNodeRenderers } from '../src/client/chat/register-node-renderers.ts'
 import type { PerformanceUsageMode, TranscriptViewMode } from '../src/chat-settings.ts'
+import type { UnitPriceOverrides } from '../src/client/contract/usage.ts'
 
 type RenderSeats = PropsRenderSlots<'conversation.chat.reasoning.body'> & PropsRenderFactories
 
@@ -44,7 +45,8 @@ export async function createReasoningRenderFixture(language = 'zh') {
     apply: (ctx) => {
       registerChatNodeRenderers(ctx,
         createSnapshotStore<PerformanceUsageMode>('detailed'),
-        derivePresentationPolicy(createSnapshotStore<TranscriptViewMode>('detailed'), createSnapshotStore<CollapseTiming>('completion')))
+        derivePresentationPolicy(createSnapshotStore<TranscriptViewMode>('detailed'), createSnapshotStore<CollapseTiming>('completion')),
+        createSnapshotStore<UnitPriceOverrides>({}))
     },
   })
   await runtime.sessions.add({ id: 'reasoning-fixture' })
