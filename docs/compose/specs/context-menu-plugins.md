@@ -3,7 +3,7 @@ feature: context-menu-plugins
 status: delivered
 updated: 2026-11-04
 branch: feat/context-menu-plugins (worktree .worktrees/context-menu-plugins)
-commits: 50ff54bd96..ed3b1116f0
+commits: 50ff54bd96..51342066b9
 ---
 
 # Context Menu Plugin Rows
@@ -12,7 +12,9 @@ commits: 50ff54bd96..ed3b1116f0
 
 **What was built** — A settled assistant message's secondary-press menu now carries plugin rows. ui-chat declares `conversation.chat.message.menu.item` as a child of the `assistant-step` node renderer; the message menu renders its entries after the shipped copy, add-to-composer, and side-conversation rows, and each entry dismisses the menu through the injected `useMenuOpenState` hook. The gate is the durable message id the node view already holds (`AssistantChatData.finalNode`), so streaming, user, and empty bodies keep the three shipped rows. ui-message-feedback registers its two rating rows there (order 10) and opens the same per-message feedback dialog the hover strip opens; the strip keeps its retract-on-second-click behavior. The Session row's existing `sidebar.workspaces.session.menu.item` path is untouched.
 
-**Verification** — `node node_modules/typescript/bin/tsc -b tsconfig.client.json` exits 0. Focused vitest suites (`packages/client/ui-message-feedback/tests`, `packages/client/ui-chat/tests/chat-message-actions.client.spec.tsx`) pass 106/106, including the new menu-row and registration tests. `gen-client-catalog --check` reports the catalog up to date. The two edited documentation pairs pass `verify-translation-pairing`; the repository-wide run reports unrelated pre-existing out-of-sync pairs. `chat-view.client.spec.tsx` could not run on this host (the sandbox cannot create the symlinks pnpm needs, and the hoisted alternative duplicates React), so its single type-only helper change rests on the client aggregate typecheck and the stream/user gating rests on the tested "no extras renders the shipped rows" path rather than an assembled right-click.
+The project header's secondary-press menu gained the same treatment: ui-workspace declares `sidebar.workspaces.project.menu.item`, and `prism-transfer` registers **Export project** (order 900), which hands the browser's download manager that Workspace's single-project archive from the existing streaming route. The disabled "导出（开发中）" placeholder is gone, and the settings page remains the place for multi-project and settings archives.
+
+**Verification** — `node node_modules/typescript/bin/tsc -b tsconfig.client.json` exits 0 after the final change. Focused vitest suites pass: `packages/client/ui-message-feedback/tests` and `packages/client/ui-chat/tests/chat-message-actions.client.spec.tsx` 106/106, `packages/client/ui-workspace/tests/rows.client.spec.tsx` 69/69, and `packages/transfer/prism-transfer/tests` 199 passed with 1 skipped (that file's `route.spec.ts` raises one unhandled rejection that reproduces on the unmodified checkout, so it is pre-existing). `gen-client-catalog --check` reports the catalog up to date. The edited documentation pairs pass `verify-translation-pairing`; the repository-wide run reports unrelated pre-existing out-of-sync pairs. `chat-view.client.spec.tsx` could not run on this host (the sandbox cannot create the symlinks pnpm needs, and the hoisted alternative duplicates React), so its single type-only helper change rests on the client aggregate typecheck and the stream/user gating rests on the tested "no extras renders the shipped rows" path rather than an assembled right-click.
 
 **Journey log**
 
@@ -36,10 +38,12 @@ The secondary-press menus added to five client surfaces build their rows inline.
 
 **S2.5 — The rows are verbs.** `menu.like` and `menu.dislike` join the feedback dictionary in both languages ("标记为好的回答" / "Mark as a good response") instead of reusing the strip's action labels.
 
+**S2.6 — The project row exports through the same route.** ui-workspace declares `sidebar.workspaces.project.menu.item` (root scope, owner `{ workspaceId, displayTitle }`) for the project header's press-point menu, with the same dismissal hook. `prism-transfer` registers `export-project` (order 900) there: it builds `GET /api/prism.transfer/export?projects=<id>&settings=0&secrets=0` and clicks a download anchor, so the archive streams through the browser's download manager instead of the tab. The route is project-scoped, so the Session row gains no export; the shipped disabled export placeholder is removed rather than left as a second, dead row.
+
 ## [S3] Scope
 
-- In scope: the message-menu slot and its hook, the feedback menu rows and registration, focused component and disposal tests, the regenerated client slot catalog, and the ui-chat README, slots tree, and feedback subsystem notes.
-- Out of scope: project-row, file-tree, and composer menus — no plugin registers rows there, so no zero-consumer slot is added; branch and usage rows in the message menu (they are not plugin contributions); changing the assistant-action strip or its retract behavior.
+- In scope: the message-menu slot and its hook, the feedback menu rows and registration, the project-menu slot and the transfer export row, focused component and disposal tests, the regenerated client slot catalog, and the ui-chat, ui-workspace, and prism-transfer README notes.
+- Out of scope: file-tree and composer menus — no plugin registers rows there, so no zero-consumer slot is added; branch and usage rows in the message menu (they are not plugin contributions); changing the assistant-action strip or its retract behavior; a per-session archive route (the transfer route is project-scoped, so no Session menu row); the settings page's typed pre-download validation for the project row (the browser downloads the route's response as-is).
 
 ## Tasks
 
@@ -47,6 +51,7 @@ The secondary-press menus added to five client surfaces build their rows inline.
 - [x] T2: render the slot in the message menu and pass the settled message id down (covers: S2.1, S2.2)
 - [x] T3: add the feedback menu rows and their registration (covers: S2.3, S2.5)
 - [x] T4: focused tests, slot-catalog regeneration, and README notes (covers: S2.4)
+- [x] T5: project-menu slot and the transfer export row (covers: S2.6)
 
 ## [S4] Acceptance
 
@@ -54,4 +59,5 @@ The secondary-press menus added to five client surfaces build their rows inline.
 - [x] Selecting a feedback row dismisses the menu and opens the feedback dialog for that message with the chosen rating. (menu-row spec, registration spec)
 - [x] Right-clicking a user message, a streaming message, or a body with no settled message shows only the standard rows. (no extras renders the shipped rows; the node view derives extras from `finalNode?.messageId`)
 - [x] Disposing the feedback contribution removes its rows from the menu while the strip keeps rendering. (disposal spec removes the registry entry; the strip entry keeps its own spec)
+- [x] The project row's secondary press shows **Export project**, and choosing it dismisses the menu and starts the project archive download. (transfer menu-row spec asserts the dismissal and the route query; the rows spec asserts the slot owner and the plugin row rendering)
 - [x] Focused client tests, typecheck, and the regenerated slot catalog pass.
