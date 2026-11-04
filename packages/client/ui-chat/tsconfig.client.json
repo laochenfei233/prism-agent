@@ -58,6 +58,9 @@
       "path": "../../llm/token-meter"
     },
     {
+      "path": "../../typert/protocol"
+    },
+    {
       "path": "../../util/workspace-path"
     },
     {

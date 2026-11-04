@@ -71,13 +71,23 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
   }
   runtime.ctx.provide('sidebarRight', sidebarRight as never)
   const browserAvailable = createSnapshotStore(true)
+  const tabDisposers: Array<() => void> = []
   const sidebarRightTabs = {
     get: vi.fn<(kind: string) => object | undefined>(() => browserAvailable.getSnapshot() ? {} : undefined),
     subscribe: (listener: () => void) => browserAvailable.subscribe(listener),
-    register: vi.fn<(definition: SidebarRightTabDefinition) => () => void>(() => () => {}),
+    register: vi.fn<(definition: SidebarRightTabDefinition) => () => void>(() => {
+      const dispose = vi.fn(() => {})
+      tabDisposers.push(dispose)
+      return dispose
+    }),
   }
   if (withBrowserRegistry) runtime.ctx.provide('sidebarRightTabs', sidebarRightTabs as never)
-  const resourceRegister = vi.fn<(provider: unknown) => () => void>(() => () => {})
+  const resourceDisposers: Array<() => void> = []
+  const resourceRegister = vi.fn<(provider: unknown) => () => void>(() => {
+    const dispose = vi.fn(() => {})
+    resourceDisposers.push(dispose)
+    return dispose
+  })
   runtime.ctx.provide('resources', { register: resourceRegister } as never)
   const openWorkspacePath = vi.fn<ClientRemote['session']['openWorkspacePath']>(
     () => Promise.resolve({ ok: true, value: { opened: true } }),
@@ -139,7 +149,7 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     },
     runtime, chat, chatSettings, browserAvailable,
     layout, openWorkspacePath, sidebarRight, sidebarRightTabs, resourceRegister, session,
-    chatViewApi, chatFlowApi, rootReference, openSession, startSession,
+    chatViewApi, chatFlowApi, rootReference, openSession, startSession, tabDisposers, resourceDisposers,
   }
 }
 
@@ -275,7 +285,7 @@ describe('Chat inject API', () => {
       await vi.waitFor(() => {
         expect(b.sidebarRight.openResource).toHaveBeenCalledWith('dsh-resource://sidechat/session/side-1')
       })
-      // The Session lands in the viewing Session's workspace, and the main
+      // The Session lands beside the viewing Session's directory, and the main
       // conversation is not replaced.
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{ cwd: '/proj' }] })
       expect(b.startSession).not.toHaveBeenCalled()
@@ -297,6 +307,9 @@ describe('Chat inject API', () => {
     } finally {
       await b.runtime.dispose()
     }
+    // Every registration the feature contributes leaves with the plugin.
+    expect(b.resourceDisposers).toHaveLength(1)
+    expect(b.resourceDisposers[0]).toHaveBeenCalledOnce()
   })
 
 
@@ -426,6 +439,9 @@ describe('Chat inject API', () => {
       await registry.dispose()
       expect(b.runtime.slots.entries('settings.general.item').some(row => row.options.id === 'link-opening')).toBe(false)
       expect(b.runtime.slots.entries('conversation.view')).toHaveLength(1)
+      // The side-conversation type leaves with the registry that accepted it.
+      expect(b.tabDisposers).toHaveLength(1)
+      expect(b.tabDisposers[0]).toHaveBeenCalledOnce()
     } finally {
       await b.runtime.dispose()
     }

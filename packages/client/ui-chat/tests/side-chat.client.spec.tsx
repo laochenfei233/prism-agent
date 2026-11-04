@@ -3,9 +3,11 @@
 import type { ReactNode } from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import {
-  parseSideChatAddress, SideChatConversation, SideChatTab, sideChatAddress, sideChatResourceProvider,
+  parseSideChatAddress, SideChatConversation, SideChatTab, sideChatAddress, sideChatResourceProvider, startSideChat,
 } from '../src/client/chat/side-chat.tsx'
 
 const SIDE = 'side-1' as SessionId
@@ -13,24 +15,43 @@ const ADDRESS = 'dsh-resource://sidechat/session/side-1'
 
 afterEach(() => { cleanup() })
 
-function bench(options: { quotes?: Map<SessionId, string>; binding?: boolean; conversation?: boolean } = {}) {
+function bench(options: {
+  quotes?: Map<SessionId, string>
+  binding?: boolean
+  conversation?: boolean
+  ready?: 'reject'
+  workspaces?: boolean
+} = {}) {
   const release = vi.fn()
   const binding = { sessionId: SIDE }
   const sessions = {
-    retain: vi.fn(() => ({ ready: Promise.resolve(binding), release })),
+    retain: vi.fn(() => ({
+      ready: options.ready === 'reject' ? Promise.reject(new Error('open failed')) : Promise.resolve(binding),
+      release,
+    })),
     binding: vi.fn(() => options.binding === false ? undefined : binding),
+    list: createSnapshotStore({ byId: { [SIDE]: { cwd: '/proj' } } }),
+    create: vi.fn(async () => 'side-2' as SessionId),
   }
   const requestDraftInitialization = vi.fn(() => 'applied' as const)
   const conversation = { input: { requestDraftInitialization } }
+  const workspaces = {
+    list: createSnapshotStore({
+      items: [{ workspaceId: 'w1' as WorkspaceId, sessionIds: [SIDE as SessionId] }],
+    }),
+  }
+  const openResource = vi.fn()
   const ctx = {
     sessions: sessions as never,
-    sidebarRight: { openResource: vi.fn() } as never,
-    get: ((name: string) => options.conversation === false || name !== 'conversation'
-      ? undefined
-      : conversation) as never,
+    sidebarRight: { openResource } as never,
+    get: ((name: string) => {
+      if (name === 'workspaces') return options.workspaces === false ? undefined : workspaces
+      return options.conversation === false || name !== 'conversation' ? undefined : conversation
+    }) as never,
   }
-  const resource = sideChatResourceProvider(ctx, options.quotes ?? new Map<SessionId, string>())
-  return { resource, sessions, requestDraftInitialization, release, binding }
+  const quotes = options.quotes ?? new Map<SessionId, string>()
+  const resource = sideChatResourceProvider(ctx, quotes)
+  return { resource, sessions, requestDraftInitialization, release, binding, quotes, openResource, ctx }
 }
 
 function open(b: ReturnType<typeof bench>, address: string, signal: AbortSignal) {
@@ -117,6 +138,37 @@ describe('side-conversation resource', () => {
     const b = bench()
     const opening = open(b, 'dsh-resource://file/session/side-1', new AbortController().signal)
     await expect(opening.next()).rejects.toThrow('invalid side chat address')
+  })
+
+  it('reports an open failure as a resource frame instead of throwing', async () => {
+    const quotes = new Map<SessionId, string>([[SIDE, '> quoted']])
+    const b = bench({ quotes, ready: 'reject' })
+    const opening = open(b, ADDRESS, new AbortController().signal)
+    expect((await opening.next()).value).toMatchObject({ ok: false })
+    expect(await opening.next()).toMatchObject({ done: true })
+    expect(b.release).toHaveBeenCalledOnce()
+    expect(quotes.size).toBe(0)
+  })
+})
+
+describe('side-conversation start', () => {
+  it('creates the Session in the Workspace holding the viewing Session', async () => {
+    const b = bench()
+    startSideChat(b.ctx as never, SIDE, '> quoted', b.quotes)
+    await vi.waitFor(() => {
+      expect(b.openResource).toHaveBeenCalledWith('dsh-resource://sidechat/session/side-2')
+    })
+    expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: 'w1' })
+    expect(b.quotes.get('side-2' as SessionId)).toBe('> quoted')
+  })
+
+  it('falls back to the viewing directory when no Workspace lists the Session', async () => {
+    const b = bench({ workspaces: false })
+    startSideChat(b.ctx as never, SIDE, '> quoted', b.quotes)
+    await vi.waitFor(() => {
+      expect(b.openResource).toHaveBeenCalledWith('dsh-resource://sidechat/session/side-2')
+    })
+    expect(b.sessions.create).toHaveBeenCalledWith({ cwd: '/proj' })
   })
 })
 

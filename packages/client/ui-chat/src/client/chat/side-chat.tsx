@@ -7,10 +7,12 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResourceProvider } from '@deepseek-ai/dsh-client-resources/client'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { NS } from '../locale.ts'
 import css from './side-chat.module.css'
 
@@ -39,6 +41,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Session-scoped Conversation occurrence hosted by one side-conversation tab. */
     'chat.side.conversation': { kind: 'single'; scope: 'session' }
+  }
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** The addressed Session could not be opened for its panel. */
+    'sidechat/open-failed': Record<string, never>
   }
 }
 
@@ -94,10 +103,25 @@ export function startSideChat(
   prompt: string,
   quotes: Map<SessionId, string>,
 ): void {
+  // The Workspace the reader is in owns the new Session: the Host attaches
+  // membership only for an explicit Workspace, so a directory alone would leave
+  // it ungrouped until the next bootstrap.
+  const workspaceId = ctx.get('workspaces')?.list.getSnapshot().items
+    .find(item => item.sessionIds.includes(sessionId))?.workspaceId
   const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
-  void ctx.sessions.create(cwd === undefined ? {} : { cwd }).then((sideId) => {
+  const request = workspaceId !== undefined
+    ? { workspaceId }
+    : cwd === undefined ? {} : { cwd }
+  void ctx.sessions.create(request).then((sideId) => {
     quotes.set(sideId, prompt)
-    ctx.sidebarRight.openResource(sideChatAddress(sideId))
+    try {
+      ctx.sidebarRight.openResource(sideChatAddress(sideId))
+    } catch (error: unknown) {
+      // The Session existing without its panel is the lesser failure; the
+      // quotation is dropped rather than stranded in the map.
+      quotes.delete(sideId)
+      throw error
+    }
   }).catch((reason: unknown) => {
     console.warn('ui-chat: side conversation failed:', reason)
   })
@@ -121,8 +145,8 @@ export function sideChatResourceProvider(ctx: SideChatContext, quotes: Map<Sessi
       try {
         const quote = quotes.get(sessionId)
         if (quote !== undefined) {
-          quotes.delete(sessionId)
           await reference.ready
+          quotes.delete(sessionId)
           const binding = ctx.sessions.binding(sessionId)
           const conversation = ctx.get('conversation')
           if (binding !== undefined && conversation !== undefined) {
@@ -131,6 +155,20 @@ export function sideChatResourceProvider(ctx: SideChatContext, quotes: Map<Sessi
         }
         yield { ok: true, value: { reference } }
         await waitForAbort(signal)
+      } catch (error: unknown) {
+        // A provider reports failures as frames; closing the tab mid-open
+        // rejects readiness, and an unexpected throw must not escape.
+        quotes.delete(sessionId)
+        if (!signal.aborted) {
+          yield {
+            ok: false,
+            error: remoteErrorOf(error) ?? new RemoteError(
+              'sidechat/open-failed',
+              error instanceof Error ? error.message : String(error),
+              {},
+            ),
+          }
+        }
       } finally {
         reference.release()
       }
@@ -169,8 +207,8 @@ export function SideChatConversation({ renderFactorySlot }: SideChatConversation
  * @param quotes - quotations awaiting the Session they were opened for.
  */
 export function registerSideChat(ctx: Context, t: TranslateNS<typeof NS>, quotes: Map<SessionId, string>): void {
-  // The resource and tab registries are both optional: Chat stays usable in
-  // compositions that ship no Sidebar.
+  // Both registries stay optional: Chat also mounts in compositions that ship
+  // neither, where a side conversation has no panel to open.
   ctx.inject(['resources'], (scope) => {
     scope.effect(
       () => scope.resources.register(sideChatResourceProvider(scope, quotes)),
