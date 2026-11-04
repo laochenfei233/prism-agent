@@ -47,12 +47,24 @@ Every key is optional and validated at load; an unusable value fails plugin load
 
 The member prompt section states the report protocol, the claim-before-write rule, and — for a teammate with a worktree — the absolute path and branch to work in.
 
+## The header entry
+
+The browser half adds a **Team** chip to the session header, beside the subagent and background-job chips (`conversation.session.header.actions`, order 15). The chip is always present; opening it shows the roster, the open tasks, and every report, needs-a-person rows first. It loads on first open, so an ordinary session costs one request only when somebody looks.
+
+The panel reads through one Host route, `POST /api/prism-team/panel`, registered on Connection's shared `/api` channel. The route answers for whichever team the requested session belongs to, so a teammate's session shows its own team without the browser knowing the roster. The route is optional: a profile that composes no web server keeps every other part of the bundle, because the service is read with `ctx.get('connection')`.
+
+The panel is read-only. Claiming, completing, or reassigning a task needs a live Agent and Lead authority, so it stays in the model's tools.
+
 ## The write scope
 
-A teammate that writes through a configured write tool is checked against the `writeScopes` of the shared task it claimed:
+A teammate that writes through a configured write tool is checked against the `writeScopes` of the shared task **it owns**:
 
-- The path is inside a claimed task's scope: the write proceeds. That is the explicit case.
-- The path is outside every claimed task, or no task is claimed: under `enforce` the call goes to approval with a reason that names the scope; under `observe` it proceeds and the ledger records an `observed` row.
+- The path is inside a scope of a task the caller has claimed: the write proceeds. That is the explicit case.
+- The path is outside every task the caller owns, or the caller owns none: under `enforce` the call goes to approval with a reason that names the scope; under `observe` it proceeds and the ledger records an `observed` row.
+
+Another member's claimed task is context, not permission: its scopes never authorize this member's write.
+
+Each configured tool names its own path argument (`write` and `edit` use `file_path`; `str_replace_editor` uses `path`), so a tool the deployment adds is checked on the argument it actually takes.
 
 `/team` prints those rows below the reports, which is what makes `observe` a usable trial before arming the check.
 
@@ -72,7 +84,8 @@ Nothing removes a worktree automatically: an unreviewed checkout may be the memb
 - **The ledger is in memory.** It answers "what does the team look like right now" and disappears on restart. An out-of-tree plugin cannot write Session events, so the durable copy of a report is the message in the Lead's inbox.
 - **`observe` is a way to close the guard.** A deployment that thinks it is protected while it runs `observe` is worse off than one that never mounted the check. `/team` prints the observed rows, and the first line of the member section states the mode.
 - **`/team` reads what the team service exposes.** It lists roster, tasks, and this bundle's ledger; it does not summarize a teammate's own conversation.
-- **No Web panel.** Reports and tasks are read through `/team`; the Agent Teams roster and task board keep their own Web projection.
+- **No Web write path.** The header panel is read-only; claiming, completing, and reassigning stay in the model's tools, because they need a live Agent and Lead authority.
+- **The header chip does not hide itself.** A session with no team still shows the Team chip; opening it answers with the empty state rather than the chip disappearing, so the header stays stable across sessions.
 
 ## Tests
 

@@ -28,14 +28,27 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Type-only: activates the `ctx.connection` service these routes register on.
+import type {} from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import type { TeamMembership } from '@deepseek-ai/dsh-experimental-agent-team'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+import type { TeamPanelValue } from './panel-contract.ts'
+import { TEAM_PANEL_PATH } from './routes.ts'
 
 /** How the write scope applies: `observe` records a refusal and lets the write through. */
 export type Mode = 'enforce' | 'observe'
+
+/** One guarded write tool and the argument naming the path it writes. */
+export interface WriteTool {
+  /** Tool name as the model calls it. */
+  readonly tool: string
+  /** Argument carrying the written path. */
+  readonly pathArgument: string
+}
 
 /** Deployment configuration for the team bundle. */
 export interface Config {
@@ -43,8 +56,8 @@ export interface Config {
   readonly mode?: Mode
   /** Whether each teammate gets its own git worktree. Defaults to `true`. */
   readonly worktree?: boolean
-  /** Write tools whose `file_path` argument the scope check judges. Defaults to `write`, `edit`, and `str_replace_editor`. */
-  readonly writeTools?: readonly string[]
+  /** Write tools the scope check judges. Defaults to `write` and `edit` (`file_path`) plus `str_replace_editor` (`path`). */
+  readonly writeTools?: readonly WriteTool[]
   /** Reports kept per team in the in-memory ledger. Defaults to `200`. */
   readonly maxReports?: number
 }
@@ -55,14 +68,22 @@ export interface ResolvedConfig {
   readonly mode: Mode
   /** Whether each teammate gets its own git worktree. */
   readonly worktree: boolean
-  /** Write tools the scope check judges. */
-  readonly writeTools: ReadonlySet<string>
+  /** Guarded tool name to the argument naming the written path. */
+  readonly writeTools: ReadonlyMap<string, string>
   /** Reports kept per team. */
   readonly maxReports: number
 }
 
-/** Write tools the shipped profiles expose, all taking the same path argument. */
-const DEFAULT_WRITE_TOOLS: readonly string[] = ['write', 'edit', 'str_replace_editor']
+/**
+ * Write tools the shipped profiles expose, each with the argument that names
+ * its path; the opt-in editor spells it `path` while the filesystem tools use
+ * `file_path`.
+ */
+const DEFAULT_WRITE_TOOLS: readonly WriteTool[] = [
+  { tool: 'write', pathArgument: 'file_path' },
+  { tool: 'edit', pathArgument: 'file_path' },
+  { tool: 'str_replace_editor', pathArgument: 'path' },
+]
 
 /** Reports kept per team unless the deployment says otherwise. */
 const DEFAULT_MAX_REPORTS = 200
@@ -100,11 +121,22 @@ export function resolveConfig(config: Config): ResolvedConfig {
   if (!Number.isInteger(maxReports) || maxReports < 1) {
     throw new Error(`prism-team: maxReports must be an integer >= 1, received ${JSON.stringify(maxReports)}`)
   }
-  const writeTools = config.writeTools ?? DEFAULT_WRITE_TOOLS
-  if (!Array.isArray(writeTools) || writeTools.some(tool => typeof tool !== 'string' || tool.trim() === '')) {
-    throw new Error('prism-team: writeTools must be an array of non-empty tool names')
+  if (config.worktree !== undefined && typeof config.worktree !== 'boolean') {
+    throw new Error(`prism-team: worktree must be a boolean, received ${JSON.stringify(config.worktree)}`)
   }
-  return { mode, worktree: config.worktree ?? true, writeTools: new Set(writeTools), maxReports }
+  const writeTools = config.writeTools ?? DEFAULT_WRITE_TOOLS
+  if (!Array.isArray(writeTools) || writeTools.length === 0) {
+    throw new Error('prism-team: writeTools must be a non-empty array of { tool, pathArgument }')
+  }
+  const guarded = new Map<string, string>()
+  for (const entry of writeTools) {
+    if (typeof entry?.tool !== 'string' || entry.tool.trim() === ''
+      || typeof entry.pathArgument !== 'string' || entry.pathArgument.trim() === '') {
+      throw new Error('prism-team: every writeTools entry must name a non-empty tool and pathArgument')
+    }
+    guarded.set(entry.tool, entry.pathArgument)
+  }
+  return { mode, worktree: config.worktree ?? true, writeTools: guarded, maxReports }
 }
 
 /** Per-team report ledger with the bound the deployment set. */
@@ -165,10 +197,10 @@ function teamShort(id: string): string {
   return id.slice(0, 8)
 }
 
-/** The `file_path` a write tool was called with. */
-function writtenPath(argumentsValue: unknown): string | undefined {
+/** The path a write tool was called with, under the argument that tool names. */
+function writtenPath(argumentsValue: unknown, pathArgument: string): string | undefined {
   if (typeof argumentsValue !== 'object' || argumentsValue === null) return undefined
-  const value = (argumentsValue as Record<string, unknown>).file_path
+  const value = (argumentsValue as Record<string, unknown>)[pathArgument]
   return typeof value === 'string' ? value : undefined
 }
 
@@ -227,10 +259,14 @@ type Workspace =
  */
 function prepareWorktree(root: string | undefined, short: string, member: string): Workspace {
   if (root === undefined) return { warning: 'the Team Lead session records no working directory' }
+  if (!existsSync(join(root, '.git'))) return { warning: `${root} is not a git checkout` }
   const path = join(root, '.worktrees', `team-${short}-${member}`)
   const branch = `team/${short}/${member}`
   if (existsSync(path)) return { path, branch }
   try {
+    // Ignore the directory before creating the checkout, so the Lead's status
+    // never lists a teammate's tree. Only reached once `.git` proves this is a
+    // repository, so a non-git working directory keeps no stray `.worktrees`.
     const ignore = join(root, '.worktrees', '.gitignore')
     if (!existsSync(ignore)) {
       mkdirSync(join(root, '.worktrees'), { recursive: true })
@@ -239,7 +275,10 @@ function prepareWorktree(root: string | undefined, short: string, member: string
     execFileSync('git', ['-C', root, 'worktree', 'add', path, '-b', branch], { stdio: 'pipe', timeout: 30_000 })
     return { path, branch }
   } catch (error) {
-    const detail = error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)
+    const stderr = typeof error === 'object' && error !== null && 'stderr' in error
+      ? String((error as { stderr?: unknown }).stderr ?? '').trim().split('\n')[0]
+      : ''
+    const detail = stderr !== undefined && stderr !== '' ? stderr : error instanceof Error ? error.message : String(error)
     return { warning: `git worktree add failed: ${detail}` }
   }
 }
@@ -363,24 +402,27 @@ function installWriteGate(ctx: Context, config: ResolvedConfig, ledger: Ledger):
     const membership = ctx.agentTeams.tryMembership(agent)
     if (membership === undefined || membership.role === 'lead') return next()
     if (!config.writeTools.has(exec.name)) return next()
-    const path = writtenPath(exec.arguments)
+    const pathArgument = config.writeTools.get(exec.name)
+    if (pathArgument === undefined) return next()
+    const path = writtenPath(exec.arguments, pathArgument)
     if (path === undefined) return next()
     const root = agent.session.header.cwd
     if (root === undefined) return next()
 
-    const claimed = ctx.agentTeams.listTasks(agent).filter(task => task.status === 'in_progress')
+    // Only the caller's own claimed task authorizes a write: another member's
+    // scope is context, not permission.
+    const claimed = ctx.agentTeams.listTasks(agent)
+      .filter(task => task.status === 'in_progress' && task.ownerName === membership.name)
     const covered = claimed.some(task => withinScopes(root, path, task.writeScopes))
     if (covered) return next()
 
     const reason = claimed.length === 0
-      ? `\`${path}\` is written with no claimed shared task, so no write scope covers it. Claim the task this work belongs to (team_task_list, then team_task_update with action "claim") and retry.`
+      ? `\`${path}\` is written with no claimed shared task of your own, so no write scope covers it. Claim the task this work belongs to (team_task_list, then team_task_update with action "claim") and retry.`
       : `\`${path}\` is outside the write scopes of your claimed task (${claimed.map(task => `${task.id}: ${task.writeScopes.join(', ') || 'none'}`).join('; ')}). Either stay inside that scope or tell the Lead the task's scope is wrong.`
-    const team = String(membership.id)
     if (config.mode === 'observe') {
-      ledger.record(team, { name: membership.name, status: 'observed', summary: path })
+      ledger.record(String(membership.id), { name: membership.name, status: 'observed', summary: path })
       return next()
     }
-    ledger.record(team, { name: membership.name, status: 'blocked', summary: path })
     return Promise.resolve({ kind: 'ask', reason })
   })
 }
@@ -391,13 +433,26 @@ function reportRow(entry: LedgerEntry): string {
   return `  ${entry.status.padEnd(9)} ${entry.name.padEnd(12)} ${entry.summary}${task}`
 }
 
+/** Order needs-a-person rows: a stoppage first, then a result, then a question. */
+function rank(status: LedgerEntry['status']): number {
+  if (status === 'blocked' || status === 'failed') return 0
+  if (status === 'ready') return 1
+  return 2
+}
+
+/** `1 member`, `2 members`. */
+function plural(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`
+}
+
 /**
  * Install the `/team` command, which any member may run.
  *
  * @param ctx - the plugin context the command is scoped to.
  * @param ledger - the shared team ledger.
+ * @param worktrees - prepared teammate checkout paths, keyed `<team>:<name>`.
  */
-function installTeamCommand(ctx: Context, ledger: Ledger): void {
+function installTeamCommand(ctx: Context, ledger: Ledger, worktrees: ReadonlyMap<string, string>): void {
   ctx.effect(() => ctx.commands.register({
     definitionId: CommandDefinitionId('prism-team/team'),
     name: 'team',
@@ -408,21 +463,101 @@ function installTeamCommand(ctx: Context, ledger: Ledger): void {
       if (membership === undefined) return { kind: 'error', text: '/team: this session is not a Team member.' }
       const team = String(membership.id)
       const members = ctx.agentTeams.listMembers(agent)
-      const tasks = ctx.agentTeams.listTasks(agent)
+      const tasks = ctx.agentTeams.listTasks(agent).filter(task => task.status !== 'completed')
       const entries = ledger.list(team)
-      const needs = entries.filter(entry => NEEDS_A_PERSON.has(entry.status))
-      const working = entries.filter(entry => !NEEDS_A_PERSON.has(entry.status))
+      const needs = entries.filter(entry => NEEDS_A_PERSON.has(entry.status)).sort((left, right) => rank(left.status) - rank(right.status))
+      const observed = entries.filter(entry => entry.status === 'observed')
+      const working = entries.filter(entry => !NEEDS_A_PERSON.has(entry.status) && entry.status !== 'observed')
 
-      const lines = [`Team ${teamShort(team)}: ${String(members.length)} members, ${String(tasks.length)} open tasks (${String(needs.length)} need a person).`]
+      const head = `Team ${teamShort(team)}: ${plural(members.length, 'member')}, ${String(tasks.length)} open ${tasks.length === 1 ? 'task' : 'tasks'} (${String(needs.length)} need a person).`
+      if (needs.length === 0 && observed.length === 0 && working.length === 0 && tasks.length === 0) {
+        return { kind: 'success', text: head }
+      }
+
+      const lines = [head]
       if (needs.length > 0) lines.push('', 'needs a person:', ...needs.map(reportRow))
       if (working.length > 0) lines.push('', 'working:', ...working.map(reportRow))
+      if (observed.length > 0) lines.push('', 'observed writes:', ...observed.map(reportRow))
       if (tasks.length > 0) {
         lines.push('', 'tasks:', ...tasks.map(task => `  ${task.id} ${task.status}${task.ownerName === undefined ? '' : ` (${task.ownerName})`}${task.ready ? '' : ' blocked'} · ${task.subject}`))
       }
-      lines.push('', ...members.map(member => memberLine(member)))
+      lines.push('', ...members.map(member => {
+        const path = worktrees.get(`${team}:${member.name}`)
+        return `${memberLine(member)}${path === undefined ? '' : ` · ${path}`}`
+      }))
       return { kind: 'success', text: lines.join('\n') }
     },
   }), 'prism-team.team()')
+}
+
+/**
+ * Answer one panel read: the roster, tasks, and reports for the team a session
+ * belongs to.
+ *
+ * A teammate's session resolves to its Team through `tryMembership`, so the
+ * browser never has to know which member the open page shows.
+ *
+ * @param ctx - the plugin context carrying the Team service.
+ * @param ledger - the shared team ledger.
+ * @param sessionId - the session the open panel belongs to.
+ * @returns the panel value; a session with no live team still returns its recorded reports.
+ */
+function panelValue(ctx: Context, ledger: Ledger, sessionId: string): TeamPanelValue {
+  const agent = ctx.agents.list().find(candidate => String(candidate.session.id) === sessionId)
+  const membership = agent === undefined ? undefined : ctx.agentTeams.tryMembership(agent)
+  if (agent === undefined || membership === undefined) {
+    return { team: sessionId, live: false, members: [], tasks: [], reports: ledger.list(sessionId) }
+  }
+  const team = String(membership.id)
+  return {
+    team,
+    live: true,
+    members: ctx.agentTeams.listMembers(agent).map(member => ({
+      name: member.name,
+      role: member.role,
+      status: member.status,
+    })),
+    tasks: ctx.agentTeams.listTasks(agent)
+      .filter(task => task.status !== 'completed')
+      .map(task => ({
+        id: String(task.id),
+        subject: task.subject,
+        status: task.status,
+        ...task.ownerName === undefined ? {} : { ownerName: task.ownerName },
+        ready: task.ready,
+      })),
+    reports: ledger.list(team),
+  }
+}
+
+/**
+ * Register the panel's one read on Connection's shared `/api` channel.
+ *
+ * The route is optional: a profile that composes no web server keeps the rest
+ * of the bundle, and `ctx.get` reads the service without making it a dependency
+ * of every deployment.
+ *
+ * @param ctx - the plugin context carrying the Team service.
+ * @param ledger - the shared team ledger.
+ */
+function installPanelRoute(ctx: Context, ledger: Ledger): void {
+  const connection = ctx.get('connection')
+  if (connection === undefined) return
+  ctx.effect(() => connection.fetch.register({
+    path: TEAM_PANEL_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async (request: Request): Promise<Response> => {
+      const body = await request.json().catch(() => undefined)
+      const sessionId = typeof body === 'object' && body !== null && 'sessionId' in body
+        ? (body as { sessionId?: unknown }).sessionId
+        : undefined
+      if (typeof sessionId !== 'string' || sessionId === '') {
+        return Response.json({ error: 'sessionId is required' }, { status: 400 })
+      }
+      return Response.json(panelValue(ctx, ledger, sessionId))
+    },
+  } satisfies ConnectionFetchRoute), 'prism-team.panel()')
 }
 
 /**
@@ -438,6 +573,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   const resolved = resolveConfig(config)
   const ledger = createLedger(resolved.maxReports)
   const workspaces = new Map<Agent, Workspace>()
+  const worktreePaths = new Map<string, string>()
   const installed = new Map<Agent, () => void>()
 
   const workspaceFor = (agent: Agent, membership: TeamMembership, worktree: boolean): Workspace | undefined => {
@@ -446,6 +582,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     if (existing !== undefined) return existing
     const prepared = prepareWorktree(membership.root.session.header.cwd, teamShort(String(membership.id)), membership.name)
     workspaces.set(agent, prepared)
+    if ('path' in prepared) worktreePaths.set(`${String(membership.id)}:${membership.name}`, prepared.path)
     return prepared
   }
 
@@ -467,8 +604,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     for (const dispose of installed.values()) dispose()
     installed.clear()
     workspaces.clear()
+    worktreePaths.clear()
   }, 'prism-team.scoped()')
 
   installWriteGate(ctx, resolved, ledger)
-  installTeamCommand(ctx, ledger)
+  installTeamCommand(ctx, ledger, worktreePaths)
+  installPanelRoute(ctx, ledger)
 }

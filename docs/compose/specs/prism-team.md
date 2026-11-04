@@ -20,6 +20,8 @@ commits: 50ff54bd96..c4bd1a25a3
 - 首版测试把假 Agent 的 `ctx` 指到根上下文，两个成员注册同名 section/工具立刻冲突；改成 `createScope` 铸出的作用域 + 真 `Session`，`/team` 的日志写入也才成立。
 - worktree 只能劝告：会话 cwd 在创建时就固定，团队包不提供逐成员目录，所以成员必须用绝对路径；这条写进 README 而不是藏起来。
 - 交付前自查抓到 S2.4 与 S2.5 互相打架：成员在自己的 worktree 里写 `src/a.ts`，相对根目录是 `.worktrees/team-x/src/a.ts`，与任务声明的 `src` 永远不匹配，等于每写一次都要审批。`withinScopes` 现在先剥掉 `.worktrees/<checkout>/` 前缀再比，并加了用例。
+- 独立评审抓到两处授权漏洞并已修：门闸原先不校验任务归属（别的成员认领的范围也能放行本次写入），`str_replace_editor` 的路径参数是 `path` 而不是 `file_path`（等于该工具从未被检查）。现在 `writeTools` 是 `{ tool, pathArgument }` 列表，且只有**调用者自己认领**的任务才授权。
+- 面板落点从 `conversation.view` tab 改为会话头部动作排（S2.9）：用户要的入口就在「N 个子智能体 / N 个后台任务」旁边，而不是再开一个 tab。
 
 ## [S1] Problem
 
@@ -146,6 +148,19 @@ git worktree add <root>/.worktrees/team-<teamShort>-<name> -b team/<teamShort>/<
 | `git worktree add` 失败 | 段落里一行警告带 stderr，不打断成员 |
 | 台账写满 | 丢最旧一条，`/team` 显示真实条数 |
 | `mode: observe` | 越界写入放行并记账，`/team` 单列 observed 行 |
+
+### S2.9 浏览器面板：会话头部入口
+
+面板落点不是 `conversation.view` 的 tab，而是**会话头部动作排**（`conversation.session.header.actions`，order 15，夹在子智能体目录 10 与后台任务 20 之间）——用户要的是「团队模式激发时，入口就在这两个 chip 旁边」。
+
+- 客户端半区（`src/client/`）注册一条 header action，chip 文案「团队 / Team」，本地化走 `ctx.locale`（`prism-team` 命名空间，`LocaleNamespaceMap` 声明）。
+- chip 常驻；面板**首次打开时**才请求，所以普通会话零流量。
+- 面板内容：成员、开放任务、全部汇报，`blocked/failed` → `ready` → `waiting` 排在最前；`observed` 单列一组。
+- 数据走一条 Host 只读路由 `POST /api/prism-team/panel`，注册在 Connection 的 `/api` 通道上。路由按请求的会话解析它的团队（teammate 的会话解析到 Lead），所以浏览器不需要知道名册。
+- 路由是可选的：用 `ctx.get('connection')` 读服务，没有 Web 服务器的 profile 保留插件其余全部行为。
+- 只读：认领/完成/改派需要活的 Agent 与 Lead 权限，仍留在模型工具里。
+
+代价与限制：客户端半区是 `lib/client.js`（CJS + `window.__ModuleLoader__.load` 包装，照 `prism-memory` 的 tsdown 双构建），只外置 `react`、`react/jsx-runtime`、`@deepseek-ai/cordis`；面板在浏览器里的实际渲染未在本机验证（当前 GUI 跑在另一个 checkout）。
 
 ## [S3] Scope
 

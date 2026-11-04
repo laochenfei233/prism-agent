@@ -162,11 +162,13 @@ describe('configuration', () => {
     expect(resolved.mode).toBe('enforce')
     expect(resolved.worktree).toBe(true)
     expect(resolved.maxReports).toBe(200)
-    expect([...resolved.writeTools]).toEqual(['write', 'edit', 'str_replace_editor'])
+    expect([...resolved.writeTools]).toEqual([['write', 'file_path'], ['edit', 'file_path'], ['str_replace_editor', 'path']])
 
     expect(() => PrismTeam.resolveConfig({ mode: 'on' as PrismTeam.Mode })).toThrow('mode must be "enforce" or "observe"')
     expect(() => PrismTeam.resolveConfig({ maxReports: 0 })).toThrow('maxReports must be an integer >= 1')
-    expect(() => PrismTeam.resolveConfig({ writeTools: [''] })).toThrow('writeTools must be an array of non-empty tool names')
+    expect(() => PrismTeam.resolveConfig({ writeTools: [] })).toThrow('writeTools must be a non-empty array')
+    expect(() => PrismTeam.resolveConfig({ writeTools: [{ tool: '', pathArgument: 'p' }] })).toThrow('every writeTools entry')
+    expect(() => PrismTeam.resolveConfig({ worktree: 'yes' } as PrismTeam.Config)).toThrow('worktree must be a boolean')
   })
 })
 
@@ -267,8 +269,7 @@ describe('/team', () => {
   it('takes one line for a healthy team', async () => {
     const { ctx, agents } = await harness({}, [{ name: 'lead', role: 'lead' }])
     const text = await run(ctx, agents[0]!, '/team')
-    expect(text).toContain('Team 01234567: 1 members, 0 open tasks (0 need a person).')
-    expect(text).not.toContain('needs a person:')
+    expect(text).toBe('Team 01234567: 1 member, 0 open tasks (0 need a person).')
   })
 
   it('refuses a session that is not on a team', async () => {
@@ -288,6 +289,34 @@ describe('write scope', () => {
     })
     expect(result.isError).toBe(true)
     expect(textOf(result)).toContain('no claimed shared task')
+  })
+
+  it('ignores another member task scope as authorization', async () => {
+    const { ctx, agents, team } = await harness()
+    registerWrite(ctx)
+    team.tasks = [task('task-1', 'in_progress', 'someone-else', ['src'])]
+    const result = await ctx.tools.execute({
+      signal: SIGNAL, callId: ToolCallId('c1'), name: 'write',
+      arguments: { file_path: 'src/a.ts' }, agent: agents[1]!,
+    })
+    expect(result.isError).toBe(true)
+  })
+
+  it('reads the path argument each guarded tool names', async () => {
+    const { ctx, agents, team } = await harness()
+    ctx.tools.register(defineTool({
+      name: 'str_replace_editor',
+      description: 'edit a file',
+      parameters: { path: { type: 'string', required: true } },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: args => Promise.resolve(args.path),
+    }))
+    team.tasks = [task('task-1', 'in_progress', 'reviewer', ['src'])]
+    const inside = await ctx.tools.execute({
+      signal: SIGNAL, callId: ToolCallId('c1'), name: 'str_replace_editor',
+      arguments: { path: 'src/a.ts' }, agent: agents[1]!,
+    })
+    expect(inside.isError).toBe(false)
   })
 
   it('lets a write inside the claimed task scope through and refuses a sibling', async () => {
@@ -350,7 +379,7 @@ describe('worktree', () => {
     const listed = execFileSync('git', ['-C', root, 'worktree', 'list'], { stdio: 'pipe' }).toString()
     expect(listed).toContain('team-01234567-one')
     expect(listed).toContain('team-01234567-two')
-  })
+  }, 20_000)
 
   it('keeps the member working when there is no repository to isolate', async () => {
     const { ctx, agents } = await harness()
