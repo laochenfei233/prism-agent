@@ -331,8 +331,8 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     key: 'conversation.chat.message.menu.item',
     kind: 'list',
     scope: 'session',
-    summary: 'Rows appended to one settled assistant message\'s secondary-press menu, after the shipped copy, quote, and side-conversation rows.',
-    doc: 'Rows appended to one settled assistant message\'s secondary-press menu,\nafter the shipped copy, quote, and side-conversation rows. Each entry\nreceives the durable message id, renders one `role="menuitem"` button\n(the shipped entries of the Session row menu use ui-primitives\'\n`MenuItemButton`), and dismisses the menu through the injected\n`useMenuOpenState` hook after acting. Streaming and user messages carry\nno durable message id, so their menus render no such entries.',
+    summary: 'Rows appended to one settled assistant message\'s secondary-press menu, after the shipped copy, add-to-composer, and side-conversation rows, in ascending `order`.',
+    doc: 'Rows appended to one settled assistant message\'s secondary-press menu,\nafter the shipped copy, add-to-composer, and side-conversation rows, in\nascending `order`. A fresh `id` adds a row; reusing a shipped or plugin\nid at another `priority` shadows that row. Each entry receives the same\nowner the action strip reads (the durable message id), renders one\n`role="menuitem"` button (the shipped entries of the Session row menu\nuse ui-primitives\' `MenuItemButton`), and dismisses the menu through the\ninjected `useMenuOpenState` hook after acting; the list\'s keyboard walk\nand focus return read the DOM, so any such button joins them. Labels\ncome from the contributing package\'s locale namespace. Streaming and\nuser messages carry no durable message id, so their menus render no\nsuch entries.',
     registerOptions: [
       {
         name: 'id',
@@ -387,8 +387,8 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-message-feedback MessageFeedbackMenuItems id \'feedback\'',
     ],
     replaceRisk: 'none',
-    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.chat.message.menu.item\', () => ctx.slots.register(\n      { name: \'conversation.chat.message.menu.item\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-chat/src/client/contract/slots.ts:474',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    const label = \'Copy message id\' // Localize in the contributing package.\n    ctx.slots.inject(\'conversation.chat.message.menu.item\', () => ctx.slots.register(\n      { name: \'conversation.chat.message.menu.item\', id: \'copy-message-id\', order: 100 },\n      ({ messageId, useMenuOpenState }) => {\n        const [, setMenuOpen] = useMenuOpenState()\n        return React.createElement(\n          \'button\',\n          {\n            type: \'button\', role: \'menuitem\',\n            onClick: () => { setMenuOpen(false); void navigator.clipboard.writeText(messageId) },\n          },\n          label,\n        )\n      },\n    ))\n  },\n}',
+    source: 'packages/client/ui-chat/src/client/contract/slots.ts:500',
   },
   {
     key: 'conversation.chat.node',
@@ -3621,7 +3621,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.quota-notice\', () => ctx.slots.register(\n      { name: \'shell.quota-notice\', select: owner => null },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-chat/src/client/contract/slots.ts:490',
+    source: 'packages/client/ui-chat/src/client/contract/slots.ts:516',
   },
   {
     key: 'sidebar',

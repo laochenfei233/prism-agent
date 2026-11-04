@@ -25,10 +25,10 @@ export function MessageFeedbackMenuItems({ messageId, openDialog, useMenuOpenSta
   return (
     <>
       <MenuItemButton separatorBefore icon={<IconLikeOutlineRegular size={14} />} onSelect={() => { choose('positive') }}>
-        {t('action.like')}
+        {t('menu.like')}
       </MenuItemButton>
       <MenuItemButton icon={<IconDislikeOutlineRegular size={14} />} onSelect={() => { choose('negative') }}>
-        {t('action.dislike')}
+        {t('menu.dislike')}
       </MenuItemButton>
     </>
   )

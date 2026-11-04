@@ -464,12 +464,38 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.chat.assistant-actions': { kind: 'list'; scope: 'session'; owner: AssistantActionOwnerProps }
     /**
      * Rows appended to one settled assistant message's secondary-press menu,
-     * after the shipped copy, quote, and side-conversation rows. Each entry
-     * receives the durable message id, renders one `role="menuitem"` button
-     * (the shipped entries of the Session row menu use ui-primitives'
-     * `MenuItemButton`), and dismisses the menu through the injected
-     * `useMenuOpenState` hook after acting. Streaming and user messages carry
-     * no durable message id, so their menus render no such entries.
+     * after the shipped copy, add-to-composer, and side-conversation rows, in
+     * ascending `order`. A fresh `id` adds a row; reusing a shipped or plugin
+     * id at another `priority` shadows that row. Each entry receives the same
+     * owner the action strip reads (the durable message id), renders one
+     * `role="menuitem"` button (the shipped entries of the Session row menu
+     * use ui-primitives' `MenuItemButton`), and dismisses the menu through the
+     * injected `useMenuOpenState` hook after acting; the list's keyboard walk
+     * and focus return read the DOM, so any such button joins them. Labels
+     * come from the contributing package's locale namespace. Streaming and
+     * user messages carry no durable message id, so their menus render no
+     * such entries.
+     * @example
+     * return {
+     *   inject: ['slots'],
+     *   apply(ctx) {
+     *     const label = 'Copy message id' // Localize in the contributing package.
+     *     ctx.slots.inject('conversation.chat.message.menu.item', () => ctx.slots.register(
+     *       { name: 'conversation.chat.message.menu.item', id: 'copy-message-id', order: 100 },
+     *       ({ messageId, useMenuOpenState }) => {
+     *         const [, setMenuOpen] = useMenuOpenState()
+     *         return React.createElement(
+     *           'button',
+     *           {
+     *             type: 'button', role: 'menuitem',
+     *             onClick: () => { setMenuOpen(false); void navigator.clipboard.writeText(messageId) },
+     *           },
+     *           label,
+     *         )
+     *       },
+     *     ))
+     *   },
+     * }
      */
     'conversation.chat.message.menu.item': {
       kind: 'list'

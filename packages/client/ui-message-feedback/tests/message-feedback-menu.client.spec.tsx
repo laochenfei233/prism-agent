@@ -30,14 +30,14 @@ describe('MessageFeedbackMenuItems', () => {
   it('renders one row per judgment', () => {
     const ui = mount()
 
-    expect(ui.getByRole('menuitem', { name: zh['action.like'] })).toBeDefined()
-    expect(ui.getByRole('menuitem', { name: zh['action.dislike'] })).toBeDefined()
+    expect(ui.getByRole('menuitem', { name: zh['menu.like'] })).toBeDefined()
+    expect(ui.getByRole('menuitem', { name: zh['menu.dislike'] })).toBeDefined()
   })
 
   it('dismisses the menu and opens the dialog for a positive judgment', () => {
     const ui = mount()
 
-    fireEvent.click(ui.getByRole('menuitem', { name: zh['action.like'] }))
+    fireEvent.click(ui.getByRole('menuitem', { name: zh['menu.like'] }))
 
     expect(ui.setMenuOpen).toHaveBeenCalledExactlyOnceWith(false)
     expect(ui.openDialog).toHaveBeenCalledExactlyOnceWith(MSG, 'positive')
@@ -46,7 +46,7 @@ describe('MessageFeedbackMenuItems', () => {
   it('dismisses the menu and opens the dialog for a negative judgment', () => {
     const ui = mount()
 
-    fireEvent.click(ui.getByRole('menuitem', { name: zh['action.dislike'] }))
+    fireEvent.click(ui.getByRole('menuitem', { name: zh['menu.dislike'] }))
 
     expect(ui.setMenuOpen).toHaveBeenCalledExactlyOnceWith(false)
     expect(ui.openDialog).toHaveBeenCalledExactlyOnceWith(MSG, 'negative')
