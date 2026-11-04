@@ -73,6 +73,9 @@
       "path": "../locale/tsconfig.client.json"
     },
     {
+      "path": "../resources"
+    },
+    {
       "path": "../store"
     },
     {
