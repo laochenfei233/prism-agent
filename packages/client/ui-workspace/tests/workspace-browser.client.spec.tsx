@@ -2750,6 +2750,13 @@ describe('WorkspaceBrowser batch mode', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
 
+  it('leads the header cluster with the batch toggle, then view options and add', () => {
+    mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
+    const cluster = screen.getByRole('button', { name: zh['batch.mode'] }).parentElement as HTMLElement
+    expect(within(cluster).getAllByRole('button').map(button => button.getAttribute('aria-label')))
+      .toEqual([zh['batch.mode'], zh['viewOptions.label'], zh['workspace.add']])
+  })
+
   it('names the annotation filter that hid every Session and clears it from the empty state', () => {
     localStorage.clear()
     const preferences = createWorkspaceViewStore().create()
