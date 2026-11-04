@@ -16,6 +16,27 @@ export interface PocketServerSurface {
   trustedHosts: string[]
 }
 
+/** The transport the Pocket settings page describes. */
+export type PocketProvider = 'tailscale' | 'tunnel'
+
+/** cloudflared facts probed from the local CLI. */
+export interface PocketCloudflaredInfo {
+  /** The `cloudflared` CLI answered `--version`. */
+  available: boolean
+  /** CLI version, when the output carried one. */
+  version?: string
+  /** Why the probe failed, when it failed. */
+  detail?: string
+}
+
+/** The persisted remote-transport selection. */
+export interface PocketRemotePrefs {
+  /** Which transport the page explains and the phone link describes. */
+  provider: PocketProvider
+  /** Stable HTTPS hostname of the tunnel transport, when one is stored. */
+  tunnelUrl?: string
+}
+
 /** Tailscale facts probed from the local CLI. */
 export interface PocketTailscaleInfo {
   /** The `tailscale` CLI answered and reported self state. */
@@ -31,7 +52,7 @@ export interface PocketTailscaleInfo {
 /** The address a phone should open, and what still stands in its way. */
 export interface PocketPhoneAccess {
   /** The first thing blocking the phone, when something does. */
-  blocker?: 'loopback' | 'no-tailscale' | 'not-serving' | 'untrusted'
+  blocker?: 'loopback' | 'no-tailscale' | 'no-tunnel-url' | 'not-serving' | 'untrusted'
   /** The address already passes the Host/Origin fence. */
   trusted: boolean
   /** Authenticated URL to open on the phone; carries the login token, so never render it verbatim. */
@@ -44,6 +65,8 @@ export interface PocketPhoneAccess {
 export interface PocketRemoteStatus {
   server: PocketServerSurface
   tailscale: PocketTailscaleInfo
+  cloudflared: PocketCloudflaredInfo
+  remote: PocketRemotePrefs
   phone: PocketPhoneAccess
   pocket: {
     pushEnabled: boolean
@@ -59,9 +82,13 @@ export interface PocketRemoteStatus {
 export interface PocketRemoteCommands {
   /** `tailscale serve --bg --https=443 http://127.0.0.1:<port>` — exposes the loopback listener to the tailnet. */
   serve?: string
-  /** Profile patch that admits the MagicDNS authority through the Host/Origin fence. */
+  /** `cloudflared tunnel run <name>` — the named tunnel whose hostname stays stable. */
+  run?: string
+  /** `cloudflared tunnel --url http://127.0.0.1:<port>` — a first-run test whose hostname is random. */
+  quick?: string
+  /** Profile patch that admits the remote authority through the Host/Origin fence. */
   trust?: string
-  /** `--trusted-host <machine>.<tailnet>.ts.net` for a server the user starts from the CLI. */
+  /** `--trusted-host <authority>` for a server the user starts from the CLI. */
   trustedHost?: string
 }
 

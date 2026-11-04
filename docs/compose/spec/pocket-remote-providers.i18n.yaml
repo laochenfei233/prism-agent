@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for pocket-remote-providers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/pocket-remote-providers.md
+/:
+  en: a1631d831e465044
+  zh: a1631d831e465044
+/pocket-remote-transports:
+  en: 2bf88f75bcd331c8
+  zh: 5423891ca6788fec
+/pocket-remote-transports/report:
+  en: 8bac5457a8050071
+  zh: ec8473e4be3966b6
+/pocket-remote-transports/s1-problem:
+  en: 4fb533e095debfa5
+  zh: 4be63edfe5a3ee93
+/pocket-remote-transports/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/pocket-remote-transports/s2-design/s2-1-two-transports-one-selected:
+  en: c811c1b88a6d5af0
+  zh: 60135be080b86f2d
+/pocket-remote-transports/s2-design/s2-2-the-tunnel-transport-is-a-stable-https-hostname:
+  en: 29b7d6cdcce4516d
+  zh: 3b19747902e4a131
+/pocket-remote-transports/s2-design/s2-3-cloudflared-detection:
+  en: de61bd5070d61914
+  zh: dad0fabb319e2cb6
+/pocket-remote-transports/s2-design/s2-4-phone-access-per-provider:
+  en: 6c1a8a48583d8f80
+  zh: 488176d867aca715
+/pocket-remote-transports/s2-design/s2-5-wire:
+  en: 9f4800511a5e93b7
+  zh: f20e1df53d5d3d73
+/pocket-remote-transports/s2-design/s2-6-commands:
+  en: cabea506ac3f185b
+  zh: 8c791fb59ecd111f
+/pocket-remote-transports/s2-design/s2-7-settings-surface:
+  en: ce37b7931cde5ca3
+  zh: 236323513a7dbdfb
+/pocket-remote-transports/s2-design/s2-8-trust-and-security-unchanged:
+  en: dc376c39cf0ffc9c
+  zh: aa16bc9bd94daa27
+/pocket-remote-transports/s2-design/s2-9-tests:
+  en: 80e4e567b0a163b5
+  zh: 22a9c94bcd5c0ad3
+/pocket-remote-transports/s3-scope:
+  en: 11300c639de209a7
+  zh: c42a85fab76b61fa
+/pocket-remote-transports/tasks:
+  en: 2004ef2c963b15df
+  zh: 292c8640518184a5
+/pocket-remote-transports/s4-acceptance:
+  en: 40cf26b2a7bb89b7
+  zh: 97caa78239c882ee

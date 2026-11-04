@@ -28,9 +28,11 @@
 - 每个 bot 绑定一个会话：首条消息即创建，`/new` 重绑，`/stop` 在 agent 暴露中止入口时中止回合，`/help` 列出命令。助手回复按渠道限制分块回到聊天；待处理的审批和提问以编号选项送达——`1`/`y` 批准、`2`/`n` 拒绝、数字选择提问选项，120 秒沉默则交回应用自身界面。
 - 凭据存于 DSH home 的 `pocket/bots.json`（mode 0600），绝不出现在任何路由响应里；渠道卡片逐字段报告是否已保存值。`测试` 只做最便宜的凭据探测，不发消息。
 
-**Tailscale 远程访问**：
+**远程访问：Tailscale 或稳定隧道**：
 
-- 「口袋」设置分区探测本机 Tailscale，只回答一个问题：手机现在能不能打开？它直接请求对外地址而不是从配置推断，因此围栏拒绝和代理缺失会读出不同结论；能打开时给出可复制的已登录链接——手机用其中的登录令牌换取会话 Cookie——打不开时列出还缺的步骤：用 `tailscale serve` 代理本机端口，以及在 profile 里把 ts.net 域加进 `trustedHosts`。内核信任策略只读不改。
+- 「口袋」设置分区提供两种通道，只描述你选中的那一种。选择持久化在 DSH home 的 `pocket/remote.json`；两个探测结果始终都会上报。
+- Tailscale：探测本机 CLI，回答手机现在能不能打开；它直接请求对外地址而不是从配置推断，因此围栏拒绝和代理缺失会读出不同结论；能打开时给出可复制的已登录链接——手机用其中的登录令牌换取会话 Cookie——打不开时列出还缺的步骤（`tailscale serve`，以及 profile 里把 ts.net 域加进 `trustedHosts`）。
+- Cloudflare 隧道或任意稳定 HTTPS 域名：填入命名隧道对外提供的地址。页面报告 cloudflared 探测结果，打印 `cloudflared tunnel run <name>` 与首次连通性测试 `cloudflared tunnel --url http://127.0.0.1:<port>`，并打印该域名的 `trustedHosts` 条目；只有探测被应答且未被围栏拒绝时，地址才算就绪。内核信任策略只读不改。
 
 **PWA 安装**：manifest、图标与 service worker 由插件自身路由提供，浏览器半在运行时注入标签，手机浏览器即可把 Prism 添加到主屏幕。
 
@@ -56,6 +58,7 @@ pocket:
 
 ## 说明与限制
 
-- webserver 设计上拒绝通配符绑定与未知 Host/Origin；设置分区会解释所选路径对应的确切命令。浏览器在非 localhost 源上要求 HTTPS 才能使用推送与 service worker，Tailscale `serve` 恰好提供它。
+- webserver 设计上拒绝通配符绑定与未知 Host/Origin；设置分区会解释所选路径对应的确切命令。浏览器在非 localhost 源上要求 HTTPS 才能使用推送与 service worker，Tailscale `serve` 与命名隧道都提供它。
+- 插件从不启动、停止或配置 Tailscale 与隧道进程，也不读取隧道凭据；随机域名的临时隧道过不了围栏，页面存下的是命名隧道的稳定域名。
 - iOS 主屏图标退化为截图（Safari 不支持 SVG 触摸图标）；PNG 图标是后续项。
 - service worker 自持一份极小的中英文案表，因为它活在客户端上下文之外。

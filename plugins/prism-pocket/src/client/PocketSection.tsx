@@ -9,12 +9,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { POCKET_BOTS_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
-import { remoteCommands } from '../commands.ts'
+import { remoteCommands, tunnelCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
 import { phoneQrSvg } from './qr.ts'
 import type { PocketLocaleKey } from './locales.ts'
-import type { PocketRemoteStatus } from '../types.ts'
+import type { PocketProvider, PocketRemoteStatus } from '../types.ts'
 
 /** Section props bound by the settings shell. */
 export type PocketSectionProps = PropsRuntime<'settings.section'> & PropsLocale<'pocket.settings'>
@@ -57,6 +57,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [pushNote, setPushNote] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [installEvent, setInstallEvent] = useState<Event | null>(null)
+  const [tunnelDraft, setTunnelDraft] = useState('')
+  const [tunnelNote, setTunnelNote] = useState<string | null>(null)
   const requestSeq = useRef(0)
 
   const refresh = useCallback(async (seq: number): Promise<void> => {
@@ -135,19 +137,51 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       .catch((cause: unknown) => { setPushNote(cause instanceof Error ? cause.message : String(cause)) })
   }
 
+  /** Persist the chosen transport and adopt the status the host answers with. */
+  const choose = (next: PocketProvider): void => {
+    const tunnelUrl = status?.remote.tunnelUrl
+    void requestJson(POCKET_REMOTE_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: next, ...(tunnelUrl !== undefined ? { tunnelUrl } : {}) }),
+    })
+      .then((value) => { setStatus(readStatus(value)) })
+      .catch((cause: unknown) => { setTunnelNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
+  /** Persist the tunnel hostname; the host re-probes it before answering. */
+  const saveTunnel = (): void => {
+    void requestJson(POCKET_REMOTE_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'tunnel', tunnelUrl: tunnelDraft.trim() }),
+    })
+      .then((value) => {
+        setStatus(readStatus(value))
+        setTunnelDraft('')
+        setTunnelNote(t('tunnel.saved'))
+      })
+      .catch((cause: unknown) => { setTunnelNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
   if (error !== null) return <p className='prism-page-message' data-tone='error'>{error}</p>
   // A Host half that predates the phone block answers without one; claim nothing.
   if (status === null || (status.phone.url === undefined && status.phone.blocker === undefined)) {
     return <p className='prism-page-message'>{t('phone.title')}</p>
   }
 
-  const commands = remoteCommands(status.server, status.tailscale)
+  const chosen = status.remote.provider
+  const commands = chosen === 'tunnel'
+    ? tunnelCommands(status.server, status.remote.tunnelUrl)
+    : remoteCommands(status.server, status.tailscale)
   const { phone } = status
   const verdict = verdictOf(phone)
 
   const steps: Step[] = []
-  if (commands.serve !== undefined && phone.blocker === 'not-serving') {
-    steps.push({ key: 'step.serve', code: commands.serve })
+  if (phone.blocker === 'not-serving') {
+    if (commands.serve !== undefined) steps.push({ key: 'step.serve', code: commands.serve })
+    if (commands.run !== undefined) steps.push({ key: 'step.run', code: commands.run })
+    if (commands.quick !== undefined) steps.push({ key: 'step.quick', code: commands.quick })
   }
   if (commands.trust !== undefined && phone.blocker === 'untrusted') {
     steps.push({ key: 'step.trust', code: commands.trust })
@@ -159,6 +193,42 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
     <div className='prism-page'>
       <section className='prism-panel'>
         <h3 className='prism-panel-title'>{t('phone.title')}</h3>
+        <div className='prism-actions' role='group' aria-label={t('remote.provider')}>
+          {(['tailscale', 'tunnel'] as const).map(option => (
+            <button
+              key={option}
+              type='button'
+              className={chosen === option ? 'prism-button prism-button-primary' : 'prism-button prism-button-quiet'}
+              aria-pressed={chosen === option}
+              onClick={() => { choose(option) }}
+            >
+              {t(option === 'tailscale' ? 'remote.provider.tailscale' : 'remote.provider.tunnel')}
+            </button>
+          ))}
+        </div>
+        {chosen === 'tunnel' && (
+          <div className='prism-field'>
+            <span className='prism-field-label'>{t('tunnel.label')}</span>
+            <input
+              className='prism-input'
+              type='text'
+              autoComplete='off'
+              value={tunnelDraft !== '' ? tunnelDraft : (status.remote.tunnelUrl ?? '')}
+              onChange={(event) => { setTunnelDraft(event.target.value) }}
+              placeholder={t('tunnel.placeholder')}
+            />
+            <p className='prism-channel-hint'>
+              {status.cloudflared.available ? t('tunnel.installed') : t('tunnel.missing')}
+              {status.cloudflared.version !== undefined ? ` ${status.cloudflared.version}` : ''}
+              {!status.cloudflared.available && status.cloudflared.detail !== undefined ? ` · ${status.cloudflared.detail}` : ''}
+            </p>
+            <p className='prism-channel-hint'>{t('tunnel.hint')}</p>
+            <div className='prism-actions'>
+              <button type='button' className='prism-button prism-button-primary' onClick={saveTunnel}>{t('tunnel.save')}</button>
+            </div>
+            {tunnelNote !== null && <p className='prism-note'>{tunnelNote}</p>}
+          </div>
+        )}
         <div className='prism-phone'>
           <div className='prism-phone-qr'>
             {phone.url !== undefined
@@ -437,13 +507,14 @@ function blameKey(blocker: PocketRemoteStatus['phone']['blocker']): PocketLocale
   switch (blocker) {
     case 'loopback': return 'phone.blocked.loopback'
     case 'no-tailscale': return 'phone.blocked.noTailscale'
+    case 'no-tunnel-url': return 'phone.blocked.noTunnelUrl'
     case 'not-serving': return 'phone.blocked.notServing'
     case 'untrusted': return 'phone.blocked.untrusted'
     default: return 'phone.ready'
   }
 }
 
-const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'not-serving', 'untrusted'])
+const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'no-tunnel-url', 'not-serving', 'untrusted'])
 
 const STATUSES: ReadonlySet<string> = new Set(['off', 'starting', 'online', 'error'])
 
@@ -455,12 +526,17 @@ function readStatus(value: unknown): PocketRemoteStatus {
   const root = objectOf(value)
   const server = objectOf(root?.server)
   const tailscale = objectOf(root?.tailscale)
+  const cloudflared = objectOf(root?.cloudflared)
+  const remote = objectOf(root?.remote)
   const pocket = objectOf(root?.pocket)
   const phone = objectOf(root?.phone)
   const publicUrl = stringOf(server?.publicUrl)
   const dnsName = stringOf(tailscale?.dnsName)
   const ipv4 = stringOf(tailscale?.ipv4)
   const detail = stringOf(tailscale?.detail)
+  const cloudflaredVersion = stringOf(cloudflared?.version)
+  const cloudflaredDetail = stringOf(cloudflared?.detail)
+  const tunnelUrl = stringOf(remote?.tunnelUrl)
   const blocker = typeof phone?.blocker === 'string' && BLOCKERS.has(phone.blocker)
     ? phone.blocker as NonNullable<PocketRemoteStatus['phone']['blocker']>
     : undefined
@@ -479,6 +555,15 @@ function readStatus(value: unknown): PocketRemoteStatus {
       ...(dnsName !== undefined ? { dnsName } : {}),
       ...(ipv4 !== undefined ? { ipv4 } : {}),
       ...(detail !== undefined ? { detail } : {}),
+    },
+    cloudflared: {
+      available: cloudflared?.available === true,
+      ...(cloudflaredVersion !== undefined ? { version: cloudflaredVersion } : {}),
+      ...(cloudflaredDetail !== undefined ? { detail: cloudflaredDetail } : {}),
+    },
+    remote: {
+      provider: remote?.provider === 'tunnel' ? 'tunnel' : 'tailscale',
+      ...(tunnelUrl !== undefined ? { tunnelUrl } : {}),
     },
     phone: {
       trusted: phone?.trusted === true,
