@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.4/prism-memory-autopilot/guide.md
+/:
+  en: 8c59946365b4db1e
+  zh: 8e4ab648f2013db7
+/prism-memory-defaults-flip-from-review-first-to-autopilot:
+  en: b781a51526720071
+  zh: 1a30c2632996be8e
+/prism-memory-defaults-flip-from-review-first-to-autopilot/change:
+  en: 57cefb36f3187214
+  zh: 8de0722f6a7b0fa1
+/prism-memory-defaults-flip-from-review-first-to-autopilot/migration:
+  en: 067d8e014b14bde8
+  zh: a5a23cbebb54b6be

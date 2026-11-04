@@ -118,15 +118,21 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ## 自动记忆
 
-有三类写入方无需工具调用即可写入。它们都不能把未复核的主张送到模型面前：沉淀与导入默认落 `pending`，而 pending 从不注入，只能由 `/memory approve` 或 `/memory reject` 复核。
+有三类写入方无需工具调用即可写入，还有第四类要花一次模型调用。信任按说话人分级，而不是按写入方分级：重述用户本人话语的主张越过预审线直接落 `active`，讨论中推出的推断则挂 `pending` —— 从不注入、仍可搜索 —— 直到写入路径或整合 pass 印证它。想全部先审的部署设 `autoDistillStatus: pending` 或 `requireApproval: true`。
 
 ### 沉淀：在轮次自己的路径上
 
 一个 `agent/turn-stopping` 监听器读取刚刚结束的那个轮次 —— 人的消息与助手自己的交代 —— 并抽取陈述了持久内容的句子：约束（"must never…"、"禁止…"）、偏好（"I prefer…"、"以后都…"）、已确立的成因（"the root cause was…"、"根因是…"），或本工作区的一条约定。
 
-这条路径里没有模型调用。它每轮零成本，且对相同文本完全确定，这正是它能每轮都跑、而不必挂在调度器后面的原因。它也不动复用计数：语料已经持有的主张直接丢弃，因为 `hits` 被当作人或模型真的去拿过这条记录的证据。
+这条路径里没有模型调用。它每轮零成本，且对相同文本完全确定，这正是它能每轮都跑、而不必挂在调度器后面的原因。它也不动复用计数：语料已在库或已退休的主张直接丢弃，因为 `hits` 被当作人或模型真的去拿过这条记录的证据 —— 例外是用户本人的话语可以越过一条挂起的 `pending` 主张直达写入路径，一次重述要促成的正是这次转正。
 
-代价说得很直白：一个识别句式的读取器既有漏检（换种说法表述的主张会被漏掉），也有误报（一句话读起来像约束但其实不是）。误报正是出厂状态为 `pending` 的原因。
+代价说得很直白：一个识别句式的读取器既有漏检（换种说法表述的主张会被漏掉），也有误报（一句话读起来像约束但其实不是）。两个来源档位限制了误报能走多远：用户说出的候选以 `autoDistillUserConfidence`（默认 `0.7`，高于 `pendingBelowConfidence` 的 `0.5`）写入并落 `active`；助手陈述里的候选以 `autoDistillConfidence`（默认 `0.4`，低于该线）写入并挂起。每次写入都把它的档位记在证据注记里。
+
+### 模型读取提炼：每轮一次调用
+
+`llmDistill`（插件自身默认关，因此没有 llm 服务的 profile 也能装载本 bundle；随附的 `cordis.patch.yml` 把它打开）加入第四个读取者：每轮一次辅助模型调用，读取刚结束的轮次里句式匹配器看不见的持久主张 —— 一次换种说法的表述，一句落在所有已知句式之外的话。
+
+调用走会话最近路由的模型，除非 `llmDistillProvider` 与 `llmDistillModel` 点名了一对；两侧文本都短于 `llmDistillMinChars` 的轮次直接跳过；调用带 `purpose: 'memory-distill'`，让成本核算能把它归因出来。答案用宽容方式解析（首个 `[` 到末个 `]`，逐元素各自校验），每条主张按模型给出的 `source` 标签落到与句式蒸馏器相同的信任档位上。失败策略 —— 与确定性 pass 刻意相反：连不上的 provider 或读不懂的答案只记日志并跳过，承载它的轮次绝不失败。开启通道而没有挂载 llm 服务则插件装载即失败。
 
 ### 整理：按窗口
 
@@ -135,9 +141,9 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 这次巡检得出三件事，并拒绝第四件：
 
 - **印证。** 由不止一个会话写出的主张，经历过不止一次出错的机会。写入路径在一条相同的主张来自不同会话时记下这一点；巡检通过盖上 `corroboratedAt` 确认这些主张。它不碰 `confidence`：一条主张携带的确定性是其作者的陈述，后台巡检抬高它等于在编造证据。
-- **主题摘要。** 持续在同一个召回标签下返回的主张，会变成一条列出它们的 `topic` 记录，于是后续召回只有一个入口而不是 N 个。摘要以 `pending` 写入：它是机器写的、关于其他记录的散文，一个错误的索引条目会经它误导每一次召回。
+- **主题摘要。** 持续在同一个召回标签下返回的主张，会变成一条列出它们的 `topic` 记录，于是后续召回只有一个入口而不是 N 个。摘要是机器写的、关于其他记录的散文；`dreamDigestStatus`（默认 `active`）决定它是直接进入召回，还是先挂起待审。
 - **日志。** 每次巡检写一条归档条目，记下它发现了什么；每完成一个有活动的本地日写一条反思。两者都是确定性的，因此日志读起来像一份 diff。
-- **矛盾只上报，绝不裁决。** 两条共用召回标签、措辞重叠但说的不是同一件事的在库主张，会被人看到。在两条主张之间做选择是一个判断，而一个错误的自动选择比一个悬而未决的问题更糟。
+- **矛盾按新旧裁决。** 两条共用召回标签、措辞重叠但说的不是同一件事的在库主张即构成矛盾；在 `dreamAutoResolveConflicts`（默认开）下，较新的主张取代较旧的 —— 这是部署在配置里一次性做出的判断，而不是逐案判断，取代链与 `/memory restore` 让它始终可回滚。设为 `false` 则矛盾回到日志里，作为留给人的未决问题。
 
 这里没有任何东西会删除。会归档的整理是 `/memory maintain`，它仍然是一个单独的运维动作。
 
@@ -155,7 +161,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ## 治理与库卫生
 
-- **待审收件箱。** 在 `requireApproval` 下，或对任何低于 `pendingBelowConfidence` 的写入，主张都以 `pending` 存储。注入与搜索可见性是两个独立的决定：一条 pending 记录从不注入、也从不计为在库，但 `memory_search` 会返回它 —— 在**每一种**配置下，包括 `requireApproval` —— 因此模型总能找到它自己写过的主张，无论它当时带什么置信度。定夺审阅的只有 `/memory approve` 或 `/memory reject`，两者模型都无法调用；`/memory forget <id>` 会把交给它的任意一条主张归档，包括 pending 的，但不记录审阅决定。
+- **待审收件箱。** 在 `requireApproval` 下，或对任何低于 `pendingBelowConfidence` 的写入，主张都以 `pending` 存储。注入与搜索可见性是两个独立的决定：一条 pending 记录从不注入、也从不计为在库，但 `memory_search` 会返回它 —— 在**每一种**配置下，包括 `requireApproval` —— 因此模型总能找到它自己写过的主张，无论它当时带什么置信度。一条 pending 记录离开收件箱有三条路：`/memory approve`、印证（来自另一会话的相同写入，或以 active confidence 的重述，就地转正）、或 `/memory reject` —— 模型除了调用写入工具外无法触发其中任何一条；`/memory forget <id>` 会把交给它的任意一条主张归档，但不记录审阅决定。未开 `requireApproval` 的升级会转正分级策略已经信任的存量：导入的主张，以及落在用户本人层（`user`、`rule`）的沉淀主张；其余等印证。
 - **双时间记录。** 每条记录带 `validAt` 与 `invalidAt`。supersede、过期、合并与遗忘都走失效而不是删除，因此旧答案保持可审计，而只有当前主张会注入。
 - **回滚。** `/memory restore` 重新激活一条记录并归档一个在库的后继者，把回滚记录在后继者的证据里。
 - **维护。** `/memory maintain` 报告它将要做什么，在 `apply` 之前不写任何东西：超过期限的在库记录被归档，达到或高于 `dedupeJaccard` 的近似重复被合并进读者会保留的那条记录（更高置信度，其次更新），存储达到容量时已归档记录被淘汰，以及无法再解析的 supersede 链被上报。
@@ -217,8 +223,8 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `maxTextChars` | `2000` | 存储文本的上限 |
 | `maxTags` | `8` | 存储标签的上限 |
 | `maxRecords` | `5000` | 存储上限；达到上限的写入会淘汰最旧的已归档记录，没有可淘汰的则以 `PRISM_MEMORY_FULL` 失败 |
-| `requireApproval` | `false` | 让每次写入都经过 `pending`；pending 记录从不注入但保持可搜索 |
-| `pendingBelowConfidence` | `0.5` | 低于此置信度的写入变为 `pending`；pending 记录从不注入但保持可搜索 |
+| `requireApproval` | `false` | 让每次写入都经过 `pending`；pending 记录从不注入但保持可搜索。同时压住印证转正与存量转正 |
+| `pendingBelowConfidence` | `0.5` | 低于此置信度的写入变为 `pending`；pending 记录从不注入但保持可搜索。两个信任档位之间的分界线 |
 | `dedupeJaccard` | `0.85` | 写入报告近似重复的阈值，也是 `maintain` 执行合并的阈值 |
 | `dedupeReplaceJaccard` | `0.97` | 写入被视为相同主张、不再存第二次的阈值 |
 | `autoTag` | `true` | 为未提供标签的写入推导召回标签 |
@@ -234,7 +240,9 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `reminderWindowDays` | `7` | 到期日提前多久浮现 |
 | `maxReminders` | `3` | 每次首轮注入的提醒数 |
 | `autoDistill` | `true` | 读取每个轮次自身的文本以寻找持久主张 |
-| `autoDistillStatus` | `pending` | 沉淀出的主张写入时所用的状态 |
+| `autoDistillStatus` | `active` | 沉淀出的主张请求的状态；由置信度线决定它落在哪里 |
+| `autoDistillConfidence` | `0.4` | 从助手陈述沉淀的主张所用置信度；低于预审线，因此挂起 |
+| `autoDistillUserConfidence` | `0.7` | 从用户本人消息沉淀的主张所用置信度；高于预审线，因此直接生效 |
 | `autoDistillConfidence` | `0.4` | 沉淀出的主张写入时所用的置信度；低于复核阈值，因此会被拦下 |
 | `autoDistillLimit` | `3` | 一个轮次可贡献的主张数 |
 | `dreamEnabled` | `true` | 按窗口运行整理巡检 |
@@ -245,7 +253,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `dreamMaxTopics` | `3` | 一次巡检写出的摘要数 |
 | `dailyReflection` | `true` | 为每个有写入的已完成本地日写一份交代 |
 | `importSources` | `[]` | `/memory import` 可读取的外部布局；不指名则不读 |
-| `importStatus` | `pending` | 导入的主张写入时所用的状态 |
+| `importStatus` | `active` | 导入的主张写入时所用的状态 |
 | `importConfidence` | `0.6` | 导入的主张写入时所用的置信度 |
 
 `dedupeReplaceJaccard` 低于 `dedupeJaccard`、`identityLayers` 中出现未知或重复的名字、`dreamClusterFloor` 低于 `2`，以及 `importSources` 中出现未知的名字，都会让插件加载失败。每个字段都是易变的，因此可以从运行中的配置面编辑。
@@ -283,7 +291,7 @@ hits          reuse count, incremented by memory_open
 
 该域停留在版本 1。后续各层新增的每个字段在记录 schema 中都是可选的，因此由更早的构建写出的存储会在当前 schema 下重新打开，而不是被拒绝或丢弃：`per-record` 布局会逐份校验存储文档，而一个必填的新字段会让所有既有记录失效。
 
-本插件为自己写下的记录 —— journal 条目、反思与主题摘要 —— 带 `dream-journal`、`dream-reflection` 或 `dream-topic` 标签，以及一个让它们既不被注入也不进入搜索的状态。它们可以通过 `/memory journal` 阅读，并在导出镜像中可见。
+journal 条目与反思带 `dream-journal` 或 `dream-reflection` 标签，以及一个让它们既不被注入也不进入搜索的 `archived` 状态。主题摘要带 `dream-topic` 并跟随 `dreamDigestStatus`，因此出厂默认把它们作为召回索引条目接进召回；无论哪种，它们都可以通过 `/memory journal` 阅读，并在导出镜像中可见。
 
 ## 模型体验
 
@@ -328,7 +336,7 @@ token 影响：无。页面通过自己的路由读写，而它所结算的东�
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 200 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -337,7 +345,7 @@ node scripts/smoke.mjs                                                        # 
 
 `tests/cache-safety.spec.ts` 是本包核心主张的测试套件：未命中的轮次不添加消息，命中的轮次在未动过的前缀之后恰好追加一条消息，该块对固定语料是确定性的，已投递的记录绝不重复，该块遵守它的字符预算，5 个工具 schema 在多次读取之间字节稳定，以及挂载治理命令不新增 schema。
 
-`tests/automatic.spec.ts` 是自动那一半的测试套件：一个轮次自身的文本在无模型调用的情况下被沉淀并拦下待审，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，矛盾被上报且两条主张都存活，常驻记忆无需关键词命中即到达，到期日会浮现，以及一次导入把一个工作区文件读成 project 作用域的主张而不重复它已经读过的东西。
+`tests/automatic.spec.ts` 是自动那一半的测试套件：用户说出的主张在出厂默认下直接生效而助手建立的主张先挂起，一次重述就地转正一条挂起的主张，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，印证会转正一条 pending 主张，矛盾按新旧裁决（部署要求时留给用户），摘要跟随 `dreamDigestStatus`，卫生 pass 随整合提交一起跑，`requireApproval` 压住每一个闸门，模型读取提炼按档位归档主张且绝不弄挂轮次，升级存量按来源转正。`tests/extract.spec.ts` 单独覆盖提炼请求与解析器。
 
 `tests/commands.spec.ts` 是运维命令面的测试套件：每个用例把一行 `/memory` 打进真实的命令运行时并读取结算后的结果，因此一次什么都没存下的 `remember`、一次渲染错行的 `search`，或一个不再被解析的子命令都会在那里失败。
 
@@ -347,8 +355,8 @@ node scripts/smoke.mjs                                                        # 
 
 - **没有 embedding。** 排序是在字面 token 上做的 BM25（ASCII 词加 CJK 字符与二元组）。改写式召回能力弱；没有重排序器，也没有向量索引。harness 不自带 embedding 提供方，因此向量路径需要先有它。
 - **记忆语料没有 FTS 索引。** 记录存放在存储域中并在内存里排序，这让检索在模型路径上保持同步且无 I/O。在 `maxRecords` 上限之下这是正确的取舍；超过它之后，或者一旦改写式召回比延迟更重要，下一步就是在同样的记录上建立 `node:sqlite` FTS5 索引。
-- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。两者都是出厂状态为 `pending` 的原因；把 `autoDistillStatus` 提到 `active` 的部署是在把误报接进注入。
-- **矛盾检测是启发式的。** 它要求共用一个召回标签且落在某个相似度区间内，因此会漏掉用不同措辞表述的矛盾，也可能把关于同一主题的两条细致主张标出来。它只上报；没有任何东西被自动裁决。
+- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。模型读取提炼通道补前者，但引入每轮一次请求的代价与自身的不确定性；两个来源档位限制后者能走多远 —— 用户档的误报直接生效，助手档的误报先挂起。
+- **矛盾检测是启发式的。** 它要求共用一个召回标签且落在某个相似度区间内，因此会漏掉用不同措辞表述的矛盾，也可能把关于同一主题的两条细致主张标出来。`dreamAutoResolveConflicts` 裁决一条矛盾时，新旧就是全部论据；取代链保住的是可回滚，不是正确。
 - **每日反思报告的是已经过完的一天，因此它在那天之后才出现。** 一个连跑数周、没有跨过本地午夜的会话永远不会产出它。
 - **整理跑在轮次的路径上。** 该巡检受 `dreamWindowRecords` 限制，但它在轮次关闭之前被等待，因此非常大的语料会让跨过窗口的那个轮次变慢。
 - **轮次末巡检的失败属于该轮次的一部分。** 沉淀与整理会传播它们的错误而不是吞掉它们，依据的原则是坏掉的存储应当吵闹。宁愿丢一次巡检也不愿让轮次失败的部署，应当在自己那一层放宽捕获范围。

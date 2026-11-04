@@ -118,28 +118,34 @@ The score is normalized by the square root of the query's own term weight. The s
 
 ## Automatic memory
 
-Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is reviewed only by `/memory approve` or `/memory reject`.
+Three producers write without a tool call, and a fourth reads with one. Trust is tiered by who said it, not by which producer wrote it: a claim restating the person's own words writes above the review floor and lands `active`, while an inference the discussion reached parks `pending` — never injected, still searchable — until the write path or the consolidation pass corroborates it. A deployment that wants everything reviewed first sets `autoDistillStatus: pending` or `requireApproval: true`.
 
 ### Distillation, on the turn's own path
 
 An `agent/turn-stopping` listener reads the turn that just closed — the person's message and the assistant's own account — and extracts sentences that state something durable: a constraint ("must never…", "禁止…"), a preference ("I prefer…", "以后都…"), an established cause ("the root cause was…", "根因是…"), or a convention of this workspace.
 
-There is no model call in this path. It costs nothing per turn and is deterministic for identical text, which is why it can run on every turn rather than behind a scheduler. It also never inflates the reuse counter: a claim the corpus already holds is dropped instead, because `hits` is read as evidence that a human or a model actually reached for a record.
+There is no model call in this path. It costs nothing per turn and is deterministic for identical text, which is why it can run on every turn rather than behind a scheduler. It also never inflates the reuse counter: a claim the corpus already holds live or retired is dropped instead, because `hits` is read as evidence that a human or a model actually reached for a record — except that the person's own words reach the write path over a held `pending` claim, whose promotion is exactly what a restatement is for.
 
-The trade is stated plainly: a form-recognizing reader has false negatives (a claim phrased some other way is missed) and false positives (a sentence that reads like a constraint but is not). The false positives are why the shipped status is `pending`.
+The trade is stated plainly: a form-recognizing reader has false negatives (a claim phrased some other way is missed) and false positives (a sentence that reads like a constraint but is not). The two source tiers bound what a false positive can do: a candidate the person stated writes at `autoDistillUserConfidence` (default `0.7`, above the `pendingBelowConfidence` floor of `0.5`) and lands `active`; a candidate from the assistant's account writes at `autoDistillConfidence` (default `0.4`, below the floor) and parks. Every write records its tier on the evidence note.
+
+### Model-read extraction, one call per turn
+
+`llmDistill` (off in the plugin's own defaults, so a profile without an llm service can still mount the bundle; the shipped `cordis.patch.yml` turns it on) adds a fourth reader: one auxiliary model call per turn that reads the closing turn for durable claims the form matcher cannot see — a paraphrase, a claim stated outside every known form.
+
+The call routes through the session's routed model unless `llmDistillProvider` and `llmDistillModel` name a pair, is skipped for turns too short on both sides (`llmDistillMinChars`), and is stamped `purpose: 'memory-distill'` so cost accounting can attribute it. The answer is parsed tolerantly (the first `[` through the last `]`, each element validated on its own), and each claim lands on the same trust tiers as the form distiller's, keyed by the model's own `source` label. Failure policy — deliberately the opposite of the deterministic passes': an unreachable provider or an unreadable answer is logged and skipped, and the turn it rode on never fails. Enabling the channel without a mounted llm service fails plugin load.
 
 ### Consolidation, on a window
 
 An `agent/turn-stopping` listener also runs a consolidation pass once the corpus has moved far enough. The window boundary is the corpus itself — the last journal entry's write time — rather than a private counter, so it survives a restart, a fork, and a second process reading the same store.
 
-The pass concludes three things and refuses a fourth:
+The pass concludes four things:
 
-- **Corroboration.** A claim written from more than one conversation has survived more than one chance to be wrong. The write path records this when an identical claim arrives from a different session; the pass confirms those claims by stamping `corroboratedAt`. It does not touch `confidence`: the certainty a claim carries is its author's statement, and a background pass raising it would be inventing evidence.
-- **Topic digests.** Claims that keep returning under one recall tag become a single `topic` record listing them, so later recall has one entry point instead of N. A digest is written `pending`: it is machine-written prose about other records, and a wrong index entry would misdirect every recall through it.
+- **Corroboration.** A claim written from more than one conversation has survived more than one chance to be wrong. The write path records this when an identical claim arrives from a different session — including over a held `pending` record, which it corroborates instead of duplicating; the pass confirms confirmed claims by stamping `corroboratedAt`, and promotes a corroborated `pending` claim to `active` (review note `auto-approved: corroborated by another conversation`). Corroboration is the approval. It does not touch `confidence`: the certainty a claim carries is its author's statement, and a background pass raising it would be inventing evidence.
+- **Topic digests.** Claims that keep returning under one recall tag become a single `topic` record listing them, so later recall has one entry point instead of N. A digest is machine-written prose about other records; `dreamDigestStatus` (default `active`) decides whether it joins recall directly or parks for review first.
 - **A journal.** Each pass writes one archived entry naming what it found, and each completed local day with activity writes one reflection. Both are deterministic, so the journal reads as a diff.
-- **Contradictions are reported, never resolved.** Two live claims that share a recall tag and overlap in wording without saying the same thing are surfaced for a person. Choosing between two claims is a judgement, and a wrong automatic choice is worse than an open question.
+- **Contradictions are settled by recency.** Two live claims that share a recall tag and overlap in wording without saying the same thing are a contradiction; under `dreamAutoResolveConflicts` (default on) the newer claim supersedes the older — a judgement the deployment has made once in configuration rather than per case, kept reversible by the supersede chain and `/memory restore`. Setting it to `false` returns contradictions to the journal as open questions for a person.
 
-Nothing here deletes. Consolidation that archives is `/memory maintain`, which stays a separate operator action.
+On apply the pass also runs the hygiene sweep (`dreamAutoMaintain`, default on): expiry archiving, near-duplicate merging, and capacity eviction happen with the consolidation instead of waiting for an operator command. `/memory maintain` stays for a dry-run look or an off-cycle pass.
 
 ### Dates
 
@@ -151,11 +157,11 @@ A record may carry a due date, distinct from its expiry. An expiry retires a cla
 
 Nothing is read unless a layout is named. `importSources` is empty by default, so another tool's memory is never enumerated behind the user's back.
 
-A claim the corpus already holds is counted as skipped rather than stored again — including a claim this importer itself parked for review, and one an operator has since archived, so a retired claim is not resurrected by the next run.
+A claim the corpus already holds is counted as skipped rather than stored again — including a claim this importer itself parked for review, and one an operator has since archived, so a retired claim is not resurrected by the next run. Imported claims write at `importStatus` (default `active`), because a source the operator named is a source the operator chose.
 
 ## Governance and library hygiene
 
-- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling the review is only `/memory approve` or `/memory reject`, neither of which the model can call; `/memory forget <id>` archives any claim it is given, a pending one included, without recording a review decision.
+- **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. A pending record leaves the inbox three ways: `/memory approve`, corroboration (an identical write from another conversation, or a restatement at active confidence, promotes it in place), or `/memory reject` — none of which the model can call except by writing, and `/memory forget <id>` archives any claim it is given without recording a review decision. Upgrading without `requireApproval` promotes the backlog the tier policy already trusts: imported claims, and distilled claims on the person's own layers (`user`, `rule`); the rest wait for corroboration.
 - **Two-time records.** Every record carries `validAt` and `invalidAt`. Superseding, expiring, merging, and forgetting all invalidate rather than delete, so an old answer stays auditable while only the current claim injects.
 - **Rollback.** `/memory restore` re-activates a record and archives a live successor, recording the rollback in the successor's evidence.
 - **Maintenance.** `/memory maintain` reports what it would do and writes nothing until `apply`: live records past their deadline are archived, near-duplicates at or above `dedupeJaccard` are merged into the record a reader would keep (higher confidence, then newer), archived records are evicted when the store is at capacity, and supersede links that no longer resolve are reported.
@@ -217,8 +223,8 @@ A record outside the caller's scope is not merely ranked lower; it is filtered o
 | `maxTextChars` | `2000` | Stored text cap |
 | `maxTags` | `8` | Stored tag cap |
 | `maxRecords` | `5000` | Store cap; a write at the cap evicts the oldest archived record, and fails with `PRISM_MEMORY_FULL` when there is none |
-| `requireApproval` | `false` | Route every write through `pending`; a pending record never injects but stays searchable |
-| `pendingBelowConfidence` | `0.5` | Writes below this confidence become `pending`; a pending record never injects but stays searchable |
+| `requireApproval` | `false` | Route every write through `pending`; a pending record never injects but stays searchable. Also holds the corroboration promotion and the backlog promotion |
+| `pendingBelowConfidence` | `0.5` | Writes below this confidence become `pending`; a pending record never injects but stays searchable. The seam between the two trust tiers |
 | `dedupeJaccard` | `0.85` | Floor at which a write reports a near-duplicate, and the floor `maintain` merges at |
 | `dedupeReplaceJaccard` | `0.97` | Floor at which a write is treated as an identical claim and not stored twice |
 | `autoTag` | `true` | Derive recall tags for a write that supplied none |
@@ -234,21 +240,32 @@ A record outside the caller's scope is not merely ranked lower; it is filtered o
 | `reminderWindowDays` | `7` | How far ahead a due date is surfaced |
 | `maxReminders` | `3` | Reminders injected per first turn |
 | `autoDistill` | `true` | Read each turn's own text for durable claims |
-| `autoDistillStatus` | `pending` | Status a distilled claim is written with |
-| `autoDistillConfidence` | `0.4` | Confidence a distilled claim is written with; below the review floor, so it parks |
+| `autoDistillStatus` | `active` | Status a distilled claim requests; the confidence floor decides what it lands as |
+| `autoDistillConfidence` | `0.4` | Confidence for a claim distilled from the assistant's account; below the review floor, so it parks |
+| `autoDistillUserConfidence` | `0.7` | Confidence for a claim distilled from the person's own message; above the review floor, so it lands active |
 | `autoDistillLimit` | `3` | Claims one turn may contribute |
+| `llmDistill` | `false` | Read each closed turn with one auxiliary model call; enabling without a mounted llm service fails load |
+| `llmDistillProvider` | `''` | Provider for the extraction call; empty follows the routed model. Must be set with `llmDistillModel` |
+| `llmDistillModel` | `''` | Model for the extraction call; empty follows the routed model |
+| `llmDistillMaxTokens` | `512` | Output token cap for one extraction call |
+| `llmDistillMaxInputChars` | `4000` | Characters of one side's turn text the extraction call reads (head-clipped) |
+| `llmDistillMinChars` | `80` | Shortest turn text, per side, worth an extraction call |
+| `llmDistillLimit` | `3` | Claims one extraction call may contribute |
 | `dreamEnabled` | `true` | Run the consolidation pass on a window |
 | `dreamEveryWrites` | `25` | Claims written since the last pass before another runs |
 | `dreamWindowRecords` | `200` | New-material records one pass compares against the corpus |
 | `dreamConflictFloor` | `0.5` | Similarity floor at which two live claims count as comparable but disagreeing |
 | `dreamClusterFloor` | `3` | Claims sharing a tag before that tag earns a digest |
 | `dreamMaxTopics` | `3` | Digests one pass writes |
+| `dreamDigestStatus` | `active` | Status a topic digest is written with |
+| `dreamAutoResolveConflicts` | `true` | Settle contradictions by recency: the newer claim supersedes the older |
+| `dreamAutoMaintain` | `true` | Run the hygiene pass with apply after a committed consolidation |
 | `dailyReflection` | `true` | Write one account per completed local day that wrote something |
 | `importSources` | `[]` | External layouts `/memory import` may read; none is read unless named |
-| `importStatus` | `pending` | Status an imported claim is written with |
+| `importStatus` | `active` | Status an imported claim is written with |
 | `importConfidence` | `0.6` | Confidence an imported claim is written with |
 
-`dedupeReplaceJaccard` below `dedupeJaccard`, an unknown or repeated name in `identityLayers`, `dreamClusterFloor` below `2`, and an unknown name in `importSources` all fail plugin load. Every field is volatile, so it is editable from the running configuration surface.
+`dedupeReplaceJaccard` below `dedupeJaccard`, an unknown or repeated name in `identityLayers`, `dreamClusterFloor` below `2`, an unknown name in `importSources`, and `llmDistillProvider` set without `llmDistillModel` (or the reverse) all fail plugin load. Every field is volatile, so it is editable from the running configuration surface.
 
 ## Record model
 
@@ -283,7 +300,7 @@ hits          reuse count, incremented by memory_open
 
 The domain stays at version 1. Every field any later layer added is optional in the record schema, so a store written by an earlier build reopens under the current schema instead of being rejected or discarded: `per-record` layouts validate each stored document, and a required new field would have made every pre-existing record invalid.
 
-Records this plugin writes for itself — journal entries, reflections, and topic digests — carry a `dream-journal`, `dream-reflection`, or `dream-topic` tag and a status that keeps them out of injection and out of search. They are readable through `/memory journal` and visible in the export mirror.
+Journal entries and reflections carry a `dream-journal` or `dream-reflection` tag and an `archived` status that keeps them out of injection and out of search. Topic digests carry `dream-topic` and follow `dreamDigestStatus`, so the shipped default admits them as recall index entries; they are readable through `/memory journal` and visible in the export mirror either way.
 
 ## Model Experience
 
@@ -328,7 +345,7 @@ Token effect: none. The page reads and writes through its own routes, and what i
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 200 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -337,7 +354,7 @@ The specs drive production services — the storage hub with its SQLite backend,
 
 `tests/cache-safety.spec.ts` is the suite for this package's central claim: an unmatched turn adds no message, a matched turn appends exactly one message after an untouched prefix, the block is deterministic for a fixed corpus, a delivered record is never repeated, the block respects its character budget, the five tool schemas are byte-stable across reads, and mounting the governance command adds no schema.
 
-`tests/automatic.spec.ts` is the suite for the automatic half: a turn's own text is distilled without a model call and parked for review, a repeated claim is not stored twice and does not inflate its reuse count, the consolidation window opens on the corpus rather than on a counter, a contradiction is reported and both claims survive, standing memory arrives without a keyword match, a due date surfaces, and an import reads a workspace file into project-scoped claims without duplicating what it already read.
+`tests/automatic.spec.ts` is the suite for the automatic half: a claim the person stated lands active on the shipped defaults while one the assistant established parks, a restatement promotes a held claim in place, a repeated claim is not stored twice and does not inflate its reuse count, the consolidation window opens on the corpus rather than on a counter, corroboration promotes a pending claim, a contradiction is settled by recency (or left open when the deployment says so), digests follow `dreamDigestStatus`, the hygiene pass rides the committed consolidation, `requireApproval` holds every gate, a model-read extraction files claims by their tier and never fails a turn, and the upgrade backlog is promoted by origin. `tests/extract.spec.ts` covers the extraction request and parser on their own.
 
 `tests/commands.spec.ts` is the suite for the operator command surface: every case types a `/memory` line into the real command runtime and reads the settled result, so a `remember` that stored nothing, a `search` that rendered the wrong line, or a subcommand that stopped resolving fails there.
 
@@ -348,7 +365,7 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **No embeddings.** Ranking is BM25 over literal tokens (ASCII words plus CJK characters and bigrams). Paraphrase recall is weak; there is no reranker and no vector index. The harness ships no embedding provider, so a vector path would need one first.
 - **The memory corpus is not FTS-indexed.** Records live in a storage domain and are ranked in memory, which keeps retrieval synchronous and I/O-free on the model path. That is the right trade below the `maxRecords` cap; above it, or once paraphrase recall matters more than latency, a `node:sqlite` FTS5 index over the same records is the next step.
 - **Distillation recognizes sentence forms, not meanings.** It is a regex table. A durable claim phrased some other way is missed, and a sentence that reads like a constraint without being one is captured. Both are why the shipped status is `pending`; a deployment that raises `autoDistillStatus` to `active` is accepting the false positives into injection.
-- **Contradiction detection is a heuristic.** It requires a shared recall tag and a similarity band, so it misses contradictions phrased with different words and can flag two nuanced claims about one subject. It only ever reports; nothing is resolved automatically.
+- **Contradiction detection is a heuristic.** It requires a shared recall tag and a similarity band, so it misses contradictions phrased with different words and can flag two nuanced claims about one subject. When `dreamAutoResolveConflicts` settles one, recency is the whole argument; the supersede chain keeps the choice reversible, not correct.
 - **The daily reflection reports a completed day, so it appears the day after.** A session that runs for weeks without a local midnight rollover never produces one.
 - **Consolidation runs on the turn's path.** The pass is bounded by `dreamWindowRecords`, but it is awaited before the turn closes, so a very large corpus makes the turn that crosses the window slower.
 - **A turn-end pass failure is part of the turn.** Distillation and consolidation propagate their errors rather than swallowing them, on the principle that a broken store should be loud. A deployment that would rather lose a pass than fail a turn should widen the catch at its own layer.
