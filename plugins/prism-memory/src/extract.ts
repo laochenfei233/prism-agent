@@ -70,6 +70,8 @@ export interface ExtractionCall {
   readonly maxTokens: number
   /** The calling session, for routing; absent when the caller has none. */
   readonly sessionId: GenerateOptions['sessionId']
+  /** Cancellation forwarded to the adapter; absent when the caller has none. */
+  readonly signal?: AbortSignal
 }
 
 /** Element schema of the extractor's answer; anything else is dropped. */
@@ -173,6 +175,7 @@ export async function extractClaims(
     maxTokens: call.maxTokens,
     purpose: 'memory-distill',
     ...call.sessionId === undefined ? {} : { sessionId: call.sessionId },
+    ...call.signal === undefined ? {} : { signal: call.signal },
   }
   for await (const chunk of llm.stream(options)) assembler.push(chunk)
   if (assembler.finish.kind === 'error' || assembler.finish.kind === 'aborted') {

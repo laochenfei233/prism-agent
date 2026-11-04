@@ -260,6 +260,9 @@ describe('the consolidation window', () => {
     const standing = ctx.prismMemory.all().find(record => record.id === newer.record.id)
     expect(standing?.status).toBe('active')
     expect(standing?.supersedes).toBe(older.record.id)
+    // A wrong recency choice is one command away from undone.
+    await ctx.prismMemory.restore(older.record.id, 'recency was wrong here', agent)
+    expect(ctx.prismMemory.all().find(record => record.id === older.record.id)?.status).toBe('active')
   })
 
   it('leaves a contradiction to a person when the deployment says so', async () => {
@@ -312,6 +315,66 @@ describe('the consolidation window', () => {
     const report = await ctx.prismMemory.dream({ apply: true })
     expect(report.promoted).toEqual([])
     expect(ctx.prismMemory.all().find(record => record.id === held.record.id)?.status).toBe('pending')
+  })
+
+  it('keeps a digest pending while requireApproval holds', async () => {
+    // Seed live claims first: review holds every write, so a corpus grown
+    // entirely under `requireApproval` never clusters — the gate below is what
+    // stops an existing cluster's digest from reaching recall anyway.
+    const root = await scratch()
+    const path = join(root, 'digest-hold.db')
+    const first = await mountMemory({ config: { dreamEveryWrites: 1, dailyReflection: false }, storagePath: path, tools: true })
+    owned.add(first)
+    const seeder = await createAgent(first, 'digest-seed')
+    for (const text of ['the deploy pipeline gates on smoke', 'the deploy pipeline tags every image', 'the deploy pipeline rolls out canary first']) {
+      await first.prismMemory.remember({ text, tags: ['deploy'] }, seeder)
+    }
+    await first.fiber.dispose()
+    owned.delete(first)
+
+    const second = await mountMemory({ config: { requireApproval: true, dreamEveryWrites: 1, dailyReflection: false }, storagePath: path, tools: true })
+    owned.add(second)
+    await second.prismMemory.dream({ apply: true })
+    const digest = second.prismMemory.all().find(record => record.tags.includes('dream-topic'))
+    expect(digest?.status).toBe('pending')
+  })
+
+  it('skips a pair whose newer claim already carries a supersedes back-link', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const agent = await createAgent(ctx, 'fan-in')
+    const olderA = await ctx.prismMemory.remember({
+      text: 'the release window opens on monday',
+      tags: ['window'],
+    }, agent)
+    await new Promise(resolve => setTimeout(resolve, 3))
+    const olderB = await ctx.prismMemory.remember({
+      text: 'the release window opens on tuesdays',
+      tags: ['window'],
+    }, agent)
+    await new Promise(resolve => setTimeout(resolve, 3))
+    const newer = await ctx.prismMemory.remember({
+      text: 'the release window opens on wednesday',
+      tags: ['window'],
+    }, agent)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    // Whichever pair sorts first settles and chains; the remaining pairs stay
+    // open for a person rather than overwriting the winner's back-link or
+    // superseding an already-settled record twice.
+    expect(report.resolved).toHaveLength(1)
+    expect(report.conflicts).toHaveLength(2)
+    const [settled] = report.resolved
+    const winner = ctx.prismMemory.all().find(record => record.id === settled?.right)
+    expect(winner?.status).toBe('active')
+    expect(winner?.supersedes).toBe(settled?.left)
+    const loser = ctx.prismMemory.all().find(record => record.id === settled?.left)
+    expect(loser?.status).toBe('superseded')
+    expect(loser?.supersededBy).toBe(settled?.right)
+    const untouchedId = [olderA.record.id, olderB.record.id, newer.record.id]
+      .find(id => id !== settled?.left && id !== settled?.right)
+    const untouched = ctx.prismMemory.all().find(record => record.id === untouchedId)
+    expect(untouched?.status).toBe('active')
+    expect(untouched?.supersedes).toBeNull()
   })
 
   it('does a dry run without writing when asked', async () => {

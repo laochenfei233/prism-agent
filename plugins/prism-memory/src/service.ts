@@ -686,7 +686,7 @@ export class PrismMemoryService extends Service {
 
     this.ctx.on('agent/turn-stopping', async ({ agent, signal }): Promise<void> => {
       if (signal.aborted) return
-      await this.afterTurn(agent)
+      await this.afterTurn(agent, signal)
     })
 
     this.ctx.on('agent/pre-step', async ({ agent, step, signal }, next): Promise<PreStepDecision> => {
@@ -1461,10 +1461,11 @@ export class PrismMemoryService extends Service {
    * model request: distillation writes records, and nothing it writes reaches a
    * request until a later turn recalls it.
    * @param agent - the agent whose turn is closing.
+   * @param signal - the closing turn's signal, forwarded to the model-read channel.
    */
-  private async afterTurn(agent: Agent): Promise<void> {
+  private async afterTurn(agent: Agent, signal?: AbortSignal): Promise<void> {
     if (this.config.autoDistill.get()) await this.distillTurn(agent)
-    if (this.config.llmDistill.get()) await this.extractTurn(agent)
+    if (this.config.llmDistill.get()) await this.extractTurn(agent, signal)
     if (this.config.dreamEnabled.get() && this.dreamWindow(Date.now()) !== null) {
       await this.dream({ apply: true })
     }
@@ -1485,7 +1486,7 @@ export class PrismMemoryService extends Service {
    */
   private async migrateBacklog(now: number): Promise<void> {
     for (const record of this.all()) {
-      if (record.status !== 'pending') continue
+      if (record.status !== 'pending' || isExpired(record, now)) continue
       const own = record.origin === 'import'
         || (record.origin === 'session' && (layerOf(record) === 'user' || layerOf(record) === 'rule'))
       if (!own) continue
@@ -1512,14 +1513,15 @@ export class PrismMemoryService extends Service {
    * land on the same trust tiers as the form distiller's, and the write path's
    * identical-claim checks keep an overlap between the two readers free.
    * @param agent - the agent whose turn is closing.
+   * @param signal - the closing turn's signal, forwarded to the call.
    */
-  private async extractTurn(agent: Agent): Promise<void> {
+  private async extractTurn(agent: Agent, signal?: AbortSignal): Promise<void> {
     const turn = turnText(agent.session.deriveMessages())
     const minChars = this.config.llmDistillMinChars.get()
     if (turn.user.length < minChars && turn.assistant.length < minChars) return
     const target = this.extractionTarget(agent)
     if (target === null) return
-    const claims = await this.extractClaimsContained(agent, target, turn)
+    const claims = await this.extractClaimsContained(agent, target, turn, signal)
     if (claims === null || claims.length === 0) return
     const admission = this.admission(agent)
     const now = Date.now()
@@ -1559,12 +1561,14 @@ export class PrismMemoryService extends Service {
    * @param agent - the agent whose turn is closing.
    * @param target - the resolved provider and model.
    * @param turn - the closing turn's two sides.
+   * @param signal - cancellation forwarded to the call.
    * @returns the valid claims, or `null` when the call did not produce a usable answer.
    */
   private async extractClaimsContained(
     agent: Agent,
     target: { readonly provider: string, readonly model: string },
     turn: TurnText,
+    signal?: AbortSignal,
   ): Promise<ExtractedClaim[] | null> {
     const llm = this.llm
     if (llm === undefined) return null
@@ -1574,6 +1578,7 @@ export class PrismMemoryService extends Service {
         model: target.model,
         maxTokens: this.config.llmDistillMaxTokens.get(),
         sessionId: agent.session.id,
+        ...signal === undefined ? {} : { signal },
       }, turn, {
         maxInputChars: this.config.llmDistillMaxInputChars.get(),
         maxClaims: this.config.llmDistillLimit.get(),
@@ -1800,11 +1805,11 @@ export class PrismMemoryService extends Service {
     // Corroboration promotion. The plan's window holds live records only, so a
     // held `pending` claim never reaches it and the scan runs over the store;
     // `requireApproval` keeps its absolute hold — nothing goes live without a
-    // person while it is set.
+    // person while it is set, and an expired claim stays retired.
     const promoted: string[] = []
     if (!this.config.requireApproval.get()) {
       for (const record of this.all()) {
-        if (record.status !== 'pending') continue
+        if (record.status !== 'pending' || isExpired(record, now)) continue
         if ((record.corroborations ?? 0) + 1 < CORROBORATION_FLOOR) continue
         await this.records.update(record.id, current => ({
           ...current,
@@ -1819,9 +1824,11 @@ export class PrismMemoryService extends Service {
     }
 
     // Contradiction settlement by recency. Both claims were live when the plan
-    // compared them; the guards re-check at apply time, because the promotion
-    // above may have moved a record in between. The supersede fields keep the
-    // full chain, so a wrong recency choice is `/memory restore` away.
+    // compared them; the guards re-check at apply time — still active, still
+    // unexpired, and neither already chained, so a record settled earlier in
+    // this pass or carrying a supersedes back-link from a fan-in is skipped
+    // rather than overwritten. The supersede fields keep the full chain, so a
+    // wrong recency choice is `/memory restore` away.
     const resolved: Conflict[] = []
     if (this.config.dreamAutoResolveConflicts.get()) {
       for (const conflict of plan.conflicts) {
@@ -1829,7 +1836,8 @@ export class PrismMemoryService extends Service {
         const newer = this.records.get(conflict.right)
         if (older === undefined || newer === undefined
           || older.status !== 'active' || newer.status !== 'active'
-          || older.supersededBy !== null || newer.supersededBy !== null) continue
+          || isExpired(older, now) || isExpired(newer, now)
+          || older.supersededBy !== null || newer.supersededBy !== null || newer.supersedes !== null) continue
         await this.records.update(older.id, current => ({
           ...current,
           status: 'superseded',
@@ -1855,8 +1863,9 @@ export class PrismMemoryService extends Service {
         tags: [topic.tag, TOPIC_TAG],
         // A digest is machine-written prose about other records; the shipped
         // status admits it as a recall index entry, and `dreamDigestStatus:
-        // pending` restores review-first behavior for a deployment that wants it.
-        status: this.config.dreamDigestStatus.get(),
+        // pending` restores review-first behavior. The admission gate routes
+        // both through `pending` while `requireApproval` holds.
+        status: this.admissionStatus(this.config.dreamDigestStatus.get(), 1),
         layer: 'topic',
         kind: 'fact',
         note: `topic digest over ${topic.memberIds.join(', ')}`,
