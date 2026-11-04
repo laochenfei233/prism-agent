@@ -418,6 +418,8 @@ type SessionTreeProps = Pick<
   rowState: SessionRowState
   /** Switch the archived filter back to the default hide-archived view. */
   onLeaveArchivedOnly: () => void
+  /** Clear the annotation filter back to no filter. */
+  onLeaveAnnotationFilter: () => void
   /** Open the browser-owned rename dialog for a real Workspace group. */
   onRenameRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned delete-confirmation dialog for a real Workspace group. */
@@ -433,15 +435,22 @@ type SessionTreeProps = Pick<
 }
 
 /** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
-function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'>) {
+function EmptySessions({ rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'> & { onLeaveAnnotationFilter: () => void }) {
   const archivedOnly = rowState.archivedFilter === 'only'
+  const annotationOnly = rowState.annotationFilter !== undefined && rowState.annotationFilter !== 'all'
   return (
     <div className={css.emptyState} data-row-key="empty">
       {archivedOnly ? <IconArchiveOutlineRegular size={24} /> : <IconQueueOutlineRegular size={24} />}
-      <div>{archivedOnly ? t('empty.noneArchived') : t('empty.none')}</div>
-      {archivedOnly && (
-        <button type="button" className={css.emptyAction} onClick={onLeaveArchivedOnly}>
-          {t('empty.viewOthers')}
+      <div>
+        {archivedOnly ? t('empty.noneArchived') : annotationOnly ? t('empty.noneAnnotated') : t('empty.none')}
+      </div>
+      {(archivedOnly || annotationOnly) && (
+        <button
+          type="button"
+          className={css.emptyAction}
+          onClick={archivedOnly ? onLeaveArchivedOnly : onLeaveAnnotationFilter}
+        >
+          {archivedOnly ? t('empty.viewOthers') : t('empty.viewAllAnnotations')}
         </button>
       )}
     </div>
@@ -451,7 +460,7 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 /** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
   list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, groupOrder,
-  rowState, onLeaveArchivedOnly,
+  rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter,
   workspaceReady, animationResetKey, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest,
   renderSlot,
@@ -827,7 +836,12 @@ function SessionTree({
         resetKey={JSON.stringify([animationResetKey, watermarkMotionKey])}
       >
         {groups.length === 0 && (
-          <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {groupRows}
       </AnimatedRows>
@@ -838,7 +852,7 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, open, onSessionRenameRequest,
+  list, sessionIds, rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, useSessionStatus, open, onSessionRenameRequest,
   usePanelInfo, setSessionOrder, workspaceReady, animationResetKey,
   revealSessionId, onSessionRevealed, renderSlot, batch, t,
 }: Pick<
@@ -855,6 +869,7 @@ function FlatList({
   | 'onSessionRevealed'
   | 'rowState'
   | 'onLeaveArchivedOnly'
+  | 'onLeaveAnnotationFilter'
   | 'batch'
   | 't'
 > & {
@@ -891,7 +906,12 @@ function FlatList({
         resetKey={animationResetKey}
       >
         {rows.length === 0 && (
-          <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {rows.map((node) => {
           const active = drag !== null && drag.pinned === node.pinned
@@ -1283,8 +1303,14 @@ export function WorkspaceBrowser({
   const acknowledgeSessionReveal = (sessionId: SessionId): void => {
     setRevealSessionId(current => current === sessionId ? undefined : current)
   }
+  // Starting a search ends batch mode: result rows carry no selection checkbox
+  // and Select all reads the list, not the query. Clearing the query leaves the
+  // reveal target alone, because opening a result clears it in the same step.
   useEffect(() => {
-    if (normalizedQuery !== '') setRevealSessionId(undefined)
+    if (normalizedQuery === '') return
+    setRevealSessionId(undefined)
+    setBatchMode(false)
+    setSelectedSessionIds([])
   }, [normalizedQuery])
 
   // Rail search = expand + land in the search box: the flag arms before the
@@ -1512,19 +1538,6 @@ export function WorkspaceBrowser({
         )}
         <div className={clsx(css.headerActions, wide && searchExpanded && css.headerActionsHidden)}>
           {wide && (
-            <ViewOptionsMenu
-              groupBy={groupBy}
-              orderBy={orderBy}
-              archivedFilter={archivedFilter}
-              annotationFilter={annotationFilter}
-              onGroupPick={actions.setGroupBy}
-              onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
-              onArchivedFilterPick={actions.setArchivedFilter}
-              onAnnotationFilterPick={actions.setAnnotationFilter}
-              t={t}
-            />
-          )}
-          {wide && (
             <Tooltip label={t('batch.mode')} side="bottom" delayMs={500}>
               <button
                 type="button"
@@ -1536,6 +1549,19 @@ export function WorkspaceBrowser({
                 <IconChecklistOutlineRegular />
               </button>
             </Tooltip>
+          )}
+          {wide && (
+            <ViewOptionsMenu
+              groupBy={groupBy}
+              orderBy={orderBy}
+              archivedFilter={archivedFilter}
+              annotationFilter={annotationFilter}
+              onGroupPick={actions.setGroupBy}
+              onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
+              onArchivedFilterPick={actions.setArchivedFilter}
+              onAnnotationFilterPick={actions.setAnnotationFilter}
+              t={t}
+            />
           )}
           {/* Adding is the button's one action, so a composition with no
               picking affordance has nothing to offer here: the region hides the
@@ -1646,6 +1672,7 @@ export function WorkspaceBrowser({
                 sessionIds={orderedFlatSessionIds}
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 workspaceReady={workspaceReady}
                 animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
                 useSessionStatus={useSessionStatus}
@@ -1678,6 +1705,7 @@ export function WorkspaceBrowser({
                 setSessionOrder={saveSessionOrder}
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 startSession={startSession}
                 open={guardedOpen}
                 insertWorkspaceBefore={insertWorkspaceBefore}

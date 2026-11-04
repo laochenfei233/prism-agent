@@ -191,28 +191,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Read a model's clipboard answer as an annotation. Accepts a Markdown code
- * fence, a leading byte-order mark, smart quotes, and chat text around the
- * object; unknown keys and mistyped fields are ignored rather than rejected.
+ * fence, a leading byte-order mark, typographic quote delimiters, and chat
+ * text around the object; unknown keys and mistyped fields are ignored rather
+ * than rejected.
  *
- * shortcut: only the first `{` through the last `}` of the text is parsed, so a
- * second object in the same block is ignored — split the import per Session if
- * that ever matters.
+ * Quotes are only straightened on a retry, so a valid answer whose text
+ * contains ’ or “ ” keeps those characters.
+ *
+ * shortcut: only the first `{` through the last `}` of the text is parsed, so
+ * chat text after the object that contains `}` breaks the read — ask the model
+ * for the object alone if that ever shows up.
  * @param text - clipboard contents.
  * @returns the annotation the text describes.
  * @throws AnnotationImportError when no JSON object can be read.
  */
 export function parseAnnotationImport(text: string): SessionAnnotation {
-  const normalized = text.replace(/^\uFEFF/, '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+  const normalized = text.replace(/^\uFEFF/, '')
   const start = normalized.indexOf('{')
   const end = normalized.lastIndexOf('}')
   if (start === -1 || end <= start) {
     throw new AnnotationImportError('no JSON object in the imported text')
   }
+  const body = normalized.slice(start, end + 1)
   let parsed: unknown
   try {
-    parsed = JSON.parse(normalized.slice(start, end + 1))
-  } catch (error) {
-    throw new AnnotationImportError(`imported JSON is invalid: ${String(error)}`)
+    parsed = JSON.parse(body)
+  } catch (strictError) {
+    try {
+      parsed = JSON.parse(body.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"))
+    } catch {
+      throw new AnnotationImportError(`imported JSON is invalid: ${String(strictError)}`)
+    }
   }
   /* v8 ignore next 3 -- the slice opens with '{', so a successful parse is always an object */
   if (!isRecord(parsed)) {

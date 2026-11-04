@@ -83,6 +83,11 @@ describe('parseAnnotationImport', () => {
     expect(parseAnnotationImport(text)).toEqual({ favorite: true, tags: ['a', 'b'] })
   })
 
+  it('keeps typographic quotes that are part of a value', () => {
+    expect(parseAnnotationImport('{"note": "他说“好”"}')).toEqual({ note: '他说“好”' })
+    expect(parseAnnotationImport('{"note": "it is ‘fine’"}')).toEqual({ note: 'it is ‘fine’' })
+  })
+
   it('accepts an empty object and keeps a non-default priority', () => {
     expect(parseAnnotationImport('{}')).toEqual({})
     expect(parseAnnotationImport('{"priority": 1}')).toEqual({ priority: 1 })

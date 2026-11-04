@@ -120,7 +120,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 60px;
+  /* Three 28px controls and their two gaps: batch toggle, view options, add. */
+  max-width: 92px;
   opacity: 1;
   overflow: hidden;
   visibility: visible;
@@ -617,7 +618,7 @@
   padding: 4px;
   margin-bottom: 4px;
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-secondary, var(--dsw-alias-interactive-bg-hover));
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .batchCount {

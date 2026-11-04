@@ -2739,4 +2739,29 @@ describe('WorkspaceBrowser batch mode', () => {
     await waitFor(() => { expect(applyBatch).toHaveBeenCalledWith([sid('one')], { kind: 'clearTags' }) })
     expect(screen.getByText('已选 1 个会话')).toBeTruthy()
   })
+
+  it('leaves batch mode as soon as a search starts', async () => {
+    mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getByRole('toolbar', { name: zh['batch.mode'] })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['search.sessions.aria'] }))
+    fireEvent.change(screen.getByPlaceholderText(zh['search.placeholder']), { target: { value: 'one' } })
+    await waitFor(() => { expect(screen.queryByRole('toolbar', { name: zh['batch.mode'] })).toBeNull() })
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+  })
+
+  it('names the annotation filter that hid every Session and clears it from the empty state', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('flat')
+    preferences.actions.setAnnotationFilter('favorite')
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify(preferences.getSnapshot()))
+    mount({
+      useSessions: hook(sessionState([summary('one', 20)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one'])])),
+    })
+    expect(screen.getByText(zh['empty.noneAnnotated'])).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['empty.viewAllAnnotations'] }))
+    expect(screen.getByText('one')).toBeTruthy()
+  })
 })

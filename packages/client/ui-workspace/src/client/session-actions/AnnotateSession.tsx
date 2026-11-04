@@ -231,7 +231,6 @@ function AnnotationForm({
         <input
           className={css.renameInput}
           value={draft.tags}
-          maxLength={640}
           placeholder={t('annotation.tagsPlaceholder')}
           onChange={(e) => { update({ tags: e.target.value }) }}
         />
