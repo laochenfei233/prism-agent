@@ -69,3 +69,15 @@
         level: full
         autoCodingPresets: [standard, ptc]
         autoLongTaskSteps: 20
+
+    # The Compose workflow itself: one system-prompt section carrying the phase
+    # entry and the `/compose-next` command. This overrides the skill's
+    # "explicit request only" entry rule on purpose — a turn that opens this many
+    # steps starts running the workflow on its own. `autoLongTaskSteps: 0` keeps
+    # the skill's rule; `/compose-next auto` follows this row again after an
+    # explicit choice.
+    - id: prism-guardrails-compose
+      name: 'prism-guardrails/compose'
+      config:
+        level: off
+        autoLongTaskSteps: 20

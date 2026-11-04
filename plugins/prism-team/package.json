@@ -1,0 +1,35 @@
+{
+  "name": "prism-team",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Prism Team: structured teammate reports, a needs-a-person list, a private worktree per teammate, and an enforced task write scope for the experimental Agent Teams packages",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-commands": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.4"
+  }
+}

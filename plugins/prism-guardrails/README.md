@@ -58,6 +58,24 @@ An explicit `/ponytail` choice wins over both rules for that session, and `/pony
 
 The prompt text and the workflows are maintained here rather than vendored from the method pack's `SKILL.md` files: updating the wording is an edit to `src/ponytail.ts`, and nothing else in the profile needs to change.
 
+## Compose mode
+
+The `compose-next` workflow is part of this bundle for the same reason: it used to be only a skill, so a long task carried no workflow and a profile had two different ways to run a mode. The bundle patch mounts a third row (`prism-guardrails-compose`, name `prism-guardrails/compose`): one system-prompt section states the phases, and `/compose-next` switches the level.
+
+| Level | Effect |
+|---|---|
+| `lite` | Five phases: orient, spec, implement, verify, review |
+| `full` | The nine phases, including the Grill decision gate, the isolated workspace, and the hand-off before any irreversible step |
+| `off` | Contributes no section; the command stays mounted (default) |
+
+| Command | Effect |
+|---|---|
+| `/compose-next [lite\|full\|off\|auto]` | Show or switch the level; `auto` drops an explicit choice, and no argument prints the level with the gesture list |
+
+A session reaches `lite` on its own after `autoLongTaskSteps` cumulative steps (20 by default; `0` disables the rule). An explicit `/compose-next` choice wins for that session, and `/compose-next auto` returns it to the rule.
+
+This rule goes against the skill's own entry gate, which says to enter only on an explicit request and never to infer it from how large a task looks. The row defaults to the automatic rule because that is what a long task is for here: without it, a 30-step turn has no workflow at all. The cost is real — a long turn starts producing a spec document nobody asked for — so a deployment that wants the skill's gate back sets `autoLongTaskSteps: 0`. The section states the phases, not the skill's full text; the skill stays the authority for a human-invoked run.
+
 ## Configuration
 
 Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission.
