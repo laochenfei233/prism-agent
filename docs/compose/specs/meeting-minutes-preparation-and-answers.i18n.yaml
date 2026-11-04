@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/meeting-minutes-preparation-and-answers.md
-meeting-minutes-preparation-and-answers.md: a87d40a0577f0dcc39a646f2c78975c784ca37cc
-meeting-minutes-preparation-and-answers.zh.md: 958f1792ca1229410b7f6d63ac043a5b6a7f32c3
+meeting-minutes-preparation-and-answers.md: 1c83c120e76444b0397f1f268f7174ac746578b7
+meeting-minutes-preparation-and-answers.zh.md: d4a5259009ec2b1ab33c30d0a67f956f4f54855a

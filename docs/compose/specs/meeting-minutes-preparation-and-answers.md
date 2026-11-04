@@ -3,7 +3,7 @@ feature: meeting-minutes-preparation-and-answers
 status: delivered
 updated: 2026-11-05
 branch: codex/meeting-minutes-plugin
-commits: base..HEAD # filled at delivery
+commits: c23775004e..a435d61c7b
 ---
 
 # Meeting Minutes: Speech Preparation and In-page Answers
