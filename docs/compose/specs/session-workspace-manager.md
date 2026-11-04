@@ -3,7 +3,7 @@ feature: session-workspace-manager
 status: delivered
 updated: 2026-11-04
 branch: feat/session-workspace-manager
-commits: 50ff54bd96..9ccd6542b0
+commits: 50ff54bd96..0b64051b37
 ---
 
 # 会话与工作区管理能力（标注 + 批量）
@@ -14,15 +14,15 @@ commits: 50ff54bd96..9ccd6542b0
 
 `packages/client/ui-primitives` 因此新增 `readClipboard`：导入需要读剪贴板，而该包已是共享的剪贴板宿主访问层；写入仍是既有的 `writeClipboard`。
 
-**验证** —— `npx tsc -b tsconfig.client.json` 通过；`npx vitest run --config vitest.config.ts packages/client/ui-workspace` 17 个文件 533 个用例全绿，`--coverage` 对该包 `src/client/**` 报告逐文件 100%；`packages/client/ui-primitives` 新增的剪贴板用例 3 个通过。`npx oxlint` 对两个包只剩 base 上已有的 `apply.client.spec.ts` 断言告警。`pnpm run build:artifacts` 六个 gate 全过；`pnpm run build:check` 只在 `packages/client/connection/tests/browser-auth.host.spec.ts` 失败，未改动检出上同样失败（PRE-EXISTING）。`verify-client-ui-i18n`、`verify-client-packages`、`gen-tsconfig-paths --check`、ui-workspace 的 `verify-translation-pairing` 通过；`verify-package-dependencies`、`verify-doc-refs`、`verify-concrete-terms`、`verify-package-readme-model-experience`、`scripts/doc-standard.spec.ts` 的失败全部落在本改动未触碰的文件上（同样在未改动检出上复现）；`README.md` 的 Summary 在 base 上已超 100 词上限。全量 `pnpm run test:gui` 的失败集中在既有失败（图标计数、ui-theme 三条样式规则、connection binary-rpc、session-import/prism-transfer 的 CSS）与本 worktree 并行运行时的两个用例（单独运行通过）。
+**验证** —— `npx tsc -b tsconfig.client.json` 通过；`npx vitest run --config vitest.config.ts packages/client/ui-workspace` 17 个文件 541 个用例全绿，`--coverage` 对该包 `src/client/**` 报告逐文件 100%；`packages/client/ui-primitives` 新增的剪贴板用例 3 个通过。`npx oxlint` 对两个包只剩 base 上已有的 `apply.client.spec.ts` 断言告警。`pnpm run build:artifacts` 六个 gate 全过；`pnpm run build:check` 只在 `packages/client/connection/tests/browser-auth.host.spec.ts` 失败，未改动检出上同样失败（PRE-EXISTING）。`verify-client-ui-i18n`、`verify-client-packages`、`gen-tsconfig-paths --check`、ui-workspace 的 `verify-translation-pairing` 通过；`verify-package-dependencies`、`verify-doc-refs`、`verify-concrete-terms`、`verify-package-readme-model-experience`、`scripts/doc-standard.spec.ts` 的失败全部落在本改动未触碰的文件上（同样在未改动检出上复现）；`README.md` 的 Summary 在 base 上已超 100 词上限。全量 `pnpm run test:gui` 的失败集中在既有失败（图标计数、ui-theme 三条样式规则、connection binary-rpc、session-import/prism-transfer 的 CSS）与本 worktree 并行运行时的两个用例（单独运行通过）。
 
 **过程记录** ——
 
 - 跨工作区移动会话在开工前被否掉：会话 cwd 存在不可变的会话头里，`working-directory` 包明确写「header 保留原始项目」，工作区归属校验与启动引导都以它为据，真移动属于会话格式级改动；已单独征求用户意见并按「本轮不做」执行。
 - 批量删除被去掉：产品没有删除会话的 Host 命令，会话只有创建、重命名、分叉、提示、附件与队列。
 - 标注没有新建 storage 域 + Remote API：那条路要新增 host 域、typert 方法、feed 与 client service；调研后按最小面选择浏览器视图 store，并在 README 的已知限制里写明它只属于当前浏览器。
-- ui-theme 的描边门禁查出编辑器输入框用了 1px 实线，改为共享的 0.5px 边框 token。
-- 覆盖率门槛迫使每个新分支都有真实用例：批量结果通知的成功/失败两种语气，以及优先级比较器的两个方向都补了断言。
+- 独立评审抓到四个真实缺陷并按根因修复：头部动作区 60px 只容两个按钮，新按钮把「添加工作区」裁掉；导入先把全部智能引号拉直，损坏了值里的弯引号；批量模式与搜索重叠（结果行没有复选框，全选却读列表）；空白 New Session 行可被批量选中。修复各自补了能锁住的用例：头部宽度与顺序、含弯引号的值、搜索即退出批量、空白行不参与选择、20 个满长标签。
+- 样式门禁与覆盖率门槛也各抓到一个问题：编辑器输入框的 1px 描边违反共享的 0.5px 规则；批量结果通知的成功/失败两种语气、优先级比较器的两个方向都没有分支覆盖。
 
 ## [S1] 问题
 
