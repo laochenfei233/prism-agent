@@ -30,6 +30,8 @@ export interface HarnessOptions {
   readonly tools?: boolean
   /** Mount the operator command registrant. */
   readonly commands?: boolean
+  /** Durable backend path; the default keeps the store in memory. */
+  readonly storagePath?: string
 }
 
 /**
@@ -40,7 +42,7 @@ export interface HarnessOptions {
 export async function mountMemory(options: HarnessOptions = {}): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(Storage)
-  await ctx.plugin(StorageSqlite, { path: ':memory:' })
+  await ctx.plugin(StorageSqlite, { path: options.storagePath ?? ':memory:' })
   await ctx.plugin(StorageDomain, { backend: 'sqlite' })
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
