@@ -67,28 +67,53 @@
         reminderWindowDays: 7
         maxReminders: 3
 
-        # Read each turn's own text for durable claims, with no extra model call.
-        # `pending` is the shipped status: an inference about what a person meant
-        # is offered for review rather than injected on the strength of a regex.
+        # Read each turn's own text for durable claims. Trust is tiered by who
+        # said it: a candidate distilled from the person's own message writes at
+        # autoDistillUserConfidence and lands active above the review floor,
+        # while one distilled from the assistant's account writes at
+        # autoDistillConfidence and parks until corroborated. Set
+        # autoDistillStatus back to pending to return everything to review.
         autoDistill: true
-        autoDistillStatus: pending
+        autoDistillStatus: active
         autoDistillConfidence: 0.4
+        autoDistillUserConfidence: 0.7
         autoDistillLimit: 3
 
+        # Model-read extraction: one auxiliary call per turn that reads for
+        # claims the form matcher misses. Off in the plugin's own defaults so a
+        # profile without an llm service can still mount the bundle; this
+        # deployment turns it on. Provider and model empty means the call
+        # follows the session's routed model.
+        llmDistill: true
+        llmDistillProvider: ''
+        llmDistillModel: ''
+        llmDistillMaxTokens: 512
+        llmDistillMaxInputChars: 4000
+        llmDistillMinChars: 80
+        llmDistillLimit: 3
+
         # The consolidation pass. Its window boundary is the last journal entry,
-        # so it survives a restart without a private counter.
+        # so it survives a restart without a private counter. On apply it also
+        # runs the automatic half of organizing: corroboration promotes a held
+        # claim, a contradiction is settled by recency (newer supersedes older;
+        # /memory restore rolls it back), and the hygiene pass applies — expiry,
+        # duplicate merging, and eviction. dreamDigestStatus pending returns
+        # topic digests to review-first.
         dreamEnabled: true
         dreamEveryWrites: 25
         dreamWindowRecords: 200
         dreamConflictFloor: 0.5
         dreamClusterFloor: 3
         dreamMaxTopics: 3
+        dreamDigestStatus: active
+        dreamAutoResolveConflicts: true
+        dreamAutoMaintain: true
         dailyReflection: true
 
         # External layouts `/memory import` may read. Empty by default: another
         # tool's memory directories are not enumerated behind the user's back.
         importSources: []
-        importStatus: pending
+        importStatus: active
         importConfidence: 0.6
 
     - id: tool-prism-memory

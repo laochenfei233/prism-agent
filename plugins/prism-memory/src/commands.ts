@@ -233,8 +233,13 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
       const details = [
         `new material scanned: ${report.scanned}`,
         `corroborated: ${report.corroborated.length === 0 ? 'none' : report.corroborated.map(entry => `${entry.id} (x${entry.corroborations})`).join(', ')}`,
+        `promoted by corroboration: ${report.promoted.length === 0 ? 'none' : report.promoted.join(', ')}`,
+        `resolved by recency: ${report.resolved.length === 0 ? 'none' : report.resolved.map(conflict => `${conflict.left} vs ${conflict.right} (${conflict.similarity.toFixed(2)})`).join(', ')}`,
         `topics: ${report.topics.length === 0 ? 'none' : report.topics.map(topic => `${topic.tag} (${topic.memberIds.length})`).join(', ')}`,
         `unresolved contradictions: ${report.conflicts.length === 0 ? 'none' : report.conflicts.map(conflict => `${conflict.left} vs ${conflict.right} (${conflict.similarity.toFixed(2)})`).join(', ')}`,
+        report.maintenance === null
+          ? 'hygiene: not run'
+          : `hygiene: ${report.maintenance.expired.length} expired, ${report.maintenance.duplicates.length} merged, ${report.maintenance.evicted.length} evicted`,
         `journal: ${report.journalId ?? 'not written'}`,
         `reflection: ${report.reflectionId ?? 'not due'}`,
       ]
