@@ -243,20 +243,29 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `autoDistillStatus` | `active` | 沉淀出的主张请求的状态；由置信度线决定它落在哪里 |
 | `autoDistillConfidence` | `0.4` | 从助手陈述沉淀的主张所用置信度；低于预审线，因此挂起 |
 | `autoDistillUserConfidence` | `0.7` | 从用户本人消息沉淀的主张所用置信度；高于预审线，因此直接生效 |
-| `autoDistillConfidence` | `0.4` | 沉淀出的主张写入时所用的置信度；低于复核阈值，因此会被拦下 |
 | `autoDistillLimit` | `3` | 一个轮次可贡献的主张数 |
+| `llmDistill` | `false` | 用一次辅助模型调用读取每个刚结束的轮次；开启而未挂载 llm 服务则装载失败 |
+| `llmDistillProvider` | `''` | 提炼调用的 provider；留空跟随路由模型。必须与 `llmDistillModel` 成对设置 |
+| `llmDistillModel` | `''` | 提炼调用的模型；留空跟随路由模型 |
+| `llmDistillMaxTokens` | `512` | 一次提炼调用的输出 token 上限 |
+| `llmDistillMaxInputChars` | `4000` | 提炼调用读取的每侧轮次文本字符数（头部裁剪） |
+| `llmDistillMinChars` | `80` | 每侧轮次文本值得发起一次调用的最短长度 |
+| `llmDistillLimit` | `3` | 一次提炼调用可贡献的主张数 |
 | `dreamEnabled` | `true` | 按窗口运行整理巡检 |
 | `dreamEveryWrites` | `25` | 距上次巡检之后写入多少主张才再跑一次 |
 | `dreamWindowRecords` | `200` | 一次巡检拿来与语料比对的新素材记录数 |
 | `dreamConflictFloor` | `0.5` | 两条在库主张算作可比但相互矛盾的相似度阈值 |
 | `dreamClusterFloor` | `3` | 共用一个标签的主张数达到多少时，该标签获得一份摘要 |
 | `dreamMaxTopics` | `3` | 一次巡检写出的摘要数 |
+| `dreamDigestStatus` | `active` | 主题摘要写入时所用的状态 |
+| `dreamAutoResolveConflicts` | `true` | 按新旧裁决矛盾：较新的主张取代较旧的 |
+| `dreamAutoMaintain` | `true` | 整合提交后自动带 apply 运行卫生 pass |
 | `dailyReflection` | `true` | 为每个有写入的已完成本地日写一份交代 |
 | `importSources` | `[]` | `/memory import` 可读取的外部布局；不指名则不读 |
 | `importStatus` | `active` | 导入的主张写入时所用的状态 |
 | `importConfidence` | `0.6` | 导入的主张写入时所用的置信度 |
 
-`dedupeReplaceJaccard` 低于 `dedupeJaccard`、`identityLayers` 中出现未知或重复的名字、`dreamClusterFloor` 低于 `2`，以及 `importSources` 中出现未知的名字，都会让插件加载失败。每个字段都是易变的，因此可以从运行中的配置面编辑。
+`dedupeReplaceJaccard` 低于 `dedupeJaccard`、`identityLayers` 中出现未知或重复的名字、`dreamClusterFloor` 低于 `2`、`importSources` 中出现未知的名字，以及 `llmDistillProvider` 设了而 `llmDistillModel` 没设（或反过来），都会让插件加载失败。每个字段都是易变的，因此可以从运行中的配置面编辑。
 
 ## 记录模型
 
@@ -345,7 +354,7 @@ node scripts/smoke.mjs                                                        # 
 
 `tests/cache-safety.spec.ts` 是本包核心主张的测试套件：未命中的轮次不添加消息，命中的轮次在未动过的前缀之后恰好追加一条消息，该块对固定语料是确定性的，已投递的记录绝不重复，该块遵守它的字符预算，5 个工具 schema 在多次读取之间字节稳定，以及挂载治理命令不新增 schema。
 
-`tests/automatic.spec.ts` 是自动那一半的测试套件：用户说出的主张在出厂默认下直接生效而助手建立的主张先挂起，一次重述就地转正一条挂起的主张，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，印证会转正一条 pending 主张，矛盾按新旧裁决（部署要求时留给用户），摘要跟随 `dreamDigestStatus`，卫生 pass 随整合提交一起跑，`requireApproval` 压住每一个闸门，模型读取提炼按档位归档主张且绝不弄挂轮次，升级存量按来源转正。`tests/extract.spec.ts` 单独覆盖提炼请求与解析器。
+`tests/automatic.spec.ts` 是自动那一半的测试套件：用户说出的主张在出厂默认下直接生效而助手建立的主张先挂起，一次重述就地转正一条挂起的主张，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，印证会转正一条 pending 主张，矛盾按新旧裁决（部署要求时留给用户），摘要在出厂默认下落 `active`，卫生 pass 随整合提交一起跑，`requireApproval` 压住印证转正并让摘要保持 pending，模型读取提炼按档位归档主张且绝不弄挂轮次，升级存量按来源转正。`tests/extract.spec.ts` 单独覆盖提炼请求与解析器。
 
 `tests/commands.spec.ts` 是运维命令面的测试套件：每个用例把一行 `/memory` 打进真实的命令运行时并读取结算后的结果，因此一次什么都没存下的 `remember`、一次渲染错行的 `search`，或一个不再被解析的子命令都会在那里失败。
 
@@ -355,7 +364,7 @@ node scripts/smoke.mjs                                                        # 
 
 - **没有 embedding。** 排序是在字面 token 上做的 BM25（ASCII 词加 CJK 字符与二元组）。改写式召回能力弱；没有重排序器，也没有向量索引。harness 不自带 embedding 提供方，因此向量路径需要先有它。
 - **记忆语料没有 FTS 索引。** 记录存放在存储域中并在内存里排序，这让检索在模型路径上保持同步且无 I/O。在 `maxRecords` 上限之下这是正确的取舍；超过它之后，或者一旦改写式召回比延迟更重要，下一步就是在同样的记录上建立 `node:sqlite` FTS5 索引。
-- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。模型读取提炼通道补前者，但引入每轮一次请求的代价与自身的不确定性；两个来源档位限制后者能走多远 —— 用户档的误报直接生效，助手档的误报先挂起。
+- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。模型读取提炼通道收窄前者，代价是每轮一次请求与其自身的不确定性；两个来源档位限制后者 —— 用户档的误报直接生效，助手档的误报先挂起。
 - **矛盾检测是启发式的。** 它要求共用一个召回标签且落在某个相似度区间内，因此会漏掉用不同措辞表述的矛盾，也可能把关于同一主题的两条细致主张标出来。`dreamAutoResolveConflicts` 裁决一条矛盾时，新旧就是全部论据；取代链保住的是可回滚，不是正确。
 - **每日反思报告的是已经过完的一天，因此它在那天之后才出现。** 一个连跑数周、没有跨过本地午夜的会话永远不会产出它。
 - **整理跑在轮次的路径上。** 该巡检受 `dreamWindowRecords` 限制，但它在轮次关闭之前被等待，因此非常大的语料会让跨过窗口的那个轮次变慢。
