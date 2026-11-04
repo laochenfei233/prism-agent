@@ -19,7 +19,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This provider registers a DashScope realtime recognizer on `ctx.speechToText`. It converts one complete WAV recording into plain closed sentences over a duplex WebSocket session, resolves `DASHSCOPE_API_KEY` or the configured credential reference per request, and owns its connection timeout and result-drain deadline. No runtime invariant companion is published because the provider exposes no independently maintained projection beyond these WebSocket lifecycle observations.
+This provider registers a DashScope realtime recognizer on `ctx.speechToText`. It converts one complete WAV recording into its closed sentences — each with the speaker the service attributed to it — over a duplex WebSocket session, resolves `DASHSCOPE_API_KEY` or the configured credential reference per request, and owns its connection timeout and result-drain deadline. No runtime invariant companion is published because the provider exposes no independently maintained projection beyond these WebSocket lifecycle observations.
 
 ## Configuration
 
@@ -36,7 +36,7 @@ No direct effect; consumers that place recognized text into model requests own a
 ## Known Limitations and Deferred Work
 
 - Only complete-recording recognition is supported; streaming microphone sessions are out of scope.
-- Speaker labels are provider-dependent and are not normalized into durable speaker identities.
+- Speaker labels are the recognizer's own identifiers, reported per closed sentence and normalized only within one transcription; they are never mapped to durable speaker identities.
 - Without a resolved DashScope key, provider registration succeeds but recognition fails at request time.
 
 -----

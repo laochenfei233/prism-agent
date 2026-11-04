@@ -18,14 +18,27 @@ const meetingMinutesId = z.string().transform(value => brandString<MeetingMinute
 /** Answer id schema at the durable boundary; branding has no runtime representation. */
 const meetingAnswerId = z.string().transform(value => brandString<MeetingAnswerId>(value))
 
+/** Durable shape of one recognized span and its provider-assigned speaker. */
+export const meetingTranscriptSegment = z.object({
+  text: z.string().min(1),
+  speaker: z.string().min(1).optional(),
+})
+
 /** Durable shape of one meeting record. Timestamps are ISO-8601 strings. */
 export const meetingMinutesRecord = z.object({
   id: meetingMinutesId,
   title: z.string().min(1),
   participants: z.array(z.string().min(1)),
-  transcript: z.string().min(1),
+  /** Empty while the microphone is still open; complete once the recording ends. */
+  transcript: z.string(),
+  /**
+   * Speaker-attributed spans of `transcript`. Optional because a text import and
+   * a provider without speaker separation both store none, and because records
+   * written before the field existed stay readable.
+   */
+  transcriptSegments: z.array(meetingTranscriptSegment).optional(),
   summary: z.string().min(1).nullable(),
-  status: z.enum(['transcribed', 'summarized']),
+  status: z.enum(['recording', 'transcribed', 'summarized']),
   audioSeconds: z.number().min(0),
   sequence: recordSequence,
   createdAt: z.string().min(1),
@@ -54,11 +67,19 @@ export interface StoredMeetingAnswerRecord extends MeetingAnswerRecord {
 
 /**
  * The meeting-minutes domain: one meeting table plus its dependent answer
- * table. Version 1 is the first committed generation.
+ * table. Version 2 widens the version-1 record schema — a record may hold an
+ * empty transcript while its microphone is open — which is why version 1
+ * stays readable and why the layout is now `per-record`: a live recording
+ * rewrites its own record repeatedly, and a growing transcript should not
+ * republish every stored meeting on each slice. Version 2 also stays current
+ * for the optional `transcriptSegments` field: both versions accept each
+ * other's records, so no new generation is needed.
  */
 export const meetingMinutesDomainSpec = defineDomain({
   name: 'meeting_minutes',
-  version: 1,
+  version: 2,
+  compatibleVersions: [1],
+  layout: 'per-record',
   tables: {
     meetings: domainTable<MeetingMinutesId, StoredMeetingMinutesRecord>(meetingMinutesRecord),
     answers: domainTable<MeetingAnswerId, StoredMeetingAnswerRecord>(meetingAnswerRecord),

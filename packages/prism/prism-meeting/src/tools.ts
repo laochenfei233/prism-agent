@@ -6,66 +6,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type {
-  MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord, MeetingMinutesService,
-} from './index.ts'
+import type { MeetingMinutesId, MeetingMinutesService } from './index.ts'
+import { answerView, meetingView } from './view.ts'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const name = 'prism-meeting-tools'
 export const inject = ['tools', 'meetingMinutes']
-
-/** Model-facing meeting fields; lists replace transcript text with its length. */
-interface MeetingView {
-  id: string
-  title: string
-  participants: string[]
-  status: MeetingMinutesRecord['status']
-  summary: string | null
-  transcript: string
-  transcriptChars: number
-  audioSeconds: number
-  createdAt: string
-  updatedAt: string
-}
-
-/** Model-facing durable answer fields. */
-interface AnswerView {
-  id: string
-  meetingId: string
-  question: string
-  answer: string
-  createdAt: string
-}
-
-/**
- * Build one stable meeting view.
- * @param record - The durable record.
- * @param includeTranscript - Whether the potentially long transcript is included.
- * @returns the model-facing meeting view.
- */
-function meetingView(record: MeetingMinutesRecord, includeTranscript: boolean): MeetingView {
-  return {
-    id: record.id,
-    title: record.title,
-    participants: [...record.participants],
-    status: record.status,
-    summary: record.summary,
-    transcript: includeTranscript ? record.transcript : '',
-    transcriptChars: record.transcript.length,
-    audioSeconds: record.audioSeconds,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  }
-}
-
-/**
- * Build one stable answer view.
- * @param record - The durable answer.
- * @returns the model-facing answer view.
- */
-function answerView(record: MeetingAnswerRecord): AnswerView {
-  return { ...record }
-}
 
 /**
  * Render a compact lossless JSON projection for model consumption.
@@ -81,9 +27,21 @@ const meetingProperties = {
   id: { type: 'string', required: true },
   title: { type: 'string', required: true },
   participants: { type: 'array', required: true, items: { type: 'string' } },
-  status: { type: 'string', required: true, enum: ['transcribed', 'summarized'] },
+  status: { type: 'string', required: true, enum: ['recording', 'transcribed', 'summarized'] },
   summary: { oneOf: [{ type: 'string' }, { type: 'null' }], required: true },
   transcript: { type: 'string', required: true },
+  segments: {
+    type: 'array',
+    required: true,
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        text: { type: 'string', required: true },
+        speaker: { type: 'string' },
+      },
+    },
+  },
   transcriptChars: { type: 'integer', required: true },
   audioSeconds: { type: 'number', required: true },
   createdAt: { type: 'string', required: true },

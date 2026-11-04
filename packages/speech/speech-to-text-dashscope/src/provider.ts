@@ -12,6 +12,7 @@ import type {
   SpeechProviderId,
   SpeechProviderInfo,
   Transcript,
+  TranscriptSegment,
 } from '@deepseek-ai/dsh-speech-to-text/types'
 import { validateWave } from '@deepseek-ai/dsh-speech-to-text/wave'
 import { deadline } from '@deepseek-ai/dsh-timeout'
@@ -142,9 +143,10 @@ export class DashScopeSpeechProvider implements SpeechProvider {
     signal.throwIfAborted()
     using callDeadline = deadline(signal, this.options.timeoutMs, DASHSCOPE_TIMEOUT_CODE)
     const startedAt = performance.now()
-    const sentences = await this.recognize(input.audio, apiKey, callDeadline.signal)
+    const segments = await this.recognize(input.audio, apiKey, callDeadline.signal)
     return {
-      text: sentences.join('\n'),
+      text: segments.map(segment => segment.text).join('\n'),
+      segments,
       audioSeconds,
       inferenceSeconds: (performance.now() - startedAt) / 1000,
     }
@@ -155,9 +157,9 @@ export class DashScopeSpeechProvider implements SpeechProvider {
    * @param audio - complete canonical WAV bytes.
    * @param apiKey - resolved bearer token.
    * @param signal - session deadline; its firing closes the socket.
-   * @returns closed sentence texts in service order.
+   * @returns closed sentences in service order, each with its attributed speaker.
    */
-  private async recognize(audio: Uint8Array, apiKey: string, signal: AbortSignal): Promise<string[]> {
+  private async recognize(audio: Uint8Array, apiKey: string, signal: AbortSignal): Promise<TranscriptSegment[]> {
     const taskId = randomUUID()
     const frames = new FrameQueue()
     const socket = new WebSocket(authorizedUrl(this.options.url, apiKey))
@@ -264,19 +266,20 @@ export class DashScopeSpeechProvider implements SpeechProvider {
    * frame for an unfinished sentence replaces the earlier text of the same sentence.
    * @param frames - decoded frames for this session.
    * @param signal - drain deadline.
-   * @returns closed sentence texts in service order.
+   * @returns closed sentences in service order, each carrying its speaker when the service named one.
    */
-  private async collect(frames: FrameQueue, signal: AbortSignal): Promise<string[]> {
-    const closed: string[] = []
-    let pending = ''
+  private async collect(frames: FrameQueue, signal: AbortSignal): Promise<TranscriptSegment[]> {
+    const closed: TranscriptSegment[] = []
+    let pending: TranscriptSegment = { text: '' }
     while (true) {
       const event = await this.nextEvent(frames, signal, 'the final recognition results')
       if (event.kind === 'finished') return closed
       if (event.kind !== 'sentence') continue
-      pending = event.sentence.text
+      const { text, speaker } = event.sentence
+      pending = { text, ...(speaker === undefined ? {} : { speaker }) }
       if (!event.sentence.final) continue
       closed.push(pending)
-      pending = ''
+      pending = { text: '' }
     }
   }
 

@@ -145,7 +145,10 @@ describe('prism-meeting tools', () => {
       meetings: { transcript: string; transcriptChars: number }[]
     }>(await call(ctx, 'meeting_minutes_list'))
     expect(calls).toEqual(['list'])
-    expect(listed).toEqual({ total: 1, meetings: [{ ...meeting, transcript: '', participants: ['Alice'], transcriptChars: 12 }] })
+    expect(listed).toEqual({
+      total: 1,
+      meetings: [{ ...meeting, transcript: '', segments: [], participants: ['Alice'], transcriptChars: 12 }],
+    })
     const read = json<{ meeting: MeetingMinutesRecord }>(await call(ctx, 'meeting_minutes_get', { id: 'meeting-1' }))
     expect(calls).toEqual(['list', 'get:meeting-1'])
     expect(read.meeting.transcript).toBe('Alice: Hello')

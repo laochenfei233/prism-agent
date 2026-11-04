@@ -19,7 +19,7 @@ kind: "package-reference"
 
 ## 概述
 
-这个 Provider 在 `ctx.speechToText` 上注册 DashScope 实时识别器。它通过双工 WebSocket 把一个完整 WAV 录音转换为纯文本闭合句，按请求解析 `DASHSCOPE_API_KEY` 或配置的凭据引用，并拥有连接超时和结果清空期限。未发布运行时不变量伴生包，因为 Provider 没有在这些 WebSocket 生命周期观察之外的独立维护投影。
+这个 Provider 在 `ctx.speechToText` 上注册 DashScope 实时识别器。它通过双工 WebSocket 把一个完整 WAV 录音转换为闭合句——每句都带上服务赋予的说话人——按请求解析 `DASHSCOPE_API_KEY` 或配置的凭据引用，并拥有连接超时和结果清空期限。未发布运行时不变量伴生包，因为 Provider 没有在这些 WebSocket 生命周期观察之外的独立维护投影。
 
 ## 配置
 
@@ -36,7 +36,7 @@ kind: "package-reference"
 ## 已知限制与后续工作
 
 - 只支持完整录音识别；流式麦克风会话不在范围内。
-- 说话人标签依赖提供者，不会规范化为持久说话人身份。
+- 说话人标签是识别器自己的标识，按闭合句返回，且只在一次转写内规范；它们永远不会映射为持久说话人身份。
 - 没有解析到 DashScope key 时，注册成功但识别在请求时失败。
 
 -----

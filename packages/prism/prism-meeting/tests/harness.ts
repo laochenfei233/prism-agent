@@ -6,7 +6,7 @@ import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import SpeechToText from '@deepseek-ai/dsh-speech-to-text'
-import type { SpeechProvider, SpeechProviderId } from '@deepseek-ai/dsh-speech-to-text'
+import type { SpeechPreparation, SpeechPreparationState, SpeechProvider, SpeechProviderId } from '@deepseek-ai/dsh-speech-to-text'
 import {
   LlmAdapter, LlmRuntime,
 } from '@deepseek-ai/dsh-llm'
@@ -165,6 +165,8 @@ export interface MeetingHarness {
   readonly service: MeetingMinutesService
   readonly llm: MeetingLlmAdapter
   readonly recognize: ReturnType<typeof makeRecognize>
+  /** The mounted preparation control, or undefined for a provider without one. */
+  readonly preparation: StubSpeechPreparation | undefined
   readonly pool: MemoryMediaPool
 }
 
@@ -180,12 +182,52 @@ function makeRecognize() {
   })
 }
 
+/** Preparation control a test drives phase by phase. */
+export class StubSpeechPreparation implements SpeechPreparation {
+  /** Times the meeting service asked this control to prepare. */
+  prepareCalls = 0
+  cancelCalls = 0
+  /** Behavior of the next prepare() call; the default becomes ready at once. */
+  onPrepare: () => void = () => { this.publish({ phase: 'ready' }) }
+
+  private readonly listeners = new Set<() => void>()
+
+  constructor(private state: SpeechPreparationState) {}
+
+  snapshot(): SpeechPreparationState {
+    return this.state
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
+  prepare(): void {
+    this.prepareCalls += 1
+    this.onPrepare()
+  }
+
+  cancel(): Promise<void> {
+    this.cancelCalls += 1
+    return Promise.resolve()
+  }
+
+  /** Publish one state to every observer. */
+  publish(state: SpeechPreparationState): void {
+    this.state = state
+    for (const listener of this.listeners) listener()
+  }
+}
+
 /** Activate memory storage, speech, and LLM routes, then the meeting service. */
 export async function harness(options?: {
   /** Reuse durable media from a prior disposed composition. */
   pool?: MemoryMediaPool
   /** Overrides the test model bound. */
   maxTranscriptChars?: number
+  /** Mounts a controllable preparation on the test provider. */
+  preparation?: { readonly initial: SpeechPreparationState }
 }): Promise<MeetingHarness> {
   const ctx = new Context()
   roots.push(ctx)
@@ -199,8 +241,12 @@ export async function harness(options?: {
   const providerId = brandString<SpeechProviderId>('meeting-test')
   const speech = new SpeechToText(ctx, SpeechToText.Config({ defaultProvider: providerId, language: 'auto' }))
   const recognize = makeRecognize()
+  const preparation = options?.preparation === undefined
+    ? undefined
+    : new StubSpeechPreparation(options.preparation.initial)
   const provider: SpeechProvider = {
     info: { id: providerId, name: 'Meeting test', location: 'host-local', languages: ['auto', 'zh'] },
+    ...(preparation === undefined ? {} : { preparation }),
     transcribe: recognize,
   }
   speech.register(provider)
@@ -217,7 +263,7 @@ export async function harness(options?: {
   await serviceFiber
   const service = ctx.meetingMinutes
   llm.requests.length = 0
-  return { ctx, service, llm, recognize, pool }
+  return { ctx, service, llm, recognize, preparation, pool }
 }
 
 /** Active contexts disposed after each test. */

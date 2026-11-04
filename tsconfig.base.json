@@ -327,6 +327,8 @@
       "@deepseek-ai/dsh-session-format-catalog/message-projections": ["./packages/session/session-format-catalog/src/message-projections.ts"],
       "@deepseek-ai/dsh-native-command/types": ["./packages/util/native-command/src/types.ts"],
       "@prism-ai/prism-meeting/tools": ["./packages/prism/prism-meeting/src/tools.ts"],
+      "@prism-ai/prism-meeting/web": ["./packages/prism/prism-meeting/src/web.ts"],
+      "@prism-ai/prism-meeting/client": ["./packages/prism/prism-meeting/src/client/index.tsx"],
       "@prism-ai/prism-meeting": ["./packages/prism/prism-meeting/src"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],

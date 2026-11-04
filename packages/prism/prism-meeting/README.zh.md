@@ -1,50 +1,97 @@
 ---
-description: "Prism 在 ctx.meetingMinutes 提供持久会议记录、配置化摘要与持久问答，以及面向模型的工具。"
-kind: "package-reference"
+description: "Prism 会议 profile 层：持久会议记录、实时麦克风转写、配置化摘要、面向模型的会议工具，以及 Web 会议页面，供用户在 dsh profile 中加入会议记录能力。"
+kind: "package-bundle"
 ---
 
 # @prism-ai/prism-meeting
 
 [English](README.md) | 中文
 
-<a id="summary"></a>
 ## 概述
 
-`ctx.meetingMinutes` 在 `meeting-minutes` 存储域中保存会议元数据、转写、摘要和问答。`createFromTranscript` 导入文本；`createFromAudio` 先解析显式语音提供者。`summarize` 和 `ask` 调用一个配置的 LLM 路由并持久化成功文本；模型失败不会改变既有持久状态。`./tools` 子路径注册面向模型的创建、列表、读取、摘要和提问操作。
-
-<a id="configuration"></a>
-## 配置
-
-`summaryProvider`、`summaryModel`、`summarySystemPrompt`、`answerSystemPrompt` 和 `maxTranscriptChars` 是必需的 volatile 字段。组合拥有默认值；服务不隐藏模型路由、提示词或转写上限。变更从后续操作开始生效。
+这个 bundle 为基于 base 的 `dsh` profile 加入会议记录能力：持久会议存储、实时麦克风转写、一个用于摘要和提问的配置化模型路由、面向模型的会议工具，以及 Web 会议页面。目前没有随包发布的 profile 包含它，profile 通过安装这个包并重启来获得它。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务，以及用于识别的语音提供者密钥。没有 Web Connection 的 profile 会让页面那一行保持 pending 而不是失败；这个包是可安装的层，而不是一个库。
 
 ## 目录
 
-- [概述](#summary)
-- [安装](#installation)
-- [配置](#configuration)
-- [服务 API](#service-api)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
 -----
 
-<a id="installation"></a>
-## 安装
+<a id="use-this-package"></a>
+## 使用本包
+
+### 安装到 profile
 
 把 tarball 安装到基于 base 的 DSH profile，然后重启该 profile：
 
 ```sh
 dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
+dsh plugin --profile <profile> remove @prism-ai/prism-meeting
 ```
 
-本包声明了 `dsh.bundle.patch`。base bundle 已提供 `prism-meeting` 和 `tool-prism-meeting` 时，insert 会复用这些 id；缺少这些行的 profile 会新增两个入口。profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`。
+本包声明了 `dsh.bundle.patch`，因此 `dsh plugin` 会把它作为 profile 层来协调，而不是挂载单个插件。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`，或为该 profile 配置其他语音提供者。
 
-<a id="service-api"></a>
-## 服务 API
+### 你获得什么
 
-`list`、`get` 和 `listAnswers` 返回分离记录；会议不存在时 `get` 和 `listAnswers` 失败。`summarize`、`ask` 和 `delete` 在既有变更后串行执行。`delete` 先删除依赖回答，再删除会议。每个异步操作都加入服务释放流程并响应取消信号。未发布运行时不变量伴生包，因为服务是变更顺序和依赖记录删除的唯一独立观察方。
+patch 插入三行，每一行的行为都由其包拥有。
+
+- `prism-meeting` 注册 `ctx.meetingMinutes`：`meeting_minutes` 存储域、部署配置的用于摘要和会议提问的模型路由，以及语音提供者准备控制。
+- `tool-prism-meeting` 注册五个面向模型的操作：`meeting_minutes_create`、`meeting_minutes_list`、`meeting_minutes_get`、`meeting_minutes_summarize` 和 `meeting_minutes_ask`。
+- `prism-meeting-web` 注册 `/api/prism-meeting` 下的浏览器路由，以及侧边栏面板栏中的会议页面。页面可就地启动并跟踪语音提供者准备及其进度，并在页面内保存问答。
+
+缺少 Web Connection 的 profile 会让 `prism-meeting-web` 保持 pending 而不是失败，因此无头 profile 拥有服务和工具而没有页面。客户端模块在启动时扫描，因此页面在 profile 重启后出现。
+
+-----
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现内部 — 点击展开</summary>
+
+这个 bundle 是一份 patch 文档，只有一条 `insert` 列表；它命名的服务、工具和浏览器条目都是本包同时发布的普通插件。
+
+### 组合机制
+
+patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 bundle 层和用户自己的 profile patch 按 id 覆盖行，后者胜出。insert 列表复用了 `prism-meeting` 和 `tool-prism-meeting` 两个 id，因此已经挂载这些行的 base profile 各保留一行，而更早的 profile 会从这个 bundle 获得它们。`prism-meeting-web` 注入 `connection`，这正是它在没有 Web Connection 的 profile 中保持 pending 的原因。
+
+### 源码对照
+
+| 文件 | 作用 |
+|---|---|
+| [`cordis.patch.yml`](cordis.patch.yml) | bundle 本体：插入的三行，以及作为行内注释的逐行理由 |
+| [`src/index.ts`](src/index.ts) | `ctx.meetingMinutes`：持久记录、录音生命周期、配置化摘要与回答 |
+| [`src/spec.ts`](src/spec.ts) | `meeting_minutes` 存储域声明 |
+| [`src/types.ts`](src/types.ts) | 公开的请求与记录词汇 |
+| [`src/tools.ts`](src/tools.ts) | 面向模型的工具行 |
+| [`src/web.ts`](src/web.ts) | 浏览器路由行 |
+| [`src/client/`](src/client/) | 会议页面及其侧边栏入口 |
+| [`tests/`](tests/) | 服务、路由、工具和页面行为 |
+
+### 不变量归属
+
+未发布运行时不变量伴生包：服务是变更顺序和依赖记录删除的唯一独立观察方，浏览器和工具行通过它读取，而不持有第二份副本。
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## 进一步探索
+
+- [会议子系统](../../../docs/subsystems/meetings.zh.md) —— 记录词汇、录音生命周期、服务语义和浏览器接口。
+- [语音转文字](../../speech/speech-to-text/README.zh.md) —— `ctx.meetingMinutes` 解析的识别接缝。
+- [生成的工具目录](../../../docs/tool-catalog.zh.md#prism-aiprism-meeting) —— 模型看到的精确 schema。
+- [生成的组合图](../../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
+- [Prism 包分组](../README.zh.md) —— 其他 Prism 能力面。
+
+-----
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -63,16 +110,21 @@ dsh --profile <profile>
 
 插件可见性不变时，工具定义保持前缀稳定。较长的读取结果和创建参数按正常仅追加历史增长。
 
+## 已知限制与延期工作
+
 <a id="known-limitations-and-deferred-work"></a>
-## 已知限制与后续工作
 
-- 记录只有一个最新摘要；不暴露摘要修订和回答删除。
-- 工具面不提供删除、回答列表、更新或音频导入操作。
-- 模型不能选择语音提供者；工具创建路径只支持文本导入。
-- 说话人分离、流式识别和导出格式不在范围内。
-- `audioSeconds` 信任语音提供者或调用者，不会独立解码音频。
+这些是当前这一层的约束，不是泛泛的比较。
 
------
+- **记录只有一个最新摘要** —— 不暴露摘要修订和回答删除。
+- **工具面不提供删除、回答列表、更新或音频导入操作** —— 模型不能选择语音提供者，工具创建路径只支持文本导入。
+- **只有语音提供者会区分说话人时才有说话人标签** —— 不区分的提供者不存片段，且标签只在其所在的那次录音内有意义。
+- **流式识别和导出格式不在范围内。**
+- **`audioSeconds` 信任语音提供者或调用者**，不会独立解码音频。
+- **实时转写每八秒新增音频向语音提供者请求一次** —— 只有结束时的收尾转写覆盖整段录音。
+- **页面中途关闭而留在录音状态的记录**只保留最后写入的片段，直到操作者关闭它。
+- **推送的会话属于目录中的第一个 Workspace**，因为没有任何客户端服务暴露当前会话所用的 Workspace。
+- **页面音频上传由 Connection 缓冲**，并受其请求体上限约束。
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -80,6 +132,6 @@ dsh --profile <profile>
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
-Prism 拥有此包；服务保留 DSH 的 `ctx.meetingMinutes` 能力名。
+Prism 拥有此包；服务保留 DSH 的 `ctx.meetingMinutes` 能力名。bundle 载体是一个包，它同时发布自己插入的服务、工具和浏览器条目，因此其 README 遵循 bundle 模板，而「模型体验」一节保持结构化形式：工具行正是本包自己的贡献。
 
 </details>

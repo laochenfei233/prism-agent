@@ -2291,6 +2291,51 @@
       "doc": "docs/subsystems/meetings.md",
       "symbol": "AskMeetingMinutesRequest",
       "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "BeginMeetingRecordingRequest",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "UpdateMeetingRecordingRequest",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "FinishMeetingRecordingRequest",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "ReviseMeetingMinutesRequest",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingTranscript",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingSpeechProvider",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingSpeechPreparation",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingSpeechStatus",
+      "source": "packages/prism/prism-meeting/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/meetings.md",
+      "symbol": "MeetingTranscriptSegment",
+      "source": "packages/prism/prism-meeting/src/types.ts"
     }
   ]
 }

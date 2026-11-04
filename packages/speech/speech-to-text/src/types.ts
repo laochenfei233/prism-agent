@@ -104,9 +104,28 @@ export interface SpeechInput {
   readonly language: string
 }
 
+/** One closed recognition span and the speaker the provider attributed it to. */
+export interface TranscriptSegment {
+  /** Verbatim text of this span, without any speaker prefix. */
+  readonly text: string
+  /**
+   * Provider-assigned speaker label, compared only for equality with other
+   * segments of the same transcription. Absent when the provider recognizes no
+   * speakers or the deployment disabled separation.
+   */
+  readonly speaker?: string
+}
+
 /** Final transcription; an empty string means no speech was recognized. */
 export interface Transcript {
+  /** Closed recognition spans joined by a newline; the complete verbatim transcript. */
   readonly text: string
+  /**
+   * The spans `text` joins, in recognition order. Present only when the provider
+   * attributes speakers; a consumer that renders one continuous transcript uses
+   * `text` alone.
+   */
+  readonly segments?: readonly TranscriptSegment[]
   readonly audioSeconds: number
   readonly inferenceSeconds: number
 }
