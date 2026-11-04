@@ -8,6 +8,9 @@
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import {
+  type AnnotationFilter, isEmptyAnnotation, type SessionAnnotation, sameAnnotation,
+} from './annotations.ts'
 import { reconcileManualOrder, type ArchivedFilter, type SessionRowState } from './tree.ts'
 
 /** Browser-local order account for the hierarchy-free flat Session list. */
@@ -15,8 +18,8 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 
 /** Session-list grouping mode: sibling Workspace sections, a Workspace tree, or one flat list. */
 export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat'
-/** Session order: saved manual positions or current recency. */
-export type SessionOrderBy = 'manual' | 'updated'
+/** Session order: saved manual positions, current recency, or annotation priority. */
+export type SessionOrderBy = 'manual' | 'updated' | 'priority'
 
 /** Workspace browser viewing state persisted across surface remounts and reloads. */
 type WorkspaceViewState = {
@@ -28,6 +31,10 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Archived-row visibility; omitted in pre-filter v5 snapshots and read as 'default'. */
   archivedFilter?: ArchivedFilter
+  /** Per-Session user annotations keyed by id; omitted in blobs written before annotations existed. */
+  annotations?: Record<string, SessionAnnotation>
+  /** Annotation filter; omitted in blobs written before the filter existed and read as 'all'. */
+  annotationFilter?: AnnotationFilter
 }
 
 type SessionOrderSource = {
@@ -66,6 +73,12 @@ type WorkspaceViewActions = {
     source: SessionOrderSource,
   ) => void
   setArchivedFilter: (draft: WorkspaceViewState, filter: ArchivedFilter) => void
+  setAnnotationFilter: (draft: WorkspaceViewState, filter: AnnotationFilter) => void
+  setAnnotation: (
+    draft: WorkspaceViewState,
+    sessionId: string,
+    annotation: SessionAnnotation,
+  ) => void
 }
 
 /** Copy read-only projections into the persisted mutable store representation. */
@@ -125,6 +138,15 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
         }))
       },
       setArchivedFilter: (d, filter: ArchivedFilter) => { d.archivedFilter = filter },
+      setAnnotationFilter: (d, filter) => { d.annotationFilter = filter },
+      setAnnotation: (d, sessionId, annotation) => {
+        const current = d.annotations?.[sessionId]
+        if (current !== undefined && sameAnnotation(current, annotation)) return
+        // An emptied annotation leaves the table, so it stays proportional to
+        // what the user actually marked rather than to every Session opened.
+        const kept = Object.entries(d.annotations ?? {}).filter(([id]) => id !== sessionId)
+        d.annotations = Object.fromEntries(isEmptyAnnotation(annotation) ? kept : [...kept, [sessionId, annotation]])
+      },
     },
   })
 }

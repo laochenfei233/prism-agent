@@ -10,7 +10,7 @@ import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts
 import { HoverCardGroup, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { menuOpenStateFactory } from '../src/client/contract/slots.ts'
-import type { MenuOpenState, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
+import type { MenuOpenState, ProjectMenuOpenState, ProjectRowOwnerProps, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { RowDragProps } from '../src/client/rows/Rows.tsx'
 import {
@@ -1280,25 +1280,46 @@ it('keeps the browser menu on a blank provisional row', () => {
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-it('runs every project context row and keeps export disabled', () => {
+it('runs every project context row and lets plugins add rows', () => {
   const onCreate = vi.fn()
   const moveToTop = vi.fn()
   const moveToBottom = vi.fn()
   const reveal = vi.fn()
   const rename = vi.fn()
   const onDelete = vi.fn()
+  const rendered = vi.fn()
+  const onEntry = vi.fn()
   const group: GroupNode = {
     key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
     sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
   }
+  const renderSlot = ((
+    name: 'sidebar.workspaces.project.menu.item',
+    owner: ProjectRowOwnerProps,
+    opts?: { hookContext?: unknown },
+  ) => {
+    rendered(name, owner, opts?.hookContext)
+    if (name !== 'sidebar.workspaces.project.menu.item') return null
+    const [open, setMenuOpen] = opts?.hookContext as ProjectMenuOpenState
+    return (
+      <MenuItemButton onSelect={() => { setMenuOpen(false); onEntry(owner, open) }}>Export project</MenuItemButton>
+    )
+  }) as Parameters<typeof ProjectRowItem>[0]['renderSlot']
   render(<ProjectRowItem
     group={group} onToggle={vi.fn()} onCreate={onCreate}
-    actions={{ rename, delete: onDelete, moveToTop, moveToBottom, reveal }} t={t}
+    actions={{ rename, delete: onDelete, moveToTop, moveToBottom, reveal }} renderSlot={renderSlot} t={t}
   />)
   const open = (): void => { fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 5, clientY: 5 }) }
   open()
-  expect(screen.getByRole('menuitem', { name: '导出（开发中）' })).toHaveProperty('disabled', true)
-  fireEvent.click(screen.getByRole('menuitem', { name: '新建会话' }))
+  expect(rendered).toHaveBeenCalledWith(
+    'sidebar.workspaces.project.menu.item',
+    { workspaceId: 'project', displayTitle: 'Project' },
+    [true, expect.any(Function)],
+  )
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Export project' }))
+  expect(onEntry).toHaveBeenCalledWith({ workspaceId: 'project', displayTitle: 'Project' }, true)
+  expect(screen.queryByRole('menu')).toBeNull()
+  open(); fireEvent.click(screen.getByRole('menuitem', { name: '新建会话' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '置底' }))
   open(); fireEvent.click(screen.getByRole('menuitem', { name: '在资源管理器中打开' }))
@@ -1327,4 +1348,54 @@ it('leaves the menu open when an entry asks the hook to stay open', () => {
   fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 12, clientY: 20 })
   fireEvent.click(screen.getByRole('menuitem', { name: 'keep' }))
   expect(screen.getByRole('menu')).toBeTruthy()
+})
+
+describe('annotation marks', () => {
+  const base: SessionNode = {
+    id: sid('marked'), title: 'Marked', blank: false, running: false,
+    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false,
+  }
+
+  it('renders the favorite, review-later, and priority marks', () => {
+    render(<SessionNodeItem
+      node={{ ...base, annotation: { favorite: true, reviewLater: true, priority: 2 } }}
+      currentId={undefined} now={0} onOpen={vi.fn()} t={t}
+    />)
+    expect(screen.getByRole('img', { name: zh['annotation.favorite'] })).toBeTruthy()
+    expect(screen.getByRole('img', { name: zh['annotation.reviewLater'] })).toBeTruthy()
+    expect(screen.getByRole('img', { name: '优先级 2' })).toBeTruthy()
+  })
+
+  it('renders no marks for an absent annotation or the default priority', () => {
+    render(<SessionNodeItem node={base} currentId={undefined} now={0} onOpen={vi.fn()} t={t} />)
+    expect(screen.queryAllByRole('img')).toHaveLength(0)
+    cleanup()
+    render(<SessionNodeItem
+      node={{ ...base, annotation: { priority: 3 } }}
+      currentId={undefined} now={0} onOpen={vi.fn()} t={t}
+    />)
+    expect(screen.queryAllByRole('img')).toHaveLength(0)
+  })
+
+  it('shows the marks on search results too', () => {
+    const result: SearchResultNode = {
+      id: sid('found'), title: 'Found', workspace: 'w', running: false,
+      runningSubagentCount: 0, completed: false, archived: false,
+      annotation: { favorite: true },
+    }
+    render(<SearchResultItem result={result} currentId={undefined} onOpen={vi.fn()} onUnarchive={vi.fn()} t={t} />)
+    expect(screen.getByRole('img', { name: zh['annotation.favorite'] })).toBeTruthy()
+  })
+
+  it('leads the row with a checkbox in batch mode and toggles it without opening the row', () => {
+    const toggle = vi.fn()
+    const onOpen = vi.fn()
+    render(<SessionNodeItem
+      node={base} currentId={undefined} now={0} onOpen={onOpen} t={t}
+      selection={{ selected: false, toggle }}
+    />)
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择会话“Marked”' }))
+    expect(toggle).toHaveBeenCalledOnce()
+    expect(onOpen).not.toHaveBeenCalled()
+  })
 })

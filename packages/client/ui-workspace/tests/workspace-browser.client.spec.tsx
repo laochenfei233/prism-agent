@@ -136,6 +136,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     unarchiveSession: vi.fn(async () => {}),
     insertWorkspaceBefore: vi.fn(async () => {}),
     revealWorkspace: vi.fn(),
+    applyBatch: vi.fn(async () => ({ ok: 0, failed: 0 })),
     createWorkspace: vi.fn(async () => workspace('created', [])),
     useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} }),
     useHostInfo: selector => selector({ home: undefined, isLoopback: true }),
@@ -449,9 +450,10 @@ describe('WorkspaceBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-    expect(screen.getAllByRole('separator')).toHaveLength(2)
+    expect(screen.getAllByRole('separator')).toHaveLength(3)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
+      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '优先级', '隐藏已归档', '全部对话（显示已归档）',
+      '仅显示已归档', '全部会话', '只看收藏', '只看待回看',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -2684,5 +2686,109 @@ describe('Workspace tree grouping', () => {
     fireEvent.dragEnd(alpha)
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledOnce()
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledWith(wid('alpha'), wid('gamma'))
+  })
+})
+
+describe('WorkspaceBrowser batch mode', () => {
+  /** Mount one grouped Workspace with two Sessions, expanded. */
+  function mountBatch(applyBatch: WorkspaceBrowserProps['applyBatch']) {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('workspace')
+    preferences.actions.setGroupExpanded('alpha', true)
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify(preferences.getSnapshot()))
+    return mount({
+      applyBatch,
+      useSessions: hook(sessionState([summary('one', 20), summary('two', 10)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two'])])),
+    })
+  }
+
+  it('toggles the toolbar with the mode and clears the selection on exit', () => {
+    mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getByRole('toolbar', { name: zh['batch.mode'] })).toBeTruthy()
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('checkbox')[0] as HTMLElement)
+    expect(screen.getByText('已选 1 个会话')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.exit'] }))
+    expect(screen.queryByRole('toolbar', { name: zh['batch.mode'] })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getByText('已选 0 个会话')).toBeTruthy()
+  })
+
+  it('selects every shown Session and runs the picked action once', async () => {
+    const applyBatch = vi.fn(async () => ({ ok: 2, failed: 0 }))
+    mountBatch(applyBatch)
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.selectAll'] }))
+    expect(screen.getByText('已选 2 个会话')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.actions'] }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: zh['batch.favorite'] }))
+    await waitFor(() => { expect(applyBatch).toHaveBeenCalledExactlyOnceWith([sid('one'), sid('two')], { kind: 'favorite' }) })
+    await waitFor(() => { expect(screen.getByText('已选 0 个会话')).toBeTruthy() })
+  })
+
+  it('keeps the selection when the run reports failures', async () => {
+    const applyBatch = vi.fn(async () => ({ ok: 1, failed: 1 }))
+    mountBatch(applyBatch)
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    fireEvent.click(screen.getAllByRole('checkbox')[0] as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.actions'] }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: zh['batch.clearTags'] }))
+    await waitFor(() => { expect(applyBatch).toHaveBeenCalledWith([sid('one')], { kind: 'clearTags' }) })
+    expect(screen.getByText('已选 1 个会话')).toBeTruthy()
+  })
+
+  it('leaves batch mode as soon as a search starts', async () => {
+    mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getByRole('toolbar', { name: zh['batch.mode'] })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['search.sessions.aria'] }))
+    fireEvent.change(screen.getByPlaceholderText(zh['search.placeholder']), { target: { value: 'one' } })
+    await waitFor(() => { expect(screen.queryByRole('toolbar', { name: zh['batch.mode'] })).toBeNull() })
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+  })
+
+  it('offers no checkbox for the provisional New Session row and skips it in Select all', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('workspace')
+    preferences.actions.setGroupExpanded('alpha', true)
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify(preferences.getSnapshot()))
+    mount({
+      applyBatch: vi.fn(async () => ({ ok: 0, failed: 0 })),
+      useSessions: hook(sessionState(
+        [summary('blank', 20, { blank: true }), summary('one', 10)],
+        { main: sid('blank') },
+      )),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['blank', 'one'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.selectAll'] }))
+    expect(screen.getByText('已选 1 个会话')).toBeTruthy()
+  })
+
+  it('leads the header cluster with the batch toggle, then view options and add', () => {
+    mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
+    const cluster = screen.getByRole('button', { name: zh['batch.mode'] }).parentElement as HTMLElement
+    expect(within(cluster).getAllByRole('button').map(button => button.getAttribute('aria-label')))
+      .toEqual([zh['batch.mode'], zh['viewOptions.label'], zh['workspace.add']])
+  })
+
+  it('names the annotation filter that hid every Session and clears it from the empty state', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('flat')
+    preferences.actions.setAnnotationFilter('favorite')
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify(preferences.getSnapshot()))
+    mount({
+      useSessions: hook(sessionState([summary('one', 20)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one'])])),
+    })
+    expect(screen.getByText(zh['empty.noneAnnotated'])).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh['empty.viewAllAnnotations'] }))
+    expect(screen.getByText('one')).toBeTruthy()
   })
 })

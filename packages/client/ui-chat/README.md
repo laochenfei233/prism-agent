@@ -14,7 +14,7 @@ Use this package to render a browser chat from recorded Session conversations, i
 
 File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
 
-A secondary press on a message body copies the selected text (or the whole message) and offers to add it to the current task or start a side conversation with it prefilled; neither action sends.
+A secondary press on a message body copies the selected text (or the whole message) and offers to add it to the current task or start a side conversation in the right Sidebar with it prefilled; neither action sends.
 
 ## Table of Contents
 
@@ -130,6 +130,8 @@ Scroll-edge fades initialize when `ResizeObserver` reports the open group's layo
 Each group owns local `useDisclosure` state that survives mode changes while its component stays mounted.
 
 The session-scoped `conversation.chat.reasoning.body` single Slot offers the original reasoning text and streaming state only when its body is expanded. Its official entry registers at priority 100 and calls the `conversation.chat.reasoning.content` Factory. A replacement uses a lower priority number and may call that same Factory with original or derived text. The root-scoped Factory requires no Session and fixes compact typography. Its optional `labels` accepts complete `MarkdownLabels` unchanged; omission uses Chat's localized defaults. The host supplies no inline fallback or plugin action state. Display extensions must preserve access to the original text and own their controls inside their Body wrapper. Extensions do not replace the reasoning preview or its disclosure policy. The [reasoning display rules](src/client/conversation-nodes/README.md#display-modes) define which blocks produce rows.
+
+The settled assistant body's secondary-press menu renders the session-scoped `conversation.chat.message.menu.item` list after its shipped copy, add-to-composer, and side-conversation rows. Entries receive that message's durable id and dismiss the menu through the injected `useMenuOpenState` hook; a streaming or user body carries no such id and renders the shipped rows only.
 
 The Chat-node slot injects a reset-bound `useDisclosure` Hook for reasoning and tools. Intermediate renderers forward it without subscribing; each invocation owns independent open state. Source callbacks retain their receiver and stable identity. When an enclosing Turn actually hides a process member, its seat resets those disclosures without replacing component keys or changing the Hook reference. Display-mode changes preserve their open state.
 

@@ -25,6 +25,9 @@ import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmD
 import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import {
+  AnnotateSessionMenuItem, FavoriteSessionMenuItem, ReviewLaterSessionMenuItem, SessionAnnotationDialog,
+} from '../src/client/session-actions/AnnotateSession.tsx'
+import {
   CopySessionPathMenuItem, RevealSessionMenuItem, SessionSettingsMenuItem,
 } from '../src/client/session-actions/SessionContextActions.tsx'
 import type { SessionPathInjected, SessionSettingsInjected } from '../src/client/contract/slots.ts'
@@ -278,9 +281,9 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(8)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(11)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(after.slots.entries('shell.overlay')).toHaveLength(3)
+    expect(after.slots.entries('shell.overlay')).toHaveLength(4)
   })
 
   it('declares the two Session row lists and registers the shipped actions and overlay surfaces into them', async () => {
@@ -298,7 +301,10 @@ describe('ui-workspace apply', () => {
       .map(registration => [registration.options.id, registration.options.order, registration.component, registration.locale])
     expect(rows(MENU_ITEM)).toEqual([
       ['pin', 100, PinSessionMenuItem, 'workspace'],
+      ['favorite', 150, FavoriteSessionMenuItem, 'workspace'],
+      ['review-later', 160, ReviewLaterSessionMenuItem, 'workspace'],
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
+      ['annotate', 250, AnnotateSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
       ['reveal', 420, RevealSessionMenuItem, 'workspace'],
@@ -313,6 +319,7 @@ describe('ui-workspace apply', () => {
     expect(rows('shell.overlay')).toEqual([
       ['workspace.session-rename', undefined, SessionRenameDialog, 'workspace'],
       ['workspace.session-archive', undefined, SessionArchiveConfirmDialog, 'workspace'],
+      ['workspace.session-annotation', undefined, SessionAnnotationDialog, 'workspace'],
       ['workspace.row-toast', undefined, RowActionToast, undefined],
     ])
     // Only archive notice entries share the browser's viewing store.
@@ -324,7 +331,7 @@ describe('ui-workspace apply', () => {
     expect(b.slots.entries('workspace.toast').map(row => row.options.key)).toEqual([
       'sessionIdCopied', 'sessionIdCopyFailed', 'pathCopied', 'pathCopyFailed', 'revealFailed', 'workspaceMoveFailed',
       'pinFailed', 'unpinFailed', 'archivedNotOpenable', 'defaultWorkspaceFailed', 'shortcutForkFailed', 'createFailed',
-      'forkRequiresOpen', 'archived', 'stoppedAndArchived',
+      'forkRequiresOpen', 'batchDone', 'archived', 'stoppedAndArchived',
     ])
     for (const registration of b.slots.entries('workspace.toast')) {
       expect(registration.locale).toBe('workspace')
@@ -893,9 +900,9 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'conversation.empty.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(8)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(11)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(b.slots.entries('shell.overlay')).toHaveLength(3)
+    expect(b.slots.entries('shell.overlay')).toHaveLength(4)
     await fiber.dispose()
     expect(b.slots.entries('sidebar.workspaces')).toHaveLength(0)
     expect(b.slots.entries('conversation.hero.workspace')).toHaveLength(0)

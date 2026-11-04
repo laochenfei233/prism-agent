@@ -14,7 +14,7 @@ kind: "package-reference"
 
 文件提及提供方同时接收当前查看的会话 ID 与收尾轮次的属主信息，因此继承历史中的链接可以指向 fork 自身。
 
-在消息正文上二级点击会复制选中的文本（没有选区时复制整条消息），并可将其添加到当前任务，或在新开的辅助对话中预填；两者都不会发送。
+在消息正文上二级点击会复制选中的文本（没有选区时复制整条消息），并可将其添加到当前任务，或在右侧栏打开的辅助对话中预填；两者都不会发送。
 
 ## 目录
 
@@ -130,6 +130,8 @@ Chat Builder 按节点发布 `bottomSource`：节点可见且属于已加载的�
 每个组拥有本地 `useDisclosure` 状态，组件保持挂载时，模式切换保留该状态。
 
 Session 作用域的 `conversation.chat.reasoning.body` single Slot 仅在思考正文展开时提供原始思考文本和流式状态。官方条目以优先级 100 注册，并调用 `conversation.chat.reasoning.content` Factory。替换项使用更小的优先级数值，可向同一个 Factory 传入原文或派生显示文本。root 作用域的 Factory 不要求 Session，并固定使用紧凑排版。其可选 `labels` 原样接受完整的 `MarkdownLabels`，省略时使用 Chat 的默认本地化文案。宿主不提供内联 fallback 或插件操作状态。显示扩展必须保留查看原文的能力，并在自己的 Body 包装内维护控件。扩展不替换思考预览或展开策略。哪些块生成思考行由[思考展示规则](src/client/conversation-nodes/README.zh.md#display-modes)定义。
+
+已定稿助手正文的右键菜单在复制、加入输入框与侧边对话三行之后，渲染 session 作用域的 `conversation.chat.message.menu.item` list。条目收到该消息的持久 id，并通过注入的 `useMenuOpenState` 钩子关闭菜单；流式正文或用户正文没有该 id，只渲染内置行。
 
 Chat 节点 slot 为推理与工具注入绑定重置来源的 `useDisclosure` 钩子。中间 renderer 只透传、不订阅，每次调用拥有独立展开状态。来源回调保留接收对象及稳定引用。外层轮次实际隐藏过程成员时，所在节点重置这些开合状态，不替换组件 key，也不改变钩子引用。展示模式切换保留展开状态。
 

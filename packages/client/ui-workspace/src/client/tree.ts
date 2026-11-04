@@ -13,6 +13,9 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
+import {
+  type AnnotationFilter, DEFAULT_PRIORITY, NO_ANNOTATIONS, type SessionAnnotation,
+} from './annotations.ts'
 
 /** Group key for Sessions outside every Workspace. */
 export const UNGROUPED_KEY = ''
@@ -59,10 +62,12 @@ export interface SessionNode {
   /** In the registry-global archive set: shown grayed in place and not openable. */
   archived: boolean
   updatedAt: number
+  /** The row's own user annotation; absent at every default. */
+  annotation?: SessionAnnotation
 }
 
 /** Session order selected by the Workspace browser. */
-export type SessionOrderBy = 'manual' | 'updated'
+export type SessionOrderBy = 'manual' | 'updated' | 'priority'
 
 /** One workspace group section: header row facts + visible top-level session rows. */
 export interface GroupNode {
@@ -98,6 +103,8 @@ export interface SearchResultNode {
   /** In the registry-global archive set: shown grayed and not openable. */
   archived: boolean
   snippet?: string
+  /** The row's own user annotation; absent at every default. */
+  annotation?: SessionAnnotation
 }
 
 /** Bounded merged search projection plus the refine-query hint bit. */
@@ -236,29 +243,53 @@ export function pinCurrentBlank(
 export type ArchivedFilter = 'default' | 'show' | 'only'
 
 /**
+ * Membership facts every derivation shares for one render: the selected
+ * Session, the archive set, and the two filters the browser applies together.
+ */
+interface Visibility {
+  current: SessionId | undefined
+  archived: ReadonlySet<SessionId>
+  archivedFilter: ArchivedFilter
+  annotations: Readonly<Record<SessionId, SessionAnnotation>>
+  annotationFilter: AnnotationFilter
+}
+
+/** Whether one annotation passes the annotation filter. */
+function annotationVisible(session: SessionSummary, visibility: Visibility): boolean {
+  switch (visibility.annotationFilter) {
+    case 'all':
+      return true
+    case 'favorite':
+      return visibility.annotations[session.id]?.favorite === true
+    case 'reviewLater':
+      return visibility.annotations[session.id]?.reviewLater === true
+    /* v8 ignore next 2 -- closed-union backstop; only reached if the filter is forged */
+    default:
+      return assertNever(visibility.annotationFilter)
+  }
+}
+
+/**
  * Ordinary sessions are visible; among blank sessions, only the current one
  * is visible. Subagent children use their parent header catalog; archived
- * sessions follow the archived filter, while their accounting slots remain
- * either way so unarchiving restores position.
+ * sessions follow the archived filter while their accounting slots remain
+ * either way so unarchiving restores position. The annotation filter applies
+ * to every remaining row.
  */
-function sessionVisible(
-  session: SessionSummary,
-  current: SessionId | undefined,
-  archived: ReadonlySet<SessionId>,
-  archivedFilter: ArchivedFilter,
-): boolean {
+function sessionVisible(session: SessionSummary, visibility: Visibility): boolean {
   if (session.origin === 'subagent') return false
-  if (session.blank && session.id !== current) return false
-  switch (archivedFilter) {
+  if (session.blank && session.id !== visibility.current) return false
+  if (!annotationVisible(session, visibility)) return false
+  switch (visibility.archivedFilter) {
     case 'default':
-      return !archived.has(session.id)
+      return !visibility.archived.has(session.id)
     case 'show':
       return true
     case 'only':
-      return archived.has(session.id)
+      return visibility.archived.has(session.id)
     /* v8 ignore next 2 -- closed-union backstop; only reached if the filter is forged */
     default:
-      return assertNever(archivedFilter)
+      return assertNever(visibility.archivedFilter)
   }
 }
 
@@ -270,6 +301,26 @@ export interface SessionRowState {
   archivedSessionIds: readonly SessionId[]
   /** Archived-row visibility choice applied to lists and search alike. */
   archivedFilter: ArchivedFilter
+  /** Per-Session annotations; absent before the browser stored any. */
+  annotations?: Readonly<Record<SessionId, SessionAnnotation>>
+  /** Annotation filter applied to list rows; absent reads as no filter. */
+  annotationFilter?: AnnotationFilter
+}
+
+/**
+ * Build the shared membership context for one derivation pass.
+ * @param list - sessions list snapshot (the retained main-view Session is current).
+ * @param rowState - registry-global pin and archive sets, annotations, and both filters.
+ * @returns the context `sessionVisible` and `sessionNode` consume.
+ */
+function visibilityOf(list: SessionListState, rowState: SessionRowState): Visibility {
+  return {
+    current: mainSessionId(list),
+    archived: new Set(rowState.archivedSessionIds),
+    archivedFilter: rowState.archivedFilter,
+    annotations: rowState.annotations ?? NO_ANNOTATIONS,
+    annotationFilter: rowState.annotationFilter ?? 'all',
+  }
 }
 
 /**
@@ -347,12 +398,10 @@ function orderedUngrouped(
 function groupByWorkspace(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
-  archived: ReadonlySet<SessionId>,
-  archivedFilter: ArchivedFilter,
+  visibility: Visibility,
   ungroupedOrder: readonly string[] | undefined,
   groupOrder: 'registry' | 'activity',
 ): Group[] {
-  const current = mainSessionId(list)
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
   for (const workspace of workspaces) {
@@ -361,12 +410,14 @@ function groupByWorkspace(
       const summary = list.byId[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
-      if (!sessionVisible(summary, current, archived, archivedFilter)) continue
+      if (!sessionVisible(summary, visibility)) continue
       members.push(summary)
     }
-    // The archived-only view lists archives, not the Workspace inventory, so
-    // a Workspace without archived Sessions contributes no group.
-    if (archivedFilter === 'only' && members.length === 0) continue
+    // A view that restricts rows to a marked subset lists those rows, not the
+    // Workspace inventory, so a Workspace left with no visible Session
+    // contributes no group.
+    if (members.length === 0
+      && (visibility.archivedFilter === 'only' || visibility.annotationFilter !== 'all')) continue
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
       Date.parse(workspace.createdAt), workspace.title, members,
@@ -375,7 +426,7 @@ function groupByWorkspace(
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, current, archived, archivedFilter))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, visibility))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -436,10 +487,11 @@ function sessionNode(
   list: SessionListState,
   statuses: SessionStatuses,
   pinned: ReadonlySet<SessionId>,
-  archived: ReadonlySet<SessionId>,
+  visibility: Visibility,
 ): SessionNode {
   const status = statuses.get(s.id)
   const pendingInteraction = visiblePendingKind(status?.pendingInteraction?.kind)
+  const annotation = visibility.annotations[s.id]
   return {
     id: s.id,
     title: sessionTitle(s),
@@ -447,9 +499,10 @@ function sessionNode(
     running: status?.running ?? s.running,
     runningSubagentCount: runningChildCount(list, s.id, statuses),
     completed: status?.completionUnread === true,
-    pinned: !archived.has(s.id) && pinned.has(s.id),
-    archived: archived.has(s.id),
+    pinned: !visibility.archived.has(s.id) && pinned.has(s.id),
+    archived: visibility.archived.has(s.id),
     updatedAt: s.updatedAt,
+    ...(annotation === undefined ? {} : { annotation }),
     ...(pendingInteraction === undefined ? {} : { pendingInteraction }),
   }
 }
@@ -477,10 +530,10 @@ export function deriveGroups(
   statuses: SessionStatuses,
   view: TreeView,
 ): GroupNode[] {
-  const archived = new Set(rowState.archivedSessionIds)
+  const visibility = visibilityOf(list, rowState)
   const pinned = new Set(rowState.pinnedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
-  const current = mainSessionId(list)
+  const current = visibility.current
   const currentGroup = current === undefined
     ? undefined
     : owningGroupKey(workspaces, current)
@@ -488,8 +541,7 @@ export function deriveGroups(
   for (const g of groupByWorkspace(
     list,
     workspaces,
-    archived,
-    rowState.archivedFilter,
+    visibility,
     view.ungroupedOrder,
     view.groupOrder ?? 'registry',
   )) {
@@ -504,8 +556,8 @@ export function deriveGroups(
       expanded,
       containsCurrent: g.key === currentGroup,
       sessions: expanded
-        ? sectionMembers(g.sessions, pinned, archived)
-          .map(session => sessionNode(session, list, statuses, pinned, archived))
+        ? sectionMembers(g.sessions, pinned, visibility.archived)
+          .map(session => sessionNode(session, list, statuses, pinned, visibility))
         : [],
     })
   }
@@ -522,6 +574,20 @@ export function sessionMemberIds(list: SessionListState): SessionId[] {
 }
 
 /**
+ * Select every Session the current row state shows, across all Workspaces.
+ * @param list - sessions list snapshot.
+ * @param rowState - archive set, annotations, and both filters.
+ * @returns visible Session ids in list order.
+ */
+export function filteredSessionIds(list: SessionListState, rowState: SessionRowState): SessionId[] {
+  const visibility = visibilityOf(list, rowState)
+  return list.ids.filter((id) => {
+    const session = list.byId[id]
+    return session !== undefined && sessionVisible(session, visibility)
+  })
+}
+
+/**
  * Select visible flat-list members without deriving row presentation or ordering.
  * @param list - sessions list snapshot.
  * @param archivedSessionIds - registry-global archive set.
@@ -533,12 +599,37 @@ export function visibleSessionIds(
   archivedSessionIds: readonly SessionId[],
   archivedFilter: ArchivedFilter,
 ): SessionId[] {
-  const archived = new Set(archivedSessionIds)
-  const current = mainSessionId(list)
+  const visibility = visibilityOf(list, { pinnedSessionIds: [], archivedSessionIds, archivedFilter })
   return list.ids.filter((id) => {
     const s = list.byId[id]
-    return s !== undefined && sessionVisible(s, current, archived, archivedFilter)
+    return s !== undefined && sessionVisible(s, visibility)
   })
+}
+
+/**
+ * Rank Sessions by annotation priority (1 leads, an unset priority ranks with
+ * 3), then by current recency, with Session identity as the deterministic tie-break.
+ * @param sessionIds - account members to rank.
+ * @param summaries - current Session summaries; members without one are omitted.
+ * @param annotations - per-Session annotations holding the priorities.
+ * @returns member ids in priority order.
+ */
+export function orderByPriority(
+  sessionIds: readonly SessionId[],
+  summaries: SessionListState['byId'],
+  annotations: Readonly<Record<SessionId, SessionAnnotation>>,
+): SessionId[] {
+  return sessionIds.flatMap((id) => {
+    const summary = summaries[id]
+    if (summary === undefined) return []
+    return [{ id, priority: annotations[id]?.priority ?? DEFAULT_PRIORITY, updatedAt: summary.updatedAt }]
+  })
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority
+      if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt
+      return a.id < b.id ? -1 : 1
+    })
+    .map(row => row.id)
 }
 
 /**
@@ -556,28 +647,24 @@ export function deriveFlat(
   rowState: SessionRowState,
   statuses: SessionStatuses,
 ): SessionNode[] {
-  const archived = new Set(rowState.archivedSessionIds)
+  const visibility = visibilityOf(list, rowState)
   const pinned = new Set(rowState.pinnedSessionIds)
-  const current = mainSessionId(list)
   const members = sessionIds.flatMap((id) => {
     const session = list.byId[id]
-    return session !== undefined && sessionVisible(session, current, archived, rowState.archivedFilter)
-      ? [session]
-      : []
+    return session !== undefined && sessionVisible(session, visibility) ? [session] : []
   })
-  return sectionMembers(members, pinned, archived)
-    .map(session => sessionNode(session, list, statuses, pinned, archived))
+  return sectionMembers(members, pinned, visibility.archived)
+    .map(session => sessionNode(session, list, statuses, pinned, visibility))
 }
 
 /**
- * Merge immediate title/Workspace substring matches with ranked Host content
- * matches. Local rows lead newest-first, content-only rows retain backend
- * order, and duplicate sessions receive the backend snippet in place.
+ * Merge immediate title/Workspace/tag/note substring matches with ranked Host
+ * content matches. Local rows lead newest-first, content-only rows retain
+ * backend order, and duplicate sessions receive the backend snippet in place.
  * @param list - session metadata authority.
  * @param workspaces - Workspace membership and display labels.
  * @param query - caller text; surrounding whitespace is ignored.
- * @param archivedSessionIds - registry-global archive set (members match per the archived filter).
- * @param archivedFilter - archived-row visibility choice; search follows it.
+ * @param rowState - registry-global archive set, annotations, and both filters; search follows them.
  * @param statuses - unified UI status by Session.
  * @param content - ranked Host content-search page.
  * @param limit - protocol-owned maximum merged row count.
@@ -587,16 +674,14 @@ export function deriveSearchResults(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   query: string,
-  archivedSessionIds: readonly SessionId[],
-  archivedFilter: ArchivedFilter,
+  rowState: SessionRowState,
   statuses: SessionStatuses,
   content: { items: readonly SessionSearchResultItem[]; hasMore: boolean },
   limit: number,
 ): SearchResultSet {
   const q = query.trim().toLowerCase()
   if (q === '') return { items: [], hasMore: false }
-  const archived = new Set(archivedSessionIds)
-  const current = mainSessionId(list)
+  const visibility = visibilityOf(list, rowState)
 
   const workspaceBySession = new Map<SessionId, string>()
   for (const workspace of workspaces) {
@@ -610,16 +695,25 @@ export function deriveSearchResults(
   for (const item of content.items) {
     if (!contentBySession.has(item.sessionId)) contentBySession.set(item.sessionId, item)
   }
+  // Tags and notes are user text, so they match like the title does; the chat
+  // history itself stays out of the local pass.
+  const annotationMatches = (id: SessionId): boolean => {
+    const annotation = visibility.annotations[id]
+    if (annotation === undefined) return false
+    return (annotation.tags ?? []).some(tag => tag.toLowerCase().includes(q))
+      || (annotation.note ?? '').toLowerCase().includes(q)
+  }
 
   const local: SessionSummary[] = []
   for (const id of list.ids) {
     const summary = list.byId[id]
     // Blank placeholders never match a query (their canonical title displays
     // localized, so matching it would tie search to one language).
-    if (summary === undefined || summary.blank || !sessionVisible(summary, current, archived, archivedFilter)) continue
+    if (summary === undefined || summary.blank || !sessionVisible(summary, visibility)) continue
     if (
       sessionTitle(summary).toLowerCase().includes(q)
       || labelOf(summary).toLowerCase().includes(q)
+      || annotationMatches(summary.id)
     ) {
       local.push(summary)
     }
@@ -638,7 +732,7 @@ export function deriveSearchResults(
   for (const summary of orderedLocal) include(summary)
   for (const item of content.items) {
     const summary = list.byId[item.sessionId]
-    if (summary !== undefined && !summary.blank && sessionVisible(summary, current, archived, archivedFilter)) include(summary)
+    if (summary !== undefined && !summary.blank && sessionVisible(summary, visibility)) include(summary)
   }
 
   return {
@@ -646,6 +740,7 @@ export function deriveSearchResults(
       const match = contentBySession.get(summary.id)
       const status = statuses.get(summary.id)
       const pendingInteraction = visiblePendingKind(status?.pendingInteraction?.kind)
+      const annotation = visibility.annotations[summary.id]
       return {
         id: summary.id,
         title: sessionTitle(summary),
@@ -656,7 +751,8 @@ export function deriveSearchResults(
           ? {}
           : { pendingInteraction }),
         completed: status?.completionUnread === true,
-        archived: archived.has(summary.id),
+        archived: visibility.archived.has(summary.id),
+        ...(annotation === undefined ? {} : { annotation }),
         ...match === undefined ? {} : { snippet: match.snippet },
       }
     }),

@@ -756,6 +756,20 @@ describe('RowActionToast', () => {
     }
   })
 
+  it.each([
+    [2, 0, '批量操作完成：成功 2 个，失败 0 个'],
+    [1, 3, '批量操作完成：成功 1 个，失败 3 个'],
+  ] as const)('reports a batch run of %i succeeded and %i failed', async (ok, failed, text) => {
+    const { notify } = await toastSurface()
+    vi.useFakeTimers()
+    try {
+      notify({ kind: 'batchDone', ok, failed })
+      expect(screen.getByRole('alert').textContent).toBe(text)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows a refused creation with the Host reason and holds it as long as the archived notice', async () => {
     const { dismissToast, notify } = await toastSurface()
     vi.useFakeTimers()

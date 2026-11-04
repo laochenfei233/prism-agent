@@ -38,7 +38,7 @@ tab 身份是 `(kind, address)` 二元组：注册表的认领把地址原文用
 | 字段 | 含义 |
 |---|---|
 | `id` | 该实现的身份，在所有注册中唯一；包名是自然取值（`@deepseek-ai/dsh-client-ui-sidebar-files`）。正文与标题坑位按它注册。 |
-| `kind` | 类型的判别名：它的 tab 是什么，也是 `openTab` 点名的对象。不唯一——extension 可以接管 builtin 的 kind。内置 kind 为 `guide`、`text`、`files`、`browser`、`subagentchat` 与 `git`。 |
+| `kind` | 类型的判别名：它的 tab 是什么，也是 `openTab` 点名的对象。不唯一——extension 可以接管 builtin 的 kind。内置 kind 为 `guide`、`text`、`files`、`browser`、`subagentchat`、`sidechat` 与 `git`。 |
 | `patterns` | 可选的资源地址 glob；按 kind 打开的页面类型省略。含 `:` 的模式匹配整个地址（`dsh-resource://file/**`）；不含的匹配 URL 的路径部分且任意深度都中（`*.md`），不是 URL 的地址不会命中此类模式。匹配不分大小写、不隐藏 dotfile；语法为 picomatch 的 POSIX 方言。 |
 | `priority` | 三档字面量之一：`extension`（缺省且最高：产品之外的类型压过所有内置查看器）、`builtin`（随产品发布的类型）、`fallback`（任何更具体的类型都应压过的纯内容查看器）。 |
 | `canOpen(address)` | 可选的同步否决，对 glob 命中生效；每次路由决策都会调用。 |
@@ -145,6 +145,7 @@ Host 的 `ctx.workspaceFiles` 服务与生成的 `workspaceFiles` Remote 命名�
 - **`files`**——`builtin`，以 `openTab('files')` 打开。工作区目录树，经 `list` 懒加载，按展开目录建立监听，用 `tab.actions.openResource(fileAddressFor(sessionId, root, path))` 在自己所在 pane 打开文件（[README](../../packages/client/ui-sidebar-files/README.zh.md)）。
 - **`browser`**——可多开的 `builtin`，以 `openTab('browser', { params: { url? } })` 打开。Chat 的[链接偏好](../../packages/client/ui-chat/README.zh.md)决定 Assistant Markdown 是否在此打开 HTTP(S) 链接。它在默认 sandbox 下接受公共与 loopback HTTP(S) 目标，本地文件改用 Document Preview，并使用应用已知的 iframe history（[README](../../packages/client/ui-sidebar-browser/README.zh.md)）。
 - **`subagentchat`**——`builtin`，`dsh-resource://subagentchat/session/<child>?parent=<parent>&mode=<mode>`。资源提供方保留一个显式寻址的 subagent Conversation，并通过共享 Conversation Factory 渲染（[README](../../packages/client/ui-subagent/README.zh.md)）。
+- **`sidechat`**——`builtin`，`dsh-resource://sidechat/session/<id>`。消息菜单手势发起的侧边提问：当前工作区中的一个 Session，由资源提供方在标签页存活期内保留，并通过共享 Conversation Factory 渲染，因此在对话旁提问不会替换主对话（[README](../../packages/client/ui-chat/README.zh.md)）。
 
 - **`git`**——`builtin`，以 `openTab('git')` 打开。Git 工作台读取仓库状态、单个文件的比较，以及 [`client/ui-sidebar-git`](../../packages/client/ui-sidebar-git/README.zh.md) 注册的暂存、取消暂存与提交路由；它不轮询，只在挂载时与每次写操作后各读一次状态。
 

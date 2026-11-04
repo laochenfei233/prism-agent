@@ -54,6 +54,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
 import type { StartSessionOptions } from '../navigation.ts'
+import type { SessionAnnotation, SessionPriority } from '../annotations.ts'
 import type {} from './toast.ts'
 import type { createWorkspaceViewStore } from '../stores.ts'
 
@@ -83,6 +84,20 @@ export interface SessionRowOwnerProps {
   displayTitle: string
 }
 
+/** Owner share of one project (Workspace) row menu occurrence. */
+export interface ProjectRowOwnerProps {
+  /** Registered Workspace the row names. */
+  workspaceId: WorkspaceId
+  /** Row display title. */
+  displayTitle: string
+}
+
+/** The project row menu's open state, the same pair shape as the Session row menu. */
+export type ProjectMenuOpenState = MenuOpenState
+
+/** Hook every project-menu entry receives to dismiss the menu it sits in. */
+export type UseProjectMenuOpenState = () => ProjectMenuOpenState
+
 /** The row menu's open state as its owner holds it: the `useState` pair. */
 export type MenuOpenState = readonly [open: boolean, setOpen: (open: boolean) => void]
 
@@ -102,6 +117,15 @@ export type UseMenuOpenState = () => MenuOpenState
  * @returns the hook the entry calls.
  */
 export const menuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.session.menu.item', UseMenuOpenState> =
+  (_standard, state) => () => state
+
+/**
+ * Bind the project row's render occurrence into its menu entries' hook.
+ * @param _standard - framework standard props (unused).
+ * @param state - the menu's open-state pair from the render occurrence.
+ * @returns the hook the entry calls.
+ */
+export const projectMenuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState> =
   (_standard, state) => () => state
 
 /**
@@ -178,6 +202,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       inject: { hooks: {
         menuOpenState: SlotHookFactory<'sidebar.workspaces.session.menu.item', UseMenuOpenState>
         shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
+      } }
+    }
+    /**
+     * Rows appended to one project (Workspace) row's secondary-press menu,
+     * after the shipped new-session, reorder, reveal, rename, and delete rows,
+     * in ascending `order`. A fresh `id` adds a row; reusing a shipped or
+     * plugin id at another `priority` shadows that row. Each entry receives
+     * the Workspace id and display title, renders one `role="menuitem"` button
+     * (ui-primitives' `MenuItemButton` adds the host styling and
+     * `separatorBefore`), and dismisses the menu through the injected
+     * `useMenuOpenState` hook after acting; the list's keyboard walk and focus
+     * return read the DOM, so any such button joins them. Labels come from the
+     * contributing package's locale namespace. The ungrouped bucket renders no
+     * project menu, so no entry renders for it.
+     */
+    'sidebar.workspaces.project.menu.item': {
+      kind: 'list'
+      scope: 'root'
+      owner: ProjectRowOwnerProps
+      hookContext: ProjectMenuOpenState
+      inject: { hooks: {
+        menuOpenState: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState>
       } }
     }
     /**
@@ -284,6 +330,12 @@ export type WorkspaceBrowserInjected = {
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /** Show one Workspace directory in the Host file manager. */
   revealWorkspace: (path: string) => void
+  /**
+   * Run one batch action over the given Sessions, one at a time, and raise the
+   * result notice. A rejected Session counts as failed and leaves the others
+   * untouched.
+   */
+  applyBatch: (sessionIds: readonly SessionId[], action: BatchAction) => Promise<BatchResult>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
 }
@@ -319,6 +371,8 @@ export type RowToast =
   | { kind: 'defaultWorkspaceFailed' }
   | { kind: 'forkRequiresOpen'; sessionId: SessionId }
   | { kind: 'shortcutForkFailed'; reason: 'unavailable' | 'failed' }
+  /** A batch run finished; both counts are stated so a partial failure is visible. */
+  | { kind: 'batchDone'; ok: number; failed: number }
   /**
    * An explicit New Session request that failed. `message` is untranslated:
    * a Host refusal as `code: message` — the stable code stays in the copy so
@@ -434,6 +488,74 @@ export interface SessionSettingsInjected {
   /** Open the product settings surface. */
   openSettings: () => void
 }
+
+/** A Session annotation edit requested from a row; the dialog entry opens on it. */
+export interface SessionAnnotationTarget {
+  /** Session the annotation belongs to. */
+  sessionId: SessionId
+  /** Row display title, named in the dialog. */
+  displayTitle: string
+}
+
+/**
+ * Annotation share (menu row toggles and the editor row). The callbacks carry
+ * the whole behavior; the hook is every stored annotation keyed by Session, so
+ * one row reads its own record with a lookup.
+ */
+export interface SessionAnnotationInjected {
+  hooks: {
+    /** Stored annotations by Session id. */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Replace one Session's annotation; an empty record clears it. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Ask for the editor dialog on this Session. */
+  requestAnnotation: (sessionId: SessionId, displayTitle: string) => void
+}
+
+/** Editor dialog share: the pending request, its settlement, and the clipboard round-trip. */
+export interface SessionAnnotationDialogInjected {
+  hooks: {
+    /** The edit asked for, until the dialog consumes or cancels it. */
+    annotationRequest: HostObservable<SessionAnnotationTarget | null>
+    /** Stored annotations by Session id (the draft's seed). */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Consume or cancel the pending request. */
+  settleSessionAnnotation: () => void
+  /** Replace one Session's annotation. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Write the prepared prompt to the clipboard; resolves false when the browser refused. */
+  copyAnnotationPrompt: (text: string) => Promise<boolean>
+  /** Read the clipboard for an import; rejects when the browser refuses. */
+  readAnnotationClipboard: () => Promise<string>
+}
+
+/** One batch action the browser can request across the selected Sessions. */
+export type BatchAction =
+  | { readonly kind: 'archive' }
+  | { readonly kind: 'unarchive' }
+  | { readonly kind: 'favorite' }
+  | { readonly kind: 'unfavorite' }
+  | { readonly kind: 'reviewLater' }
+  | { readonly kind: 'unreview' }
+  | { readonly kind: 'priority'; readonly priority: SessionPriority }
+  | { readonly kind: 'clearTags' }
+
+/** How a batch run ended, per Session. */
+export interface BatchResult {
+  /** Sessions the action applied to. */
+  ok: number
+  /** Sessions the action rejected or skipped. */
+  failed: number
+}
+
+/** Props of the annotation editor entry in `shell.overlay`. */
+export type SessionAnnotationDialogProps =
+  PropsRuntime<'shell.overlay'>
+  & PropsLocale<'workspace'>
+  & Omit<SessionAnnotationDialogInjected, 'hooks'>
+  & PropsHooks<SessionAnnotationDialogInjected['hooks']>
 
 /** A Session rename the rename action asked for; the dialog entry opens on it. */
 export interface SessionRenameTarget {

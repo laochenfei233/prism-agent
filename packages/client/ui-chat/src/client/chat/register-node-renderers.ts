@@ -3,6 +3,7 @@ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { PerformanceUsageMode } from '../../chat-settings.ts'
 import type { UnitPriceOverrides } from '../contract/usage.ts'
 import type { ChatPresentationPolicy } from '../presentation-policy.ts'
+import { messageMenuOpenStateFactory } from '../contract/slots.ts'
 import { NS } from '../locale.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
@@ -57,6 +58,9 @@ export function registerChatNodeRenderers(
     children: {
       'conversation.chat.reasoning.body': { kind: 'single', scope: 'session' },
       'conversation.chat.message.images': { kind: 'single', scope: 'session' },
+      'conversation.chat.message.menu.item': {
+        kind: 'list', scope: 'session', inject: { hooks: { menuOpenState: messageMenuOpenStateFactory } },
+      },
     },
     inject: () => ({ hooks: { presentation } }),
   }, AssistantNodeView))

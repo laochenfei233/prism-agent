@@ -120,7 +120,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 60px;
+  /* Three 28px controls and their two gaps: batch toggle, view options, add. */
+  max-width: 92px;
   opacity: 1;
   overflow: hidden;
   visibility: visible;
@@ -599,6 +600,120 @@
 
 .archiveActivity li {
   overflow-wrap: anywhere;
+}
+
+/* Active batch mode: the same 36px control, held down like a toggle. */
+.iconButtonActive {
+  background: var(--dsw-alias-interactive-bg-active, var(--dsw-alias-interactive-bg-hover));
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Batch toolbar: one dense strip above the list, wrapping on narrow widths. */
+.batchBar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 4px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.batchCount {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batchAction {
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.batchAction:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.batchAction:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+.batchAction:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+/* Annotation editor fields: a checkbox row, a labelled select, and text inputs. */
+.annotationToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.annotationField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.annotationSelect,
+.annotationNote {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.annotationSelect {
+  height: 28px;
+  padding: 0 6px;
+}
+
+.annotationNote {
+  padding: 6px;
+  resize: vertical;
+  line-height: 18px;
+}
+
+.annotationTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.annotationHint {
+  flex: 1 1 100%;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 @media (prefers-reduced-motion: reduce) {

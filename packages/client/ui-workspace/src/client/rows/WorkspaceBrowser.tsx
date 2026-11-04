@@ -19,9 +19,9 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 import clsx from 'clsx'
 import {
   Button, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
-  IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
+  IconChecklistOutlineRegular, IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
+  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular, IconLikeFillRegular,
+  IconListPenOutlineRegular, IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
   IconWorkspaceTreeOutlineRegular, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -31,11 +31,12 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import { type AnnotationFilter, NO_ANNOTATIONS, type SessionAnnotation, type SessionPriority } from '../annotations.ts'
+import type { BatchAction, WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
+  deriveFlat, deriveGroups, deriveSearchResults, filteredSessionIds, orderByPriority, orderByRecency, owningGroupKey,
+  owningParentFolder, pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
@@ -139,14 +140,19 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
-/** Grouping, ordering, and archived-filter menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
+/** Grouping, ordering, and both filter menus; own open state so it resets with the wide chrome. */
+function ViewOptionsMenu({
+  groupBy, orderBy, archivedFilter, annotationFilter,
+  onGroupPick, onOrderPick, onArchivedFilterPick, onAnnotationFilterPick, t,
+}: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   archivedFilter: ArchivedFilter
+  annotationFilter: AnnotationFilter
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
   onArchivedFilterPick: (filter: ArchivedFilter) => void
+  onAnnotationFilterPick: (filter: AnnotationFilter) => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
@@ -163,23 +169,33 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
         { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
+        { id: 'priority', label: t('orderBy.priority'), icon: <IconChecklistOutlineRegular /> },
         { type: 'separator' as const, id: 'archived-filter-separator' },
         { type: 'label' as const, id: 'filter-by', text: t('filterBy.label') },
         { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
         { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconQueueOutlineRegular /> },
         { id: 'only-archived', label: t('viewOptions.onlyArchived'), icon: <IconArchiveCheckOutlineRegular /> },
+        { type: 'separator' as const, id: 'annotation-filter-separator' },
+        { type: 'label' as const, id: 'annotation-filter', text: t('annotationFilter.label') },
+        { id: 'all-annotations', label: t('annotationFilter.all'), icon: <IconQueueOutlineRegular /> },
+        { id: 'favorite-only', label: t('annotationFilter.favorite'), icon: <IconLikeFillRegular /> },
+        { id: 'review-later-only', label: t('annotationFilter.reviewLater'), icon: <IconListPenOutlineRegular /> },
       ]}
       selectedIds={[
         groupBy,
         orderBy,
         { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
+        { all: 'all-annotations', favorite: 'favorite-only', reviewLater: 'review-later-only' }[annotationFilter],
       ]}
       onSelect={(id) => {
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
-        else if (id === 'manual' || id === 'updated') onOrderPick(id)
+        else if (id === 'manual' || id === 'updated' || id === 'priority') onOrderPick(id)
         else if (id === 'hide-archived') onArchivedFilterPick('default')
         else if (id === 'show-archived') onArchivedFilterPick('show')
         else if (id === 'only-archived') onArchivedFilterPick('only')
+        else if (id === 'all-annotations') onAnnotationFilterPick('all')
+        else if (id === 'favorite-only') onAnnotationFilterPick('favorite')
+        else if (id === 'review-later-only') onAnnotationFilterPick('reviewLater')
         setOpen(false)
       }}
       align="end"
@@ -199,6 +215,94 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
             <IconSlidersTwoOutlineRegular />
           </button>
         </Tooltip>
+      )}
+    />
+  )
+}
+
+/** Batch-mode selection threaded into both list bodies: membership plus the flip callback. */
+interface BatchSelection {
+  selected: ReadonlySet<SessionId>
+  toggle: (sessionId: SessionId) => void
+}
+
+/** Priority rows of the batch menu, in display order. */
+const BATCH_PRIORITIES = [
+  { id: 'priority-1', priority: 1, label: 'priority.1' },
+  { id: 'priority-2', priority: 2, label: 'priority.2' },
+  { id: 'priority-3', priority: 3, label: 'priority.3' },
+  { id: 'priority-4', priority: 4, label: 'priority.4' },
+  { id: 'priority-5', priority: 5, label: 'priority.5' },
+] as const satisfies readonly { id: string; priority: SessionPriority; label: Parameters<WorkspaceBrowserProps['t']>[0] }[]
+
+/**
+ * Resolve one batch-menu row id to the action it runs.
+ * @param id - the menu's row id.
+ * @returns the action, or undefined for a non-action row.
+ */
+function batchActionOf(id: string): BatchAction | undefined {
+  switch (id) {
+    case 'archive': return { kind: 'archive' }
+    case 'unarchive': return { kind: 'unarchive' }
+    case 'favorite': return { kind: 'favorite' }
+    case 'unfavorite': return { kind: 'unfavorite' }
+    case 'review-later': return { kind: 'reviewLater' }
+    case 'unreview': return { kind: 'unreview' }
+    case 'clear-tags': return { kind: 'clearTags' }
+    case 'priority-1': return { kind: 'priority', priority: 1 }
+    case 'priority-2': return { kind: 'priority', priority: 2 }
+    case 'priority-3': return { kind: 'priority', priority: 3 }
+    case 'priority-4': return { kind: 'priority', priority: 4 }
+    case 'priority-5': return { kind: 'priority', priority: 5 }
+    /* v8 ignore next -- the menu emits only the ids listed above. */
+    default: return undefined
+  }
+}
+
+/** The batch menu: every action the browser can run over the current selection. */
+function BatchActionsMenu({ disabled, onPick, t }: {
+  disabled: boolean
+  onPick: (action: BatchAction) => void
+  t: WorkspaceBrowserProps['t']
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Menu
+      open={open}
+      onClose={() => { setOpen(false) }}
+      items={[
+        { id: 'archive', label: t('batch.archive'), icon: <IconArchiveOutlineRegular /> },
+        { id: 'unarchive', label: t('batch.unarchive'), icon: <IconArchiveCheckOutlineRegular /> },
+        { type: 'separator' as const, id: 'batch-mark-separator' },
+        { id: 'favorite', label: t('batch.favorite'), icon: <IconLikeFillRegular /> },
+        { id: 'unfavorite', label: t('batch.unfavorite'), icon: <IconLikeFillRegular /> },
+        { id: 'review-later', label: t('batch.reviewLater'), icon: <IconQueueOutlineRegular /> },
+        { id: 'unreview', label: t('batch.unreview'), icon: <IconQueueOutlineRegular /> },
+        { type: 'separator' as const, id: 'batch-tags-separator' },
+        { id: 'clear-tags', label: t('batch.clearTags'), icon: <IconListPenOutlineRegular /> },
+        { type: 'separator' as const, id: 'batch-priority-separator' },
+        { type: 'label' as const, id: 'batch-priority', text: t('batch.priority') },
+        ...BATCH_PRIORITIES.map(row => ({ id: row.id, label: t(row.label) })),
+      ]}
+      onSelect={(id) => {
+        setOpen(false)
+        const action = batchActionOf(id)
+        if (action !== undefined) onPick(action)
+      }}
+      align="end"
+      dense
+      listClassName={css.viewOptionsMenu}
+      portal
+      anchor={(
+        <button
+          type="button"
+          className={css.batchAction}
+          disabled={disabled}
+          aria-disabled={disabled}
+          onClick={() => { setOpen(v => !v) }}
+        >
+          {t('batch.actions')}
+        </button>
       )}
     />
   )
@@ -239,6 +343,32 @@ function sessionDragOrder(
   return pinCurrentBlank(next, rows.find(row => row.blank)?.id)
 }
 
+/**
+ * Order one account's members by the browser's selected mode: current
+ * recency, annotation priority, or the saved manual positions.
+ * @param mode - the selected order.
+ * @param memberIds - account membership to rank.
+ * @param saved - browser-local manual positions for this account.
+ * @param summaries - current Session metadata.
+ * @param rowState - pin and archive sets the manual order reconciles against.
+ * @param annotations - per-Session annotations holding the priorities.
+ * @returns member ids in display order.
+ */
+function orderMembers(
+  mode: SessionOrderBy,
+  memberIds: readonly SessionId[],
+  saved: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+  rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>,
+  annotations: Readonly<Record<SessionId, SessionAnnotation>>,
+): SessionId[] {
+  switch (mode) {
+    case 'updated': return orderByRecency(memberIds, summaries)
+    case 'priority': return orderByPriority(memberIds, summaries, annotations)
+    case 'manual': return reconcileManualOrder(memberIds, saved, summaries, rowState)
+  }
+}
+
 /** In-flight Workspace-row drag: source identity plus the current marker. */
 interface WorkspaceDragState {
   workspaceId: WorkspaceId
@@ -257,6 +387,7 @@ type SessionTreeProps = Pick<
   | 'insertWorkspaceBefore' | 'revealWorkspace' | 't' | 'usePanelInfo'
 > & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
+  | 'sidebar.workspaces.project.menu.item'
   | 'sidebar.workspaces.session.row.action'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
@@ -288,6 +419,8 @@ type SessionTreeProps = Pick<
   rowState: SessionRowState
   /** Switch the archived filter back to the default hide-archived view. */
   onLeaveArchivedOnly: () => void
+  /** Clear the annotation filter back to no filter. */
+  onLeaveAnnotationFilter: () => void
   /** Open the browser-owned rename dialog for a real Workspace group. */
   onRenameRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned delete-confirmation dialog for a real Workspace group. */
@@ -298,18 +431,27 @@ type SessionTreeProps = Pick<
   revealSessionId?: SessionId | undefined
   /** Acknowledge that the chosen Session row has been revealed. */
   onSessionRevealed: (sessionId: SessionId) => void
+  /** Batch-mode selection; absent while batch mode is off. */
+  batch?: BatchSelection | undefined
 }
 
 /** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
-function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'>) {
+function EmptySessions({ rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'> & { onLeaveAnnotationFilter: () => void }) {
   const archivedOnly = rowState.archivedFilter === 'only'
+  const annotationOnly = rowState.annotationFilter !== undefined && rowState.annotationFilter !== 'all'
   return (
     <div className={css.emptyState} data-row-key="empty">
       {archivedOnly ? <IconArchiveOutlineRegular size={24} /> : <IconQueueOutlineRegular size={24} />}
-      <div>{archivedOnly ? t('empty.noneArchived') : t('empty.none')}</div>
-      {archivedOnly && (
-        <button type="button" className={css.emptyAction} onClick={onLeaveArchivedOnly}>
-          {t('empty.viewOthers')}
+      <div>
+        {archivedOnly ? t('empty.noneArchived') : annotationOnly ? t('empty.noneAnnotated') : t('empty.none')}
+      </div>
+      {(archivedOnly || annotationOnly) && (
+        <button
+          type="button"
+          className={css.emptyAction}
+          onClick={archivedOnly ? onLeaveArchivedOnly : onLeaveAnnotationFilter}
+        >
+          {archivedOnly ? t('empty.viewOthers') : t('empty.viewAllAnnotations')}
         </button>
       )}
     </div>
@@ -319,14 +461,14 @@ function EmptySessions({ rowState, onLeaveArchivedOnly, t }: Pick<SessionTreePro
 /** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
   list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, groupOrder,
-  rowState, onLeaveArchivedOnly,
+  rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter,
   workspaceReady, animationResetKey, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest,
   renderSlot,
   insertWorkspaceBefore, revealWorkspace,
   nestWorkspaces, groupExpansion, setGroupExpanded,
   setSessionOrder, home, t,
-  revealSessionId, onSessionRevealed, shortcuts,
+  revealSessionId, onSessionRevealed, shortcuts, batch,
 }: SessionTreeProps) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -563,6 +705,7 @@ function SessionTree({
           group={group}
           containsCurrentDescendant={currentAncestors.has(group.key)}
           home={home}
+          renderSlot={renderSlot}
           t={t}
           onToggle={() => {
             if (group.expanded) dropWatermarks(key => withinGroup(key, group.key))
@@ -649,6 +792,9 @@ function SessionTree({
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               drag={dragProps}
+              selection={batch === undefined || node.blank
+                ? undefined
+                : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
               t={t}
             />
           )
@@ -692,7 +838,12 @@ function SessionTree({
         resetKey={JSON.stringify([animationResetKey, watermarkMotionKey])}
       >
         {groups.length === 0 && (
-          <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {groupRows}
       </AnimatedRows>
@@ -703,9 +854,9 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, open, onSessionRenameRequest,
+  list, sessionIds, rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, useSessionStatus, open, onSessionRenameRequest,
   usePanelInfo, setSessionOrder, workspaceReady, animationResetKey,
-  revealSessionId, onSessionRevealed, renderSlot, t,
+  revealSessionId, onSessionRevealed, renderSlot, batch, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessionStatus'
@@ -720,6 +871,8 @@ function FlatList({
   | 'onSessionRevealed'
   | 'rowState'
   | 'onLeaveArchivedOnly'
+  | 'onLeaveAnnotationFilter'
+  | 'batch'
   | 't'
 > & {
   list: SessionListState
@@ -755,7 +908,12 @@ function FlatList({
         resetKey={animationResetKey}
       >
         {rows.length === 0 && (
-          <EmptySessions rowState={rowState} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {rows.map((node) => {
           const active = drag !== null && drag.pinned === node.pinned
@@ -773,6 +931,9 @@ function FlatList({
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
+              selection={batch === undefined || node.blank
+                ? undefined
+                : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
               drag={{
                 start: () => {
                   dropCommitted.current = false
@@ -818,8 +979,7 @@ function SearchResults({
   open,
   onUnarchive,
   workspaces,
-  archivedSessionIds,
-  archivedFilter,
+  rowState,
   query,
   remote,
   resultLimit,
@@ -827,9 +987,8 @@ function SearchResults({
   t,
 }: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo'> & {
   workspaces: readonly WorkspaceView[]
-  archivedSessionIds: readonly SessionNode['id'][]
-  /** Search matches follow the archived filter selected for the list. */
-  archivedFilter: ArchivedFilter
+  /** Registry-global archive set, annotations, and both filters; search follows them. */
+  rowState: SessionRowState
   /** Unarchive an archived result row in place. */
   onUnarchive: (id: SessionNode['id']) => void
   query: string
@@ -847,13 +1006,12 @@ function SearchResults({
       list,
       workspaces,
       query,
-      archivedSessionIds,
-      archivedFilter,
+      rowState,
       statuses,
       currentRemote,
       resultLimit,
     ),
-    [list, workspaces, query, archivedSessionIds, archivedFilter, statuses, currentRemote, resultLimit],
+    [list, workspaces, query, rowState, statuses, currentRemote, resultLimit],
   )
   const pending = currentRemote.status === 'loading'
   const currentId = panelActive
@@ -928,6 +1086,7 @@ export function WorkspaceBrowser({
   revealWorkspace,
   unarchiveSession,
   createWorkspace,
+  applyBatch,
   searchSessions,
   searchResultLimit,
   useDirectoryFlow,
@@ -971,6 +1130,8 @@ export function WorkspaceBrowser({
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
   const archivedFilter = useStore(s => s.archivedFilter ?? 'default')
+  const annotations = useStore(s => s.annotations ?? NO_ANNOTATIONS)
+  const annotationFilter = useStore(s => s.annotationFilter ?? 'all')
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -998,15 +1159,15 @@ export function WorkspaceBrowser({
     [archivedSessionIds, pinnedSessionIds],
   )
   const rowState = useMemo<SessionRowState>(
-    () => ({ ...orderState, archivedFilter }),
-    [orderState, archivedFilter],
+    () => ({ ...orderState, archivedFilter, annotations, annotationFilter }),
+    [orderState, archivedFilter, annotations, annotationFilter],
   )
   const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
     const memberIds = workspace.sessionIds
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(memberIds, list.byId)
-      : reconcileManualOrder(memberIds, sessionOrderByAccount[workspace.workspaceId], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, memberIds, sessionOrderByAccount[workspace.workspaceId], list.byId, orderState, annotations,
+    )
     return {
       ...workspace,
       sessionIds: pinCurrentBlank(
@@ -1014,25 +1175,25 @@ export function WorkspaceBrowser({
         currentBlank !== undefined && memberIds.includes(currentBlank) ? currentBlank : undefined,
       ),
     }
-  }), [currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, workspaces])
+  }), [annotations, currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, workspaces])
   const orderedUngroupedSessionIds = useMemo(() => {
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(ungroupedMemberIds, list.byId)
-      : reconcileManualOrder(ungroupedMemberIds, sessionOrderByAccount[UNGROUPED_KEY], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, ungroupedMemberIds, sessionOrderByAccount[UNGROUPED_KEY], list.byId, orderState, annotations,
+    )
     return pinCurrentBlank(
       baseOrder,
       currentBlank !== undefined && ungroupedMemberIds.includes(currentBlank) ? currentBlank : undefined,
     )
-  }, [currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, ungroupedMemberIds])
+  }, [annotations, currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, ungroupedMemberIds])
   const orderedFlatSessionIds = useMemo(() => {
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(flatMemberIds, list.byId)
-      : reconcileManualOrder(flatMemberIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, flatMemberIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], list.byId, orderState, annotations,
+    )
     return pinCurrentBlank(
       baseOrder,
       currentBlank !== undefined && flatMemberIds.includes(currentBlank) ? currentBlank : undefined,
     )
-  }, [currentBlank, flatMemberIds, list.byId, orderBy, orderState, sessionOrderByAccount])
+  }, [annotations, currentBlank, flatMemberIds, list.byId, orderBy, orderState, sessionOrderByAccount])
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
     ...orderedWorkspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
     [UNGROUPED_KEY, orderedUngroupedSessionIds] as const,
@@ -1084,6 +1245,32 @@ export function WorkspaceBrowser({
   ])
   const saveSessionOrder = (accountKey: string, order: readonly string[]): void => {
     actions.setSessionOrder(accountKey, order, activeSessionOrders)
+  }
+  // Batch mode is a browser-local interaction: the selection never persists,
+  // and leaving the mode always drops it.
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedSessionIds, setSelectedSessionIds] = useState<readonly SessionId[]>([])
+  const selectedIdSet = useMemo(() => new Set(selectedSessionIds), [selectedSessionIds])
+  const leaveBatch = (): void => {
+    setBatchMode(false)
+    setSelectedSessionIds([])
+  }
+  const batch = useMemo<BatchSelection | undefined>(() => batchMode
+    ? {
+      selected: selectedIdSet,
+      toggle: (sessionId) => {
+        setSelectedSessionIds(current => current.includes(sessionId)
+          ? current.filter(id => id !== sessionId)
+          : [...current, sessionId])
+      },
+    }
+    : undefined, [batchMode, selectedIdSet])
+  const runBatch = (action: BatchAction): void => {
+    if (selectedSessionIds.length === 0) return
+    void applyBatch(selectedSessionIds, action).then((result) => {
+      // Failures stay selected, so the retry covers exactly what did not apply.
+      if (result.failed === 0) setSelectedSessionIds([])
+    })
   }
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
@@ -1321,7 +1508,13 @@ export function WorkspaceBrowser({
                 maxLength={SEARCH_QUERY_MAX_CODE_UNITS}
                 value={query}
                 tabIndex={searchExpanded ? 0 : -1}
-                onChange={(e) => { setQuery(sanitizeSearchQuery(e.target.value)) }}
+                onChange={(e) => {
+                  const next = sanitizeSearchQuery(e.target.value)
+                  // Result rows carry no selection checkbox and Select all reads
+                  // the list, so typing a query ends batch mode.
+                  if (next.trim() !== '') leaveBatch()
+                  setQuery(next)
+                }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
@@ -1347,13 +1540,28 @@ export function WorkspaceBrowser({
         )}
         <div className={clsx(css.headerActions, wide && searchExpanded && css.headerActionsHidden)}>
           {wide && (
+            <Tooltip label={t('batch.mode')} side="bottom" delayMs={500}>
+              <button
+                type="button"
+                className={clsx(css.iconButton, css.wide, batchMode && css.iconButtonActive)}
+                aria-label={t('batch.mode')}
+                aria-pressed={batchMode}
+                onClick={() => { if (batchMode) leaveBatch(); else setBatchMode(true) }}
+              >
+                <IconChecklistOutlineRegular />
+              </button>
+            </Tooltip>
+          )}
+          {wide && (
             <ViewOptionsMenu
               groupBy={groupBy}
               orderBy={orderBy}
               archivedFilter={archivedFilter}
+              annotationFilter={annotationFilter}
               onGroupPick={actions.setGroupBy}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
               onArchivedFilterPick={actions.setArchivedFilter}
+              onAnnotationFilterPick={actions.setAnnotationFilter}
               t={t}
             />
           )}
@@ -1417,6 +1625,31 @@ export function WorkspaceBrowser({
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
       <div className={css.listArea}>
+        {wide && batchMode && (
+          <div className={css.batchBar} role="toolbar" aria-label={t('batch.mode')}>
+            <span className={css.batchCount}>{t('batch.count', { n: selectedSessionIds.length })}</span>
+            <button
+              type="button"
+              className={css.batchAction}
+              onClick={() => {
+                // The provisional blank row is not an archive or marking target.
+                setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
+              }}
+            >
+              {t('batch.selectAll')}
+            </button>
+            <button
+              type="button"
+              className={css.batchAction}
+              disabled={selectedSessionIds.length === 0}
+              onClick={() => { setSelectedSessionIds([]) }}
+            >
+              {t('batch.clear')}
+            </button>
+            <BatchActionsMenu disabled={selectedSessionIds.length === 0} onPick={runBatch} t={t} />
+            <button type="button" className={css.batchAction} onClick={leaveBatch}>{t('batch.exit')}</button>
+          </div>
+        )}
         {wide && (normalizedQuery !== ''
           ? (
             <SearchResults
@@ -1426,8 +1659,7 @@ export function WorkspaceBrowser({
               open={openSearchResult}
               onUnarchive={onSessionUnarchive}
               workspaces={workspaces}
-              archivedSessionIds={archivedSessionIds}
-              archivedFilter={archivedFilter}
+              rowState={rowState}
               query={normalizedQuery}
               remote={remoteSearch}
               resultLimit={searchResultLimit}
@@ -1442,6 +1674,7 @@ export function WorkspaceBrowser({
                 sessionIds={orderedFlatSessionIds}
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 workspaceReady={workspaceReady}
                 animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
                 useSessionStatus={useSessionStatus}
@@ -1451,6 +1684,7 @@ export function WorkspaceBrowser({
                 setSessionOrder={saveSessionOrder}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
+                batch={batch}
                 t={t}
               />
             )
@@ -1473,12 +1707,14 @@ export function WorkspaceBrowser({
                 setSessionOrder={saveSessionOrder}
                 rowState={rowState}
                 onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 startSession={startSession}
                 open={guardedOpen}
                 insertWorkspaceBefore={insertWorkspaceBefore}
                 revealWorkspace={revealWorkspace}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
+                batch={batch}
                 home={home}
                 t={t}
                 onRenameRequest={(workspaceId, displayTitle) => {

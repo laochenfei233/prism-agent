@@ -128,8 +128,8 @@ describe('session rename through the assembled browser', () => {
     const trigger = within(row as HTMLElement).getByLabelText('会话“Persisted title”的操作')
     fireEvent.click(trigger)
     expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '置顶会话', '重命名', '分叉会话', '归档会话', '在资源管理器中打开', '复制路径', '复制 Session ID', 'Export action', 'Last action',
-      '前往配置',
+      '置顶会话', '收藏会话', '标记待回看', '重命名', '标签与备注…', '分叉会话', '归档会话', '在资源管理器中打开', '复制路径',
+      '复制 Session ID', 'Export action', 'Last action', '前往配置',
     ])
     // The shipped reveal and settings rows each start a group; the fixture
     // entry's own separatorBefore adds the third.

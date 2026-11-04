@@ -347,7 +347,7 @@ describe('deriveGroups', () => {
     expect(deriveFlat(sessions, visibleSessionIds(sessions, noArchive, 'default'), noRows, statuses)
       .find(node => node.id === done.id)!.completed).toBe(true)
     const search = deriveSearchResults(
-      sessions, [workspace('first', ['done', 'plain'])], 'done', noArchive, 'default',
+      sessions, [workspace('first', ['done', 'plain'])], 'done', noRows,
       statuses, { items: [], hasMore: false }, 10,
     )
     expect(search.items[0]?.completed).toBe(true)
@@ -393,7 +393,7 @@ describe('deriveGroups', () => {
       [parent.id, 1], [fork.id, 1],
     ])
     expect(deriveSearchResults(
-      sessions, [workspace('first', ['parent', 'fork'])], 'parent', noArchive, 'default',
+      sessions, [workspace('first', ['parent', 'fork'])], 'parent', noRows,
       noAttention, { items: [], hasMore: false }, 10,
     ).items[0]).toMatchObject({ id: parent.id, runningSubagentCount: 1 })
   })
@@ -417,7 +417,7 @@ describe('deriveGroups', () => {
     const counts = (snapshot: SessionStatusSnapshot) => [
       deriveGroups(sessions, [workspace('first', ['parent'])], noRows, snapshot, view(['first']))[0]!.sessions[0]!.runningSubagentCount,
       deriveFlat(sessions, [parent.id], noRows, snapshot)[0]!.runningSubagentCount,
-      deriveSearchResults(sessions, [], 'parent', noArchive, 'default', snapshot, { items: [], hasMore: false }, 10).items[0]!.runningSubagentCount,
+      deriveSearchResults(sessions, [], 'parent', noRows, snapshot, { items: [], hasMore: false }, 10).items[0]!.runningSubagentCount,
     ]
     expect(counts(statuses)).toEqual([1, 1, 1])
     statuses.set(child.id, status(undefined, { running: false }))
@@ -624,8 +624,7 @@ describe('deriveSearchResults archive filtering', () => {
       list(hit, gone),
       [],
       'needle',
-      archived('gone'),
-      'default',
+      rowState({ archived: ['gone'] }),
       noAttention,
       { items: [{ sessionId: gone.id, snippet: 'needle body' }], hasMore: false },
       10,
@@ -637,7 +636,7 @@ describe('deriveSearchResults archive filtering', () => {
     const gone = summary('gone', 1)
     gone.title = gone.displayTitle = 'Needle archived'
     const result = deriveSearchResults(
-      list(gone), [], 'needle', archived('gone'), 'show', noAttention, { items: [], hasMore: false }, 10,
+      list(gone), [], 'needle', rowState({ archived: ['gone'], archivedFilter: 'show' }), noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.archived])).toEqual([[gone.id, true]])
   })
@@ -648,7 +647,7 @@ describe('deriveSearchResults archive filtering', () => {
     const gone = summary('gone', 1)
     gone.title = gone.displayTitle = 'Needle archived'
     const result = deriveSearchResults(
-      list(hit, gone), [], 'needle', archived('gone'), 'only', noAttention, { items: [], hasMore: false }, 10,
+      list(hit, gone), [], 'needle', rowState({ archived: ['gone'], archivedFilter: 'only' }), noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.archived])).toEqual([[gone.id, true]])
   })
@@ -670,8 +669,7 @@ describe('deriveSearchResults', () => {
         workspace('duplicate-owner', ['title-hit'], 'Ignored duplicate owner'),
       ],
       ' NEEDLE ',
-      noArchive,
-      'default',
+      noRows,
       new Map([[titleHit.id, status({
         key: 'question:1', kind: 'plan-review', sessionId: titleHit.id,
       } as SessionPendingInteraction)]]),
@@ -734,8 +732,7 @@ describe('deriveSearchResults', () => {
       sessions,
       [workspace('first', ['opaque-current', 'new session stale'])],
       'new session',
-      noArchive,
-      'default',
+      noRows,
       noAttention,
       {
         items: [
@@ -759,8 +756,7 @@ describe('deriveSearchResults', () => {
       list(...rows),
       [],
       'needle',
-      noArchive,
-      'default',
+      noRows,
       noAttention,
       { items: [], hasMore: false },
       3,
@@ -772,15 +768,14 @@ describe('deriveSearchResults', () => {
       list(summary('body', 1)),
       [],
       'needle',
-      noArchive,
-      'default',
+      noRows,
       noAttention,
       { items: [{ sessionId: sid('body'), snippet: 'needle' }], hasMore: true },
       3,
     )
     expect(backendMore.items).toHaveLength(1)
     expect(backendMore.hasMore).toBe(true)
-    expect(deriveSearchResults(list(), [], '  ', noArchive, 'default', noAttention, { items: [], hasMore: true }, 3))
+    expect(deriveSearchResults(list(), [], '  ', noRows, noAttention, { items: [], hasMore: true }, 3))
       .toEqual({ items: [], hasMore: false })
   })
 })

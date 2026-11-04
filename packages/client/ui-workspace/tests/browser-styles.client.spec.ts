@@ -134,4 +134,13 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
   })
+
+  // The cluster clips overflow, so its ceiling must cover the three wide-state
+  // controls (batch toggle, view options, add workspace): 3*28 + 2*4.
+  it('reserves room in the header action cluster for all three controls', () => {
+    const actions = declarations('.headerActions')
+    expect(actions?.get('gap')).toBe('4px')
+    expect(actions?.get('max-width')).toBe('92px')
+    expect(declarations('.iconButton')?.get('width')).toBe('28px')
+  })
 })

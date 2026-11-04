@@ -2,6 +2,7 @@
 // @vitest-environment jsdom
 
 import type { ProcessGroupData } from '../src/client/contract/process-groups.ts'
+import type { ReasoningBodyOwnerProps } from '../src/client/contract/slots.ts'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { GlobalStandardProps, PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -434,8 +435,16 @@ function makeHarness(
     }
     return imageSlotOverride?.(owner) ?? options?.fallback ?? null
   }
-  const renderAssistantSlot: React.ComponentProps<typeof AssistantNodeView>['renderSlot'] = (name, owner, options) =>
-    name === 'conversation.chat.message.images' ? renderImages(name, owner, options) : renderReasoningSlot(name, owner, options)
+  const renderAssistantSlot = ((
+    name: 'conversation.chat.reasoning.body' | 'conversation.chat.message.images' | 'conversation.chat.message.menu.item',
+    owner: object,
+    options?: { hookContext?: unknown; fallback?: React.ReactNode },
+  ) => name === 'conversation.chat.message.images'
+    ? renderImages(name, owner, options)
+    : name === 'conversation.chat.reasoning.body'
+      ? renderReasoningSlot(name, owner as ReasoningBodyOwnerProps & object, options)
+      : null
+  ) as React.ComponentProps<typeof AssistantNodeView>['renderSlot']
   const renderNodeSlot: NodeRenderer = (key, owner, opts) => {
     if (nodeSlotOverride !== undefined) return nodeSlotOverride(key, owner, opts)
     return <HarnessChatNode standard={props} owner={owner}
