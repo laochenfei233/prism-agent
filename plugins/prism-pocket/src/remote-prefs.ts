@@ -18,7 +18,7 @@ import type { PocketProvider, PocketRemotePrefs } from './types.ts'
  * @returns the URL when acceptable.
  */
 export function readTunnelUrl(value: unknown): string | undefined {
-  if (typeof value !== 'string' || value.length === 0) return undefined
+  if (typeof value !== 'string' || value.length === 0 || value.trim() !== value) return undefined
   let url: URL
   try {
     url = new URL(value)
@@ -65,8 +65,8 @@ export class RemotePrefsStore {
    * @param prefs - the validated selection.
    */
   write(prefs: PocketRemotePrefs): void {
-    this.prefs = prefs
     writeJsonFile(this.file, { version: 1, ...prefs })
+    this.prefs = prefs
   }
 }
 

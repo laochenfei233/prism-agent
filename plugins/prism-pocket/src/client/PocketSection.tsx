@@ -178,10 +178,15 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const verdict = verdictOf(phone)
 
   const steps: Step[] = []
-  if (phone.blocker === 'not-serving') {
-    if (commands.serve !== undefined) steps.push({ key: 'step.serve', code: commands.serve })
-    if (commands.run !== undefined) steps.push({ key: 'step.run', code: commands.run })
-    if (commands.quick !== undefined) steps.push({ key: 'step.quick', code: commands.quick })
+  if (chosen === 'tunnel') {
+    // The run steps are how the transport comes up, so they matter most in
+    // the states that are still blocked (including "no hostname stored yet").
+    if (phone.blocker !== undefined) {
+      if (commands.run !== undefined) steps.push({ key: 'step.run', code: commands.run })
+      if (commands.quick !== undefined) steps.push({ key: 'step.quick', code: commands.quick })
+    }
+  } else if (commands.serve !== undefined && phone.blocker === 'not-serving') {
+    steps.push({ key: 'step.serve', code: commands.serve })
   }
   if (commands.trust !== undefined && phone.blocker === 'untrusted') {
     steps.push({ key: 'step.trust', code: commands.trust })
@@ -207,16 +212,18 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
           ))}
         </div>
         {chosen === 'tunnel' && (
-          <div className='prism-field'>
-            <span className='prism-field-label'>{t('tunnel.label')}</span>
-            <input
-              className='prism-input'
-              type='text'
-              autoComplete='off'
-              value={tunnelDraft !== '' ? tunnelDraft : (status.remote.tunnelUrl ?? '')}
-              onChange={(event) => { setTunnelDraft(event.target.value) }}
-              placeholder={t('tunnel.placeholder')}
-            />
+          <>
+            <label className='prism-field'>
+              <span className='prism-field-label'>{t('tunnel.label')}</span>
+              <input
+                className='prism-input'
+                type='text'
+                autoComplete='off'
+                value={tunnelDraft !== '' ? tunnelDraft : (status.remote.tunnelUrl ?? '')}
+                onChange={(event) => { setTunnelDraft(event.target.value) }}
+                placeholder={t('tunnel.placeholder')}
+              />
+            </label>
             <p className='prism-channel-hint'>
               {status.cloudflared.available ? t('tunnel.installed') : t('tunnel.missing')}
               {status.cloudflared.version !== undefined ? ` ${status.cloudflared.version}` : ''}
@@ -224,11 +231,18 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
             </p>
             <p className='prism-channel-hint'>{t('tunnel.hint')}</p>
             <div className='prism-actions'>
-              <button type='button' className='prism-button prism-button-primary' onClick={saveTunnel}>{t('tunnel.save')}</button>
+              <button
+                type='button'
+                className='prism-button prism-button-primary'
+                disabled={tunnelDraft.trim() === ''}
+                onClick={saveTunnel}
+              >
+                {t('tunnel.save')}
+              </button>
             </div>
-            {tunnelNote !== null && <p className='prism-note'>{tunnelNote}</p>}
-          </div>
+          </>
         )}
+        {tunnelNote !== null && <p className='prism-note'>{tunnelNote}</p>}
         <div className='prism-phone'>
           <div className='prism-phone-qr'>
             {phone.url !== undefined
@@ -262,6 +276,19 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
                       <span className='prism-step-label'>{t(step.key)}</span>
                       <code className='prism-code'>{step.code}</code>
                       {step.key === 'step.trust' && <span className='prism-step-hint'>{t('step.trust.hint')}</span>}
+                      {step.key === 'step.trust' && commands.trustedHost !== undefined && (
+                        <>
+                          <span className='prism-step-hint'>{t('step.trust.cli')}</span>
+                          <code className='prism-code'>{commands.trustedHost}</code>
+                          <button
+                            type='button'
+                            className='prism-button prism-button-quiet'
+                            onClick={() => copy('step.trust.cli', commands.trustedHost ?? '')}
+                          >
+                            {copied === 'step.trust.cli' ? t('phone.copied') : t('phone.copy')}
+                          </button>
+                        </>
+                      )}
                       <button
                         type='button'
                         className='prism-button prism-button-quiet'

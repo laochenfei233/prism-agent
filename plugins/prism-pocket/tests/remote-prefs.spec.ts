@@ -24,6 +24,8 @@ describe('readTunnelUrl', () => {
     expect(readTunnelUrl('https://user:pass@prism.example.com')).toBeUndefined()
     expect(readTunnelUrl('https://prism.example.com/#frag')).toBeUndefined()
     expect(readTunnelUrl('not a url')).toBeUndefined()
+    // Whitespace would persist a value the readiness probe then skips.
+    expect(readTunnelUrl(' https://prism.example.com')).toBeUndefined()
     expect(readTunnelUrl('')).toBeUndefined()
     expect(readTunnelUrl(undefined)).toBeUndefined()
   })
