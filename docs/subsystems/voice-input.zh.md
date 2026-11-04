@@ -2,11 +2,13 @@
 
 [English](voice-input.md) | 中文
 
-语音输入包含三个角色：[服务定义](../../packages/speech/speech-to-text/README.zh.md)路由具名 Provider，[SenseVoice Provider](../../packages/experimental/speech-to-text-sensevoice/README.zh.md)拥有本地推理，[Remote 消费者](../../packages/experimental/api-speech-to-text/README.zh.md)服务浏览器。[可选 Bundle](../../packages/experimental/voice-input-bundle/README.zh.md)将它们与麦克风 UI 组合。
+语音输入包含三个角色：[服务定义](../../packages/speech/speech-to-text/README.zh.md)路由具名 Provider，[SenseVoice Provider](../../packages/experimental/speech-to-text-sensevoice/README.zh.md)拥有本地推理，[DashScope Provider](../../packages/speech/speech-to-text-dashscope/README.zh.md)拥有在线推理，[Remote 消费者](../../packages/experimental/api-speech-to-text/README.zh.md)服务浏览器。[可选 Bundle](../../packages/experimental/voice-input-bundle/README.zh.md)将它们与麦克风 UI 全部组合，默认选择本地识别器并把在线识别器作为一种偏好提供。
 
 ## Provider 选择
 
 `SpeechProviderId` 为注册标识添加类型品牌。`SpeechProviderInfo` 携带显示名称、支持的 `languages` 语言提示及 `host-local` 或 `cloud` 处理位置。`SpeechRequest` 包含 WAV 字节和可选的 Provider、语言选择；`resolve()` 生成捕获一个 Provider 实例的 `SpeechSpec`。缺失的 Provider 或不支持的语言会报错；替换或撤销会使已解析的任务失效。音频不会回退到其他 Provider。
+
+云端识别器无需凭据即可注册，并立即报告就绪，因为它不下载任何东西；它的 key 按请求解析，所以缺少 key 只会让该次请求失败，而不会让加载失败。本地识别器则声明准备流程并拥有下载。组合的默认语言必须是每个已提供识别器都声明的语言，因为所选 Provider 不支持的语言会让偏好写入失败。
 
 `SpeechProvider.transcribe()` 接收完整的 `SpeechInput` 与 `AbortSignal`。`Transcript` 返回纯文本 `text`、`audioSeconds` 和 `inferenceSeconds`。Provider 响应取消，并在注销完成前结束其任务。本地 Provider 串行执行调用、限制队列，并独立于 Session 管理工作进程生命周期。
 

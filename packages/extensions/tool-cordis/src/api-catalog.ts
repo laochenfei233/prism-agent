@@ -1479,10 +1479,48 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the durable record after storage settles.',
       },
       {
+        signature: 'beginRecording( request: BeginMeetingRecordingRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Open one durable recording before any transcript exists, so a caller can list and follow the meeting while its microphone is still open.',
+        parameters: [{ name: 'request', description: 'Title and optional participants known when recording starts.' }, { name: 'signal', description: 'Caller cancellation before the durable write.' }],
+        returns: 'the durable record after storage settles.',
+      },
+      {
+        signature: 'updateRecording( id: MeetingMinutesId, request: UpdateMeetingRecordingRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Replace the transcript one open recording has produced so far, so a reload or a second reader follows the meeting without the caller\'s live buffer.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'request', description: 'Complete recognized text so far and its audio duration.' }, { name: 'signal', description: 'Caller cancellation before the durable write.' }],
+        returns: 'the durable record after storage settles.',
+        throws: ['when the meeting is absent or is no longer recording.'],
+      },
+      {
+        signature: 'finishRecording( id: MeetingMinutesId, request: FinishMeetingRecordingRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Close one open recording with the transcript of its complete recording, so the record becomes readable by the summary and question operations.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'request', description: 'Complete transcript and recognized-audio duration.' }, { name: 'signal', description: 'Caller cancellation before the durable write.' }],
+        returns: 'the durable record after storage settles.',
+        throws: ['when the meeting is absent or is no longer recording.'],
+      },
+      {
+        signature: 'reviseMeeting( id: MeetingMinutesId, request: ReviseMeetingMinutesRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
+        description: 'Revise the operator-editable fields of any stored meeting, so a title the recorder generated can be replaced once the meeting is known.',
+        parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'request', description: 'Title and participant names to replace; each omission keeps the stored value.' }, { name: 'signal', description: 'Caller cancellation before the durable write.' }],
+        returns: 'the durable record after storage settles.',
+      },
+      {
         signature: 'async createFromAudio( request: CreateMeetingFromAudioRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingMinutesRecord>',
         description: 'Transcribe one complete recording with the explicitly resolved speech provider, then persist its text as a new meeting.',
         parameters: [{ name: 'request', description: 'Title, optional participants, complete WAV audio, and optional speech selection.' }, { name: 'signal', description: 'Caller cancellation for recognition and the durable write.' }],
         returns: 'the durable record after transcription and storage settle.',
+      },
+      {
+        signature: 'async transcribe( audio: Uint8Array, signal: AbortSignal = new AbortController().signal, providerId?: string, language?: string, ): Promise<MeetingTranscript>',
+        description: 'Transcribe one complete recording with the explicitly resolved speech provider without storing a meeting, so a caller can show recognized text while it is still capturing audio.',
+        parameters: [{ name: 'audio', description: 'Complete canonical WAV recording.' }, { name: 'signal', description: 'Caller cancellation for recognition.' }, { name: 'providerId', description: 'Speech provider id; omission uses the speech plugin\'s selection.' }, { name: 'language', description: 'Speech language hint; omission uses the speech plugin\'s selection.' }],
+        returns: 'the recognized text and its audio duration.',
+      },
+      {
+        signature: 'speech(): MeetingSpeechStatus',
+        description: 'Report the speech providers this deployment can transcribe with, so a caller can tell an operator that recording needs a speech plugin before it asks for a microphone.',
+        parameters: [],
+        returns: 'the registered providers and the default selection.',
       },
       {
         signature: 'list(): MeetingMinutesRecord[]',
@@ -1501,12 +1539,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Generate and persist the meeting summary. A model or cancellation failure leaves the existing record unchanged.',
         parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'signal', description: 'Caller cancellation for the model call and durable write.' }],
         returns: 'the summarized record.',
+        throws: ['when the meeting is still recording, because a leading fragment is not a meeting to summarize.'],
       },
       {
         signature: 'ask( id: MeetingMinutesId, request: AskMeetingMinutesRequest, signal: AbortSignal = new AbortController().signal, ): Promise<MeetingAnswerRecord>',
         description: 'Ask one question about a meeting, return its answer, and persist the exchange.',
         parameters: [{ name: 'id', description: 'The meeting id.' }, { name: 'request', description: 'The nonempty question.' }, { name: 'signal', description: 'Caller cancellation for the model call and durable write.' }],
         returns: 'the durable answer record.',
+        throws: ['when the meeting is still recording, because a leading fragment is not a meeting to question.'],
       },
       {
         signature: 'listAnswers(id: MeetingMinutesId): MeetingAnswerRecord[]',
@@ -4549,6 +4589,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface BashEnvVariableInfo extends BashEnvVariable {\n    contributor: string;\n    key: DshEnvironmentKey;\n}',
   },
   {
+    name: 'BeginMeetingRecordingRequest',
+    declaration: 'export interface BeginMeetingRecordingRequest {\n    readonly title: string;\n    readonly participants?: readonly string[];\n}',
+  },
+  {
     name: 'Branded',
     declaration: 'export type Branded<B extends string> = string & {\n    readonly [BRAND]: B;\n};',
   },
@@ -4822,7 +4866,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateMeetingFromTranscriptRequest',
-    declaration: 'export interface CreateMeetingFromTranscriptRequest {\n    readonly title: string;\n    readonly participants?: readonly string[];\n    readonly transcript: string;\n    readonly audioSeconds?: number;\n}',
+    declaration: 'export interface CreateMeetingFromTranscriptRequest {\n    readonly title: string;\n    readonly participants?: readonly string[];\n    readonly transcript: string;\n    readonly segments?: readonly MeetingTranscriptSegment[];\n    readonly audioSeconds?: number;\n}',
   },
   {
     name: 'CreateSessionOptions',
@@ -5035,6 +5079,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'FileUploadValue',
     declaration: 'export interface FileUploadValue {\n    readonly receiptId: FileUploadReceiptId;\n    readonly file: FileAttachmentRef;\n}',
+  },
+  {
+    name: 'FinishMeetingRecordingRequest',
+    declaration: 'export interface FinishMeetingRecordingRequest {\n    readonly transcript: string;\n    readonly segments?: readonly MeetingTranscriptSegment[];\n    readonly audioSeconds: number;\n}',
   },
   {
     name: 'FinishReason',
@@ -5522,11 +5570,27 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'MeetingMinutesRecord',
-    declaration: 'export interface MeetingMinutesRecord {\n    readonly id: MeetingMinutesId;\n    readonly title: string;\n    readonly participants: readonly string[];\n    readonly transcript: string;\n    readonly summary: string | null;\n    readonly status: MeetingMinutesStatus;\n    readonly audioSeconds: number;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+    declaration: 'export interface MeetingMinutesRecord {\n    readonly id: MeetingMinutesId;\n    readonly title: string;\n    readonly participants: readonly string[];\n    readonly transcript: string;\n    readonly transcriptSegments?: readonly MeetingTranscriptSegment[] | undefined;\n    readonly summary: string | null;\n    readonly status: MeetingMinutesStatus;\n    readonly audioSeconds: number;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
   },
   {
     name: 'MeetingMinutesStatus',
-    declaration: 'export type MeetingMinutesStatus = \'transcribed\' | \'summarized\';',
+    declaration: 'export type MeetingMinutesStatus = \'recording\' | \'transcribed\' | \'summarized\';',
+  },
+  {
+    name: 'MeetingSpeechProvider',
+    declaration: 'export interface MeetingSpeechProvider {\n    readonly id: string;\n    readonly name: string;\n    readonly phase: string;\n}',
+  },
+  {
+    name: 'MeetingSpeechStatus',
+    declaration: 'export interface MeetingSpeechStatus {\n    readonly providers: readonly MeetingSpeechProvider[];\n    readonly selected: string;\n}',
+  },
+  {
+    name: 'MeetingTranscript',
+    declaration: 'export interface MeetingTranscript {\n    readonly text: string;\n    readonly segments?: readonly MeetingTranscriptSegment[];\n    readonly audioSeconds: number;\n}',
+  },
+  {
+    name: 'MeetingTranscriptSegment',
+    declaration: 'export interface MeetingTranscriptSegment {\n    readonly text: string;\n    readonly speaker?: string | undefined;\n}',
   },
   {
     name: 'Message',
@@ -6055,6 +6119,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResumeAgentOptions',
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+  },
+  {
+    name: 'ReviseMeetingMinutesRequest',
+    declaration: 'export interface ReviseMeetingMinutesRequest {\n    readonly title?: string;\n    readonly participants?: readonly string[];\n}',
   },
   {
     name: 'RpcId',
@@ -7406,11 +7474,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'Transcript',
-    declaration: 'export interface Transcript {\n    readonly text: string;\n    readonly audioSeconds: number;\n    readonly inferenceSeconds: number;\n}',
+    declaration: 'export interface Transcript {\n    readonly text: string;\n    readonly segments?: readonly TranscriptSegment[];\n    readonly audioSeconds: number;\n    readonly inferenceSeconds: number;\n}',
   },
   {
     name: 'TranscriptionRequest',
     declaration: 'export interface TranscriptionRequest {\n    readonly audioBase64: string;\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'TranscriptSegment',
+    declaration: 'export interface TranscriptSegment {\n    readonly text: string;\n    readonly speaker?: string;\n}',
   },
   {
     name: 'TurnEndCancelCause',
@@ -7527,6 +7599,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TypertTypeModel',
     declaration: 'export interface TypertTypeModel {\n    readonly name: string;\n    readonly declaration: string;\n}',
+  },
+  {
+    name: 'UpdateMeetingRecordingRequest',
+    declaration: 'export interface UpdateMeetingRecordingRequest {\n    readonly transcript: string;\n    readonly segments?: readonly MeetingTranscriptSegment[];\n    readonly audioSeconds: number;\n}',
   },
   {
     name: 'UpdateTeamTaskRequest',

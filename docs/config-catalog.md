@@ -4166,7 +4166,7 @@ export interface Config {
 
 Depends on: `Volatile` (`@deepseek-ai/cordis`)
 
-Source: [`packages/prism/prism-meeting/src/index.ts:33`](../packages/prism/prism-meeting/src/index.ts)
+Source: [`packages/prism/prism-meeting/src/index.ts:35`](../packages/prism/prism-meeting/src/index.ts)
 
 ## Loadable plugins with no config
 

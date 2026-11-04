@@ -2,11 +2,13 @@
 
 English | [中文](voice-input.zh.md)
 
-Voice input has three roles: the [Service Definition](../../packages/speech/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes them with the microphone UI.
+Voice input has three roles: the [Service Definition](../../packages/speech/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, the [DashScope provider](../../packages/speech/speech-to-text-dashscope/README.md) owns online inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes all of them with the microphone UI, selecting the local recognizer by default and offering the online one as a preference.
 
 ## Provider selection
 
 `SpeechProviderId` brands the registration identity. `SpeechProviderInfo` carries a display name, accepted `languages` hints and `host-local` or `cloud` processing location. `SpeechRequest` contains WAV bytes and optional provider/language selection; `resolve()` produces `SpeechSpec` with one captured provider instance. A missing provider or unsupported language fails; replacement or withdrawal invalidates resolved work. Audio never falls back to a different provider.
+
+A cloud recognizer registers without a credential and reports readiness immediately, because it downloads nothing; its key is resolved per request, so a missing key fails that request rather than the load. A local recognizer instead advertises preparation and owns the download. The composed default language must be one every offered recognizer declares, since a language the selected provider rejects fails the preference write.
 
 `SpeechProvider.transcribe()` accepts one complete `SpeechInput` and an `AbortSignal`. `Transcript` returns plain `text`, `audioSeconds` and `inferenceSeconds`. Providers honor cancellation and settle their work before deregistration completes. The local provider serializes calls, bounds its queue and manages its worker lifetime independently of Sessions.
 

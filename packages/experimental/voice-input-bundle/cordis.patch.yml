@@ -3,10 +3,20 @@
       name: '@deepseek-ai/dsh-speech-to-text'
       config:
         defaultProvider: sensevoice-local
+        # Both bundled recognizers accept `zh`: SenseVoice detects the language
+        # per recording as well, while the cloud recognizer accepts only the
+        # languages it declares. A language the selected provider rejects fails
+        # the preference write, so the shared default has to fit both.
+        language: zh
     - id: speech-to-text-sensevoice
       name: '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice'
       config:
         dataRoot: !!js dshHomePath('speech-to-text', 'sensevoice')
+    # Online recognizer: one duplex WebSocket per recording, and the key is
+    # resolved per request, so registration itself needs no secret. Selecting a
+    # cloud recognizer performs no download and reports readiness immediately.
+    - id: speech-to-text-dashscope
+      name: '@deepseek-ai/dsh-speech-to-text-dashscope'
     - id: api-speech-to-text
       name: '@deepseek-ai/dsh-experimental-api-speech-to-text'
     - id: ui-voice-input
