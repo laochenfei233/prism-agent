@@ -147,7 +147,7 @@
   box-sizing: border-box;
   width: 96px;
   padding: 3px 6px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-base, transparent);
   color: var(--dsw-alias-label-primary);
@@ -163,7 +163,7 @@
 
 .action {
   padding: 2px 8px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: var(--dsw-alias-label-secondary);
