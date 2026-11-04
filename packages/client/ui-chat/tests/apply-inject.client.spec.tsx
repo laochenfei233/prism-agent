@@ -20,6 +20,8 @@ import {
   apply as applyChat, inject as injectChat, type ChatFlowDataInjected, type ChatViewInjected,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ResourceProvider } from '@deepseek-ai/dsh-client-resources/client'
+import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { createChatStore } from '../src/client/stores.ts'
 import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../src/chat-settings.ts'
@@ -69,13 +71,24 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
   }
   runtime.ctx.provide('sidebarRight', sidebarRight as never)
   const browserAvailable = createSnapshotStore(true)
+  const tabDisposers: Array<() => void> = []
   const sidebarRightTabs = {
     get: vi.fn<(kind: string) => object | undefined>(() => browserAvailable.getSnapshot() ? {} : undefined),
     subscribe: (listener: () => void) => browserAvailable.subscribe(listener),
-    register: vi.fn(() => () => {}),
+    register: vi.fn<(definition: SidebarRightTabDefinition) => () => void>(() => {
+      const dispose = vi.fn(() => {})
+      tabDisposers.push(dispose)
+      return dispose
+    }),
   }
   if (withBrowserRegistry) runtime.ctx.provide('sidebarRightTabs', sidebarRightTabs as never)
-  runtime.ctx.provide('resources', { register: vi.fn(() => () => {}) } as never)
+  const resourceDisposers: Array<() => void> = []
+  const resourceRegister = vi.fn<(provider: unknown) => () => void>(() => {
+    const dispose = vi.fn(() => {})
+    resourceDisposers.push(dispose)
+    return dispose
+  })
+  runtime.ctx.provide('resources', { register: resourceRegister } as never)
   const openWorkspacePath = vi.fn<ClientRemote['session']['openWorkspacePath']>(
     () => Promise.resolve({ ok: true, value: { opened: true } }),
   )
@@ -135,8 +148,8 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
       return preference as LinkOpeningRowInjected
     },
     runtime, chat, chatSettings, browserAvailable,
-    layout, openWorkspacePath, sidebarRight, sidebarRightTabs, session, chatViewApi, chatFlowApi, rootReference, openSession,
-    startSession,
+    layout, openWorkspacePath, sidebarRight, sidebarRightTabs, resourceRegister, session,
+    chatViewApi, chatFlowApi, rootReference, openSession, startSession, tabDisposers, resourceDisposers,
   }
 }
 
@@ -241,12 +254,62 @@ describe('Chat inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('starts a side conversation with the quoted text through Workspace navigation', async () => {
+  it('leaves the conversation unchanged when the Host refuses a side conversation', async () => {
     const b = await bench()
-    const { injected } = b.chatViewApi(b.rootReference)
-    injected.startSideConversation('> quoted\n\n')
-    expect(b.startSession).toHaveBeenCalledExactlyOnceWith(undefined, { prompt: '> quoted\n\n', whenDraftExists: 'append' })
-    await b.runtime.dispose()
+    b.runtime.sessions.stubCreate(async () => { throw new Error('refused') })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { injected } = b.chatViewApi(b.rootReference)
+      injected.startSideConversation('> quoted\n\n')
+      await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith('ui-chat: side conversation failed:', expect.any(Error)) })
+      expect(b.sidebarRight.openResource).not.toHaveBeenCalled()
+      expect(b.startSession).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+      await b.runtime.dispose()
+    }
+  })
+
+  it('opens a side conversation in the right Sidebar and stages its quotation', async () => {
+    const b = await bench()
+    const SIDE = 'side-1' as SessionId
+    b.runtime.sessions.stubCreate(async () => SIDE)
+    await b.runtime.sessions.add({
+      id: SIDE,
+      summary: { title: 'S', displayTitle: 'S', cwd: '/proj' },
+      session: sessionFakeFor(),
+    })
+    try {
+      const { injected } = b.chatViewApi(b.rootReference)
+      injected.startSideConversation('> quoted\n\n')
+      await vi.waitFor(() => {
+        expect(b.sidebarRight.openResource).toHaveBeenCalledWith('dsh-resource://sidechat/session/side-1')
+      })
+      // The Session lands beside the viewing Session's directory, and the main
+      // conversation is not replaced.
+      expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{ cwd: '/proj' }] })
+      expect(b.startSession).not.toHaveBeenCalled()
+      expect(b.openSession).not.toHaveBeenCalled()
+
+      const provider = b.resourceRegister.mock.calls[0]![0] as ResourceProvider<'sidechat'>
+      const staged = vi.spyOn(b.runtime.ctx.conversation.input, 'requestDraftInitialization')
+      const controller = new AbortController()
+      const opening = provider.open('dsh-resource://sidechat/session/side-1', { signal: controller.signal })[Symbol.asyncIterator]()
+      expect((await opening.next()).value).toMatchObject({ ok: true })
+      expect(staged).toHaveBeenCalledExactlyOnceWith(
+        b.runtime.sessions.binding(SIDE),
+        { prompt: '> quoted\n\n', whenDraftExists: 'append' },
+      )
+      // Closing the tab releases the reference it retained for the panel.
+      controller.abort()
+      expect(await opening.next()).toMatchObject({ done: true })
+      expect(b.runtime.sessions.retainInfo(SIDE).getSnapshot().retainedBy.sideChat).toBeUndefined()
+    } finally {
+      await b.runtime.dispose()
+    }
+    // Every registration the feature contributes leaves with the plugin.
+    expect(b.resourceDisposers).toHaveLength(1)
+    expect(b.resourceDisposers[0]).toHaveBeenCalledOnce()
   })
 
 
@@ -367,10 +430,18 @@ describe('Chat inject API', () => {
       })
       await vi.waitFor(() => {
         expect(b.runtime.slots.entries('settings.general.item').some(row => row.options.id === 'link-opening')).toBe(true)
+        expect(b.sidebarRightTabs.register).toHaveBeenCalledWith(expect.objectContaining({ kind: 'sidechat' }))
       })
+      const definition = b.sidebarRightTabs.register.mock.calls[0]![0]
+      expect(definition.canOpen?.('dsh-resource://sidechat/session/side-1')).toBe(true)
+      expect(definition.canOpen?.('dsh-resource://file/session/side-1')).toBe(false)
+      expect(definition.title('dsh-resource://sidechat/session/side-1')).toBe('侧边提问')
       await registry.dispose()
       expect(b.runtime.slots.entries('settings.general.item').some(row => row.options.id === 'link-opening')).toBe(false)
       expect(b.runtime.slots.entries('conversation.view')).toHaveLength(1)
+      // The side-conversation type leaves with the registry that accepted it.
+      expect(b.tabDisposers).toHaveLength(1)
+      expect(b.tabDisposers[0]).toHaveBeenCalledOnce()
     } finally {
       await b.runtime.dispose()
     }

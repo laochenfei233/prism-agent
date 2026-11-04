@@ -36,6 +36,7 @@ import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
+import { registerSideChat, startSideChat } from './chat/side-chat.tsx'
 import { en, NS, zh } from './locale.ts'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
 import { createChatStore } from './stores.ts'
@@ -135,6 +136,10 @@ export function apply(ctx: Context): void {
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-chat: dictionaries')
   const t = ctx.locale.bind(NS)
+  // A quotation captured by a menu gesture, keyed by the Session its tab will
+  // show; the resource provider consumes it when that tab opens.
+  const sideChatQuotes = new Map<SessionId, string>()
+  registerSideChat(ctx, t, sideChatQuotes)
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
@@ -294,13 +299,12 @@ export function apply(ctx: Context): void {
                 // Fork or child-title failure leaves the source view unchanged.
               })
           },
-          // A side conversation is a fresh Session in the current workspace with
-          // the quoted text staged in its composer: the reader still chooses when
-          // to send. Without an explicit workspace the navigation layer inherits
-          // the current Session's own.
-          startSideConversation: (prompt) => {
-            ctx.uiWorkspace.startSession(undefined, { prompt, whenDraftExists: 'append' })
-          },
+          // A side conversation is a fresh Session in the current workspace,
+          // opened as a right-Sidebar tab so the main conversation keeps showing
+          // the passage the reader selected. The quotation waits for that tab:
+          // its resource provider stages it in the created Session's composer,
+          // and nothing sends.
+          startSideConversation: (prompt) => { startSideChat(ctx, sessionId, prompt, sideChatQuotes) },
         }
       },
     }, ChatView)

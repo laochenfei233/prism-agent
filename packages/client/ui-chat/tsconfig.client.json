@@ -58,6 +58,9 @@
       "path": "../../llm/token-meter"
     },
     {
+      "path": "../../typert/protocol"
+    },
+    {
       "path": "../../util/workspace-path"
     },
     {
@@ -71,6 +74,9 @@
     },
     {
       "path": "../locale/tsconfig.client.json"
+    },
+    {
+      "path": "../resources"
     },
     {
       "path": "../store"

@@ -323,7 +323,7 @@ export interface ChatViewInjected {
     read: () => ChatScrollPosition | null
   }
   forkAt: (seq: number) => void
-  /** Start a side conversation in the current workspace, prefilled with quoted text. */
+  /** Start a side conversation in the current workspace, opened in the right Sidebar with the quoted text staged. */
   startSideConversation: (prompt: string) => void
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
