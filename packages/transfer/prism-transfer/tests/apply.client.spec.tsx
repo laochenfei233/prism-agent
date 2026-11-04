@@ -35,7 +35,10 @@ async function bench(options: { pickResult?: unknown } = {}): Promise<{ ctx: Con
   const slots = ctx.get('slots') as SlotRegistry
   slots.register({
     name: 'root',
-    children: { 'settings.data.page': { kind: 'list', scope: 'root' } },
+    children: {
+      'settings.data.page': { kind: 'list', scope: 'root' },
+      'sidebar.workspaces.project.menu.item': { kind: 'list', scope: 'root' },
+    },
   } as never, () => null)
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
@@ -58,6 +61,21 @@ describe('transfer client', () => {
       expect(entries[0]?.options).toMatchObject({ id: 'transfer' })
       await fiber.dispose()
       expect(slots.entries('settings.data.page')).toHaveLength(0)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('registers the project export row and removes it on disposal', async () => {
+    const { ctx, slots } = await bench()
+    try {
+      const fiber = ctx.plugin({ inject, apply })
+      await fiber.await()
+      const entries = slots.entries('sidebar.workspaces.project.menu.item')
+      expect(entries).toHaveLength(1)
+      expect(entries[0]?.options).toMatchObject({ id: 'export-project', order: 900 })
+      await fiber.dispose()
+      expect(slots.entries('sidebar.workspaces.project.menu.item')).toHaveLength(0)
     } finally {
       await ctx.fiber.dispose()
     }

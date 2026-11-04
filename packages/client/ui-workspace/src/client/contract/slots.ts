@@ -83,6 +83,20 @@ export interface SessionRowOwnerProps {
   displayTitle: string
 }
 
+/** Owner share of one project (Workspace) row menu occurrence. */
+export interface ProjectRowOwnerProps {
+  /** Registered Workspace the row names. */
+  workspaceId: WorkspaceId
+  /** Row display title. */
+  displayTitle: string
+}
+
+/** The project row menu's open state, the same pair shape as the Session row menu. */
+export type ProjectMenuOpenState = MenuOpenState
+
+/** Hook every project-menu entry receives to dismiss the menu it sits in. */
+export type UseProjectMenuOpenState = () => ProjectMenuOpenState
+
 /** The row menu's open state as its owner holds it: the `useState` pair. */
 export type MenuOpenState = readonly [open: boolean, setOpen: (open: boolean) => void]
 
@@ -102,6 +116,15 @@ export type UseMenuOpenState = () => MenuOpenState
  * @returns the hook the entry calls.
  */
 export const menuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.session.menu.item', UseMenuOpenState> =
+  (_standard, state) => () => state
+
+/**
+ * Bind the project row's render occurrence into its menu entries' hook.
+ * @param _standard - framework standard props (unused).
+ * @param state - the menu's open-state pair from the render occurrence.
+ * @returns the hook the entry calls.
+ */
+export const projectMenuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState> =
   (_standard, state) => () => state
 
 /**
@@ -178,6 +201,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       inject: { hooks: {
         menuOpenState: SlotHookFactory<'sidebar.workspaces.session.menu.item', UseMenuOpenState>
         shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
+      } }
+    }
+    /**
+     * Rows appended to one project (Workspace) row's secondary-press menu,
+     * after the shipped new-session, reorder, reveal, rename, and delete rows,
+     * in ascending `order`. A fresh `id` adds a row; reusing a shipped or
+     * plugin id at another `priority` shadows that row. Each entry receives
+     * the Workspace id and display title, renders one `role="menuitem"` button
+     * (ui-primitives' `MenuItemButton` adds the host styling and
+     * `separatorBefore`), and dismisses the menu through the injected
+     * `useMenuOpenState` hook after acting; the list's keyboard walk and focus
+     * return read the DOM, so any such button joins them. Labels come from the
+     * contributing package's locale namespace. The ungrouped bucket renders no
+     * project menu, so no entry renders for it.
+     */
+    'sidebar.workspaces.project.menu.item': {
+      kind: 'list'
+      scope: 'root'
+      owner: ProjectRowOwnerProps
+      hookContext: ProjectMenuOpenState
+      inject: { hooks: {
+        menuOpenState: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState>
       } }
     }
     /**

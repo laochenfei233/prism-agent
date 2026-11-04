@@ -17,7 +17,7 @@ import clsx from 'clsx'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   ContextMenu, HoverCard, IconArchiveOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular,
-  IconDownloadOutlineRegular, IconEditOutlineRegular,
+  IconEditOutlineRegular,
   IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
   IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
@@ -26,7 +26,7 @@ import {
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
-import type { MenuOpenState, WorkspaceBrowserProps } from '../contract/slots.ts'
+import type { MenuOpenState, ProjectMenuOpenState, WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
@@ -221,7 +221,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, home, newShortcut, t }: {
+export function ProjectRowItem({ group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, home, newShortcut, renderSlot, t }: {
   group: GroupNode
   newShortcut?: ShortcutCatalogEntry | undefined
   containsCurrentDescendant?: boolean
@@ -239,6 +239,8 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
+  /** Renders the project menu's plugin rows; the menu shows only for real Workspaces. */
+  renderSlot?: PropsRenderSlots<'sidebar.workspaces.project.menu.item'>['renderSlot'] | undefined
   t: RowTranslate
 }) {
   const row = group
@@ -247,6 +249,11 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
   const contextMenu = useContextMenu()
+  // Plugin rows dismiss the same press-point menu the shipped rows live in.
+  const projectMenuState = useMemo((): ProjectMenuOpenState => [
+    contextMenu.point !== null,
+    (open: boolean) => { if (!open) contextMenu.close() },
+  ], [contextMenu.point, contextMenu.close])
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
@@ -262,8 +269,6 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
     { id: 'reveal', label: t('menu.revealSession'), icon: <IconFolderOpenRegular /> },
     { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
-    { type: 'separator' as const, id: 'project-export' },
-    { id: 'export', label: t('project.export'), icon: <IconDownloadOutlineRegular />, disabled: true },
   ]
   const onProjectMenuSelect = (id: string): void => {
     /* v8 ignore next -- the context menu renders only with `actions` present. */
@@ -351,7 +356,13 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
         </Tooltip>
       </span>
       {actions !== undefined && (
-        <ContextMenu state={contextMenu} items={projectMenuItems} onSelect={onProjectMenuSelect} />
+        <ContextMenu state={contextMenu} items={projectMenuItems} onSelect={onProjectMenuSelect}>
+          {renderSlot === undefined || group.workspaceId === undefined ? null : renderSlot(
+            'sidebar.workspaces.project.menu.item',
+            { workspaceId: group.workspaceId, displayTitle: label },
+            { hookContext: projectMenuState },
+          )}
+        </ContextMenu>
       )}
     </div>
   )
