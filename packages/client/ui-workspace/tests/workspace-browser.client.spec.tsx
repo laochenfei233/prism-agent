@@ -2750,6 +2750,26 @@ describe('WorkspaceBrowser batch mode', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
 
+  it('offers no checkbox for the provisional New Session row and skips it in Select all', () => {
+    localStorage.clear()
+    const preferences = createWorkspaceViewStore().create()
+    preferences.actions.setGroupBy('workspace')
+    preferences.actions.setGroupExpanded('alpha', true)
+    localStorage.setItem('dsh.workspace.view.v5', JSON.stringify(preferences.getSnapshot()))
+    mount({
+      applyBatch: vi.fn(async () => ({ ok: 0, failed: 0 })),
+      useSessions: hook(sessionState(
+        [summary('blank', 20, { blank: true }), summary('one', 10)],
+        { main: sid('blank') },
+      )),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['blank', 'one'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.mode'] }))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: zh['batch.selectAll'] }))
+    expect(screen.getByText('已选 1 个会话')).toBeTruthy()
+  })
+
   it('leads the header cluster with the batch toggle, then view options and add', () => {
     mountBatch(vi.fn(async () => ({ ok: 0, failed: 0 })))
     const cluster = screen.getByRole('button', { name: zh['batch.mode'] }).parentElement as HTMLElement

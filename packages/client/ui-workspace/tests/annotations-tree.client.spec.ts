@@ -68,6 +68,18 @@ describe('annotations in the derived rows', () => {
     const state = list(summary('a', 2), summary('b', 1))
     expect(filteredSessionIds(state, rowState({ a: { favorite: true } }, 'favorite'))).toEqual([sid('a')])
   })
+
+  it('drops a Workspace the annotation filter leaves empty', () => {
+    const state = list(summary('plain', 3), summary('marked', 2))
+    const groups = deriveGroups(
+      state,
+      [workspace('empty', ['plain']), workspace('kept', ['marked'])],
+      rowState({ marked: { reviewLater: true } }, 'reviewLater'),
+      noStatuses,
+      { expandedGroups: ['empty', 'kept'] },
+    )
+    expect(groups.map(group => group.key)).toEqual(['kept'])
+  })
 })
 
 describe('orderByPriority', () => {

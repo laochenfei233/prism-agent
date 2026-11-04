@@ -413,9 +413,11 @@ function groupByWorkspace(
       if (!sessionVisible(summary, visibility)) continue
       members.push(summary)
     }
-    // The archived-only view lists archives, not the Workspace inventory, so
-    // a Workspace without archived Sessions contributes no group.
-    if (visibility.archivedFilter === 'only' && members.length === 0) continue
+    // A view that restricts rows to a marked subset lists those rows, not the
+    // Workspace inventory, so a Workspace left with no visible Session
+    // contributes no group.
+    if (members.length === 0
+      && (visibility.archivedFilter === 'only' || visibility.annotationFilter !== 'all')) continue
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
       Date.parse(workspace.createdAt), workspace.title, members,

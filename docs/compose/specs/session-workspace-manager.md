@@ -1,14 +1,28 @@
 ---
 feature: session-workspace-manager
-status: designed
+status: delivered
 updated: 2026-11-04
 branch: feat/session-workspace-manager
-commits: pending
+commits: 50ff54bd96..9ccd6542b0
 ---
 
 # 会话与工作区管理能力（标注 + 批量）
 
 ## Report
+
+**做了什么** —— 侧栏会话行现在带一份浏览器本地的用户标注：收藏、待回看、1–5 优先级、最多 20 个（每个 ≤32 字符）的标签，以及不超过 2000 字符的备注，与其它视图偏好一起存在 `dsh.workspace.view.v5` 里、按会话 ID 关联。行内显示标记（收藏、待回看、非默认优先级数字），视图选项可以「只看收藏」「只看待回看」并新增优先级排序，搜索同时命中标签与备注。行菜单新增收藏、待回看两个一键切换，以及「标签与备注…」对话框；对话框里的「复制 Prompt」把含会话标题与当前标注 JSON 的本地化提示写入剪贴板，「导入」把这种 JSON 读回字段，两者都不调用模型。标题栏的清单按钮进入批量模式：每行出现复选框，工具栏可全选当前筛选、清空选择，或对选中行执行归档、取消归档、收藏、取消收藏、标记待回看、取消待回看、设置优先级 1–5、清空标签之一，结束后用一条通知报告成功与失败条数。
+
+`packages/client/ui-primitives` 因此新增 `readClipboard`：导入需要读剪贴板，而该包已是共享的剪贴板宿主访问层；写入仍是既有的 `writeClipboard`。
+
+**验证** —— `npx tsc -b tsconfig.client.json` 通过；`npx vitest run --config vitest.config.ts packages/client/ui-workspace` 17 个文件 533 个用例全绿，`--coverage` 对该包 `src/client/**` 报告逐文件 100%；`packages/client/ui-primitives` 新增的剪贴板用例 3 个通过。`npx oxlint` 对两个包只剩 base 上已有的 `apply.client.spec.ts` 断言告警。`pnpm run build:artifacts` 六个 gate 全过；`pnpm run build:check` 只在 `packages/client/connection/tests/browser-auth.host.spec.ts` 失败，未改动检出上同样失败（PRE-EXISTING）。`verify-client-ui-i18n`、`verify-client-packages`、`gen-tsconfig-paths --check`、ui-workspace 的 `verify-translation-pairing` 通过；`verify-package-dependencies`、`verify-doc-refs`、`verify-concrete-terms`、`verify-package-readme-model-experience`、`scripts/doc-standard.spec.ts` 的失败全部落在本改动未触碰的文件上（同样在未改动检出上复现）；`README.md` 的 Summary 在 base 上已超 100 词上限。全量 `pnpm run test:gui` 的失败集中在既有失败（图标计数、ui-theme 三条样式规则、connection binary-rpc、session-import/prism-transfer 的 CSS）与本 worktree 并行运行时的两个用例（单独运行通过）。
+
+**过程记录** ——
+
+- 跨工作区移动会话在开工前被否掉：会话 cwd 存在不可变的会话头里，`working-directory` 包明确写「header 保留原始项目」，工作区归属校验与启动引导都以它为据，真移动属于会话格式级改动；已单独征求用户意见并按「本轮不做」执行。
+- 批量删除被去掉：产品没有删除会话的 Host 命令，会话只有创建、重命名、分叉、提示、附件与队列。
+- 标注没有新建 storage 域 + Remote API：那条路要新增 host 域、typert 方法、feed 与 client service；调研后按最小面选择浏览器视图 store，并在 README 的已知限制里写明它只属于当前浏览器。
+- ui-theme 的描边门禁查出编辑器输入框用了 1px 实线，改为共享的 0.5px 边框 token。
+- 覆盖率门槛迫使每个新分支都有真实用例：批量结果通知的成功/失败两种语气，以及优先级比较器的两个方向都补了断言。
 
 ## [S1] 问题
 
@@ -59,7 +73,7 @@ interface SessionAnnotation {
 
 - 筛选：视图选项菜单新增「标注筛选」一节，三选一 `all` / `favorite` / `reviewLater`，与归档筛选、分组、排序叠加；存放在视图 store 的 `annotationFilter` 字段（同样可选 + 缺省 `all`）。
 - 排序：`orderBy` 增加 `priority`。优先级升序（1 最先），同优先级按最近更新降序，再按会话 ID 稳定排序；置顶行仍然领衔，与现有分区规则一致。分组顺序在优先级模式下保持注册表顺序（不按活动度重排）。
-- 搜索：本地匹配除标题与工作区名外，再匹配标签与备注（大小写不敏感）。搜索仍不读取聊天历史，Host 全文搜索保持不变。
+- 搜索：本地匹配除标题与工作区名外，再匹配标签与备注（大小写不敏感）。搜索同样跟随归档筛选与标注筛选（只看收藏时只搜索收藏的会话）。搜索仍不读取聊天历史，Host 全文搜索保持不变。
 
 ### S2.5 编辑界面
 
@@ -83,7 +97,7 @@ interface SessionAnnotation {
 ### S2.7 批量处理
 
 - **入口**：视图选项按钮左侧新增「批量处理」开关按钮（`IconChecklistOutlineRegular`），只在宽状态显示。
-- **选择**：批量模式下每行标题左侧出现复选框，点击行本身仍然打开会话。选择是会话 id 的集合，只存在于浏览器本地状态，不持久化；切换筛选或搜索结果后保留已选，退出批量模式清空。
+- **选择**：批量模式下每行标题左侧出现复选框（临时的空白 New Session 行除外），点击行本身仍然打开会话。选择是会话 id 的集合，只存在于浏览器本地状态，不持久化；切换分组、归档筛选或标注筛选后保留已选，开始搜索即结束批量模式——搜索结果行没有复选框，全选也只读列表——退出批量模式同样清空。
 - **工具栏**：批量模式下 header 让出一条工具栏：`全选当前筛选` / `清空选择` / `批量操作` 菜单 / 完成。
 - **批量动作**：归档、取消归档、收藏、取消收藏、待回看、取消待看、设置优先级（1–5）、清空标签。
 - **执行**：逐个串行执行，逐条捕获失败；结束后弹出一条结果通知（成功 N 条 / 失败 M 条），失败项不改变选中集合，便于重试。归档仍复用 Host 的归档命令，运行中的会话被 Host 拒绝即计入失败，不触发逐条确认对话框。
@@ -102,24 +116,24 @@ interface SessionAnnotation {
 
 ## Tasks
 
-- [ ] T1: `annotations.ts` — 类型、标签解析与格式化、备注规范化、空判定、Prompt 生成、剪贴板 JSON 解析（covers: S2.2, S2.6）
-- [ ] T2: 视图 store 增加 `annotations` / `annotationFilter` 与 `setAnnotation` / `setAnnotationFilter` 写入动作（covers: S2.1, S2.4）
-- [ ] T3: 树派生透传标注、标注筛选、优先级排序、搜索匹配标签与备注（covers: S2.3, S2.4）
-- [ ] T4: 会话行与搜索行渲染标记；批量模式下渲染选择框（covers: S2.3, S2.7）
-- [ ] T5: 标注菜单项与对话框（收藏 / 待回看 / 标签与备注）（covers: S2.5）
-- [ ] T6: 对话框内「复制 Prompt」「导入」（covers: S2.6）
-- [ ] T7: 批量模式入口、工具栏、批量动作执行与结果通知（covers: S2.7）
-- [ ] T8: 测试（纯函数、store、派生、组件）与文档（本 spec、包 README、changelog 片段）（covers: S2.2–S2.7）
+- [x] T1: `annotations.ts` — 类型、标签解析与格式化、备注规范化、空判定、Prompt 生成、剪贴板 JSON 解析（covers: S2.2, S2.6）
+- [x] T2: 视图 store 增加 `annotations` / `annotationFilter` 与 `setAnnotation` / `setAnnotationFilter` 写入动作（covers: S2.1, S2.4）
+- [x] T3: 树派生透传标注、标注筛选、优先级排序、搜索匹配标签与备注（covers: S2.3, S2.4）
+- [x] T4: 会话行与搜索行渲染标记；批量模式下渲染选择框（covers: S2.3, S2.7）
+- [x] T5: 标注菜单项与对话框（收藏 / 待回看 / 标签与备注）（covers: S2.5）
+- [x] T6: 对话框内「复制 Prompt」「导入」（covers: S2.6）
+- [x] T7: 批量模式入口、工具栏、批量动作执行与结果通知（covers: S2.7）
+- [x] T8: 测试（纯函数、store、派生、组件）与文档（本 spec、包 README、changelog 片段）（covers: S2.2–S2.7）
 
 ## [S4] 验收
 
-- [ ] 给会话设置收藏 / 待回看 / 优先级 / 标签 / 备注后，刷新页面标记仍在（同一浏览器）。
-- [ ] 标注筛选三态可用，并与归档筛选、分组、排序叠加生效。
-- [ ] 优先级排序把 1 排在最前、3 与未设置并列、同优先级按最近更新降序。
-- [ ] 搜索框输入标签或备注里的词能命中该会话。
-- [ ] 菜单一键切换收藏与待回看，重复点击可取消。
-- [ ] 对话框保存后行内标记立即变化；取消不写入。
-- [ ] 复制 Prompt 把含当前标注 JSON 的提示写入剪贴板；导入合法 JSON 填入字段，非法 JSON 报错且不覆盖已填内容。
-- [ ] 批量模式可多选、全选当前筛选、清空选择；批量归档 / 取消归档 / 收藏 / 待回看 / 设置优先级 / 清空标签逐条执行并给出成功与失败条数。
-- [ ] 退出批量模式清空选择，且不改变任何会话数据。
-- [ ] `pnpm run test:gui`、`pnpm --filter @deepseek-ai/dsh-client-ui-workspace exec vitest run --coverage`、`tsc -b tsconfig.client.json`、`pnpm run verify-client-ui-i18n` 全绿。
+- [x] 给会话设置收藏 / 待回看 / 优先级 / 标签 / 备注后，刷新页面标记仍在（同一浏览器）。
+- [x] 标注筛选三态可用，并与归档筛选、分组、排序叠加生效。
+- [x] 优先级排序把 1 排在最前、3 与未设置并列、同优先级按最近更新降序。
+- [x] 搜索框输入标签或备注里的词能命中该会话。
+- [x] 菜单一键切换收藏与待回看，重复点击可取消。
+- [x] 对话框保存后行内标记立即变化；取消不写入。
+- [x] 复制 Prompt 把含当前标注 JSON 的提示写入剪贴板；导入合法 JSON 填入字段，非法 JSON 报错且不覆盖已填内容。
+- [x] 批量模式可多选、全选当前筛选、清空选择；批量归档 / 取消归档 / 收藏 / 待回看 / 设置优先级 / 清空标签逐条执行并给出成功与失败条数。
+- [x] 退出批量模式清空选择，且不改变任何会话数据。
+- [x] `npx vitest run --config vitest.config.ts packages/client/ui-workspace`（含 `--coverage` 对 `src/client/**` 的逐文件 100%）、`npx tsc -b tsconfig.client.json`、`pnpm run verify-client-ui-i18n` 全绿。

@@ -218,7 +218,9 @@ export function parseAnnotationImport(text: string): SessionAnnotation {
     parsed = JSON.parse(body)
   } catch (strictError) {
     try {
-      parsed = JSON.parse(body.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"))
+      // Only double quotes can delimit JSON, so this is the one substitution
+      // that can turn a typographic answer into a readable object.
+      parsed = JSON.parse(body.replace(/[“”]/g, '"'))
     } catch {
       throw new AnnotationImportError(`imported JSON is invalid: ${String(strictError)}`)
     }

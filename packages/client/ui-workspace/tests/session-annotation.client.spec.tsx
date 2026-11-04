@@ -116,6 +116,17 @@ describe('annotation dialog', () => {
     expect(settleSessionAnnotation).toHaveBeenCalledOnce()
   })
 
+  it('accepts twenty maximum-length tags in the editor and stores all of them', () => {
+    const { setAnnotation } = open(undefined)
+    const tags = Array.from({ length: 20 }, (_, index) => `${'x'.repeat(30)}${String(index).padStart(2, '0')}`).join(', ')
+    fireEvent.change(screen.getByRole('textbox', { name: en['annotation.tagsField'] }), { target: { value: tags } })
+    fireEvent.click(screen.getByRole('button', { name: commonEn.save }))
+    expect(setAnnotation).toHaveBeenCalledOnce()
+    const stored = setAnnotation.mock.calls[0]?.[1] as SessionAnnotation
+    expect(stored.tags).toHaveLength(20)
+    expect((stored.tags ?? []).every(tag => tag.length === 32)).toBe(true)
+  })
+
   it('closes without writing when cancelled', () => {
     const { setAnnotation, settleSessionAnnotation } = open(undefined)
     fireEvent.click(screen.getByRole('button', { name: commonEn.cancel }))

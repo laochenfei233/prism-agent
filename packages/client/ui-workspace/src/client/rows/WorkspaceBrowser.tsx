@@ -1303,14 +1303,8 @@ export function WorkspaceBrowser({
   const acknowledgeSessionReveal = (sessionId: SessionId): void => {
     setRevealSessionId(current => current === sessionId ? undefined : current)
   }
-  // Starting a search ends batch mode: result rows carry no selection checkbox
-  // and Select all reads the list, not the query. Clearing the query leaves the
-  // reveal target alone, because opening a result clears it in the same step.
   useEffect(() => {
-    if (normalizedQuery === '') return
-    setRevealSessionId(undefined)
-    setBatchMode(false)
-    setSelectedSessionIds([])
+    if (normalizedQuery !== '') setRevealSessionId(undefined)
   }, [normalizedQuery])
 
   // Rail search = expand + land in the search box: the flag arms before the
@@ -1512,7 +1506,13 @@ export function WorkspaceBrowser({
                 maxLength={SEARCH_QUERY_MAX_CODE_UNITS}
                 value={query}
                 tabIndex={searchExpanded ? 0 : -1}
-                onChange={(e) => { setQuery(sanitizeSearchQuery(e.target.value)) }}
+                onChange={(e) => {
+                  const next = sanitizeSearchQuery(e.target.value)
+                  // Result rows carry no selection checkbox and Select all reads
+                  // the list, so typing a query ends batch mode.
+                  if (next.trim() !== '') leaveBatch()
+                  setQuery(next)
+                }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
