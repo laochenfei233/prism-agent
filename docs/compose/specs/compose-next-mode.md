@@ -3,7 +3,7 @@ feature: compose-next-mode
 status: delivered
 updated: 2026-11-04
 branch: feat/prism-team
-commits: 50ff54bd96..933c30fa6a
+commits: 50ff54bd96..c4bd1a25a3
 ---
 
 # Compose Next As A Mode

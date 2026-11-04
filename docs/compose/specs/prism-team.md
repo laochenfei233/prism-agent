@@ -3,7 +3,7 @@ feature: prism-team
 status: delivered
 updated: 2026-11-04
 branch: feat/prism-team
-commits: 50ff54bd96..933c30fa6a
+commits: 50ff54bd96..c4bd1a25a3
 ---
 
 # Prism Team
@@ -12,13 +12,14 @@ commits: 50ff54bd96..933c30fa6a
 
 **What was built** — `plugins/prism-team`，一个 Host-only 出树插件，把四条能力装进实验性 Agent Teams 而不改动 `packages/**`：`team_report` 工具把 teammate 的进展变成一条结构化消息送进 Lead 收件箱并记入插件台账；`/team` 把 `blocked/failed/ready/waiting` 排在 `progress` 之前、健康时只输出一行；每个 teammate 在创建时拿到自己的 `git worktree` 与分支 `team/<team>/<name>`，路径写进它的段落；`tools/pre-execute` 上的写入门闸按该成员已认领任务的 `writeScopes` 判定，范围外默认 `ask`、`observe` 下只记录。装载走 `agent/created` + `ctx.agentTeams.tryMembership`，非团队成员零行为。
 
-**Verification** — `tsc -p tsconfig.verify.json --noEmit`（借主 checkout 的已构建声明）exit 0；`vitest run --config vitest.config.ts` 16/16 通过，其中 worktree 用例在临时 git 仓库里断言两个 teammate 拿到不同路径与分支、Lead 没有 worktree、`git worktree list` 承认两者；`tsdown` 构建产出 `lib/index.js` 16.78 kB；`oxlint`（staged）0 warning 0 error；`git diff --cached --check` 干净。`capability.e2e.spec.ts` 未跑：它自己的脚本是 `npm run build && …`，本次没有产出仓库级构建。
+**Verification** — `tsc -p tsconfig.verify.json --noEmit`（借主 checkout 的已构建声明）exit 0；`vitest run --config vitest.config.ts` 17/17 通过，其中 worktree 用例在临时 git 仓库里断言两个 teammate 拿到不同路径与分支、Lead 没有 worktree、`git worktree list` 承认两者；`tsdown` 构建产出 `lib/index.js` 16.78 kB；`oxlint`（staged）0 warning 0 error；`git diff --cached --check` 干净。`capability.e2e.spec.ts` 未跑：它自己的脚本是 `npm run build && …`，本次没有产出仓库级构建。
 
 **Journey log** —
 
 - compose 一开始写在团队插件里，验证时确认「skill 变插件」是通用能力而非团队专属，于是移到 `prism-guardrails/src/compose.ts`；否则同一件事会有两个家，且 solo 会话拿不到。
 - 首版测试把假 Agent 的 `ctx` 指到根上下文，两个成员注册同名 section/工具立刻冲突；改成 `createScope` 铸出的作用域 + 真 `Session`，`/team` 的日志写入也才成立。
 - worktree 只能劝告：会话 cwd 在创建时就固定，团队包不提供逐成员目录，所以成员必须用绝对路径；这条写进 README 而不是藏起来。
+- 交付前自查抓到 S2.4 与 S2.5 互相打架：成员在自己的 worktree 里写 `src/a.ts`，相对根目录是 `.worktrees/team-x/src/a.ts`，与任务声明的 `src` 永远不匹配，等于每写一次都要审批。`withinScopes` 现在先剥掉 `.worktrees/<checkout>/` 前缀再比，并加了用例。
 
 ## [S1] Problem
 
