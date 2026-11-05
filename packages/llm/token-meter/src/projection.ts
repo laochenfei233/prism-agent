@@ -15,6 +15,13 @@ export interface TokenUsageProjection {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /**
+   * Unix epoch milliseconds of the latest settlement event that reported a
+   * usage sample. The session-level cost estimate prices its tier at this
+   * log-derived instant, so the rendered value never depends on the reading
+   * wall clock. Absent until a provider-reported usage settles.
+   */
+  lastSettledAt?: number
 }
 
 /**

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
@@ -23,6 +23,9 @@ const ZERO: TokenUsageProjection = {
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
 }
+
+/** Pinned wall clock the fake-timer block appends settlement events at. */
+const SETTLED_AT = Date.parse('2026-11-02T05:00:00Z')
 
 async function harness(): Promise<{
   ctx: Context
@@ -101,6 +104,14 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeq, e
 }
 
 describe('tokenUsage session projection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(SETTLED_AT)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('serves zero buckets without usage samples', async () => {
     const { ctx, session } = await harness()
     expect(projected(ctx, session)).toEqual(ZERO)
@@ -135,6 +146,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 4,
       cacheReadTokens: 7,
       cacheWriteTokens: 2,
+      lastSettledAt: SETTLED_AT,
     })
     expect(changes).toHaveLength(1)
   })
@@ -159,6 +171,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 5,
       cacheReadTokens: 8,
       cacheWriteTokens: 1,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -215,6 +228,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 7,
       cacheReadTokens: 11,
       cacheWriteTokens: 1,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -252,6 +266,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 15,
       cacheReadTokens: 2,
       cacheWriteTokens: 4,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -265,6 +280,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 1,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -291,6 +307,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 3,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -311,6 +328,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 2,
       cacheReadTokens: 5,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 })

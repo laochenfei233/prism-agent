@@ -13,8 +13,10 @@ import { en } from '../src/client/locale.ts'
 
 const t = makeTranslate(en, commonEn)
 
-/** Off-peak Monday (UTC) instant the pill prices at; the pill reads `new Date()`. */
+/** Off-peak Monday (UTC) instant the pill prices at, via the logged settlement time. */
 const OFF_PEAK = new Date('2026-11-02T05:00:00Z')
+/** Peak Monday (UTC) instant inside the 01:00–04:00 window. */
+const PEAK = new Date('2026-11-02T02:30:00Z')
 
 afterEach(() => {
   cleanup()
@@ -26,6 +28,7 @@ const USAGE: TokenUsageProjection = {
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
   outputTokens: 1_000_000,
+  lastSettledAt: OFF_PEAK.getTime(),
 }
 
 function props(
@@ -60,8 +63,10 @@ describe('UsageCostPill', () => {
   })
 
   it('shows the estimated session cost and opens the dashboard', () => {
+    // The wall clock sits in a peak window; the estimate must price at the
+    // logged off-peak settlement instant, not the render-time clock.
     vi.useFakeTimers()
-    vi.setSystemTime(OFF_PEAK)
+    vi.setSystemTime(PEAK)
     const view = render(<UsageCostPill {...props(USAGE, 'deepseek-flash')} />)
     const trigger = view.getByRole('button', { name: 'Estimated cost for this session: $0.75' })
     expect(trigger.textContent).toBe('≈$0.75')
@@ -74,9 +79,17 @@ describe('UsageCostPill', () => {
     expect(view.queryByRole('dialog')).toBeNull()
   })
 
-  it('prices with a stored custom price and forwards the editor write', () => {
+  it('prices the tier at the logged settlement instant even when the clock disagrees', () => {
     vi.useFakeTimers()
     vi.setSystemTime(OFF_PEAK)
+    const settledAtPeak = { ...USAGE, lastSettledAt: PEAK.getTime() }
+    const view = render(<UsageCostPill {...props(settledAtPeak, 'deepseek-flash')} />)
+    expect(view.getByRole('button', { name: 'Estimated cost for this session: $1.50' })).toBeDefined()
+  })
+
+  it('prices with a stored custom price and forwards the editor write', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(PEAK)
     const setUnitPrice = vi.fn()
     const view = render(<UsageCostPill {...props(USAGE, 'deepseek-flash', { 'deepseek-flash': { miss: 2, hit: 0, output: 0 } }, setUnitPrice)} />)
     expect(view.getByRole('button', { name: 'Estimated cost for this session: $2.00' })).toBeDefined()

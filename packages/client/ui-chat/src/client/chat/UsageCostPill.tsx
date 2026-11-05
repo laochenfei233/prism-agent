@@ -26,7 +26,8 @@ export type UsageCostPillProps =
  * @param props.unitPrices - live custom unit prices.
  * @param props.setUnitPrice - write face handed to the dashboard editor.
  * @param props.t - Chat locale seat.
- * @returns the pill, or null while the Session has no billable tokens or no route.
+ * @returns the pill, or null while the Session has no billable tokens, no
+ *   route, or no logged settlement instant to price the tier from.
  */
 export function UsageCostPill({ useProjection, useUnitPrices, setUnitPrice, t }: UsageCostPillProps) {
   const [open, setOpen] = useState(false)
@@ -34,10 +35,13 @@ export function UsageCostPill({ useProjection, useUnitPrices, setUnitPrice, t }:
   const selection = useProjection('modelSelection')
   const overrides = useUnitPrices(value => value)
   const model = selection?.next?.model
-  const billable = usage !== undefined
-    && usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens + usage.outputTokens > 0
-  if (!billable || model === undefined) return null
-  const cost = sessionCost(usage, model, new Date(), overrides)
+  if (usage === undefined || usage.lastSettledAt === undefined || model === undefined) return null
+  const billable = usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens + usage.outputTokens > 0
+  if (!billable) return null
+  // The tier prices at the logged settlement instant, not `new Date()`: the
+  // reading must stay reconstructable from the session log and deterministic
+  // across replay, which a render-time wall clock is neither.
+  const cost = sessionCost(usage, model, new Date(usage.lastSettledAt), overrides)
   const amount = cost === undefined ? undefined : t('cost.usd', { amount: formatUsd(cost.totalUsd) })
   return (
     <span className={css.root}>

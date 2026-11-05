@@ -25,7 +25,7 @@ import type {
   ChatFlowInjected, ChatNodeInjected, ChatSnapshot, TranscriptViewRowInjected, UseChatNodeTurnData, UseDisclosure,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { QuotaNoticeInjected } from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { UsagePriceEditorInjected } from '../src/client/contract/usage.ts'
+import type { UsagePriceEditorInjected, UsagePriceInjected } from '../src/client/contract/usage.ts'
 import type { PerformanceUsageRowInjected } from '../src/client/settings/PerformanceUsageRow.tsx'
 import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../src/chat-settings.ts'
 import { ActivityPill, UsagePill } from '../src/client/chat/StatsPills.tsx'
@@ -93,6 +93,21 @@ async function bench() {
 
 function storeOf(runtime: SlotTestRuntime, key: 'conversation.session' | 'conversation.session.header' | 'conversation.view') {
   return (runtime.slots.entries(key)[0] as { store?: unknown } | undefined)?.store
+}
+
+/** Assert a slot entry injected the shared unit-price hooks seat; slot entries inject faces untyped. */
+function assertUsagePriceHooks(face: object | undefined): asserts face is UsagePriceInjected {
+  if (face === undefined || !('hooks' in face)) {
+    throw new Error('test fixture: the slot entry did not inject the usage-price hooks')
+  }
+}
+
+/** Assert the header entry injected the full editor face (hooks seat plus the setUnitPrice action). */
+function assertUsagePriceFace(face: object | undefined): asserts face is UsagePriceEditorInjected {
+  assertUsagePriceHooks(face)
+  if (!('setUnitPrice' in face)) {
+    throw new Error('test fixture: the slot entry did not inject the usage-price editor face')
+  }
 }
 
 describe('Chat apply wiring', () => {
@@ -201,8 +216,10 @@ describe('Chat apply wiring', () => {
       .find(entry => entry.options.id === 'usage-cost')!
     const tail = b.runtime.slots.entries('conversation.chat.node')
       .find(entry => entry.options.key === 'turn-tail')!
-    const face = (header.inject as unknown as () => UsagePriceEditorInjected)()
-    const tailFace = (tail.inject as unknown as () => { hooks: { unitPrices: { getSnapshot: () => unknown } } })()
+    const face = header.inject!()
+    assertUsagePriceFace(face)
+    const tailFace = tail.inject!()
+    assertUsagePriceHooks(tailFace)
     expect(face.hooks.unitPrices).toBe(tailFace.hooks.unitPrices)
     expect(face.hooks.unitPrices.getSnapshot()).toEqual({})
 

@@ -10,11 +10,11 @@ Desktop product events use the optional [product analytics service](../product-a
 
 ## Summary
 
-Use this package to render a browser chat from recorded Session conversations, including historical images, localized actions, and restored scroll position. Work-details modes control reasoning previews and process visibility without hiding final answers; Verbose keeps completed-turn process rows visible. Local transcript and steering submissions appear immediately, remain in their original surface, and disappear atomically when authoritative Session records arrive, while queued submissions stay outside Chat. The package does not assemble or modify model requests.
+Renders Session conversations as a browser chat, preserving images, localized actions, and scroll position. Work-details modes control reasoning-preview and process visibility without hiding final answers. Local transcript and steering submissions appear immediately in place and yield atomically to authoritative Session records; queued submissions never enter Chat. It never assembles or modifies model requests.
 
-File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
+File-mention providers receive the viewed Session ID and closing-turn owner, so inherited-history links address the fork.
 
-A secondary press on a message body copies the selected text (or the whole message) and offers to add it to the current task or start a side conversation in the right Sidebar with it prefilled; neither action sends.
+A second press on a message body copies the selection or whole message and offers to add it to the current task or a prefilled right-Sidebar side conversation; neither sends.
 
 ## Table of Contents
 

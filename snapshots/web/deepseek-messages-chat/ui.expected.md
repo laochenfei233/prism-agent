@@ -1,6 +1,7 @@
 - banner:
   - navigation "会话层级": 只回复 MESSAGES_WEB_READY，不调用
   - text: 标准模式
+  - button "deepseek-v4-flash 尚未收录单价": 未收录单价
   - button "更多操作"
   - button "打开右侧边栏"
   - tablist:
