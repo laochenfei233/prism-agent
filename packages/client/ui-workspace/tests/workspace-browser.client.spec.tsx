@@ -423,7 +423,9 @@ describe('WorkspaceBrowser', () => {
         useSessions: hook(sessionState([summary('alive', 2), summary('gone', 1)])),
         useWorkspaces: hook(workspaceState([workspace('alpha', ['alive', 'gone'])], [sid('gone')])),
       })
-      expect(b.store.getSnapshot().archivedFilter).toBeUndefined()
+      // Rehydration merges over init, so the pre-filter blob reads as the
+      // default filter rather than an absent one; both hide archived rows.
+      expect(b.store.getSnapshot().archivedFilter).toBe('default')
       expect(screen.getByText('alive')).toBeTruthy()
       expect(screen.queryByText('gone')).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: '视图选项' }))

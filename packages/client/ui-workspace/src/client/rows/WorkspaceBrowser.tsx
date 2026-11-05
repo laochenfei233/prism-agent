@@ -31,7 +31,7 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { type AnnotationFilter, NO_ANNOTATIONS, type SessionAnnotation, type SessionPriority } from '../annotations.ts'
+import { type AnnotationFilter, NO_ANNOTATIONS, type SessionAnnotation } from '../annotations.ts'
 import type { BatchAction, WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
@@ -40,6 +40,7 @@ import {
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
+import { BatchActionsToolbar } from './BatchActions.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
@@ -224,88 +225,6 @@ function ViewOptionsMenu({
 interface BatchSelection {
   selected: ReadonlySet<SessionId>
   toggle: (sessionId: SessionId) => void
-}
-
-/** Priority rows of the batch menu, in display order. */
-const BATCH_PRIORITIES = [
-  { id: 'priority-1', priority: 1, label: 'priority.1' },
-  { id: 'priority-2', priority: 2, label: 'priority.2' },
-  { id: 'priority-3', priority: 3, label: 'priority.3' },
-  { id: 'priority-4', priority: 4, label: 'priority.4' },
-  { id: 'priority-5', priority: 5, label: 'priority.5' },
-] as const satisfies readonly { id: string; priority: SessionPriority; label: Parameters<WorkspaceBrowserProps['t']>[0] }[]
-
-/**
- * Resolve one batch-menu row id to the action it runs.
- * @param id - the menu's row id.
- * @returns the action, or undefined for a non-action row.
- */
-function batchActionOf(id: string): BatchAction | undefined {
-  switch (id) {
-    case 'archive': return { kind: 'archive' }
-    case 'unarchive': return { kind: 'unarchive' }
-    case 'favorite': return { kind: 'favorite' }
-    case 'unfavorite': return { kind: 'unfavorite' }
-    case 'review-later': return { kind: 'reviewLater' }
-    case 'unreview': return { kind: 'unreview' }
-    case 'clear-tags': return { kind: 'clearTags' }
-    case 'priority-1': return { kind: 'priority', priority: 1 }
-    case 'priority-2': return { kind: 'priority', priority: 2 }
-    case 'priority-3': return { kind: 'priority', priority: 3 }
-    case 'priority-4': return { kind: 'priority', priority: 4 }
-    case 'priority-5': return { kind: 'priority', priority: 5 }
-    /* v8 ignore next -- the menu emits only the ids listed above. */
-    default: return undefined
-  }
-}
-
-/** The batch menu: every action the browser can run over the current selection. */
-function BatchActionsMenu({ disabled, onPick, t }: {
-  disabled: boolean
-  onPick: (action: BatchAction) => void
-  t: WorkspaceBrowserProps['t']
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Menu
-      open={open}
-      onClose={() => { setOpen(false) }}
-      items={[
-        { id: 'archive', label: t('batch.archive'), icon: <IconArchiveOutlineRegular /> },
-        { id: 'unarchive', label: t('batch.unarchive'), icon: <IconArchiveCheckOutlineRegular /> },
-        { type: 'separator' as const, id: 'batch-mark-separator' },
-        { id: 'favorite', label: t('batch.favorite'), icon: <IconLikeFillRegular /> },
-        { id: 'unfavorite', label: t('batch.unfavorite'), icon: <IconLikeFillRegular /> },
-        { id: 'review-later', label: t('batch.reviewLater'), icon: <IconQueueOutlineRegular /> },
-        { id: 'unreview', label: t('batch.unreview'), icon: <IconQueueOutlineRegular /> },
-        { type: 'separator' as const, id: 'batch-tags-separator' },
-        { id: 'clear-tags', label: t('batch.clearTags'), icon: <IconListPenOutlineRegular /> },
-        { type: 'separator' as const, id: 'batch-priority-separator' },
-        { type: 'label' as const, id: 'batch-priority', text: t('batch.priority') },
-        ...BATCH_PRIORITIES.map(row => ({ id: row.id, label: t(row.label) })),
-      ]}
-      onSelect={(id) => {
-        setOpen(false)
-        const action = batchActionOf(id)
-        if (action !== undefined) onPick(action)
-      }}
-      align="end"
-      dense
-      listClassName={css.viewOptionsMenu}
-      portal
-      anchor={(
-        <button
-          type="button"
-          className={css.batchAction}
-          disabled={disabled}
-          aria-disabled={disabled}
-          onClick={() => { setOpen(v => !v) }}
-        >
-          {t('batch.actions')}
-        </button>
-      )}
-    />
-  )
 }
 
 /** In-flight root-row drag: source identity plus the current insert marker. */
@@ -1626,29 +1545,17 @@ export function WorkspaceBrowser({
           itself is wide-only. */}
       <div className={css.listArea}>
         {wide && batchMode && (
-          <div className={css.batchBar} role="toolbar" aria-label={t('batch.mode')}>
-            <span className={css.batchCount}>{t('batch.count', { n: selectedSessionIds.length })}</span>
-            <button
-              type="button"
-              className={css.batchAction}
-              onClick={() => {
-                // The provisional blank row is not an archive or marking target.
-                setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
-              }}
-            >
-              {t('batch.selectAll')}
-            </button>
-            <button
-              type="button"
-              className={css.batchAction}
-              disabled={selectedSessionIds.length === 0}
-              onClick={() => { setSelectedSessionIds([]) }}
-            >
-              {t('batch.clear')}
-            </button>
-            <BatchActionsMenu disabled={selectedSessionIds.length === 0} onPick={runBatch} t={t} />
-            <button type="button" className={css.batchAction} onClick={leaveBatch}>{t('batch.exit')}</button>
-          </div>
+          <BatchActionsToolbar
+            count={selectedSessionIds.length}
+            onSelectAll={() => {
+              // The provisional blank row is not an archive or marking target.
+              setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
+            }}
+            onClear={() => { setSelectedSessionIds([]) }}
+            onPick={runBatch}
+            onExit={leaveBatch}
+            t={t}
+          />
         )}
         {wide && (normalizedQuery !== ''
           ? (
