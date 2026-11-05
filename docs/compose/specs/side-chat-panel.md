@@ -8,6 +8,8 @@ commits: 50ff54bd96..57ce788948
 
 # Side Chat Panel
 
+English | [中文](side-chat-panel.zh.md)
+
 ## Report
 
 **What was built** — A secondary press on selected message text now asks beside the conversation. The existing "Ask in a side conversation" entry creates a Session in the viewing Session's Workspace and opens it as a right-Sidebar tab (`dsh-resource://sidechat/session/<id>`) with the selected passage staged as a quotation in that conversation's composer; nothing sends, and the main conversation keeps its own selection and scroll position. `ui-chat` registers the `sidechat` resource protocol, its `builtin` tab type, the tab body over the shared `conversation.content` Factory, and the nested Conversation seat the body hosts. The resource retains one Session reference for the tab's lifetime, stages the quotation once after the Session's opening settles, reports an unexpected open failure as a resource failure frame, and releases the reference when the tab closes.

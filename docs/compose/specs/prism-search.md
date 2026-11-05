@@ -8,6 +8,8 @@ commits: dd1145a3c5..cc6a6a6d02
 
 # Prism Search
 
+English | [中文](prism-search.zh.md)
+
 ## Report
 
 **What was built** — `plugins/prism-search` (`@prism/prism-search`): a Host half registering a keyless `ctx.web` search provider `prism-search` that queries 18 free engines in parallel, fuses their rankings with RRF on normalized URLs, reads the top pages through `ctx.web.fetch`, and orders the result with a model chosen in Models through one auxiliary `ctx.llm.stream()` call; and a browser half adding Settings → Search, which switches `web.searchProvider` onto the provider and stores the ordering route from the live model catalog. The shipped `web_search` tool and its card, limits, and timeout policy are reused unchanged.

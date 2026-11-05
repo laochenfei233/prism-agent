@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for context-menu-plugins.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/context-menu-plugins.md
+/:
+  en: 909a13003cfd3e94
+  zh: 909a13003cfd3e94
+/context-menu-plugin-rows:
+  en: 6b14669da6d86be9
+  zh: 0f1a81d99d79417c
+/context-menu-plugin-rows/report:
+  en: a853e7d7d38efaee
+  zh: 51692f1864bcf061
+/context-menu-plugin-rows/s1-problem:
+  en: f20ac152100a5376
+  zh: 8d121d049738ac06
+/context-menu-plugin-rows/s2-design:
+  en: fe2a4a29628440f8
+  zh: 33168405a6a441ec
+/context-menu-plugin-rows/s3-scope:
+  en: 03ff50d25c99297e
+  zh: 2d0484bc6623955c
+/context-menu-plugin-rows/tasks:
+  en: 63d4ba56a07a509d
+  zh: 46da960b66ebb20e
+/context-menu-plugin-rows/s4-acceptance:
+  en: d38fb411394e745d
+  zh: 6fac35750963e47c

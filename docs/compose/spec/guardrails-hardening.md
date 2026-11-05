@@ -35,7 +35,7 @@ Prior art: `cc-safety-net` (kenryu42) ships exactly the first two checks, plus a
 
 Two keys, symmetric with the existing `writeTools` shape:
 
-```ts
+```ts ignore-check
 readonly readTools?: readonly ReadTool[]        // { tool, pathArgument }
 readonly sensitivePaths?: readonly string[]
 ```
@@ -54,7 +54,7 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 One key holding both halves:
 
-```ts
+```ts ignore-check
 readonly commandGuard?: {
   readonly tools: readonly { tool: string; commandArgument: string }[]
   readonly deny: readonly { pattern: string; reason: string }[]

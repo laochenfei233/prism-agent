@@ -35,7 +35,7 @@ commits: c22ec9f0b9..4c3d69444f
 
 两个键，与既有的 `writeTools` 形状对称：
 
-```ts
+```ts ignore-check
 readonly readTools?: readonly ReadTool[]        // { tool, pathArgument }
 readonly sensitivePaths?: readonly string[]
 ```
@@ -54,7 +54,7 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 一个键同时承载两半：
 
-```ts
+```ts ignore-check
 readonly commandGuard?: {
   readonly tools: readonly { tool: string; commandArgument: string }[]
   readonly deny: readonly { pattern: string; reason: string }[]

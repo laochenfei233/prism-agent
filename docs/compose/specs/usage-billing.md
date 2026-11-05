@@ -8,6 +8,8 @@ commits: 50ff54bd96..6ce808e0c7
 
 # Usage Billing
 
+English | [中文](usage-billing.zh.md)
+
 ## Report
 
 **What was built** — `packages/client/ui-chat` now shows money beside tokens. A session-header cost pill (registered into `conversation.session.header.actions`, id `usage-cost`, order 30) estimates the session's cost from the durable `tokenUsage` projection and the `modelSelection` route, and opens a dashboard modal listing every priced token bucket, the active peak/off-peak tier, the built-in DeepSeek rate table with the peak multiple, and an editor for custom per-model unit prices. A route with no price keeps the pill with a "no price yet" reading so the editor stays reachable. Custom prices persist per browser under `dsh.usage-billing.prices.v1` and feed both the pill and the completed-turn usage row, which now appends its own cost priced at the turn's single recorded route and end-time tier. All copy lives in the `chat` locale dictionary; no sidebar entry, panel, or new package was added.

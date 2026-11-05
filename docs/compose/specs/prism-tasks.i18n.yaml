@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for prism-tasks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-tasks.md
+/:
+  en: dcbaee269ed36f89
+  zh: dcbaee269ed36f89
+/section:
+  en: fe60d8ebedeaa4d7
+  zh: 9cff417600cd381d
+/section/report:
+  en: abcc210069068ac3
+  zh: abcc210069068ac3
+/section/s1-problem:
+  en: 5d496cb0a7940fc5
+  zh: 5d496cb0a7940fc5
+/section/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/section/s2-design/s2-1-conversation-view-tab:
+  en: 4a41e17c365094be
+  zh: 4a41e17c365094be
+/section/s2-design/s2-2:
+  en: d5bbd9a367546182
+  zh: d5bbd9a367546182
+/section/s2-design/s2-3:
+  en: bd50b8970c09260f
+  zh: bd50b8970c09260f
+/section/s2-design/s2-4:
+  en: f15426444803696f
+  zh: f15426444803696f
+/section/s2-design/s2-5:
+  en: 25a31dac7af9155f
+  zh: 25a31dac7af9155f
+/section/s2-design/s2-6:
+  en: 4bec4f7a4ac0498d
+  zh: 4bec4f7a4ac0498d
+/section/s2-design/s2-7-v2:
+  en: 74109a025635c08c
+  zh: 74109a025635c08c
+/section/s3-scope:
+  en: 8c08c620b0c41c9b
+  zh: 8c08c620b0c41c9b
+/section/tasks:
+  en: b62fe60e3b64a108
+  zh: b62fe60e3b64a108
+/section/s4-acceptance:
+  en: d199078c5093b240
+  zh: d199078c5093b240

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for side-chat-panel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/side-chat-panel.md
+/:
+  en: 2e7117207bc50c8e
+  zh: 2e7117207bc50c8e
+/side-chat-panel:
+  en: 6aa0b300ddb88960
+  zh: fea521ac5aa28dd2
+/side-chat-panel/report:
+  en: e07f9b6c4aec85fa
+  zh: 106256c051490271
+/side-chat-panel/s1-problem:
+  en: f1dc2086d0fdfe79
+  zh: 1695f7702ad00a1f
+/side-chat-panel/s2-design:
+  en: a33a4da978e4df7e
+  zh: da677e94484eaa3d
+/side-chat-panel/s3-scope:
+  en: e999c40508a432d7
+  zh: 47970c6cb1db33e0
+/side-chat-panel/tasks:
+  en: bb69773e4c457acd
+  zh: 170cb4bd34d1a472
+/side-chat-panel/s4-acceptance:
+  en: 9862199245a23326
+  zh: ff9d583c2cf76394

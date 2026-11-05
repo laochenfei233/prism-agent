@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for usage-billing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/usage-billing.md
+/:
+  en: 119d658251c9c082
+  zh: 119d658251c9c082
+/usage-billing:
+  en: 3171872cfe369935
+  zh: cebcedd883ceb355
+/usage-billing/report:
+  en: 69041d7303391d90
+  zh: 234cac27975d73a1
+/usage-billing/s1-problem:
+  en: 8edbdd5e745fa4a9
+  zh: 1e3e140750eee700
+/usage-billing/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/usage-billing/s2-design/s2-1-home-the-existing-statistics-owner:
+  en: 1c38473ad88e6ee5
+  zh: 3233ef48e382e950
+/usage-billing/s2-design/s2-2-session-cost-pill:
+  en: 1272fb2ea077077f
+  zh: 1dfc16c97fbc941d
+/usage-billing/s2-design/s2-3-dashboard-modal:
+  en: 585cd3b21dad738c
+  zh: e1fdedf9e7a88485
+/usage-billing/s2-design/s2-4-built-in-price-table:
+  en: df1c2e524490a758
+  zh: 542bcfd74845bb20
+/usage-billing/s2-design/s2-5-per-turn-cost:
+  en: 55ac4a24b6396e64
+  zh: 550206df1ac392bf
+/usage-billing/s2-design/s2-6-custom-unit-prices:
+  en: 166623b6ee55d809
+  zh: 9f7e54e6ff89cfb0
+/usage-billing/s2-design/s2-7-state-ownership:
+  en: 0107e263cf76fa7c
+  zh: a10c232b7e064de1
+/usage-billing/s2-design/s2-8-copy-and-absence:
+  en: 172cd262c3741a91
+  zh: 67803cc0df9b4197
+/usage-billing/s3-scope:
+  en: 2591320ff2ddb240
+  zh: 353f4b9576fb81f5
+/usage-billing/tasks:
+  en: 6d4a1a040d8966de
+  zh: b828c7dcb7fba4d8
+/usage-billing/s4-acceptance:
+  en: 56ff859cb32f5176
+  zh: 3a9991a998c13694
