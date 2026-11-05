@@ -4,34 +4,34 @@
 #   pnpm run verify-translation-pairing --write packages/client/ui-theme/README.md
 /:
   en: e9c14ae3732deb3a
-  zh: fee230def9844d2d
+  zh: a99a9fdac15015e0
 /deepseek-ai-dsh-client-ui-theme:
   en: 06c7d7624947a72a
   zh: ac4ca82984564825
 /deepseek-ai-dsh-client-ui-theme/summary:
-  en: edcc0374c3141742
-  zh: c7a977d16a76399a
+  en: 37d4a6d471a1e5d5
+  zh: f7361447cec9f3eb
 /deepseek-ai-dsh-client-ui-theme/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
 /deepseek-ai-dsh-client-ui-theme/use-this-package:
-  en: 5a279269e31713c1
-  zh: dcd5c31fbdfd63e2
+  en: 13af599f11540ee5
+  zh: fcb80b462df07d0e
 /deepseek-ai-dsh-client-ui-theme/use-this-package/theme-gallery-and-font-size:
-  en: 0ba1bc01c9cd7eae
-  zh: 192f5568ed64b50c
+  en: 8d2c706f93cae49b
+  zh: 497bfa71ae02c65b
 /deepseek-ai-dsh-client-ui-theme/use-this-package/designed-themes:
-  en: 9074b78bedce75d2
+  en: 9330e6ad6e458c85
   zh: af65514b3759204f
 /deepseek-ai-dsh-client-ui-theme/use-this-package/fonts:
   en: b45d5b48ca799c3a
-  zh: f10ad07018e13f4d
+  zh: 8839674c0e323724
 /deepseek-ai-dsh-client-ui-theme/use-this-package/registering-a-theme:
   en: 385125ecdf3aeb7b
   zh: bf951ea3a843db81
 /deepseek-ai-dsh-client-ui-theme/use-this-package/pre-plugin-palette:
-  en: 7096686003696864
-  zh: e4ef91ac8bd2ab49
+  en: 2297c30996a88b24
+  zh: fa7fc670161ae4ab
 /deepseek-ai-dsh-client-ui-theme/understand-the-implementation:
   en: 3eb9b0e3365b2db3
   zh: c73acc55dd897266
@@ -54,8 +54,8 @@
   en: ca75c51c89c2c9b0
   zh: de54f3467ef3b9be
 /deepseek-ai-dsh-client-ui-theme/known-limitations-and-deferred-work:
-  en: 0d328dbced31a041
-  zh: 2951de356ba6bb82
+  en: ec661bf54824384b
+  zh: 9b1c51ed59e2a97d
 /deepseek-ai-dsh-client-ui-theme/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

@@ -117,7 +117,7 @@ async function bench(options: { recordResult?: unknown; recordCarrier?: unknown 
       return {
         ...entry.options,
         locale: entry.locale,
-        inject: entry.inject as unknown as ((sessionId: SessionId) => MessageFeedbackMenuInjected) | undefined,
+        inject: entry.inject as ((sessionId: SessionId) => MessageFeedbackMenuInjected) | undefined,
       }
     },
   }

@@ -59,10 +59,21 @@ Host 半通过 `ctx.connection.fetch.register` 在 Connection 鉴权围栏内注
 
 无；本包不组装也不发送任何请求。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - 面板按整路径提交。按 hunk 暂存、切换分支、历史、pull 与 push、冲突解决都不在范围内。
 - 未跟踪文件在暂存前没有比较，行上直接说明这一点，而不是读取文件。
 - 取消暂存先试 `git reset HEAD`，只对 HEAD 尚未诞生的仓库回退到 `git rm --cached`。
 - 状态是面板请求时的快照。面板开着而工作树在别处变化时，没有任何东西会刷新它。
+
+### 开发备注
+
+<details>
+<summary>面向维护者的实现备注——点击展开</summary>
+
+工作台是注册到右侧边栏 tab 类型表中的一个 tab 类型；面板从单一快照 store 渲染，由 tab 按需刷新，所有 git 操作都经 harness 进程边界外调执行，而不持有长驻 git 进程。
+
+</details>
+

@@ -111,3 +111,12 @@ None; moving the home changes where the next process reads its session logs, not
 - **A failed copy removes its destination** — the empty directory the operator picked goes with the partial copy, so a retry starts clean instead of meeting a tree nobody can explain.
 - **No progress or cancellation** — the copy is one sequential walk; the page shows a busy state until it settles, and interrupting the app leaves a partial destination that the next attempt refuses because it is no longer empty.
 - **An environment variable still wins** — a launch that names the home through `$DSH_HOME` (CLI) or `$PRISM_HOME` (desktop) ignores the pointer, so the copy alone does not move that launch.
+
+### Dev Note
+
+<details>
+<summary>Implementation notes for maintainers — click to expand</summary>
+
+The pointer file is one line naming the real home directory; every home-path consumer resolves through it, and the copy walks the source tree in one sequential pass, recreating links only when the platform allows, so a partial copy is always a plain directory the next attempt can replace.
+
+</details>

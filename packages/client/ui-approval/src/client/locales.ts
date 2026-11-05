@@ -1,4 +1,4 @@
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5).
 /** `approval` namespace dictionaries. */
 
 /** Simplified Chinese dictionary and key-set source of truth. */

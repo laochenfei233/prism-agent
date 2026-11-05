@@ -27,8 +27,11 @@
   en: 0d6017c7417bb81a
   zh: 74b1b52a1b58890d
 /deepseek-ai-dsh-client-ui-sidebar-git/model-experience/kv-cache-effect:
-  en: d2cb539ea2103db8
-  zh: 89b6fc72ba32443e
+  en: 3c8c24331053618c
+  zh: e5560d533d922bbe
 /deepseek-ai-dsh-client-ui-sidebar-git/known-limitations-and-deferred-work:
-  en: f062bd4480b12f25
-  zh: b3f1c18c74791d79
+  en: f8e23066feba6c22
+  zh: ae03098a0b6abe37
+/deepseek-ai-dsh-client-ui-sidebar-git/known-limitations-and-deferred-work/dev-note:
+  en: 5677e4516a945be6
+  zh: 0d6b6f0806bb3b6f

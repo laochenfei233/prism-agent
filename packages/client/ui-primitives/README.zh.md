@@ -76,6 +76,7 @@ kind: "package-library"
 | `GuideArtworkBrowser`/`Files` | 固定配色的 36×36 浏览器与文件夹插画，用于侧栏引导入口。 |
 | `FileTypeIcon`、`classifyFileType`、`fileExtension` | 按类别着色的 28px 文件或文件夹图形，以及它背后共享的不区分大小写文件名映射。代码与配置文件使用细分的全彩技术图形；链接前置图形使用 `LinkIconMedium`，图片内容使用图片预览。 |
 | `languageForPath`、`CODE_HIGHLIGHT_EXTENSIONS`、`useCodeHighlighter` | 代码预览与 diff review 共用的惰性逐行 token 高亮。文件名 grammar 选择再导出自 `@deepseek-ai/dsh-util-code-language`，即 read 卡片持久化短 id `lang` 提示背后的同一张扩展名表。 |
+| `hunkRows`、`DiffHunkLines`、`DiffRow` | 统一 diff 的行模型：一条绘出的行携带其旧新行号，以及每个对比视图共用的 `+`/`-`/空格编号。`DiffBlock` 卡片与翻转文件的评审视图都由它构建自己的行。 |
 
 有四组容易混淆：
 

@@ -25,6 +25,19 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
+/**
+ * The Agent face the Ponytail section and commands read: identity, session,
+ * prompt-section injection, and provider options.
+ */
+function isAgentFace(value: {
+  readonly id?: unknown
+  readonly session?: unknown
+  readonly inject?: unknown
+  readonly options?: unknown
+}): value is Agent {
+  return value.session !== undefined && typeof value.inject === 'function' && value.options !== undefined
+}
+
 /** Boot the registries the entry contributes to and return one live agent. */
 async function harness(
   config: Ponytail.Config = {},
@@ -40,12 +53,14 @@ async function harness(
     preset === undefined ? {} : { meta: { agentPreset: preset } },
   )
   const inject = vi.fn()
-  const agent = {
+  const fixture = {
     id: session.id,
     session,
     inject,
     options: { provider: 'mock', model: 'mock' },
-  } as unknown as Agent
+  }
+  if (!isAgentFace(fixture)) throw new Error('agent fixture is missing its Ponytail Agent face')
+  const agent: Agent = fixture
   return { ctx, agent, inject }
 }
 

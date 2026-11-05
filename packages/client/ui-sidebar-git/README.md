@@ -59,10 +59,21 @@ None, as the package adds a browser-side panel and Host routes and registers not
 
 None; no request is assembled or sent by this package.
 
-<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - The panel commits whole paths. Hunk-level staging, branch switching, history, pull and push, and conflict resolution are out of scope.
 - An untracked file has no comparison until it is staged; its row says so instead of reading the file.
 - Unstaging tries `git reset HEAD` first and falls back to `git rm --cached` only for a repository whose HEAD is unborn.
 - The status is a snapshot the panel asked for. Nothing refreshes it while the panel sits open and the working tree changes elsewhere.
+
+### Dev Note
+
+<details>
+<summary>Implementation notes for maintainers — click to expand</summary>
+
+The workbench is one tab type registered against the Right Sidebar's tab-type table; the panel renders from a single snapshot store the tab refreshes on demand, and every git operation shells out through the harness process boundary rather than holding a long-lived git process.
+
+</details>
+

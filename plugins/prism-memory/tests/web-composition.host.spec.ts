@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
+import type { ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
@@ -22,6 +23,14 @@ import * as web from '../src/web.ts'
 
 /** The entry id every case loads. */
 const ENTRY = '@prism/prism-memory/web'
+
+/**
+ * The Node internal loader face the Loader exercises: the v2 shape's version
+ * marker and import entry; the remaining ModuleLoaderV2 members stay unused.
+ */
+function isModuleLoaderV2(value: { readonly version?: unknown; readonly import?: unknown }): value is ModuleLoaderV2 {
+  return value.version === 'v2' && typeof value.import === 'function'
+}
 
 /**
  * `FiberState` values from `vendor/cordis/src/fiber.ts`. It is a `const enum`,
@@ -83,14 +92,16 @@ async function entryStates(rows: readonly string[]): Promise<number[]> {
     ['@deepseek-ai/dsh-client-connection', Connection],
     [ENTRY, web],
   ])
-  booted.loader.internal = {
+  const internal = {
     version: 'v2',
     async import(specifier: string) {
       if (specifier === './memory-stub.mjs') return import(pathToFileURL(join(root!, 'memory-stub.mjs')).href)
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
-  } as unknown as NonNullable<typeof booted.loader.internal>
+  }
+  if (!isModuleLoaderV2(internal)) throw new Error('loader internal stub is missing its v2 face')
+  booted.loader.internal = internal
   await booted.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(configPath).href },
