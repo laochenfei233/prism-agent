@@ -100,7 +100,7 @@ export const CHANNEL_META: readonly BotChannelMeta[] = [
     chip: '企',
     fields: [
       { name: 'corpId' }, { name: 'agentId' }, { name: 'corpSecret', secret: true },
-      { name: 'token' }, { name: 'encodingAesKey', secret: true },
+      { name: 'token', secret: true }, { name: 'encodingAesKey', secret: true },
     ],
     hint: 'hint.wecom',
     consoleUrl: 'https://work.weixin.qq.com',
@@ -113,7 +113,7 @@ export const CHANNEL_META: readonly BotChannelMeta[] = [
     chip: '微',
     fields: [
       { name: 'appId' }, { name: 'appSecret', secret: true },
-      { name: 'token' }, { name: 'encodingAesKey', secret: true },
+      { name: 'token', secret: true }, { name: 'encodingAesKey', secret: true },
     ],
     hint: 'hint.wechat',
     consoleUrl: 'https://mp.weixin.qq.com/debug/cgi-bin/sandbox?t=sandbox/login',

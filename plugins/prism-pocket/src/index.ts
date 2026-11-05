@@ -25,9 +25,10 @@ import { phoneAccess, probeVerdict } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
 import { BotStore } from './bots/store.ts'
 import { BotSupervisor } from './bots/supervisor.ts'
-import { BotConversations, readBotHostServices } from './bots/binding.ts'
+import { BotConversations, operatorAuthorized, readBotHostServices } from './bots/binding.ts'
 import { BotOutbox, assistantTextOf } from './bots/outbox.ts'
 import { BotAskRelay } from './bots/asks.ts'
+import { InboundDedup } from './bots/shared/dedup.ts'
 import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, runBotAction, type BotRouteDeps } from './bots/routes.ts'
 import type { BotChannelId, BotInbound } from './bots/types.ts'
 
@@ -180,6 +181,7 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
   // harness's fail-loud policy would exit the process).
   const relay = new BotAskRelay({
     targetOf: sessionId => conversations.targetOf(sessionId),
+    authorized: (channel, chatId, senderId) => operatorAuthorized(store.entry(channel), chatId, senderId),
     send: async (channel, chatId, text) => {
       try {
         await send(channel, chatId, text)
@@ -194,10 +196,15 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
     warn,
   })
 
+  // One replay filter for both entry paths (adapter hooks and callback routes).
+  const dedup = new InboundDedup()
+
   const deliverInbound = async (channel: BotChannelId, message: BotInbound): Promise<void> => {
     try {
+      // An empty messageId skips dedup: the platform gave nothing to key on.
+      if (message.messageId.length > 0 && !dedup.first(`${channel}:${message.messageId}`)) return
       const entry = store.entry(channel)
-      if (entry?.sessionId !== undefined && relay.consume(channel, message.chatId, entry.sessionId, message.text)) return
+      if (entry?.sessionId !== undefined && relay.consume(channel, message.chatId, entry.sessionId, message.senderId, message.text)) return
       await conversations.onInbound(channel, message)
     } catch (cause: unknown) {
       warn(cause instanceof Error ? cause.message : String(cause))

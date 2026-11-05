@@ -6,26 +6,45 @@
  * @module @prism/prism-pocket/bots
  */
 
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { BotChannelId, BotConfig, BotEntry, BotStoreBody } from './types.ts'
 import { BOT_CHANNELS } from './types.ts'
 import { reviveBotConfig } from './validate.ts'
+import { timingSafeStringEquals } from './shared/sign.ts'
+
+/** The unambiguous pairing-code alphabet: no 0/O/1/l/I. */
+const PAIRING_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz'
+
+/** Pairing-code length: eight symbols over thirty-one keep casual guessing infeasible. */
+const PAIRING_CODE_LENGTH = 8
+
+/** Generate one pairing code from crypto randomness. */
+function generatePairingCode(): string {
+  const bytes = randomBytes(PAIRING_CODE_LENGTH)
+  let code = ''
+  for (const byte of bytes) code += PAIRING_ALPHABET[byte % PAIRING_ALPHABET.length]
+  return code
+}
 
 /** Read a store body without trusting it; corrupt or missing yields empty. */
 function readBody(file: string): BotStoreBody {
   try {
     const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof parsed !== 'object' || parsed === null) return { version: 1, bots: {} }
-    const root = parsed as { version?: unknown; bots?: unknown }
+    const root = parsed as { version?: unknown; bots?: unknown; pairingCode?: unknown }
     if (typeof root.bots !== 'object' || root.bots === null) return { version: 1, bots: {} }
     const bots: Partial<Record<BotChannelId, BotEntry>> = {}
     for (const [channel, entry] of Object.entries(root.bots as Record<string, unknown>)) {
       const revived = reviveEntry(entry)
       if (revived !== undefined) bots[channel as BotChannelId] = revived
     }
-    return { version: 1, bots }
+    return {
+      version: 1,
+      bots,
+      ...(typeof root.pairingCode === 'string' && root.pairingCode.length > 0 ? { pairingCode: root.pairingCode } : {}),
+    }
   } catch {
     return { version: 1, bots: {} }
   }
@@ -34,7 +53,7 @@ function readBody(file: string): BotStoreBody {
 /** Re-validate one persisted entry; enabled defaults false, binding survives only with a config. */
 function reviveEntry(value: unknown): BotEntry | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  const candidate = value as { config?: unknown; enabled?: unknown; sessionId?: unknown; chatId?: unknown }
+  const candidate = value as { config?: unknown; enabled?: unknown; sessionId?: unknown; chatId?: unknown; senderId?: unknown }
   if (typeof candidate.config !== 'object' || candidate.config === null) return undefined
   const config = candidate.config as { channel?: unknown; fields?: unknown }
   if (typeof config.channel !== 'string') return undefined
@@ -42,11 +61,15 @@ function reviveEntry(value: unknown): BotEntry | undefined {
   if (validated === undefined) return undefined
   const sessionId = typeof candidate.sessionId === 'string' && candidate.sessionId.length > 0 ? candidate.sessionId : undefined
   const chatId = typeof candidate.chatId === 'string' && candidate.chatId.length > 0 ? candidate.chatId : undefined
+  // A persisted senderId stays verbatim (including '' — the platform supplied none);
+  // anything else reads as legacy, which keeps chatId-only authority.
+  const senderId = typeof candidate.senderId === 'string' ? candidate.senderId : undefined
   return {
     config: validated,
     enabled: candidate.enabled === true,
     ...(sessionId !== undefined ? { sessionId } : {}),
     ...(chatId !== undefined ? { chatId } : {}),
+    ...(senderId !== undefined ? { senderId } : {}),
   }
 }
 
@@ -91,6 +114,7 @@ export class BotStore {
           enabled: existing?.enabled === true,
           ...(existing?.sessionId !== undefined ? { sessionId: existing.sessionId } : {}),
           ...(existing?.chatId !== undefined ? { chatId: existing.chatId } : {}),
+          ...(existing?.senderId !== undefined ? { senderId: existing.senderId } : {}),
         },
       },
     }
@@ -114,16 +138,54 @@ export class BotStore {
   }
 
   /**
-   * Bind one channel to a session and the chat that earned it.
+   * Bind one channel to a session, the chat that earned it, and the operator
+   * sender identity the binding answers to. Every claim records a senderId —
+   * `''` when the platform supplies none — so only legacy alpha bindings run
+   * on chatId-only authority.
    * @param channel - the channel to bind.
    * @param sessionId - the session the bot drives.
    * @param chatId - the chat replies go to.
+   * @param senderId - the operator's platform sender identity (may be `''`).
    */
-  bind(channel: BotChannelId, sessionId: string, chatId: string): void {
+  bind(channel: BotChannelId, sessionId: string, chatId: string, senderId: string): void {
     const existing = this.body.bots[channel]
     if (existing === undefined) return
-    this.body = { version: 1, bots: { ...this.body.bots, [channel]: { ...existing, sessionId, chatId } } }
+    this.body = { version: 1, bots: { ...this.body.bots, [channel]: { ...existing, sessionId, chatId, senderId } } }
     this.persist()
+  }
+
+  /**
+   * The active pairing code the Pocket page displays, generating and
+   * persisting one on first read.
+   * @returns the code to send as `/start <code>` from the operator's chat.
+   */
+  pairingCode(): string {
+    return this.body.pairingCode ?? this.rotatePairingCode()
+  }
+
+  /**
+   * Replace the active pairing code with a fresh one.
+   * @returns the new code, already persisted.
+   */
+  rotatePairingCode(): string {
+    const code = generatePairingCode()
+    this.body = { ...this.body, pairingCode: code }
+    this.persist()
+    return code
+  }
+
+  /**
+   * Consume one pairing attempt; a match rotates the code so a displayed
+   * code can never pair twice.
+   * @param code - the code the chat sent.
+   * @returns whether the code matched the active one.
+   */
+  consumePairingCode(code: string): boolean {
+    const active = this.body.pairingCode
+    if (active === undefined || code.length === 0) return false
+    if (!timingSafeStringEquals(active, code)) return false
+    this.rotatePairingCode()
+    return true
   }
 
   /** Every channel currently enabled, in page order. */

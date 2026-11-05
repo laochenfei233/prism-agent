@@ -54,8 +54,8 @@ describe('BotSupervisor', () => {
     const { supervisor, calls } = recordingSupervisor({ telegram: factoryOf([scriptedHandle()], hooks) })
     await supervisor.start('telegram', TELEGRAM_CONFIG)
     expect(supervisor.state('telegram').status).toBe('online')
-    hooks[0]?.onInbound({ chatId: 'c1', text: 'hi' })
-    expect(calls.inbound).toEqual([{ chatId: 'c1', text: 'hi' }])
+    hooks[0]?.onInbound({ chatId: 'c1', senderId: 'op1', messageId: 'm1', text: 'hi' })
+    expect(calls.inbound).toEqual([{ chatId: 'c1', senderId: 'op1', messageId: 'm1', text: 'hi' }])
     expect(calls.statuses).toEqual(['telegram:starting', 'telegram:online'])
   })
 
@@ -121,9 +121,19 @@ describe('decideInbound', () => {
 describe('BotAskRelay', () => {
   const target = { channel: 'telegram' as const, chatId: 'c1' }
 
-  function relayOf(sent: string[], targetOf: (sessionId: string) => typeof target | undefined = () => target): BotAskRelay {
+  /** The operator rule under test: only this sender id resolves an ask. */
+  function onlyOperator(senderId: string): (channel: BotChannelId, chatId: string, from: string) => boolean {
+    return (_channel, _chatId, from) => from === senderId
+  }
+
+  function relayOf(
+    sent: string[],
+    targetOf: (sessionId: string) => typeof target | undefined = () => target,
+    authorized: (channel: BotChannelId, chatId: string, senderId: string) => boolean = () => true,
+  ): BotAskRelay {
     return new BotAskRelay({
       targetOf,
+      authorized,
       send: async (channel, chatId, text) => { sent.push(`${channel}:${chatId}:${text}`) },
     })
   }
@@ -136,9 +146,22 @@ describe('BotAskRelay', () => {
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })
     expect(sent[0]).toContain('shell')
     expect(relay.has('s1')).toBe(true)
-    expect(relay.consume('telegram', 'c1', 's1', 'y')).toBe(true)
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', 'y')).toBe(true)
     await expect(pending).resolves.toBe('allowed-once')
     expect(next).not.toHaveBeenCalled()
+  })
+
+  it('rejects an answer from a non-operator and keeps waiting', async () => {
+    const sent: string[] = []
+    const relay = relayOf(sent, () => target, onlyOperator('op1'))
+    const next = vi.fn(async () => 'delegated')
+    const pending = relay.handleApproval('s1', 'shell', next)
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    expect(relay.consume('telegram', 'c1', 's1', 'stranger', 'y')).toBe(false)
+    expect(relay.has('s1')).toBe(true)
+    expect(next).not.toHaveBeenCalled()
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', 'y')).toBe(true)
+    await expect(pending).resolves.toBe('allowed-once')
   })
 
   it('delegates when the chat is not bound or an ask is already pending', async () => {
@@ -149,7 +172,7 @@ describe('BotAskRelay', () => {
     const first = bound.handleApproval('s1', 'a', async () => 'x')
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })
     await expect(bound.handleApproval('s1', 'b', async () => 'delegated')).resolves.toBe('delegated')
-    bound.consume('telegram', 'c1', 's1', '1')
+    bound.consume('telegram', 'c1', 's1', 'op1', '1')
     await expect(first).resolves.toBe('allowed-once')
   })
 
@@ -176,7 +199,7 @@ describe('BotAskRelay', () => {
       questions: [{ id: 'q1', question: 'Which?', options: [{ label: 'One' }, { label: 'Two' }] }],
     }, next)
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })
-    expect(relay.consume('telegram', 'c1', 's1', '2')).toBe(true)
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', '2')).toBe(true)
     await expect(pending).resolves.toEqual({ answers: [{ id: 'q1', selected: ['Two'] }] })
   })
 
@@ -187,11 +210,11 @@ describe('BotAskRelay', () => {
       questions: [{ id: 'q1', question: 'Which?', options: [{ label: 'One' }] }],
     }, async () => 'delegated')
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })
-    expect(relay.consume('telegram', 'c1', 's1', 'banana')).toBe(true)
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', 'banana')).toBe(true)
     expect(relay.has('s1')).toBe(true)
-    expect(relay.consume('telegram', 'c1', 's1', '9')).toBe(true)
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', '9')).toBe(true)
     expect(relay.has('s1')).toBe(true)
-    expect(relay.consume('telegram', 'c1', 's1', '1')).toBe(true)
+    expect(relay.consume('telegram', 'c1', 's1', 'op1', '1')).toBe(true)
     await expect(pending).resolves.toEqual({ answers: [{ id: 'q1', selected: ['One'] }] })
   })
 

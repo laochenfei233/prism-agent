@@ -1,9 +1,10 @@
 /**
  * The ask relay: approvals and user questions of bot-bound sessions render
- * in the chat as numbered choices; the chat's next reply resolves the ask,
- * and silence delegates through `next()` so the host's own surfaces keep
- * the request. The relay observes only — it never claims a request whose
- * session no bot bound, and never two asks per session at once.
+ * in the chat as numbered choices; the operator's next reply resolves the
+ * ask, and silence delegates through `next()` so the host's own surfaces
+ * keep the request. The relay observes only — it never claims a request
+ * whose session no bot bound, never two asks per session at once, and
+ * leaves every non-operator reply for the caller's own handling.
  *
  * @module @prism/prism-pocket/bots
  */
@@ -21,6 +22,8 @@ export type AskReply = 'yes' | 'no' | 'number' | 'other'
 export interface BotAskDeps {
   /** Resolve one session's reply target, when a bot bound it. */
   readonly targetOf: (sessionId: string) => BotReplyTarget | undefined
+  /** Whether the sender may resolve the binding's asks (the operator rule, read off the store). */
+  readonly authorized: (channel: BotChannelId, chatId: string, senderId: string) => boolean
   /** Deliver one text to one chat. */
   readonly send: (channel: BotChannelId, chatId: string, text: string) => Promise<void>
 }
@@ -130,16 +133,20 @@ export class BotAskRelay {
   }
 
   /**
-   * Offer one inbound chat reply to the session's pending ask.
+   * Offer one inbound chat reply to the session's pending ask. A reply from
+   * a sender the operator rule rejects is left unconsumed, so the caller's
+   * own foreign-chat handling answers it.
    * @param channel - the channel the reply arrived on.
    * @param chatId - the chat the reply came from.
    * @param sessionId - the session the chat is bound to.
+   * @param senderId - the sender identity the platform carried (`''` = unknown).
    * @param text - the reply text.
    * @returns whether the reply was consumed by a pending ask.
    */
-  consume(channel: BotChannelId, chatId: string, sessionId: string, text: string): boolean {
+  consume(channel: BotChannelId, chatId: string, sessionId: string, senderId: string, text: string): boolean {
     const ask = this.pending.get(sessionId)
     if (ask === undefined || ask.target.channel !== channel || ask.target.chatId !== chatId) return false
+    if (!this.deps.authorized(channel, chatId, senderId)) return false
     if (ask.kind === 'approval') {
       const reply = classifyAskReply(text)
       if (reply === 'yes') this.settle(sessionId, 'allowed-once')

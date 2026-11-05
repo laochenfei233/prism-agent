@@ -94,8 +94,8 @@ describe('BotStore', () => {
     const config = readBotConfig('telegram', { botToken: 't' })
     store.setConfig(config)
     expect(store.setEnabled('telegram', true)).toBe(true)
-    store.bind('telegram', 'session-1', 'chat-1')
-    expect(store.entry('telegram')).toMatchObject({ enabled: true, sessionId: 'session-1', chatId: 'chat-1' })
+    store.bind('telegram', 'session-1', 'chat-1', 'op1')
+    expect(store.entry('telegram')).toMatchObject({ enabled: true, sessionId: 'session-1', chatId: 'chat-1', senderId: 'op1' })
     // Windows does not carry POSIX file modes; the 0600 intent is asserted where it exists.
     if (process.platform !== 'win32') expect(statSync(file).mode & 0o777).toBe(0o600)
     const reread = new BotStore(file)
@@ -105,10 +105,23 @@ describe('BotStore', () => {
   it('keeps the binding through a config change and refuses to enable an unknown channel', () => {
     const { store } = tempStore()
     store.setConfig(readBotConfig('dingtalk', { clientId: 'c', clientSecret: 's' }))
-    store.bind('dingtalk', 's1', 'c1')
+    store.bind('dingtalk', 's1', 'c1', 'staff-1')
     store.setConfig(readBotConfig('dingtalk', { clientId: 'c2', clientSecret: 's2' }))
     expect(store.entry('dingtalk')?.sessionId).toBe('s1')
+    expect(store.entry('dingtalk')?.senderId).toBe('staff-1')
     expect(store.setEnabled('telegram', true)).toBe(false)
+  })
+
+  it('reads a legacy binding without senderId back as chatId-only authority', () => {
+    const { store, file } = tempStore()
+    store.setConfig(readBotConfig('qq', { appId: 'i', clientSecret: 's' }))
+    store.bind('qq', 's1', 'c1', 'op1')
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    delete raw.bots.qq.senderId
+    writeRaw(file, raw)
+    const reread = new BotStore(file)
+    expect(reread.entry('qq')).toMatchObject({ sessionId: 's1', chatId: 'c1' })
+    expect(reread.entry('qq')?.senderId).toBeUndefined()
   })
 
   it('drops entries that no longer validate on read', () => {
@@ -128,6 +141,26 @@ describe('BotStore', () => {
       store.setEnabled(channel, true)
     }
     expect(store.enabledChannels()).toEqual(['telegram', 'whatsapp'])
+  })
+})
+
+describe('pairing code', () => {
+  it('generates an unambiguous code on first read and persists it', () => {
+    const { store, file } = tempStore()
+    const first = store.pairingCode()
+    expect(first).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{8}$/u)
+    expect(new BotStore(file).pairingCode()).toBe(first)
+    expect(store.rotatePairingCode()).not.toBe(first)
+  })
+
+  it('consumes only the active code and rotates it away on success', () => {
+    const { store } = tempStore()
+    const code = store.pairingCode()
+    expect(store.consumePairingCode('')).toBe(false)
+    expect(store.consumePairingCode('wrong-code')).toBe(false)
+    expect(store.consumePairingCode(code)).toBe(true)
+    expect(store.consumePairingCode(code)).toBe(false)
+    expect(store.pairingCode()).not.toBe(code)
   })
 })
 

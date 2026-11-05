@@ -7,10 +7,11 @@
  * @module @prism/prism-pocket/bots/adapters
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import type { BotAdapterFactory, WhatsappConfig } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { postBotJson } from '../shared/http.ts'
+import { timingSafeStringEquals } from '../shared/sign.ts'
 
 /** Per-message character limit of the Cloud API text message. */
 export const WHATSAPP_MESSAGE_LIMIT = 4096
@@ -29,10 +30,7 @@ export function verifyWhatsappSignature(appSecret: string, rawBody: string, head
   const prefix = 'sha256='
   if (!header.startsWith(prefix)) return false
   const expected = createHmac('sha256', appSecret).update(rawBody, 'utf8').digest('hex')
-  const provided = header.slice(prefix.length)
-  const a = Buffer.from(expected, 'utf8')
-  const b = Buffer.from(provided, 'utf8')
-  return a.byteLength === b.byteLength && timingSafeEqual(a, b)
+  return timingSafeStringEquals(expected, header.slice(prefix.length))
 }
 
 /**
@@ -45,7 +43,7 @@ export function resolveWhatsappVerifyChallenge(
   query: Readonly<Record<string, string | undefined>>,
   verifyToken: string,
 ): string | undefined {
-  if (query['hub.mode'] !== 'subscribe' || query['hub.verify_token'] !== verifyToken) return undefined
+  if (query['hub.mode'] !== 'subscribe' || !timingSafeStringEquals(query['hub.verify_token'] ?? '', verifyToken)) return undefined
   const challenge = query['hub.challenge']
   return challenge !== undefined && challenge.length > 0 ? challenge : undefined
 }
@@ -53,6 +51,8 @@ export function resolveWhatsappVerifyChallenge(
 /** One inbound webhook message, narrowed to the fields the adapter reads. */
 export interface WhatsappMessage {
   readonly from: string
+  /** The WhatsApp message id (`wamid.…`), stable per delivery. */
+  readonly id: string
   readonly text: string
 }
 
@@ -75,10 +75,10 @@ export function readWhatsappMessages(body: unknown): readonly WhatsappMessage[] 
       const list = typeof value === 'object' && value !== null ? (value as { messages?: unknown }).messages : undefined
       if (!Array.isArray(list)) continue
       for (const message of list) {
-        const record = message as { from?: unknown; text?: unknown }
+        const record = message as { from?: unknown; id?: unknown; text?: unknown }
         const text = typeof record.text === 'object' && record.text !== null ? (record.text as { body?: unknown }).body : undefined
         if (typeof record.from !== 'string' || typeof text !== 'string' || text.trim().length === 0) continue
-        messages.push({ from: record.from, text: text.trim() })
+        messages.push({ from: record.from, id: typeof record.id === 'string' ? record.id : '', text: text.trim() })
       }
     }
   }

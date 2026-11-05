@@ -67,10 +67,12 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   // inside the root would precede the columns' chrome in document order, so a
   // chrome row that declares window drag after it would override its subtraction.
   // Beside the root, base.css's `body > :not(#root)` rule subtracts it instead.
+  // The `dsh-settings-dialog*` classes are the stable styling seam for
+  // out-of-tree stylesheets (e.g. the prism-pocket phone adaptation).
   return createPortal((
-    <div className={css.overlay} role="presentation">
+    <div className={clsx(css.overlay, 'dsh-settings-dialog-overlay')} role="presentation">
       <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div ref={panel} tabIndex={-1} data-shortcut-modal="settings" className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div ref={panel} tabIndex={-1} data-shortcut-modal="settings" className={clsx(css.panel, 'dsh-settings-dialog')} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <nav className={css.nav}>
           <div className={css.navTitle} id={titleId} tabIndex={-1}
             data-modal-autofocus={active === undefined ? '' : undefined}>{renderSlot('settings.header', {})}</div>

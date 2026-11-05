@@ -10,7 +10,7 @@
 import type { BotAdapterFactory, BotInbound } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { fetchBotJson, postBotJson, stringField } from '../shared/http.ts'
-import { ReconnectingWs } from '../shared/ws.ts'
+import { ReconnectingWs, waitForSocketReady } from '../shared/ws.ts'
 
 /** Per-message character limit applied on sends. */
 export const QQ_MESSAGE_LIMIT = 1000
@@ -61,6 +61,7 @@ export function buildQqIdentify(accessToken: string): string {
 /** One inbound C2C or group message, narrowed to the fields the adapter reads. */
 export interface QqMessage {
   readonly chatId: string
+  readonly senderId: string
   readonly text: string
   readonly msgId: string
   readonly group: boolean
@@ -83,8 +84,9 @@ export function readQqMessage(type: string, data: unknown): QqMessage | undefine
   const author = typeof record.author === 'object' && record.author !== null ? record.author as Record<string, unknown> : undefined
   const openid = group ? author?.member_openid : author?.user_openid
   if (typeof openid !== 'string') return undefined
+  // The open platform exposes only pseudo ids: this openid identifies the sender.
   const msgId = typeof record.id === 'string' ? record.id : ''
-  return { chatId: openid, text: record.content.trim(), msgId, group }
+  return { chatId: openid, senderId: openid, text: record.content.trim(), msgId, group }
 }
 
 /** The REST body for one passive reply to an inbound message. */
@@ -143,7 +145,7 @@ export const createQqAdapter: BotAdapterFactory = (config, hooks) => {
       const message = readQqMessage(frame.t ?? '', frame.data)
       if (message !== undefined) {
         if (message.msgId.length > 0) passive.set(message.chatId, { msgId: message.msgId, seq: 0, group: message.group })
-        hooks.onInbound({ chatId: message.chatId, text: message.text } satisfies BotInbound)
+        hooks.onInbound({ chatId: message.chatId, senderId: message.senderId, messageId: message.msgId, text: message.text } satisfies BotInbound)
       }
     }
   }
@@ -181,17 +183,9 @@ export const createQqAdapter: BotAdapterFactory = (config, hooks) => {
         },
       )
       ws.start()
-      await new Promise<void>((resolve, reject) => {
-        const began = Date.now()
-        const check = setInterval(() => {
-          if (lastSequence !== null) {
-            clearInterval(check)
-            resolve()
-          } else if (Date.now() - began > 15_000) {
-            clearInterval(check)
-            reject(new Error('gateway READY did not arrive within 15s'))
-          }
-        }, 250)
+      await waitForSocketReady(() => lastSequence !== null, {
+        channel: 'qq',
+        awaited: 'gateway READY did not arrive',
       })
     },
     async stop() {

@@ -21,6 +21,10 @@ export type PocketLocaleKey =
   | 'phone.copied'
   | 'phone.qr'
   | 'phone.qr.unavailable'
+  | 'phone.qr.credential'
+  | 'phone.pairing'
+  | 'phone.pairing.rotate'
+  | 'phone.pairing.hint'
   | 'phone.steps'
   | 'step.serve'
   | 'step.trust'
@@ -117,6 +121,10 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.copied': 'Copied',
   'phone.qr': 'Scan to open this workspace',
   'phone.qr.unavailable': 'No link to encode yet — resolve the blockers below first',
+  'phone.qr.credential': 'The QR encodes this workspace\'s login link — anyone who scans it gets in. Do not share it or screenshot it.',
+  'phone.pairing': 'Bot pairing code',
+  'phone.pairing.rotate': 'New code',
+  'phone.pairing.hint': 'Send /start <code> from your chat to bind the bot to you.',
   'phone.steps': 'Still needed',
   'step.serve': 'Proxy the port to Tailscale',
   'step.trust': 'Trust this address',
@@ -214,6 +222,10 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.copied': '已复制',
   'phone.qr': '扫码直达这个工作区',
   'phone.qr.unavailable': '还没有可编码的链接——先解决下面的阻塞步骤',
+  'phone.qr.credential': '二维码内嵌本工作区的登录链接，扫码即进入——请勿分享或截图。',
+  'phone.pairing': 'Bot 配对码',
+  'phone.pairing.rotate': '换一个',
+  'phone.pairing.hint': '在你的聊天里发送 /start <配对码>，即可把 bot 绑定到你。',
   'phone.steps': '还需要做到',
   'step.serve': '把这个端口代理到 Tailscale',
   'step.trust': '信任这个地址',

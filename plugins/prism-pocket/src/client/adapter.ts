@@ -35,12 +35,15 @@ export function installAdapter(layout: LayoutLike): () => void {
   const disposeKeyboard = installKeyboard()
   const disposeDrawer = installDrawer(layout, backdrop)
   const disposeTyping = installTyping()
+  // The rail is the collapsed desktop sidebar; on a phone the drawer replaces it.
+  document.documentElement.classList.add('prism-rail-hidden')
 
   return () => {
     closeDrawerState(layout)
     disposeKeyboard()
     disposeDrawer()
     disposeTyping()
+    document.documentElement.classList.remove('prism-rail-hidden')
     style.remove()
     backdrop.remove()
   }
@@ -126,6 +129,10 @@ function openDrawer(layout: LayoutLike): void {
     console.info('[prism-pocket] sidebar [data-slot] anchor not found; drawer unavailable')
     return
   }
+  // The column is hidden while the drawer is closed, so it has to rejoin the
+  // flow before it can be measured — otherwise an expanded sidebar also reads
+  // zero and the toggle below would collapse the very panel being opened.
+  document.documentElement.classList.remove('prism-rail-hidden')
   if (sidebar.getBoundingClientRect().width < 100) layout.toggleSidebar()
   document.documentElement.classList.add('prism-drawer-open')
   window.history.pushState({ 'prism-pocket-drawer': true }, '')
@@ -146,11 +153,17 @@ function closeDrawerState(layout: LayoutLike): void {
   document.documentElement.classList.remove('prism-drawer-open')
   const sidebar = sidebarElement()
   if (sidebar !== null && sidebar.getBoundingClientRect().width >= 100) layout.toggleSidebar()
+  document.documentElement.classList.add('prism-rail-hidden')
 }
 
-/** The sidebar slot wrapper, when the app has rendered it. */
+/**
+ * The sidebar's rendered root. The `[data-slot]` anchor itself is a
+ * `display: contents` marker with no box, so layout must be read from the
+ * element it renders.
+ */
 function sidebarElement(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[data-slot="sidebar"]')
+  const rendered = document.querySelector<HTMLElement>('[data-slot="sidebar"]')?.firstElementChild
+  return rendered instanceof HTMLElement ? rendered : null
 }
 
 /**

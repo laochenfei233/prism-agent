@@ -99,7 +99,7 @@ export type BotConfig =
   | { readonly channel: 'wechat'; readonly fields: WechatConfig }
   | { readonly channel: 'whatsapp'; readonly fields: WhatsappConfig }
 
-/** Names of the secret fields per channel; these are never echoed as values — the route masks every field, and reports only whether a value is stored. */
+/** Names of the secret fields per channel; these are never echoed as values — the route masks every field, and reports only whether a value is stored. The callback-signing tokens count: the list route echoes neither them nor their values. */
 export const BOT_SECRET_FIELDS: Readonly<Record<BotChannelId, readonly string[]>> = {
   telegram: ['botToken'],
   discord: ['botToken'],
@@ -107,9 +107,9 @@ export const BOT_SECRET_FIELDS: Readonly<Record<BotChannelId, readonly string[]>
   feishu: ['appSecret'],
   dingtalk: ['clientSecret'],
   qq: ['clientSecret'],
-  wecom: ['corpSecret', 'encodingAesKey'],
-  wechat: ['appSecret', 'encodingAesKey'],
-  whatsapp: ['accessToken', 'appSecret'],
+  wecom: ['corpSecret', 'encodingAesKey', 'token'],
+  wechat: ['appSecret', 'encodingAesKey', 'token'],
+  whatsapp: ['accessToken', 'appSecret', 'verifyToken'],
 }
 
 /** Connection state of one channel, as the page renders it. */
@@ -123,18 +123,40 @@ export interface BotEntry {
   readonly sessionId?: string
   /** The chat the session is bound to, when a chat earned the binding. */
   readonly chatId?: string
+  /**
+   * The operator sender identity the binding answers to. Bindings recorded by
+   * alpha builds carry none (`undefined` = legacy): they keep chatId-only
+   * authority, while every new claim records the sender. `''` means the
+   * platform supplied no sender id and behaves like legacy.
+   */
+  readonly senderId?: string
 }
 
 /** The `pocket/bots.json` body. */
 export interface BotStoreBody {
   readonly version: 1
   readonly bots: Partial<Record<BotChannelId, BotEntry>>
+  /** The active pairing code the page displays; generated on first read and rotated on every successful pairing. */
+  readonly pairingCode?: string
 }
 
 /** One inbound chat message, normalized across channels. */
 export interface BotInbound {
   /** Platform chat identity, stable per conversation. */
   readonly chatId: string
+  /**
+   * Platform sender identity, stable per user (`from.id`, `author.id`,
+   * `event.user`, open id, staff id, FromUserName). `''` means the platform
+   * supplied none on this event path; every authority decision treats `''`
+   * as unknown and falls back to the chat identity.
+   */
+  readonly senderId: string
+  /**
+   * Platform message identity, stable per message (`message_id`, snowflake
+   * id, event `ts`, `MsgId`, WhatsApp message id). `''` when the platform
+   * supplies none; empty ids skip replay dedup.
+   */
+  readonly messageId: string
   /** Display name of the sender, when the platform carries one. */
   readonly senderName?: string
   /** The message text, trimmed and non-empty. */

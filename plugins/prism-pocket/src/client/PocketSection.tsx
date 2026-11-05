@@ -53,11 +53,19 @@ async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
 export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [status, setStatus] = useState<PocketRemoteStatus | null>(null)
   const [bots, setBots] = useState<readonly BotView[]>([])
+  const [pairingCode, setPairingCode] = useState('')
+  const [pairingNote, setPairingNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pushNote, setPushNote] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [installEvent, setInstallEvent] = useState<Event | null>(null)
   const requestSeq = useRef(0)
+
+  /** Apply a bots-list response body to the channel list and the pairing code. */
+  const applyList = useCallback((body: unknown): void => {
+    setBots(readBots(body))
+    setPairingCode(readPairingCode(body))
+  }, [])
 
   const refresh = useCallback(async (seq: number): Promise<void> => {
     const [remote, botsBody] = await Promise.all([
@@ -66,8 +74,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
     ])
     if (requestSeq.current !== seq) return
     setStatus(readStatus(remote))
-    if (botsBody !== undefined) setBots(readBots(botsBody))
-  }, [])
+    if (botsBody !== undefined) applyList(botsBody)
+  }, [applyList])
 
   useEffect(() => {
     const seq = ++requestSeq.current
@@ -101,7 +109,18 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config === undefined ? { channel, action } : { channel, action, config, enabled: true }),
-    }).then((value) => { setBots(readBots(value)) })
+    }).then((value) => { applyList(value) })
+
+  const rotatePairing = (): void => {
+    setPairingNote(null)
+    void requestJson(POCKET_BOTS_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rotatePairing' }),
+    })
+      .then(applyList)
+      .catch((cause: unknown) => { setPairingNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
 
   const subscribe = (): void => {
     if (status === null) return
@@ -165,6 +184,27 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
               ? <div className='prism-qr' aria-label={t('phone.qr')} dangerouslySetInnerHTML={{ __html: phoneQrSvg(phone.url) }} />
               : <p className='prism-qr-empty'>{t('phone.qr.unavailable')}</p>}
             <span className='prism-qr-caption'>{t('phone.qr')}</span>
+            <span className='prism-step-hint'>{t('phone.qr.credential')}</span>
+            {pairingCode !== '' && (
+              <div className='prism-pairing'>
+                <span className='prism-qr-caption'>{t('phone.pairing')}</span>
+                <code className='prism-code'>{pairingCode}</code>
+                <div className='prism-actions'>
+                  <button
+                    type='button'
+                    className='prism-button prism-button-quiet'
+                    onClick={() => copy('pairing', pairingCode)}
+                  >
+                    {copied === 'pairing' ? t('phone.copied') : t('phone.copy')}
+                  </button>
+                  <button type='button' className='prism-button prism-button-quiet' onClick={rotatePairing}>
+                    {t('phone.pairing.rotate')}
+                  </button>
+                </div>
+                {pairingNote !== null && <p className='prism-note'>{pairingNote}</p>}
+                <span className='prism-step-hint'>{t('phone.pairing.hint')}</span>
+              </div>
+            )}
           </div>
           <div className='prism-phone-side'>
             <div className='prism-verdict' data-tone={verdict}>
@@ -506,6 +546,16 @@ function readValues(value: unknown): Readonly<Record<string, string>> {
     if (text !== undefined) values[name] = text
   }
   return values
+}
+
+/**
+ * Narrow the pairing code out of a bots-list body; a malformed body reads as none.
+ * @param value - the list route's response body.
+ * @returns the active pairing code, or `''` when the body carries none.
+ */
+function readPairingCode(value: unknown): string {
+  const code = objectOf(value)?.pairingCode
+  return typeof code === 'string' && code.length > 0 ? code : ''
 }
 
 /** Narrow the bots list body; a malformed body reads as an empty list. */

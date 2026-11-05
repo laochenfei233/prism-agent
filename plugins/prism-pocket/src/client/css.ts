@@ -5,9 +5,10 @@
  * injects only while active (`html.prism-active`).
  *
  * Every selector anchors on a `[data-slot="<key>"]` wrapper the app renders
- * for its slots — the documented addressable seam — or on the plugin's own
- * `.prism-*` classes. When the app renames a seam, the rule simply stops
- * matching; nothing breaks.
+ * for its slots — the documented addressable seam — on the settings shell's
+ * stable `dsh-settings-dialog*` classes (ui-settings-general's styling seam
+ * for out-of-tree stylesheets), or on the plugin's own `.prism-*` classes.
+ * When the app renames a seam, the rule simply stops matching; nothing breaks.
  *
  * @module @prism/prism-pocket/client/css
  */
@@ -20,20 +21,77 @@ html.prism-active {
   -webkit-text-size-adjust: 100%;
 }
 
-/* The drawer: the sidebar leaves the column flow and covers the viewport.
-   The slot anchor renders display:contents, so it is restored to a real box
-   here — otherwise the fixed positioning would have nothing to position. */
-html.prism-active.prism-drawer-open [data-slot="sidebar"] {
-  /* The anchor's inline display:contents only yields to !important. */
-  display: block !important;
+/* Single column: the collapsed sidebar rail costs a sixth of a phone screen to
+   show icons and steals it from the conversation. The drawer is the way in, so
+   the rail column leaves the flow while the drawer is closed. The :has() parent
+   selector reaches the column because the slot wrapper renders display:contents
+   and owns no box of its own. */
+html.prism-active.prism-rail-hidden div:has(> [data-slot="sidebar"]) {
+  display: none;
+}
+
+/* Settings on a phone: the desktop dialog insets a 342px panel by 24px and
+   keeps a 188px section column beside a 154px content column, which wraps
+   Chinese into one character per line. Go full-bleed and lay the section list
+   across the top instead, so the content keeps the full width. Anchored on
+   the shell's stable dsh-settings-dialog classes; the panel mounts only while
+   the dialog is open, so no script has to track it. */
+html.prism-active .dsh-settings-dialog-overlay {
+  padding: 0;
+}
+html.prism-active .dsh-settings-dialog {
+  flex-direction: column;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+/* The section list becomes a horizontal strip above the content. */
+html.prism-active .dsh-settings-dialog > :first-child {
+  flex: none;
+  width: 100%;
+  height: auto;
+}
+html.prism-active .dsh-settings-dialog > :first-child > :last-child {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+html.prism-active .dsh-settings-dialog > :first-child > :last-child > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+html.prism-active .dsh-settings-dialog > :last-child {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The frame is a two-track grid (rail + content). With the rail out of the flow
+   the content column would take the rail's 56px track and leave the rest empty,
+   so it spans every track instead. */
+html.prism-active div:has(> [data-slot="main"]) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* The drawer: the whole sidebar column leaves the flow and covers the viewport,
+   with the app's own expanded sidebar inside it. */
+html.prism-active.prism-drawer-open div:has(> [data-slot="sidebar"]) {
+  display: block;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  width: min(82vw, 360px);
+  width: min(86vw, 340px);
   height: 100dvh;
   z-index: 100;
   overflow-y: auto;
+  background: var(--dsw-alias-bg-layer-1);
   box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

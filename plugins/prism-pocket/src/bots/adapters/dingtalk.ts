@@ -10,7 +10,7 @@
 import type { BotAdapterFactory, BotInbound } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { postBotJson } from '../shared/http.ts'
-import { ReconnectingWs } from '../shared/ws.ts'
+import { ReconnectingWs, waitForSocketReady } from '../shared/ws.ts'
 
 /** Per-message character limit applied on sends. */
 export const DINGTALK_MESSAGE_LIMIT = 2000
@@ -70,6 +70,8 @@ export function buildDingtalkAck(frame: DingtalkFrame): string {
 /** One robot message, narrowed to the fields the adapter reads. */
 export interface DingtalkMessage {
   readonly chatId: string
+  readonly senderId: string
+  readonly messageId: string
   readonly senderName?: string
   readonly text: string
   readonly webhook: string
@@ -83,14 +85,21 @@ export interface DingtalkMessage {
  */
 export function readDingtalkMessage(data: unknown): DingtalkMessage | undefined {
   if (typeof data !== 'object' || data === null) return undefined
-  const record = data as { sessionWebhook?: unknown; text?: unknown; senderNick?: unknown; senderStaffId?: unknown; conversationId?: unknown }
+  const record = data as { sessionWebhook?: unknown; text?: unknown; senderNick?: unknown; senderStaffId?: unknown; senderId?: unknown; msgId?: unknown; conversationId?: unknown }
   if (typeof record.sessionWebhook !== 'string') return undefined
   const content = typeof record.text === 'object' && record.text !== null ? (record.text as { content?: unknown }).content : undefined
   if (typeof content !== 'string' || content.trim().length === 0) return undefined
   const chatId = typeof record.conversationId === 'string' ? record.conversationId : record.sessionWebhook
   const senderName = typeof record.senderNick === 'string' ? record.senderNick : undefined
+  // senderStaffId is the stable corp-internal staff id; senderId is its older alias.
+  const senderId = typeof record.senderStaffId === 'string' && record.senderStaffId.length > 0
+    ? record.senderStaffId
+    : typeof record.senderId === 'string' ? record.senderId : ''
+  const messageId = typeof record.msgId === 'string' ? record.msgId : ''
   return {
     chatId,
+    senderId,
+    messageId,
     text: content.trim(),
     webhook: record.sessionWebhook,
     ...(senderName !== undefined ? { senderName } : {}),
@@ -154,17 +163,9 @@ export const createDingtalkAdapter: BotAdapterFactory = (config, hooks) => {
         },
       )
       ws.start()
-      await new Promise<void>((resolve, reject) => {
-        const began = Date.now()
-        const check = setInterval(() => {
-          if (ws?.open === true) {
-            clearInterval(check)
-            resolve()
-          } else if (Date.now() - began > 15_000) {
-            clearInterval(check)
-            reject(new Error('stream socket did not open within 15s'))
-          }
-        }, 250)
+      await waitForSocketReady(() => ws?.open === true, {
+        channel: 'dingtalk',
+        awaited: 'stream socket did not open',
       })
     },
     async stop() {

@@ -9,7 +9,7 @@
 import type { BotAdapterFactory, BotInbound } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { fetchBotJson, postBotJson, stringField } from '../shared/http.ts'
-import { ReconnectingWs } from '../shared/ws.ts'
+import { ReconnectingWs, waitForSocketReady } from '../shared/ws.ts'
 
 /** Per-message character limit of Discord text messages. */
 export const DISCORD_MESSAGE_LIMIT = 2000
@@ -57,6 +57,8 @@ export function buildDiscordIdentify(botToken: string): string {
 /** One MESSAGE_CREATE dispatch, narrowed to the fields the adapter reads. */
 export interface DiscordMessage {
   readonly chatId: string
+  readonly senderId: string
+  readonly messageId: string
   readonly senderName?: string
   readonly text: string
 }
@@ -69,14 +71,21 @@ export interface DiscordMessage {
  */
 export function readDiscordMessage(data: unknown): DiscordMessage | undefined {
   if (typeof data !== 'object' || data === null) return undefined
-  const record = data as { content?: unknown; channel_id?: unknown; author?: unknown }
+  const record = data as { content?: unknown; channel_id?: unknown; id?: unknown; author?: unknown }
   if (typeof record.channel_id !== 'string' || typeof record.content !== 'string') return undefined
   if (record.content.trim().length === 0) return undefined
-  const author = typeof record.author === 'object' && record.author !== null ? record.author as { bot?: unknown; username?: unknown } : undefined
+  const author = typeof record.author === 'object' && record.author !== null
+    ? record.author as { id?: unknown; bot?: unknown; username?: unknown }
+    : undefined
   if (author?.bot === true) return undefined
   const senderName = typeof author?.username === 'string' ? author.username : undefined
+  // The author snowflake is the stable per-user id; the message snowflake never repeats.
+  const senderId = typeof author?.id === 'string' ? author.id : ''
+  const messageId = typeof record.id === 'string' ? record.id : ''
   return {
     chatId: record.channel_id,
+    senderId,
+    messageId,
     text: record.content.trim(),
     ...(senderName !== undefined ? { senderName } : {}),
   }
@@ -141,17 +150,9 @@ export const createDiscordAdapter: BotAdapterFactory = (config, hooks) => {
       )
       ws.start()
       // READY either arrives or the credentials are wrong; wait a bounded time for it.
-      await new Promise<void>((resolve, reject) => {
-        const began = Date.now()
-        const check = setInterval(() => {
-          if (lastSequence !== null) {
-            clearInterval(check)
-            resolve()
-          } else if (Date.now() - began > 15_000) {
-            clearInterval(check)
-            reject(new Error('gateway READY did not arrive within 15s'))
-          }
-        }, 250)
+      await waitForSocketReady(() => lastSequence !== null, {
+        channel: 'discord',
+        awaited: 'gateway READY did not arrive',
       })
     },
     async stop() {
