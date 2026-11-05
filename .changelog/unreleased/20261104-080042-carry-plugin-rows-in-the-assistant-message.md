@@ -2,7 +2,7 @@
 type: added
 breaking: false
 audience: user
-commits: 50822cc099
+commits: b244bf5ed5
 draft: true
 ---
 Carry plugin rows in the assistant message context menu

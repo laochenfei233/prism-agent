@@ -500,6 +500,33 @@ describe('runImport refusals', () => {
     }
   })
 
+  it('rejects a known-type event that fails event validation, naming its seq', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'KnownShape', exportedAt: 't', hasProjectFolder: false },
+      {
+        [`sessions/b-3/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('b-3')}${
+          JSON.stringify({ type: 'user/message', seq: 3, time: 2000, data: {} })}\n`),
+      },
+    ))
+    await expect(runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())).rejects.toMatchObject({ code: 'bad-archive', message: /seq 3/ })
+  })
+
+  it('imports a plugin-owned unknown event type uninterpreted', async () => {
+    const archive = await spool(projectArchive(
+      { title: 'ExtensionEvent', exportedAt: 't', hasProjectFolder: false },
+      {
+        [`sessions/b-4/session.v${String(SESSION_FORMAT_VERSION)}.jsonl`]: text(`${headerLine('b-4')}${
+          JSON.stringify({ type: 'plugin/telemetry', seq: 0, time: 2000, data: { arbitrary: true } })}\n`),
+      },
+    ))
+    const result = await runImport(buildDeps({ homePath }), {
+      archivePath: archive.path, archiveBytes: archive.bytes, destinationRoot,
+    }, silentProgress())
+    expect(result.projects[0]?.sessions).toBe(1)
+  })
+
   it('rejects a session whose stored write fails', async () => {
     const archive = await spool(projectArchive(
       { title: 'WriteFail', exportedAt: 't', hasProjectFolder: false },

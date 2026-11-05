@@ -23,6 +23,7 @@ import { mkdir, opendir, rename, rm, stat, statfs } from 'node:fs/promises'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import {
+  adoptSessionEvent,
   SESSION_FORMAT_VERSION,
   type SessionEvent,
   type SessionHeader,
@@ -264,7 +265,21 @@ function parseLogText(text: string): { header: SessionHeader; events: readonly S
       || record['data'] === undefined) {
       throw new TransferError('bad-archive', 'malformed session event envelope')
     }
-    events.push(record as SessionEvent)
+    // Known-type events run through the same per-event validator the storage
+    // reader uses (`validateStoredEvents` delegates to `adoptSessionEvent`),
+    // so a malformed known type never reaches the durable log. SessionEventMap
+    // is merge-extensible: `adoptSessionEvent` gates its checks on known
+    // discriminators, so plugin-owned unknown types pass through untouched.
+    const event = record as SessionEvent
+    try {
+      adoptSessionEvent(event)
+    } catch (error: unknown) {
+      throw new TransferError(
+        'bad-archive',
+        `session log event at seq ${String(event.seq)} fails validation: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+    events.push(event)
   }
   const createdAt = typeof headerRecord['createdAt'] === 'number' && headerRecord['createdAt'] > 0
     ? headerRecord['createdAt']
