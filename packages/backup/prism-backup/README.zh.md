@@ -6,7 +6,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `@prism/prism-backup` 把 profile 与 home 两层 `cordis.patch.yml`、`.env`、`.credentials.yaml`、长期记忆存储、工作区注册表以及每个已注册项目文件夹打包，上传到 WebDAV、SMB 或 S3 目标之一，并按保留数清理旧归档。浏览器半区是一个设置分区：经共享配置表单编辑 `prism-backup` 命名空间，经凭据面保存密码，并通过一条 POST 路由驱动 `run`、`test`、`state`。会话日志永不打包。
 
@@ -15,7 +15,7 @@ kind: "package-reference"
 - [使用本包](#use-this-package)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发说明](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -90,7 +90,7 @@ kind: "package-reference"
 - 会话数据被有意排除；它有自己位于 [`dsh-session-log-export`](../../session-query/session-log-export/README.zh.md) 的导出功能。
 
 <a id="dev-note"></a>
-### 开发说明
+### 开发备注
 
 <details>
 <summary>维护者工作上下文 —— 点击展开</summary>

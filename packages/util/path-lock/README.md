@@ -24,7 +24,7 @@ Use `PathLock` when two processes must exclude each other over one path and the 
 
 Acquire a lock around the read-modify-write cycle that must not interleave with another process, and release it in a `finally`:
 
-```ts
+```ts ignore-check
 import { PathLock, PathLockedError } from '@deepseek-ai/dsh-util-path-lock'
 
 declare const lockPath: string

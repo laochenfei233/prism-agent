@@ -17,7 +17,7 @@ export interface EngineAnswer {
   readonly hits: readonly EngineHit[]
 }
 
-/** One fused result: the hit plus its fusion score and provenance. */
+/** One fused result: the hit plus its fusion score and the engines that returned it. */
 export interface RankedHit extends EngineHit {
   /** Summed reciprocal-rank score; higher is better. */
   readonly score: number

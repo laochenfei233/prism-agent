@@ -272,7 +272,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'setTheme(id: string): void',
         description: 'Switch the theme preference — the only user preference write entry. Built-in preferences are written through the settings scope and every accepted value emits `theme/change`.',
-        parameters: [{ name: 'id', description: 'a registered theme id or `system`; unknown ids throw.' }],
+        parameters: [{ name: 'id', description: 'a registered theme id, `system`, or `custom`; unknown ids throw.' }],
       },
       {
         signature: 'setFontSize(role: FontRole, px: number): void',
@@ -590,6 +590,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ConnectionWebSocketEventMap',
     declaration: 'export interface ConnectionWebSocketEventMap {\n    readonly open: object;\n    readonly error: object;\n    readonly close: object;\n    readonly message: {\n        readonly data: unknown;\n    };\n}',
+  },
+  {
+    name: 'CustomThemeInputs',
+    declaration: 'export interface CustomThemeInputs {\n    scheme: ThemeColorScheme;\n    canvas: string;\n    accent: string;\n}',
+  },
+  {
+    name: 'CustomThemePreset',
+    declaration: 'export interface CustomThemePreset {\n    name: string;\n    scheme: ThemeColorScheme;\n    canvas: string;\n    accent: string;\n}',
   },
   {
     name: 'DraftInitializationOptions',
@@ -1041,7 +1049,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StoreSpec',
-    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    actions: A;\n}',
+    declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    merge?: (persisted: unknown, current: T) => T;\n    actions: A;\n}',
   },
   {
     name: 'SubmissionHandle',
@@ -1061,7 +1069,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ThemeSnapshot',
-    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSizes: FontSizes;\n    fontFamilies: FontFamilies;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
+    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSizes: FontSizes;\n    fontFamilies: FontFamilies;\n    custom: CustomThemeInputs;\n    customPresets: readonly CustomThemePreset[];\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
   },
   {
     name: 'ThemeTokenModes',

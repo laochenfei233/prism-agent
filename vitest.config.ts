@@ -268,7 +268,10 @@ export default defineConfig({
         'packages/client/ui-primitives/src/RiskConfirmation.tsx',
         'packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx',
         'packages/client/ui-workspace/src/client/WorkspacePicker.tsx',
+        // BatchActions is WorkspaceBrowser's batch toolbar, moved out verbatim;
+        // it keeps the browser-grade exemption until the lane covers the surface.
         'packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx',
+        'packages/client/ui-workspace/src/client/rows/BatchActions.tsx',
         'packages/client/ui-renderer/src/client/*',
         // Session object internals retain the runtime GUI debt exemption; the
         // assistant-stream reconciler, Controller entry, transport, Agent scope,

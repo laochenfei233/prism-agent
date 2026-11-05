@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`prism-transfer` adds an Import & Export page under Settings that moves projects and settings between installs as files. Export writes a standard zip per selection — the workspace folder, every attached session's log with subagents, media, and files — plus an optional JSON file of the settings page's editable values. Import verifies the archive entry by entry, publishes each project with one atomic rename, restores sessions under their original ids, re-stores media through the attachment service, registers the workspace, and reapplies settings. Import never overwrites existing data. The project row's secondary-press menu also carries **Export project**, which downloads that Workspace's single-project archive through the same streaming route; the settings page remains the place for multi-project and settings archives.
+`prism-transfer` adds an Import & Export page under Settings that moves projects and settings between installs as files. Export writes a standard zip per selection — the workspace folder, every attached session's log with subagents, media, and files — plus an optional JSON of editable settings values. Import verifies the archive entry by entry, publishes each project with one atomic rename, restores sessions under their original ids, re-stores media, registers the workspace, and reapplies settings without overwriting existing data. The project row's menu carries **Export project** through the same streaming route; multi-project and settings archives stay on the settings page.
 
 ## Table of Contents
 
@@ -119,3 +119,12 @@ None; an imported session's next request carries the same derived history any st
 - **No encryption or foreign zips** — archives this app did not produce (no manifest) are refused, and there is no password protection.
 - **The project-row export skips the page's validation pass** — the route streams the archive, or its error response, straight to the browser's download manager, so a refusal arrives as a downloaded error file instead of in-page copy; the settings page remains the place that surfaces typed failures before downloading.
 - **Empty directories and very large logs** — empty folders inside a project are not archived, a session log larger than 256 MiB is refused at import (export has no such cap), and a mid-import failure keeps already-restored sessions; re-importing the same archive then reports those sessions as duplicates under the newly published folder.
+
+### Dev Note
+
+<details>
+<summary>Implementation notes for maintainers — click to expand</summary>
+
+Import treats the manifest as the archive's contract: entry names are validated structurally before any byte is written, sessions restore under their original ids into freshly numbered project folders, and settings reapply through the revision fence — so a refused import leaves the tree exactly as it was.
+
+</details>

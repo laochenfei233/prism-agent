@@ -14,7 +14,9 @@ const kitRepositoryUrl = new RegExp(`\\bgithub\\.com/${organization}/libreoffice
 const commitCandidate = /(?<![a-z0-9])[\da-f]{7,40}(?![a-z0-9])/gi
 // Docs under docs/compose/ are the fork's resync handoffs: they must name the exact
 // commits a sync consumed, which release tags and repository links cannot express.
-const excludedPrefixes = ['vendor/', '.agents/notes/archived/', 'docs/compose/']
+// The .changelog/ tree records per-entry and per-release commit attribution by design,
+// and python/sdk/uv.lock is a generated lockfile whose URLs embed content hashes.
+const excludedPrefixes = ['vendor/', '.agents/notes/archived/', 'docs/compose/', '.changelog/', 'python/sdk/uv.lock']
 const gitOutputLimit = 64 * 1024 * 1024
 // One 41-byte line per object; 1.2 million objects produce about 49 MiB.
 const objectListingLimit = 1024 * 1024 * 1024

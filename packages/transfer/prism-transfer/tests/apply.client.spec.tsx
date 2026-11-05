@@ -5,26 +5,41 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { Context } from '@deepseek-ai/cordis'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, inject, NS } from '../src/client/index.ts'
-import { TransferSection, type TransferFace, type TransferSectionProps } from '../src/client/TransferSection.tsx'
+import { TransferSection, type TransferFace } from '../src/client/TransferSection.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-/** Fake workspace list with one registered project. */
-function fakeWorkspaces() {
+const t = makeTranslate(en)
+
+/** Fake workspace list with one registered project; commands are never called. */
+function fakeWorkspaces(): TransferFace['workspaces'] {
   return {
     list: {
       getSnapshot: () => ({
-        items: [{ workspaceId: 'w1', path: '/p', title: '项目', sessionIds: [], createdAt: '', updatedAt: '' }],
+        items: [{ workspaceId: 'w1' as WorkspaceId, path: '/p', title: '项目', sessionIds: [], createdAt: '', updatedAt: '' }],
         archivedSessionIds: [],
         pinnedSessionIds: [],
         state: 'idle',
+        phase: 'ready',
         error: null,
       }),
       subscribe: () => () => {},
     },
+    create: vi.fn(),
+    initializeDefault: vi.fn(),
+    rename: vi.fn(),
+    delete: vi.fn(),
+    insertBefore: vi.fn(),
+    archiveSession: vi.fn(),
+    unarchiveSession: vi.fn(),
+    pinSession: vi.fn(),
+    unpinSession: vi.fn(),
+    insertSessionBefore: vi.fn(),
   }
 }
 
@@ -93,14 +108,8 @@ describe('transfer client', () => {
       await fiber.await()
       const entry = slots.entries('settings.data.page')[0]
       // The inject thunk hands the section the face with the unwrapping picker.
-      const face = (entry?.inject as unknown as () => TransferFace)()
-      const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
-      render(<TransferSection {...{
-        close: vi.fn(),
-        t,
-        workspaces: fakeWorkspaces() as never,
-        directoryPicker: face.directoryPicker,
-      } as unknown as TransferSectionProps} />)
+      const face = entry?.inject!() as { directoryPicker: TransferFace['directoryPicker'] }
+      render(<TransferSection t={t} workspaces={fakeWorkspaces()} directoryPicker={face.directoryPicker} />)
       fireEvent.click(screen.getByText('Change…'))
       await waitFor(() => {
         expect(screen.getByText('No system directory picker on this deployment; keeping the default.')).toBeDefined()
@@ -116,14 +125,8 @@ describe('transfer client', () => {
     try {
       const fiber = ctx.plugin({ inject, apply })
       await fiber.await()
-      const face = (slots.entries('settings.data.page')[0]?.inject as unknown as () => TransferFace)()
-      const t = (key: keyof typeof en, _params?: Record<string, unknown>): string => en[key]
-      render(<TransferSection {...{
-        close: vi.fn(),
-        t,
-        workspaces: fakeWorkspaces() as never,
-        directoryPicker: face.directoryPicker,
-      } as unknown as TransferSectionProps} />)
+      const face = slots.entries('settings.data.page')[0]?.inject!() as { directoryPicker: TransferFace['directoryPicker'] }
+      render(<TransferSection t={t} workspaces={fakeWorkspaces()} directoryPicker={face.directoryPicker} />)
       fireEvent.click(screen.getByText('Change…'))
       await waitFor(() => {
         expect(screen.getByText('/picked/root')).toBeDefined()

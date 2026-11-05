@@ -475,7 +475,14 @@ export async function pushBinaryChunks(
 }
 
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
-/** Push one streamed file entry without retaining its complete byte sequence. */
+/** Push one streamed file entry without retaining its complete byte sequence.
+ * @param deflate - the zip entry sink receiving each chunk.
+ * @param chunks - the source byte chunks, streamed as they arrive.
+ * @param controller - the response stream controller the capacity gate backpressures.
+ * @param capacity - the response capacity gate awaited between chunks.
+ * @param signal - the abort signal that stops the push mid-stream.
+ * @returns resolution when the stream drained or aborted.
+ */
 export async function pushStreamChunks(
   deflate: ZipDeflate,
   chunks: AsyncIterable<Uint8Array>,
