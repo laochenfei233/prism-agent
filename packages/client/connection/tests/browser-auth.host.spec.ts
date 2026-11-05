@@ -75,7 +75,7 @@ function createAuth(
 }
 
 function request(url: string, authority = '127.0.0.1:3080', init?: {
-  cookie?: string
+  cookie?: string | undefined
   method?: string
 }): ConnectionIndexRequest {
   return {
@@ -243,9 +243,11 @@ describe('BrowserAuth', () => {
 
     const tls = exchange(restarted, authority, true, 'dsh-auth-earlier-port=v1.legacy.legacy')
     expect(mintCookie(tls.state)).toContain('; Secure')
-    // The prune cookie mirrors the listener protocol, so the browser accepts the deletion of a Secure cookie too.
+    // Deletion covers both secure variants: the Secure one clears a cookie
+    // minted under TLS, the plain one a cookie minted over HTTP.
     expect(setCookies(tls.state)[1]).toContain('dsh-auth-earlier-port=; Max-Age=0')
     expect(setCookies(tls.state)[1]!.endsWith('; Secure')).toBe(true)
+    expect(setCookies(tls.state)[2]).toBe('dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
     expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }), true)).toBe(true)
     expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }))).toBe(false)
     const tlsName = tls.cookie.slice(0, tls.cookie.indexOf('='))
@@ -289,11 +291,30 @@ describe('BrowserAuth', () => {
     expect(setCookies(res.state)).toEqual([
       expect.stringMatching(/^dsh-auth-[A-Za-z0-9_-]+=v1\./u),
       'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
       'dsh-auth-oldest-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-oldest-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
     ])
     expect(auth.isAuthenticated(request(
       '/', authority, { cookie: mintCookie(res.state).split(';', 1)[0]! },
     ))).toBe(true)
+  })
+
+  it('deletes a Secure-attributed stale cookie from an HTTP listener with both secure variants', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const res = response()
+    const url = new URL(auth.authenticatedUrl('http://127.0.0.1:3080'))
+    expect(auth.authorizeIndex(request(
+      `${url.pathname}${url.search}`,
+      '127.0.0.1:3080',
+      { cookie: 'dsh-auth-tls-era=v1.legacy.legacy' },
+    ), res.value)).toBe(false)
+    // A non-secure Set-Cookie cannot delete a Secure-only cookie
+    // (RFC 6265bis), so the plain listener must also emit the Secure variant.
+    expect(setCookies(res.state).slice(1)).toEqual([
+      'dsh-auth-tls-era=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-tls-era=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
+    ])
   })
 
   it('expires stale session cookies when exchanging the API credential', async () => {
@@ -308,6 +329,7 @@ describe('BrowserAuth', () => {
     expect(setCookies(res.state)).toEqual([
       expect.stringMatching(/^dsh-auth-[A-Za-z0-9_-]+=v2\./u),
       'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
     ])
   })
 

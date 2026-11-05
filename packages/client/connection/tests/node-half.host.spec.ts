@@ -69,6 +69,17 @@ function fakeRawPost(headers: Record<string, string>, url: string, body: string)
   return request
 }
 
+/**
+ * The ServerResponse face the fence, bridge, and connect routes exercise:
+ * event emission plus writeHead, write, end, and writableEnded.
+ */
+function isServerResponseFace(value: object): value is ServerResponse {
+  return 'writableEnded' in value && typeof value.writableEnded === 'boolean'
+    && 'writeHead' in value && typeof value.writeHead === 'function'
+    && 'write' in value && typeof value.write === 'function'
+    && 'end' in value && typeof value.end === 'function'
+}
+
 /** Response recorder compatible with both the fence's short-circuit and the bridge. */
 function fakeResponse(): {
   response: ServerResponse
@@ -91,7 +102,8 @@ function fakeResponse(): {
       this.writableEnded = true
       return this
     },
-  }) as unknown as ServerResponse
+  })
+  if (!isServerResponseFace(response)) throw new Error('response recorder is missing its ServerResponse face')
   return { response, state }
 }
 
