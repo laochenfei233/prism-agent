@@ -726,6 +726,24 @@ jobs:
           packages/experimental/tool-ralph/tests/integration.spec.ts
           packages/subprocess/subprocess-local/tests/process-exit.spec.ts
 
+  # Packaging broke once because the installer template referenced macros its
+  # includes did not define, and the break only surfaced in the release
+  # workflow (see scripts/verify-nsis-template.mjs). Resolve the template's
+  # includes and macro targets on every PR so the class of failure shows up
+  # before merge instead.
+  nsis-template:
+    name: nsis template / include and macro resolution
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the NSIS include set
+        run: sudo apt-get update -q && sudo apt-get install -y -q nsis
+      - run: node scripts/verify-nsis-template.mjs
+
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
   # node versions evolve. Every blocking job in THIS workflow must be listed in
@@ -751,7 +769,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [node-24, node-24-coverage, node-24-bench, node-24-consumers, node-compat, python-sdk, python-runtime, windows-build, windows-native-tests]
+    needs: [node-24, node-24-coverage, node-24-bench, node-24-consumers, node-compat, python-sdk, python-runtime, windows-build, windows-native-tests, nsis-template]
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     steps:
       - name: Fail if any needed job did not succeed

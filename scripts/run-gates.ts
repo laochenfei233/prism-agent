@@ -417,6 +417,7 @@ function ciPrimaryGates(): Gate[] {
     // neither races tsbuildinfo nor replaces declarations while they are read.
     ciBuildGate('build', { needs: ['typecheck', 'lint', 'doc-typecheck'] }),
     pnpmScript('publint', 'publint', { needs: ['build'] }),
+    pnpmScript('published-closure', 'verify-published-closure', { label: 'published closure', needs: ['build'] }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
       needs: ['build'],
@@ -507,6 +508,7 @@ function ciArtifactGates(): Gate[] {
   return [
     ciBuildGate(),
     pnpmScript('publint', 'publint', { needs: ['build'] }),
+    pnpmScript('published-closure', 'verify-published-closure', { label: 'published closure', needs: ['build'] }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
       needs: ['build'],
@@ -527,6 +529,7 @@ function ciConsumerGates(): Gate[] {
     'expected-output',
     'doc-typecheck',
     'node-next-types',
+    'published-closure',
     'built-bin-smoke',
   ]
   return [
@@ -536,6 +539,10 @@ function ciConsumerGates(): Gate[] {
       env: { [CLIENT_BUILD_PROFILE_SELECTOR]: 'official' },
     }),
     pnpmScript('publint', 'publint', { needs: builtTree }),
+    pnpmScript('published-closure', 'verify-published-closure', {
+      label: 'published closure',
+      needs: builtTree,
+    }),
     pnpmScript('lint-and-duplication', 'check:ci:lint:contracts-ready', {
       label: 'lint and duplication',
       needs: builtTree,
@@ -630,6 +637,7 @@ function ciWindowsObservationalGates(): Gate[] {
     // Linux owns required lint and snapshots; Windows omits those duplicates.
     pnpmScript('duplication', 'duplication'),
     pnpmScript('publint', 'publint', { needs: ['build'] }),
+    pnpmScript('published-closure', 'verify-published-closure', { label: 'published closure', needs: ['build'] }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
       needs: ['build'],
@@ -786,6 +794,10 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
   return [
     pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
     pnpmScript('publint', 'publint', artifactOptions),
+    pnpmScript('published-closure', 'verify-published-closure', {
+      label: 'published closure',
+      ...artifactOptions,
+    }),
     pnpmScript('constraints', 'constraints'),
     pnpmScript('default-product-isolation', 'verify-default-product-isolation', { label: 'default product isolation' }),
     pnpmScript('product-use', 'verify-product-use', { label: 'product package classification' }),

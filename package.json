@@ -92,6 +92,8 @@
     "verify-repository-references": "tsx scripts/verify-repository-references.ts",
     "verify-concrete-terms": "tsx scripts/verify-concrete-terms.ts",
     "verify-no-unknown-casts": "tsx scripts/verify-no-unknown-casts.ts",
+    "verify-published-closure": "tsx scripts/verify-published-closure.ts",
+    "verify-nsis-template": "node scripts/verify-nsis-template.mjs",
     "verify-doc-refs": "tsx scripts/verify-doc-refs.ts",
     "verify-subsystem-pages": "tsx scripts/verify-subsystem-pages.ts",
     "verify-package-paths": "tsx scripts/verify-package-paths.ts",
