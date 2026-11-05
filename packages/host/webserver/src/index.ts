@@ -101,24 +101,29 @@ export interface Config {
   compressionLevel?: number
   /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
   compressionThresholdBytes?: number
+  /**
+   * Request-header byte bound handed to the listener (`maxHeaderSize`).
+   * Cookies ignore ports, so a browser store that accumulated one session
+   * cookie per past loopback port crosses Node's 16 KiB default, and a
+   * parser-level 431 would keep the launch-token exchange that prunes those
+   * cookies from ever running.
+   * @default 65536
+   */
+  maxRequestHeaderBytes?: number
 }
 
 const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
-/**
- * Fixed request-header bound, above Node's 16 KiB default: cookies ignore
- * ports, so a browser store that accumulated one session cookie per past
- * loopback port crosses the default, and a parser-level 431 would keep the
- * launch-token exchange that prunes those cookies from ever running.
- */
-const MAX_REQUEST_HEADER_BYTES = 64 * 1024
+/** Default request-header byte bound; see {@link Config.maxRequestHeaderBytes}. */
+const DEFAULT_MAX_REQUEST_HEADER_BYTES = 64 * 1024
 
 interface ResolvedConfig extends Config {
   compression: 'none' | 'gzip'
   compressionLevel: number
   compressionThresholdBytes: number
+  maxRequestHeaderBytes: number
 }
 
 type NodeMiddleware = (
@@ -302,6 +307,7 @@ export class WebServer extends Service {
     compression: z.union([z.const('none'), z.const('gzip')]).default(DEFAULT_COMPRESSION),
     compressionLevel: z.number().step(1).min(0).max(9).default(DEFAULT_COMPRESSION_LEVEL),
     compressionThresholdBytes: z.natural().default(DEFAULT_COMPRESSION_THRESHOLD_BYTES),
+    maxRequestHeaderBytes: z.natural().min(1024).default(DEFAULT_MAX_REQUEST_HEADER_BYTES),
   })
 
   private readonly exact = new Map<string, WebRoute>()
@@ -322,6 +328,7 @@ export class WebServer extends Service {
   private listenedPort: number | undefined
   private readonly gzip: NodeMiddleware | undefined
   private readonly tlsConfig: TlsConfig | undefined
+  private readonly maxRequestHeaderBytes: number
 
   constructor(ctx: Context, private config: Config) {
     super(ctx, 'webServer')
@@ -329,6 +336,7 @@ export class WebServer extends Service {
     // Schemastery passes an explicit `tls: null` through; only a real object serves TLS.
     this.tlsConfig = resolved.tls ?? undefined
     this.gzip = resolved.compression === 'gzip' ? createGzipMiddleware(resolved) : undefined
+    this.maxRequestHeaderBytes = resolved.maxRequestHeaderBytes
   }
 
   /** The listening port (the OS-assigned value when config.port is 0), or `undefined` before `listen` binds. */
@@ -467,7 +475,7 @@ export class WebServer extends Service {
     // Disposal waits for in-flight acquisition and closes any listener it produces.
     await this.ctx.effect(async () => {
       if (tls === undefined) {
-        this.server = createServer({ maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
+        this.server = createServer({ maxHeaderSize: this.maxRequestHeaderBytes }, listener)
       } else {
         const certFile = resolve(tls.certFile)
         const keyFile = resolve(tls.keyFile)
@@ -476,7 +484,7 @@ export class WebServer extends Service {
           readTlsFile('keyFile', keyFile),
         ])
         try {
-          this.server = createSecureServer({ cert, key, maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
+          this.server = createSecureServer({ cert, key, maxHeaderSize: this.maxRequestHeaderBytes }, listener)
         } catch (error) {
           throw new Error(`webserver: tls.certFile ${certFile} and tls.keyFile ${keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
         }

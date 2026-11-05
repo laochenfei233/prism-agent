@@ -324,10 +324,13 @@ describe('real Loader composition', () => {
       compression: 'none',
       compressionLevel: 1,
       compressionThresholdBytes: 1024,
+      maxRequestHeaderBytes: 65536,
     })
     expect(() => HttpServer.Config({
       host: '127.0.0.1', port: 0, compressionLevel: 10,
     })).toThrow()
+    expect(() => HttpServer.Config({ host: '127.0.0.1', port: 0, maxRequestHeaderBytes: 1023 }))
+      .toThrow()
 
     const loaded = await loadComposition(0, true)
     const server = loaded.webServer
@@ -585,6 +588,7 @@ describe('real Loader composition', () => {
       compression: 'none',
       compressionLevel: 1,
       compressionThresholdBytes: 1024,
+      maxRequestHeaderBytes: 65536,
     })
 
     const loaded = await loadComposition(0, false, '127.0.0.1', tls)

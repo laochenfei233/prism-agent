@@ -1853,6 +1853,15 @@ export interface Config {
   compressionLevel?: number
   /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
   compressionThresholdBytes?: number
+  /**
+   * Request-header byte bound handed to the listener (`maxHeaderSize`).
+   * Cookies ignore ports, so a browser store that accumulated one session
+   * cookie per past loopback port crosses Node's 16 KiB default, and a
+   * parser-level 431 would keep the launch-token exchange that prunes those
+   * cookies from ever running.
+   * @default 65536
+   */
+  maxRequestHeaderBytes?: number
 }
 
 /**

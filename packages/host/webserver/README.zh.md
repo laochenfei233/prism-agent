@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-浏览器经由 `dsh-host-webserver` 通过 HTTP 访问 web GUI：一个 `node:http` 服务器——当 `tls` 指定证书与私钥时改用 `node:https`——其他插件在其中注册具名路由、upgrade 路由、index 启动输入与一个回退 handler。它不了解任何 harness 概念，也不提供任何文件服务——`/api` 桥接、插件 bundle、HMR（热模块替换）事件流与 SPA dist 都属于注册它们的插件。路由匹配顺序固定不变：先在整张表中匹配精确 route，再匹配最长前缀，最后交给回退 handler。请求 header 以固定的 64 KiB 为上限（高于 Node 的 16 KiB 默认值），因此每个过往 loopback port 留下一条 session cookie 的浏览器存储仍会被服务，而不是在解析器中被 431 拒绝。它只服务浏览器；Electron 通过 `file://` 加载 dist，并经 IPC 桥接承载 fetch。
+浏览器经由 `dsh-host-webserver` 通过 HTTP 访问 web GUI：一个 `node:http` 服务器——当 `tls` 指定证书与私钥时改用 `node:https`——其他插件在其中注册具名路由、upgrade 路由、index 启动输入与一个回退 handler。`/api` 桥接、插件 bundle、HMR 事件流与 SPA dist 都属于注册它们的插件。路由匹配顺序固定：先精确匹配，再最长前缀，最后回退 handler；请求 header 以 `maxRequestHeaderBytes` 为上限（默认 64 KiB，高于 Node 的 16 KiB），因此楔死的浏览器 cookie 存储仍会被服务，而不是在解析器中被 431 拒绝。只服务浏览器：Electron 经 `file://` 加载 dist。
 
 ## 目录
 
