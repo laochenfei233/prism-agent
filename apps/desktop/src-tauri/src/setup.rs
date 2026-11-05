@@ -306,7 +306,7 @@ fn ensure_local_bundles(
 /// entry that names it, because the loader fails hard on a name it cannot
 /// resolve. Only retired local bundles are listed here: plugin-center installs
 /// write their own names into the same array.
-const RETIRED_LOCAL_BUNDLES: &[&str] = &["dsh-tauri"];
+const RETIRED_LOCAL_BUNDLES: &[&str] = &["dsh-tauri", "dsh-agent-progress"];
 
 /// Whether one profile bundle entry names a retired local bundle.
 fn is_retired_local_bundle(name: &str) -> bool {
