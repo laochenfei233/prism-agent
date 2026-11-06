@@ -52,6 +52,37 @@
   width: 200px;
 }
 
+.speechSelect {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speechSelectLabel {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.speechSelect select {
+  max-width: 180px;
+  padding: 4px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.speechSelect select:focus-visible {
+  outline: 1.5px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
 .failure,
 .warning,
 .notice {

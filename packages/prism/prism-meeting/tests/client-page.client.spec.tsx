@@ -97,9 +97,10 @@ function face(overrides: Partial<MeetingPageFace> = {}): MeetingPageFace {
     summarize: vi.fn(async (id: string) => meeting({ id, status: 'summarized', summary: 'Decisions.' })),
     remove: vi.fn(async () => true),
     transcribe: vi.fn(async () => ({ text: 'live words', audioSeconds: 8 })),
-    speech: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready' }], selected: 'p' })),
-    prepare: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready' }], selected: 'p' })),
-    cancelPrepare: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready' }], selected: 'p' })),
+    speech: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' })),
+    prepare: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' })),
+    cancelPrepare: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' })),
+    selectSpeech: vi.fn(async () => ({ providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' })),
     ask: vi.fn(async (id: string, question: string) => ({
       id: 'a1', meetingId: id, question, answer: 'Ship Friday.', createdAt: new Date(2026, 10, 4, 9).toISOString(),
     })),
@@ -173,8 +174,9 @@ describe('meetings page', () => {
   it('warns when the selected provider is registered but not prepared', async () => {
     renderPage(face({
       speech: vi.fn(async () => ({
-        providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared' }],
+        providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared', languages: ['auto'] }],
         selected: 'p',
+        language: 'auto',
       })),
     }))
     expect(await screen.findByText(/is not ready \(unprepared\)/)).toBeTruthy()
@@ -187,10 +189,11 @@ describe('meetings page', () => {
     }
     const downloading = {
       providers: [{
-        id: 'p', name: 'SenseVoice', phase: 'downloading',
+        id: 'p', name: 'SenseVoice', phase: 'downloading', languages: ['auto'],
         preparation: { phase: 'downloading', resource: 'model', completedBytes: 1500, totalBytes: 3000 },
       }],
       selected: 'p',
+      language: 'auto',
     }
     renderPage(face({
       speech: vi.fn(async () => current),
@@ -210,10 +213,11 @@ describe('meetings page', () => {
     renderPage(face({
       speech: vi.fn(async () => ({
         providers: [{
-          id: 'p', name: 'SenseVoice', phase: 'failed',
+          id: 'p', name: 'SenseVoice', phase: 'failed', languages: ['auto'],
           preparation: { phase: 'failed', message: 'disk full' },
         }],
         selected: 'p',
+        language: 'auto',
       })),
     }))
     expect(await screen.findByText(/Speech model preparation failed/)).toBeTruthy()
@@ -265,13 +269,70 @@ describe('meetings page', () => {
   it('stays quiet when a prepared provider rests in standby', async () => {
     renderPage(face({
       speech: vi.fn(async () => ({
-        providers: [{ id: 'p', name: 'SenseVoice', phase: 'standby' }],
+        providers: [{ id: 'p', name: 'SenseVoice', phase: 'standby', languages: ['auto'] }],
         selected: 'p',
+        language: 'auto',
       })),
     }))
     await screen.findByText('Weekly sync')
     expect(screen.queryByText(/is not ready/)).toBeNull()
     expect(screen.queryByText(/Prepare speech model/)).toBeNull()
+  })
+
+  it('switches the recognizer from the toolbar and surfaces a failed switch', async () => {
+    const cloud = {
+      providers: [
+        { id: 'local', name: 'SenseVoice', phase: 'ready', languages: ['auto', 'zh'] },
+        { id: 'cloud', name: 'Groq Whisper', phase: 'ready', languages: ['auto', 'en'] },
+      ],
+      selected: 'local',
+      language: 'zh',
+    }
+    const meetingFace = face({ speech: vi.fn(async () => cloud) })
+    const view = await ready(meetingFace)
+    fireEvent.change(screen.getByLabelText('Speech recognizer'), { target: { value: 'cloud' } })
+    await waitFor(() => { expect(meetingFace.selectSpeech).toHaveBeenCalledWith('cloud', 'auto') })
+    view.unmount()
+
+    const failing = face({
+      speech: vi.fn(async () => cloud),
+      selectSpeech: vi.fn(async () => { throw new Error('storage offline') }),
+    })
+    await ready(failing)
+    fireEvent.change(screen.getByLabelText('Speech recognizer'), { target: { value: 'cloud' } })
+    expect((await screen.findByRole('alert')).textContent).toContain('storage offline')
+  })
+
+  it('keeps the selector and polling after dismissing, and re-shows a changed notice', async () => {
+    // Each read returns a fresh object, so the status update is a new reference
+    // the page actually re-renders on.
+    let current: {
+      providers: { id: string; name: string; phase: string; languages: string[] }[]
+      selected: string
+      language: string
+    } = {
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared', languages: ['auto'] }],
+      selected: 'p',
+      language: 'auto',
+    }
+    const meetingFace = face({ speech: vi.fn(async () => ({ ...current })) })
+    const view = await ready(meetingFace)
+    expect(await screen.findByText(/is not ready/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => { expect(screen.queryByText(/is not ready/)).toBeNull() })
+    expect(screen.getByLabelText('Speech recognizer')).toBeTruthy()
+
+    current = {
+      providers: [{
+        id: 'p', name: 'SenseVoice', phase: 'failed', languages: ['auto'],
+        preparation: { phase: 'failed', message: 'disk full' },
+      }],
+      selected: 'p',
+      language: 'auto',
+    }
+    await act(async () => { vi.advanceTimersByTime(2_000) })
+    expect(await screen.findByText(/Speech model preparation failed/)).toBeTruthy()
+    view.unmount()
   })
 
   it('renders the speaker named by each stored span', async () => {
@@ -425,7 +486,7 @@ describe('meetings page', () => {
     await waitFor(() => { expect(capture.stopped).toHaveLength(1) })
     await waitFor(() => {
       expect(meetingFace.finish).toHaveBeenCalledWith({
-        id: 'live', transcript: 'live words', audioSeconds: 8,
+        id: 'live', transcript: 'live words', audioSeconds: expect.any(Number) as number,
       })
     })
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -536,30 +597,28 @@ describe('meetings page', () => {
     expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
   })
 
-  it('keeps the live text and reports a failed closing transcription', async () => {
+  it('ends the meeting with the accumulated slice transcript and no second recognition', async () => {
     const capture = captureDouble()
     capture.blocks.push(new Float32Array(TARGET_SAMPLES))
     const meetingFace = face({
       capture: vi.fn(async () => await capture.capture()),
-      transcribe: vi.fn(async () => ({ text: 'live words', audioSeconds: 8 }))
-        .mockRejectedValueOnce(new Error('slice offline'))
-        .mockRejectedValueOnce(new Error('final offline')),
+      transcribe: vi.fn(async () => ({ text: 'live words', audioSeconds: 8 })),
     })
     await ready(meetingFace)
     fireEvent.click(screen.getByRole('button', { name: 'Start meeting' }))
     await waitFor(() => { expect(screen.getByRole('button', { name: 'End meeting' })).toBeTruthy() })
     await act(async () => { vi.advanceTimersByTime(9_000) })
-    await waitFor(() => {
-      expect(screen.getByText(en.liveSliceFailed.replace('{reason}', 'slice offline'))).toBeTruthy()
-    })
+    await waitFor(() => { expect(screen.getByText('live words')).toBeTruthy() })
+    expect(meetingFace.transcribe).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'End meeting' }))
     await waitFor(() => {
       expect(meetingFace.finish).toHaveBeenCalledWith({
-        id: 'live', transcript: '', audioSeconds: expect.any(Number) as number,
+        id: 'live', transcript: 'live words', audioSeconds: expect.any(Number) as number,
       })
     })
-    expect(await screen.findByText(en.liveFinalFailed.replace('{reason}', 'final offline'))).toBeTruthy()
+    expect(meetingFace.transcribe).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'End meeting' })).toBeNull()
   })
 
   it('imports an audio file and stores the recognized meeting', async () => {

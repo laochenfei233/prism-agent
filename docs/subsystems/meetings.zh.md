@@ -222,7 +222,7 @@ interface MeetingSpeechStatus {
 
 `./web` 入口在 Connection 共享的 `/api` 通道上为每个操作注册一条精确 Fetch 路由——`/api/prism-meeting/list`、`get`、`create`、`begin`、`update`、`finish`、`revise`、`summarize`、`delete`、`speech`、`speech/prepare`、`speech/cancel`、`ask`、`answers`、`transcribe` 和 `audio`。每次调用都经过该通道的浏览器信任与认证围栏，每个应答都带同一种 `{ ok, value }` 或 `{ ok, error }` 信封。JSON 路由在服务看到请求体之前先做校验；`transcribe` 和 `audio` 以请求体承载原始录音字节，`audio` 从查询参数读取标题、参与者、语言和提供者选择。每个操作都委托给 `ctx.meetingMinutes`，因此页面使用部署配置的模型路由而不是第二条路由。之所以用路由而不是插件注册的 RPC 通道：`HostConnectionService` 是通过它自己的 context 创建通道的，而该 context 并未注入 `webServer`，所以 `ctx.connection.rpc.handle()` 会在加载时失败。
 
-`./client` 入口注册一个 `sidebar.panellist` 入口以及该入口选中的 `main` 键控面板。页面列出已存会议、按关键字过滤、展示单场会议的摘要、转写与持久化问答、编辑其标题与参与者、删除记录，并通过 `ctx.sessions` 和 `ctx.uiWorkspace` 把一个问题推送到新会话。问答页签就当前会议向配置的模型路由提问，并按新到旧列出已存的问答。「开始会议」先打开麦克风，随即写入它的持久记录，因此进行中的会议就是列表里的一行，和已存记录共用同一个详情栏：每八秒把新增音频送去转写，每次应答都替换已存转写，详情栏提供暂停、结束和放弃。结束时对整段录音重新转写并在同一步关闭记录；上次没有正常结束而留下的录音中记录，页面会提供关闭操作。麦克风被拒绝时会指出需要开启的设置，创建记录失败会释放麦克风，未注册语音提供者时页面会直接说明。已注册但未就绪的提供者会带出一条准备栏，含启动操作、下载进度和取消操作，操作者无需离开页面即可备好本地模型。「导入会议」识别选定的一个音频文件并入库。两条路径都会把音频重新编码为语音提供者校验的规范 16 kHz 单声道 PCM16 WAV。页面文案注册在 `meetingMinutes` 语言命名空间，样式表只使用 shell 的 `--dsw-*` 令牌。
+`./client` 入口注册一个 `sidebar.panellist` 入口以及该入口选中的 `main` 键控面板。页面列出已存会议、按关键字过滤、展示单场会议的摘要、转写与持久化问答、编辑其标题与参与者、删除记录，并通过 `ctx.sessions` 和 `ctx.uiWorkspace` 把一个问题推送到新会话。问答页签就当前会议向配置的模型路由提问，并按新到旧列出已存的问答。「开始会议」先打开麦克风，随即写入它的持久记录，因此进行中的会议就是列表里的一行，和已存记录共用同一个详情栏：每八秒把新增音频送去转写，每次应答都替换已存转写，详情栏提供暂停、结束和放弃。结束时保留分段已保存的转写并在同一步关闭记录，不做第二次识别；上次没有正常结束而留下的录音中记录，页面会提供关闭操作。麦克风被拒绝时会指出需要开启的设置，创建记录失败会释放麦克风，未注册语音提供者时页面会直接说明。工具栏带识别器选择器，持久化部署的语音选择，分段随所选提供者路由。已注册但未就绪的提供者会带出一条准备栏，含启动操作、下载进度和取消操作，操作者无需离开页面即可备好本地模型。「导入会议」识别选定的一个音频文件并入库。两条路径都会把音频重新编码为语音提供者校验的规范 16 kHz 单声道 PCM16 WAV。页面文案注册在 `meetingMinutes` 语言命名空间，样式表只使用 shell 的 `--dsw-*` 令牌。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -331,6 +331,16 @@ prepareSpeech(providerId?: string): MeetingSpeechStatus
  * @returns fresh speech status after cancellation settles.
  */
 async cancelSpeechPreparation(providerId?: string): Promise<MeetingSpeechStatus>
+
+/**
+ * Persist one recognizer as the deployment's speech selection, so the
+ * operator picks a cloud or HTTP provider from the meeting page instead of
+ * being steered at the local model.
+ * @param providerId - registered provider to select.
+ * @param language - language hint to persist; omission keeps the stored one.
+ * @returns fresh speech status after the selection settles.
+ */
+async selectSpeech(providerId: string, language?: string): Promise<MeetingSpeechStatus>
 
 /**
  * Read meetings in newest-first creation order.

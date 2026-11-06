@@ -57,6 +57,7 @@ export function apply(ctx: ClientContext): void {
     speech: signal => api.speech(signal),
     prepare: providerId => api.prepare(providerId),
     cancelPrepare: providerId => api.cancelPrepare(providerId),
+    selectSpeech: (providerId, language) => api.select(providerId, language),
     ask: (id, question) => api.ask(id, question),
     answers: id => api.answers(id),
     uploadAudio: async (audio, request) =>

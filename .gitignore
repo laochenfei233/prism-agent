@@ -49,3 +49,4 @@ worktrees/
 # Standalone repo staging (dsh-desktop)
 .standalone/
 native/system/test/bin/
+*.tgz

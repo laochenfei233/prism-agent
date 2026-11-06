@@ -3,8 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import type { MeetingView } from '../src/view.ts'
 import {
-  bytesText, downloadProgress, durationText, filterMeetings, parseParticipants, rowMeta,
-  selectedSpeechProvider, speechNotice, speechPhaseAction, statusLabel, timestampText, transcriptLines,
+  bytesText, compatibleLanguage, downloadProgress, durationText, filterMeetings, parseParticipants,
+  rowMeta, selectedSpeechProvider, speechNotice, speechPhaseAction, statusLabel, timestampText,
+  transcriptLines,
 } from '../src/client/presentation.ts'
 import { zh } from '../src/client/locales.ts'
 
@@ -135,7 +136,7 @@ describe('speechNotice', () => {
 
   it('names the selected provider that still needs preparation', () => {
     expect(speechNotice({
-      providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared' }],
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared', languages: ['auto'] }],
       selected: 'p',
     }, translate)).toBe('语音识别提供者“SenseVoice”尚未就绪（unprepared）：先准备语音模型，再开始录音。')
   })
@@ -143,7 +144,7 @@ describe('speechNotice', () => {
   it('reports a failed preparation with the provider message', () => {
     expect(speechNotice({
       providers: [{
-        id: 'p', name: 'SenseVoice', phase: 'failed',
+        id: 'p', name: 'SenseVoice', phase: 'failed', languages: ['auto'],
         preparation: { phase: 'failed', message: '磁盘已满' },
       }],
       selected: 'p',
@@ -153,7 +154,7 @@ describe('speechNotice', () => {
   it('reports a download with its resource and progress', () => {
     expect(speechNotice({
       providers: [{
-        id: 'p', name: 'SenseVoice', phase: 'downloading',
+        id: 'p', name: 'SenseVoice', phase: 'downloading', languages: ['auto'],
         preparation: { phase: 'downloading', resource: 'int8 模型', completedBytes: 1500, totalBytes: 3000 },
       }],
       selected: 'p',
@@ -162,7 +163,7 @@ describe('speechNotice', () => {
 
   it('reports nothing when the selected provider is ready', () => {
     expect(speechNotice({
-      providers: [{ id: 'p', name: 'SenseVoice', phase: 'ready' }],
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'ready', languages: ['auto'] }],
       selected: 'p',
     }, translate)).toBeNull()
   })
@@ -176,7 +177,7 @@ describe('speechNotice', () => {
 
   it('falls back to the first provider when the selection is absent', () => {
     expect(speechNotice({
-      providers: [{ id: 'p', name: 'SenseVoice', phase: 'loading' }],
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'loading', languages: ['auto'] }],
       selected: 'gone',
     }, translate)).toContain('SenseVoice')
   })
@@ -199,9 +200,19 @@ describe('downloadProgress', () => {
   })
 })
 
+describe('compatibleLanguage', () => {
+  it('keeps the current language, falls back to auto, then to the first hint', () => {
+    const provider = (languages: string[]) => ({ id: 'p', name: 'P', phase: 'ready', languages })
+    expect(compatibleLanguage(provider(['auto', 'zh']), 'zh')).toBe('zh')
+    expect(compatibleLanguage(provider(['auto', 'en']), 'zh')).toBe('auto')
+    expect(compatibleLanguage(provider(['zh', 'en']), 'auto')).toBe('zh')
+    expect(compatibleLanguage(provider([], ''), '')).toBe('')
+  })
+})
+
 describe('speechPhaseAction', () => {
   it('offers prepare while idle and cancel while preparation runs', () => {
-    const provider = (phase: string) => ({ id: 'p', name: 'P', phase })
+    const provider = (phase: string) => ({ id: 'p', name: 'P', phase, languages: ['auto'] })
     expect(speechPhaseAction(provider('ready'))).toBeNull()
     expect(speechPhaseAction(provider('standby'))).toBeNull()
     expect(speechPhaseAction(provider('unprepared'))).toBe('prepare')
@@ -218,8 +229,8 @@ describe('speechPhaseAction', () => {
 describe('selectedSpeechProvider', () => {
   it('prefers the selection, falls back to the first provider, and reports none', () => {
     const providers = [
-      { id: 'p', name: 'P', phase: 'ready' },
-      { id: 'q', name: 'Q', phase: 'ready' },
+      { id: 'p', name: 'P', phase: 'ready', languages: ['auto'] },
+      { id: 'q', name: 'Q', phase: 'ready', languages: ['auto'] },
     ]
     expect(selectedSpeechProvider({ providers, selected: 'q' })?.id).toBe('q')
     expect(selectedSpeechProvider({ providers, selected: 'gone' })?.id).toBe('p')

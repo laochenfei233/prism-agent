@@ -1520,7 +1520,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'speech(): MeetingSpeechStatus',
         description: 'Report the speech providers this deployment can transcribe with, so a caller can tell an operator that recording needs a speech plugin before it asks for a microphone.',
         parameters: [],
-        returns: 'the registered providers and the default selection.',
+        returns: 'the registered providers, the default selection, and preparation progress.',
+      },
+      {
+        signature: 'prepareSpeech(providerId?: string): MeetingSpeechStatus',
+        description: 'Start or join preparation of one speech provider, so an operator readies a local model from the meeting page instead of another surface.',
+        parameters: [{ name: 'providerId', description: 'provider to prepare; omission prepares the selection.' }],
+        returns: 'fresh speech status after the request.',
+      },
+      {
+        signature: 'async cancelSpeechPreparation(providerId?: string): Promise<MeetingSpeechStatus>',
+        description: 'Cancel one provider\'s in-flight preparation.',
+        parameters: [{ name: 'providerId', description: 'provider to cancel; omission cancels the selection.' }],
+        returns: 'fresh speech status after cancellation settles.',
+      },
+      {
+        signature: 'async selectSpeech(providerId: string, language?: string): Promise<MeetingSpeechStatus>',
+        description: 'Persist one recognizer as the deployment\'s speech selection, so the operator picks a cloud or HTTP provider from the meeting page instead of being steered at the local model.',
+        parameters: [{ name: 'providerId', description: 'registered provider to select.' }, { name: 'language', description: 'language hint to persist; omission keeps the stored one.' }],
+        returns: 'fresh speech status after the selection settles.',
       },
       {
         signature: 'list(): MeetingMinutesRecord[]',
@@ -5577,12 +5595,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type MeetingMinutesStatus = \'recording\' | \'transcribed\' | \'summarized\';',
   },
   {
+    name: 'MeetingSpeechPreparation',
+    declaration: 'export interface MeetingSpeechPreparation {\n    readonly phase: string;\n    readonly message?: string;\n    readonly resource?: string;\n    readonly completedBytes?: number;\n    readonly totalBytes?: number;\n}',
+  },
+  {
     name: 'MeetingSpeechProvider',
-    declaration: 'export interface MeetingSpeechProvider {\n    readonly id: string;\n    readonly name: string;\n    readonly phase: string;\n}',
+    declaration: 'export interface MeetingSpeechProvider {\n    readonly id: string;\n    readonly name: string;\n    readonly phase: string;\n    readonly languages: readonly string[];\n    readonly preparation?: MeetingSpeechPreparation;\n}',
   },
   {
     name: 'MeetingSpeechStatus',
-    declaration: 'export interface MeetingSpeechStatus {\n    readonly providers: readonly MeetingSpeechProvider[];\n    readonly selected: string;\n}',
+    declaration: 'export interface MeetingSpeechStatus {\n    readonly providers: readonly MeetingSpeechProvider[];\n    readonly selected: string;\n    readonly language: string;\n}',
   },
   {
     name: 'MeetingTranscript',

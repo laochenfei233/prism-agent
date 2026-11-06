@@ -529,6 +529,14 @@ describe('speech preparation', () => {
     expect(stub.cancelCalls).toBe(1)
   })
 
+  it('refuses a selection the speech seam cannot persist', async () => {
+    const suite = await harness({ preparation: { initial: { phase: 'ready' } } })
+    // The harness composes no settings entry, so the persisted write is the
+    // refusal path; the delegate itself is one configure call away.
+    await expect(suite.service.selectSpeech('meeting-test')).rejects.toThrow('Speech selection requires')
+    expect(suite.service.speech().selected).toBe('meeting-test')
+  })
+
   it('projects a failed preparation with its message', async () => {
     const suite = await harness({ preparation: { initial: { phase: 'failed', message: 'disk full' } } })
     expect(suite.service.speech().providers[0]).toMatchObject({

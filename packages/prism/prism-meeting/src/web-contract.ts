@@ -92,6 +92,12 @@ export interface MeetingSpeechTargetBody {
   readonly providerId?: string
 }
 
+/** Body selecting one recognizer as the deployment's speech selection. */
+export interface MeetingSpeechSelectBody {
+  readonly providerId: string
+  readonly language?: string
+}
+
 /** Value of `ask`: one persisted answer. */
 export interface MeetingAnswerValue {
   readonly answer: AnswerView

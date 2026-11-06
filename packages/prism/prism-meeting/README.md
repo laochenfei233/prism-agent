@@ -121,7 +121,7 @@ These are current constraints of the layer, not a general comparison.
 - **Speaker labels exist only when the speech provider separates speakers** — a provider that reports none stores no spans, and a label means nothing outside its own recording.
 - **Streaming recognition and export formats are out of scope.**
 - **`audioSeconds` trusts the speech provider or caller** and is not independently decoded.
-- **Live transcription asks the speech provider once per eight seconds of new audio** — only the closing pass covers the complete recording.
+- **Live transcription asks the speech provider once per eight seconds of new audio** — audio past the last slice is never recognized, and the recording ends with the slices' text as-is.
 - **A record left in the recording status by a page that closed mid-meeting** keeps only its last stored slice until an operator closes it.
 - **The pushed Session belongs to the first Workspace in the catalog**, because no client service exposes the Workspace the Conversation is showing.
 - **Page audio upload is buffered by Connection** and bounded by its configured request-body cap.

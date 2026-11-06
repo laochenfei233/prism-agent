@@ -94,6 +94,7 @@ describe('meeting browser routes', () => {
       '/api/prism-meeting/speech',
       '/api/prism-meeting/speech/cancel',
       '/api/prism-meeting/speech/prepare',
+      '/api/prism-meeting/speech/select',
       '/api/prism-meeting/summarize',
       '/api/prism-meeting/transcribe',
       '/api/prism-meeting/update',
@@ -139,6 +140,14 @@ describe('meeting browser routes', () => {
     expect(listed.answers).toHaveLength(1)
     expect(failure(await h.post('ask', json({ id: 'missing', question: 'Hi' })))).toBe('prism-meeting/not-found')
     expect(failure(await h.post('answers', json({ id: 'missing' })))).toBe('prism-meeting/not-found')
+  })
+
+  it('persists a recognizer selection through the service', async () => {
+    const h = await webHarness()
+    // The harness composes no settings entry, so the persisted write is refused
+    // and the route surfaces the speech selection's own refusal.
+    expect(failure(await h.post('speech/select', json({ providerId: 'meeting-test' }))))
+      .toBe('prism-meeting/failure')
   })
 
   it('lists stored meetings without their transcripts', async () => {

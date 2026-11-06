@@ -87,6 +87,12 @@ const askBody = z.object({
   question: z.string(),
 })
 
+/** One JSON body selecting one recognizer as the deployment's speech selection. */
+const speechSelectBody = z.object({
+  providerId: z.string().min(1),
+  language: z.string().min(1).optional(),
+})
+
 /**
  * Register every browser route.
  * @param ctx - Registrant context carrying `ctx.meetingMinutes` and `ctx.connection`.
@@ -205,6 +211,13 @@ export function apply(ctx: Context): void {
   route('speech-cancel', `${BASE}/speech/cancel`, json(async (body) => {
     const { providerId } = speechTargetBody.parse(body)
     return ok({ speech: await ctx.meetingMinutes.cancelSpeechPreparation(providerId) })
+  }))
+
+  // Persisting the recognizer here routes every later transcription — slices
+  // and imports — through the operator's chosen provider.
+  route('speech-select', `${BASE}/speech/select`, json(async (body) => {
+    const parsed = speechSelectBody.parse(body)
+    return ok({ speech: await ctx.meetingMinutes.selectSpeech(parsed.providerId, parsed.language) })
   }))
 
   // Live capture asks for text alone: the page appends each answer while

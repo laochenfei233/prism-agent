@@ -425,10 +425,12 @@ export default class MeetingMinutesService extends Service {
           id: view.id,
           name: view.name,
           phase: view.preparation.phase,
+          languages: [...view.languages],
           ...(preparation === undefined ? {} : { preparation }),
         }
       }),
       selected: snapshot.selection.providerId,
+      language: snapshot.selection.language,
     }
   }
 
@@ -450,6 +452,22 @@ export default class MeetingMinutesService extends Service {
    */
   async cancelSpeechPreparation(providerId?: string): Promise<MeetingSpeechStatus> {
     await this.ctx.speechToText.cancelPreparation(this.speechProviderId(providerId))
+    return this.speech()
+  }
+
+  /**
+   * Persist one recognizer as the deployment's speech selection, so the
+   * operator picks a cloud or HTTP provider from the meeting page instead of
+   * being steered at the local model.
+   * @param providerId - registered provider to select.
+   * @param language - language hint to persist; omission keeps the stored one.
+   * @returns fresh speech status after the selection settles.
+   */
+  async selectSpeech(providerId: string, language?: string): Promise<MeetingSpeechStatus> {
+    await this.ctx.speechToText.configure({
+      providerId: brandString<SpeechProviderId>(providerId),
+      ...(language === undefined ? {} : { language }),
+    })
     return this.speech()
   }
 

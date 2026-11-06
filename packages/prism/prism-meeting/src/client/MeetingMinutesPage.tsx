@@ -19,8 +19,8 @@ import type {
 } from '../web-contract.ts'
 import { LIVE_SLICE_SECONDS, TARGET_SAMPLE_RATE, wavBlob, type LiveCapture } from './audio.ts'
 import {
-  durationText, filterMeetings, parseParticipants, rowMeta, selectedSpeechProvider, speechNotice,
-  speechPhaseAction, statusLabel, timestampText, transcriptLines, type Translate,
+  compatibleLanguage, durationText, filterMeetings, parseParticipants, rowMeta, selectedSpeechProvider,
+  speechNotice, speechPhaseAction, statusLabel, timestampText, transcriptLines, type Translate,
 } from './presentation.ts'
 import type { MeetingQuestion } from './push.ts'
 import css from './MeetingMinutesPage.module.css'
@@ -52,7 +52,7 @@ export interface MeetingPageFace {
   readonly begin: (body: MeetingBeginBody) => Promise<MeetingView>
   /** Replace the transcript one open recording has produced so far. */
   readonly update: (body: MeetingRecordingBody) => Promise<MeetingView>
-  /** Close one open recording with the transcript of its complete recording. */
+  /** Close one open recording with the transcript its slices saved. */
   readonly finish: (body: MeetingRecordingBody) => Promise<MeetingView>
   /** Replace the operator-editable fields of one stored meeting. */
   readonly revise: (body: MeetingReviseBody) => Promise<MeetingView>
@@ -68,6 +68,8 @@ export interface MeetingPageFace {
   readonly prepare: (providerId: string | undefined) => Promise<MeetingSpeechStatus>
   /** Cancel one speech provider's preparation; omission targets the selection. */
   readonly cancelPrepare: (providerId: string | undefined) => Promise<MeetingSpeechStatus>
+  /** Persist one recognizer as the deployment's speech selection. */
+  readonly selectSpeech: (providerId: string, language: string | undefined) => Promise<MeetingSpeechStatus>
   /** Ask one meeting a question and store the exchange. */
   readonly ask: (id: string, question: string) => Promise<AnswerView>
   /** Read one meeting's persisted answers, newest first. */
@@ -142,7 +144,7 @@ function microphoneFailure(t: Translate, error: unknown): string {
 export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
   const {
     t, list, read, begin, update, finish, revise, summarize, remove,
-    transcribe, speech, prepare, cancelPrepare, ask, answers, uploadAudio, push, capture,
+    transcribe, speech, prepare, cancelPrepare, selectSpeech, ask, answers, uploadAudio, push, capture,
   } = props
   const [meetings, setMeetings] = useState<readonly MeetingView[]>([])
   const [load, setLoad] = useState<LoadState>('loading')
@@ -157,6 +159,8 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
   const [importing, setImporting] = useState(false)
   const [speechStatus, setSpeechStatus] = useState<MeetingSpeechStatus | null>(null)
   const [speechBusy, setSpeechBusy] = useState(false)
+  /** The notice text the operator dismissed; different text shows again. */
+  const [dismissedNotice, setDismissedNotice] = useState<string | null>(null)
   const [storedAnswers, setStoredAnswers] = useState<readonly AnswerView[]>([])
   const [asking, setAsking] = useState(false)
   const [draftQuestion, setDraftQuestion] = useState('')
@@ -368,7 +372,12 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
     setLive(current => (current === null ? current : { ...current, phase: 'recording' }))
   }, [])
 
-  /** Release the microphone and store the transcript of the complete recording. */
+  /**
+   * Release the microphone and store the transcript the slices already saved.
+   * The accumulated slice text is the recording's transcript — a second pass
+   * over the complete audio would duplicate every recognition and add one more
+   * way to lose the meeting's text.
+   */
   const onFinish = useCallback(async (): Promise<void> => {
     const active = recording.current
     const id = liveId.current
@@ -379,29 +388,16 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
       ? current
       : { ...current, phase: 'finishing', seconds: readSeconds() }))
     await liveWrites.current
-    const samples = await active.stop()
-    let body = liveBody(id)
-    let degraded: string | null = null
+    await active.stop()
     try {
-      const recognized = await transcribe(wavBlob(samples))
-      body = {
-        id,
-        transcript: recognized.text,
-        ...(recognized.segments === undefined ? {} : { segments: recognized.segments }),
-        audioSeconds: Math.round(recognized.audioSeconds),
-      }
-    } catch (error) {
-      degraded = t('liveFinalFailed', { reason: reasonOf(error) })
-    }
-    try {
-      replaceRow(await finish(body))
-      setFailure(degraded)
+      replaceRow(await finish(liveBody(id)))
+      setFailure(null)
     } catch (error) {
       setFailure(t('finishFailed', { reason: reasonOf(error) }))
     }
     liveId.current = null
     setLive(null)
-  }, [closeSpan, finish, liveBody, readSeconds, replaceRow, t, transcribe])
+  }, [closeSpan, finish, liveBody, readSeconds, replaceRow, t])
 
   /** Abandon the running meeting: release the microphone, then offer its record for deletion. */
   const onDiscard = useCallback(async (): Promise<void> => {
@@ -527,6 +523,22 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
     }
   }, [cancelPrepare, t])
 
+  /** Persist one recognizer choice, adjusting the language to one it accepts. */
+  const onSelectSpeech = useCallback(async (providerId: string): Promise<void> => {
+    if (speechStatus === null) return
+    const provider = speechStatus.providers.find(item => item.id === providerId)
+    if (provider === undefined) return
+    setSpeechBusy(true)
+    try {
+      setSpeechStatus(await selectSpeech(providerId, compatibleLanguage(provider, speechStatus.language)))
+      setDismissedNotice(null)
+    } catch (error) {
+      setFailure(t('speechSelectFailed', { reason: reasonOf(error) }))
+    } finally {
+      setSpeechBusy(false)
+    }
+  }, [selectSpeech, speechStatus, t])
+
   const selectedId = selected?.id
 
   // Reading the answers tab follows the meeting the page shows, so a slower
@@ -572,7 +584,8 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
   const translate: Translate = t
   const liveMeeting = live === null ? null : meetings.find(row => row.id === live.meetingId) ?? null
   const liveHere = live !== null && selected !== null && selected.id === live.meetingId
-  const speechWarning = speechStatus === null ? null : speechNotice(speechStatus, t)
+  const speechNoticeText = speechStatus === null ? null : speechNotice(speechStatus, t)
+  const speechWarning = speechNoticeText !== null && speechNoticeText !== dismissedNotice ? speechNoticeText : null
   const selectedSpeech = speechStatus === null ? null : selectedSpeechProvider(speechStatus)
   const speechAction = selectedSpeech === null ? null : speechPhaseAction(selectedSpeech)
 
@@ -592,6 +605,20 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
             value={query}
             onChange={(event) => { setQuery(event.target.value) }}
           />
+          {speechStatus !== null && speechStatus.providers.length > 0 && (
+            <label className={css.speechSelect}>
+              <span className={css.speechSelectLabel}>{t('speechSelector')}</span>
+              <select
+                value={speechStatus.selected}
+                disabled={speechBusy}
+                onChange={(event) => { void onSelectSpeech(event.target.value) }}
+              >
+                {speechStatus.providers.map(provider => (
+                  <option key={provider.id} value={provider.id}>{provider.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <Button variant="outline" onClick={() => { void refresh() }}>{t('refresh')}</Button>
           <Button variant="outline" onClick={() => { setImporting(true) }}>{t('createImport')}</Button>
           <Button
@@ -630,7 +657,11 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
                 {t('speechCancelPrepare')}
               </Button>
             )}
-            <button type="button" className={css.dismiss} onClick={() => { setSpeechStatus(null) }}>
+            <button
+              type="button"
+              className={css.dismiss}
+              onClick={() => { if (speechNoticeText !== null) setDismissedNotice(speechNoticeText) }}
+            >
               {t('dismiss')}
             </button>
           </span>
@@ -716,7 +747,7 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
                         ? `${t('recording')} ${recordedText(live.seconds)}`
                         : live.phase === 'paused'
                           ? `${t('paused')} ${recordedText(live.seconds)}`
-                          : t('transcribingLive')}
+                          : t('liveEnding')}
                     </span>
                     <span className={css.liveHint}>
                       {t('liveHint', { seconds: String(LIVE_SLICE_SECONDS) })}

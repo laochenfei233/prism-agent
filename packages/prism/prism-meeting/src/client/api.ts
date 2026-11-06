@@ -142,14 +142,17 @@ function readProvider(value: unknown): MeetingSpeechStatus['providers'][number] 
   const id = readField(value, 'id')
   const name = readField(value, 'name')
   const phase = readField(value, 'phase')
+  const languages = readField(value, 'languages')
   const preparation = readOptionalField(value, 'preparation')
-  if (typeof id !== 'string' || typeof name !== 'string' || typeof phase !== 'string') {
+  if (typeof id !== 'string' || typeof name !== 'string' || typeof phase !== 'string'
+    || !Array.isArray(languages) || !languages.every(item => typeof item === 'string')) {
     throw invalidResponse('speech provider')
   }
   return {
     id,
     name,
     phase,
+    languages,
     ...(preparation === undefined ? {} : { preparation: readPreparation(preparation) }),
   }
 }
@@ -168,8 +171,11 @@ function readSpeech(value: unknown): MeetingSpeechStatus {
   if (typeof value !== 'object' || value === null) throw invalidResponse('speech status')
   const listed = readField(value, 'providers')
   const selected = readField(value, 'selected')
-  if (!Array.isArray(listed) || typeof selected !== 'string') throw invalidResponse('speech status')
-  return { providers: listed.map(readProvider), selected }
+  const language = readField(value, 'language')
+  if (!Array.isArray(listed) || typeof selected !== 'string' || typeof language !== 'string') {
+    throw invalidResponse('speech status')
+  }
+  return { providers: listed.map(readProvider), selected, language }
 }
 
 /** Recognized text of one recording, without a stored meeting. */
@@ -208,6 +214,8 @@ export interface MeetingApi {
   readonly prepare: (providerId: string | undefined, signal?: AbortSignal) => Promise<MeetingSpeechStatus>
   /** Cancel one speech provider's preparation; omission targets the selection. */
   readonly cancelPrepare: (providerId: string | undefined, signal?: AbortSignal) => Promise<MeetingSpeechStatus>
+  /** Persist one recognizer as the deployment's speech selection. */
+  readonly select: (providerId: string, language: string | undefined, signal?: AbortSignal) => Promise<MeetingSpeechStatus>
   /** Ask one meeting a question and store the exchange. */
   readonly ask: (id: string, question: string, signal?: AbortSignal) => Promise<AnswerView>
   /** Read one meeting's persisted answers, newest first. */
@@ -330,6 +338,13 @@ export function createMeetingApi(doFetch: typeof fetch = (input, init) => global
         await postJson('speech/cancel', providerId === undefined ? {} : { providerId }, signal),
         'speech',
       ))
+    },
+    async select(providerId, language, signal) {
+      return readSpeech(readField(await postJson(
+        'speech/select',
+        language === undefined ? { providerId } : { providerId, language },
+        signal,
+      ), 'speech'))
     },
     async ask(id, question, signal) {
       const answer = readField(await postJson('ask', { id, question }, signal), 'answer')

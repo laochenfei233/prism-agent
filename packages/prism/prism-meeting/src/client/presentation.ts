@@ -129,6 +129,23 @@ export function selectedSpeechProvider(status: MeetingSpeechStatus): MeetingSpee
   return status.providers.find(provider => provider.id === status.selected) ?? status.providers[0] ?? null
 }
 
+/**
+ * Pick the language hint a newly selected provider accepts: the current
+ * selection's language when listed, else `auto` when detected, else the
+ * provider's first hint.
+ * @param provider - the provider being selected.
+ * @param current - the language the deployment has selected so far.
+ * @returns a language the provider accepts.
+ */
+export function compatibleLanguage(
+  provider: MeetingSpeechStatus['providers'][number],
+  current: string,
+): string {
+  if (provider.languages.includes(current)) return current
+  if (provider.languages.includes('auto')) return 'auto'
+  return provider.languages[0] ?? current
+}
+
 /** Action the page offers for one provider's preparation state. */
 export type SpeechPhaseAction = 'prepare' | 'cancel'
 

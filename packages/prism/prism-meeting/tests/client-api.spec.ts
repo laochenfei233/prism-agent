@@ -173,12 +173,25 @@ describe('meeting api', () => {
   })
 
   it('reads the speech providers a recording would transcribe with', async () => {
-    const stub = okFetch({ speech: { providers: [{ id: 'p', name: 'Provider', phase: 'ready' }], selected: 'p' } })
+    const stub = okFetch({ speech: { providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' } })
     await expect(createMeetingApi(stub.fetch).speech()).resolves.toEqual({
-      providers: [{ id: 'p', name: 'Provider', phase: 'ready' }],
+      providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }],
       selected: 'p',
+      language: 'auto',
     })
     expect(stub.calls[0]?.url).toBe('api/prism-meeting/speech')
+  })
+
+  it('sends the recognizer selection with and without a language', async () => {
+    const status = { providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' }
+    const plain = okFetch({ speech: status })
+    await expect(createMeetingApi(plain.fetch).select('p', undefined)).resolves.toEqual(status)
+    expect(plain.calls[0]?.url).toBe('api/prism-meeting/speech/select')
+    expect(plain.calls[0]?.init.body).toBe('{"providerId":"p"}')
+
+    const hinted = okFetch({ speech: status })
+    await createMeetingApi(hinted.fetch).select('p', 'zh')
+    expect(hinted.calls[0]?.init.body).toBe('{"providerId":"p","language":"zh"}')
   })
 
   it.each([
@@ -188,10 +201,12 @@ describe('meeting api', () => {
     ['a selection that is not a string', { speech: { providers: [], selected: 7 } }],
     ['a preparation projection of the wrong field type', {
       speech: {
-        providers: [{ id: 'p', name: 'Provider', phase: 'downloading', preparation: { phase: 7 } }],
+        providers: [{ id: 'p', name: 'Provider', phase: 'downloading', languages: ['auto'], preparation: { phase: 7 } }],
         selected: 'p',
+        language: 'auto',
       },
     }],
+    ['a status without the selection language', { speech: { providers: [], selected: 'p' } }],
   ])('rejects %s in the speech status', async (_case, value) => {
     const stub = okFetch(value)
     await expect(createMeetingApi(stub.fetch).speech())
@@ -202,23 +217,25 @@ describe('meeting api', () => {
     const stub = okFetch({
       speech: {
         providers: [{
-          id: 'p', name: 'Provider', phase: 'downloading',
+          id: 'p', name: 'Provider', phase: 'downloading', languages: ['auto'],
           preparation: { phase: 'downloading', resource: 'model', completedBytes: 8, totalBytes: 16 },
         }],
         selected: 'p',
+        language: 'auto',
       },
     })
     await expect(createMeetingApi(stub.fetch).speech()).resolves.toEqual({
       providers: [{
-        id: 'p', name: 'Provider', phase: 'downloading',
+        id: 'p', name: 'Provider', phase: 'downloading', languages: ['auto'],
         preparation: { phase: 'downloading', resource: 'model', completedBytes: 8, totalBytes: 16 },
       }],
       selected: 'p',
+      language: 'auto',
     })
   })
 
   it('sends the prepare and cancel requests, with and without a provider', async () => {
-    const status = { providers: [{ id: 'p', name: 'Provider', phase: 'ready' }], selected: 'p' }
+    const status = { providers: [{ id: 'p', name: 'Provider', phase: 'ready', languages: ['auto'] }], selected: 'p', language: 'auto' }
     const named = okFetch({ speech: status })
     await expect(createMeetingApi(named.fetch).prepare('p')).resolves.toEqual(status)
     expect(named.calls[0]?.url).toBe('api/prism-meeting/speech/prepare')
