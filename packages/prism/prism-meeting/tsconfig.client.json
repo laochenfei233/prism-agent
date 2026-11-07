@@ -6,11 +6,14 @@
     "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
   },
   "include": [
-    "src/client",
-    "src/css-modules.d.ts",
-    "src/types.ts",
-    "src/view.ts",
-    "src/web-contract.ts"
+    "src"
+  ],
+  "exclude": [
+    // Host-face sources: the browser face imports only the shared vocabulary.
+    "src/index.ts",
+    "src/spec.ts",
+    "src/tools.ts",
+    "src/web.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },

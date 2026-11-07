@@ -30,7 +30,7 @@
       "path": "../../credentials/credentials"
     },
     {
-      "path": "../speech-to-text"
+      "path": "../../experimental/speech-to-text"
     }
   ]
 }

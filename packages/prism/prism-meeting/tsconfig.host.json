@@ -21,7 +21,7 @@
     { "path": "../../client/connection/tsconfig.host.json" },
     { "path": "../../storage/storage-domain" },
     { "path": "../../llm/llm" },
-    { "path": "../../speech/speech-to-text" },
+    { "path": "../../experimental/speech-to-text" },
     { "path": "../../util/brand" },
     { "path": "../../core/tools" }
   ]

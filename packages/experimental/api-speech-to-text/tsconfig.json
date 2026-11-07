@@ -15,7 +15,7 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../speech/speech-to-text"
+      "path": "../../experimental/speech-to-text"
     },
     {
       "path": "../../typert/protocol"

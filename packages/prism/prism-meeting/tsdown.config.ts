@@ -1,3 +1,3 @@
 import { clientBundle } from '../../client/tsdown.client.ts'
 
-export default clientBundle('@prism-ai/prism-meeting', ['lib/types/index.js'], { hostPhase: true })
+export default clientBundle(import.meta.dirname, ['lib/types/index.js'], { hostPhase: true })

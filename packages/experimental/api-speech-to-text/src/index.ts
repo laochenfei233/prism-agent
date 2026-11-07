@@ -2,10 +2,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type {} from '@deepseek-ai/dsh-speech-to-text'
-import type { SpeechPreparationOptions, SpeechProviderId, SpeechSelectionPatch, Transcript } from '@deepseek-ai/dsh-speech-to-text/types'
+import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
+import type { SpeechPreparationOptions, SpeechProviderId, SpeechSelectionPatch, Transcript } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import type { SpeechCatalog, TranscriptionRequest } from './types.ts'
-import { validateWave } from '@deepseek-ai/dsh-speech-to-text/wave'
+import { validateWave } from '@deepseek-ai/dsh-experimental-speech-to-text/wave'
 
 export type * from './types.ts'
 

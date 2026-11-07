@@ -248,7 +248,6 @@
     { "path": "./packages/speech/speech-to-text-http" },
     { "path": "./packages/experimental/speech-to-text-sensevoice" },
     { "path": "./packages/experimental/api-speech-to-text" },
-    { "path": "./packages/speech/speech-to-text-dashscope" },
     { "path": "./packages/experimental/voice-input-bundle" },
     { "path": "./packages/experimental/plugin-market-bundle" },
     { "path": "./packages/client/locale/tsconfig.host.json" },
