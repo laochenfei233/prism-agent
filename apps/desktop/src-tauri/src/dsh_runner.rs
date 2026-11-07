@@ -2,6 +2,7 @@
 //! start left running, spawn, port health probe, automatic crash restart, and
 //! clean teardown on app exit.
 
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -9,7 +10,11 @@ use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::webview::{
+    cookie::{time::Duration as CookieDuration, SameSite},
+    Cookie,
+};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
@@ -1057,6 +1062,115 @@ fn plain_path(p: &Path) -> PathBuf {
         p.to_path_buf()
     }
 }
+
+/// Cookie fields needed to install the launch exchange result in WebView2.
+#[derive(Debug)]
+struct AuthCookie {
+    name: String,
+    value: String,
+    max_age: i64,
+}
+
+/// The clean Web origin to load after the launch-token exchange.
+#[derive(Serialize)]
+pub struct WebviewSession {
+    pub url: String,
+}
+
+/// Read the sole dsh browser-session cookie from the token-exchange response.
+fn auth_cookie_from_response(response: &str) -> Option<AuthCookie> {
+    let header_block = response.split("
+
+").next()?;
+    let set_cookie = header_block.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("set-cookie")
+            .then(|| value.trim())
+    })?;
+    let (name, value) = set_cookie.split(';').next()?.split_once('=')?;
+    let name = name.trim();
+    if !name.starts_with("dsh-auth-") {
+        return None;
+    }
+    let max_age = set_cookie
+        .split(';')
+        .find_map(|attribute| {
+            let (key, value) = attribute.trim().split_once('=')?;
+            key.eq_ignore_ascii_case("max-age")
+                .then(|| value.trim().parse::<i64>().ok())
+                .flatten()
+        })
+        .unwrap_or(30 * 24 * 60 * 60);
+    Some(AuthCookie {
+        name: name.to_owned(),
+        value: value.trim().to_owned(),
+        max_age,
+    })
+}
+
+/// Exchange the one-time URL token for a browser cookie in the native store.
+/// The cookie is made usable by the embedded cross-origin iframe; a strict
+/// cookie minted by an iframe would not be sent back to the loopback server.
+#[tauri::command]
+pub async fn authenticate_webview(app: AppHandle, url: String) -> Result<WebviewSession, String> {
+    let parsed = url
+        .parse::<Url>()
+        .ok()
+        .filter(|parsed| {
+            parsed.scheme() == "http"
+                && parsed.host_str() == Some("127.0.0.1")
+                && parsed.port().is_some()
+        })
+        .ok_or("invalid dsh web launch URL")?;
+    let (cookie_parts, clean_url) = tauri::async_runtime::spawn_blocking(move || {
+        let port = parsed.port().ok_or("invalid dsh web launch URL")?;
+        let target = match parsed.query() {
+            Some(query) => format!("{}?{query}", parsed.path()),
+            None => parsed.path().to_owned(),
+        };
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        use std::io::Write;
+        stream
+            .write_all(
+                format!(
+                    "GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        let mut response = String::new();
+        std::io::Read::read_to_string(&mut stream, &mut response)
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        let cookie = auth_cookie_from_response(&response)
+            .ok_or_else(|| "launch-token response contained no dsh browser cookie".to_owned())?;
+        let mut clean = parsed;
+        clean.set_query(None);
+        clean.set_fragment(None);
+        Ok::<_, String>((cookie, clean.to_string()))
+    })
+    .await
+    .map_err(|e| format!("launch-token exchange task failed: {e}"))??;
+    let cookie = Cookie::build((cookie_parts.name, cookie_parts.value))
+        .domain("127.0.0.1")
+        .path("/")
+        .http_only(true)
+        .same_site(SameSite::None)
+        .secure(true)
+        .max_age(CookieDuration::seconds(cookie_parts.max_age))
+        .build();
+    let window = app
+        .get_webview_window("main")
+        .ok_or("main webview unavailable")?;
+    window
+        .set_cookie(cookie)
+        .map_err(|e| format!("browser-cookie installation failed: {e}"))?;
+    Ok(WebviewSession { url: clean_url })
+}
+
 
 #[derive(Serialize)]
 pub struct DshStatus {
