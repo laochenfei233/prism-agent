@@ -12,8 +12,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import * as yaml from 'js-yaml'
 import { Context } from '@deepseek-ai/cordis'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
-import SpeechToText from '@deepseek-ai/dsh-speech-to-text'
-import * as DashScope from '@deepseek-ai/dsh-speech-to-text-dashscope'
+import SpeechToText from '@deepseek-ai/dsh-experimental-speech-to-text'
+import * as DashScope from '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
 
 /** The bundle package root. */
 const root = fileURLToPath(new URL('..', import.meta.url))

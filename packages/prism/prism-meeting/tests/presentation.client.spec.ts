@@ -168,13 +168,15 @@ describe('speechNotice', () => {
     expect(speechNotice({
       providers: [{ id: 'p', name: 'SenseVoice', phase: 'ready', languages: ['auto'] }],
       selected: 'p',
+      language: 'auto',
     }, translate)).toBeNull()
   })
 
   it('reports nothing for a prepared provider resting in standby', () => {
     expect(speechNotice({
-      providers: [{ id: 'p', name: 'SenseVoice', phase: 'standby' }],
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'standby', languages: ['auto'] }],
       selected: 'p',
+      language: 'auto',
     }, translate)).toBeNull()
   })
 
@@ -182,6 +184,7 @@ describe('speechNotice', () => {
     expect(speechNotice({
       providers: [{ id: 'p', name: 'SenseVoice', phase: 'loading', languages: ['auto'] }],
       selected: 'gone',
+      language: 'auto',
     }, translate)).toContain('SenseVoice')
   })
 })
@@ -209,7 +212,7 @@ describe('compatibleLanguage', () => {
     expect(compatibleLanguage(provider(['auto', 'zh']), 'zh')).toBe('zh')
     expect(compatibleLanguage(provider(['auto', 'en']), 'zh')).toBe('auto')
     expect(compatibleLanguage(provider(['zh', 'en']), 'auto')).toBe('zh')
-    expect(compatibleLanguage(provider([], ''), '')).toBe('')
+    expect(compatibleLanguage(provider([]), '')).toBe('')
   })
 })
 
@@ -235,8 +238,8 @@ describe('selectedSpeechProvider', () => {
       { id: 'p', name: 'P', phase: 'ready', languages: ['auto'] },
       { id: 'q', name: 'Q', phase: 'ready', languages: ['auto'] },
     ]
-    expect(selectedSpeechProvider({ providers, selected: 'q' })?.id).toBe('q')
-    expect(selectedSpeechProvider({ providers, selected: 'gone' })?.id).toBe('p')
-    expect(selectedSpeechProvider({ providers: [], selected: '' })).toBeNull()
+    expect(selectedSpeechProvider({ providers, selected: 'q', language: 'auto' })?.id).toBe('q')
+    expect(selectedSpeechProvider({ providers, selected: 'gone', language: 'auto' })?.id).toBe('p')
+    expect(selectedSpeechProvider({ providers: [], selected: '', language: 'auto' })).toBeNull()
   })
 })

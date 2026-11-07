@@ -7,7 +7,11 @@ import {
   MeetingMinutesPage, type MeetingMinutesPageProps, type MeetingPageFace,
 } from '../src/client/MeetingMinutesPage.tsx'
 import type { LiveCapture } from '../src/client/audio.ts'
-import { en, type MeetingLocaleKey } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
+// The page's module augmentation registers its locale namespace for the props type.
+import type {} from '../src/client/index.tsx'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MeetingSpeechStatus } from '../src/types.ts'
 import type { MeetingBeginBody, MeetingRecordingBody, MeetingReviseBody } from '../src/web-contract.ts'
 import type { MeetingView } from '../src/view.ts'
 
@@ -17,11 +21,13 @@ afterEach(cleanup)
 const TARGET_SAMPLES = 16_000
 
 /** Substitute `{name}` placeholders in one dictionary line. */
-const translate = (key: MeetingLocaleKey, params?: Record<string, string>): string =>
-  Object.entries(params ?? {}).reduce(
-    (text, [name, value]) => text.replaceAll(`{${name}}`, value),
-    en[key],
+const translate: TranslateNS<'meetingMinutes'> = (key, params) => {
+  const line = (en as Record<string, string>)[key] ?? key
+  return Object.entries(params ?? {}).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+    line,
   )
+}
 
 /** One stored meeting with the fields a case is about. */
 function meeting(overrides: Partial<MeetingView> = {}): MeetingView {
@@ -122,6 +128,9 @@ function standardSeats() {
     useSessionStatus: unused,
     useSessionRetainInfo: unused,
     useResource: unused,
+    useRemoteAccess: unused,
+    useSessionAccess: unused,
+    useWorkspaceAccess: unused,
   }
 }
 
@@ -167,7 +176,7 @@ describe('meetings page', () => {
   })
 
   it('warns when no speech provider can transcribe', async () => {
-    renderPage(face({ speech: vi.fn(async () => ({ providers: [], selected: '' })) }))
+    renderPage(face({ speech: vi.fn(async () => ({ providers: [], selected: '', language: 'auto' })) }))
     expect(await screen.findByText(/No speech provider is available/)).toBeTruthy()
   })
 
@@ -183,9 +192,10 @@ describe('meetings page', () => {
   })
 
   it('prepares the selected provider from the page and follows the progress', async () => {
-    let current = {
-      providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared' }],
+    let current: MeetingSpeechStatus = {
+      providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared', languages: ['auto'] }],
       selected: 'p',
+      language: 'auto',
     }
     const downloading = {
       providers: [{
@@ -306,11 +316,7 @@ describe('meetings page', () => {
   it('keeps the selector and polling after dismissing, and re-shows a changed notice', async () => {
     // Each read returns a fresh object, so the status update is a new reference
     // the page actually re-renders on.
-    let current: {
-      providers: { id: string; name: string; phase: string; languages: string[] }[]
-      selected: string
-      language: string
-    } = {
+    let current: MeetingSpeechStatus = {
       providers: [{ id: 'p', name: 'SenseVoice', phase: 'unprepared', languages: ['auto'] }],
       selected: 'p',
       language: 'auto',
@@ -361,7 +367,11 @@ describe('meetings page', () => {
         id: body.id,
         status: 'recording',
         transcript: body.transcript,
-        segments: body.segments === undefined ? [] : [...body.segments],
+        segments: body.segments === undefined
+          ? []
+          : body.segments.map(segment => (segment.speaker === undefined
+            ? { text: segment.text }
+            : { text: segment.text, speaker: segment.speaker })),
         transcriptChars: body.transcript.length,
         audioSeconds: body.audioSeconds,
       })),
