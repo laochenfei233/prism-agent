@@ -1,14 +1,14 @@
 /**
- * Shared workspace-package graph discovery and Mermaid identifier helpers for
- * the generated module graph and relationship-diagram generators. Each caller
- * supplies its own group ordering because the documents use different visual
- * priorities; manifest parsing and dependency-safe ordering have one owner.
+ * Shared DSH- and Prism-package graph discovery and Mermaid identifier helpers
+ * for the generated module graph and relationship-diagram generators. Each
+ * caller supplies its own group ordering because the documents use different
+ * visual priorities; manifest parsing and dependency-safe ordering have one owner.
  */
 
 import { globSync, readFileSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 
-const SCOPE = '@deepseek-ai/dsh-'
+const SCOPES = ['@deepseek-ai/dsh-', '@prism-ai/'] as const
 
 /** One harness package and its in-repo peer-dependency edges. */
 export interface PackageGraphNode {
@@ -22,6 +22,20 @@ export interface PackageGraphNode {
   rel: string
   /** Short names of in-repo peer dependencies, sorted. */
   deps: string[]
+  /** Full in-repo peer dependency names, keyed by short name. */
+  dependencyNames?: Readonly<Record<string, string>>
+}
+
+/**
+ * Return one package's within-repository short name.
+ * @param name - npm package name.
+ * @returns The name without a recognized workspace scope.
+ */
+function packageShortName(name: string): string | undefined {
+  for (const scope of SCOPES) {
+    if (name.startsWith(scope)) return name.slice(scope.length)
+  }
+  return undefined
 }
 
 /**
@@ -39,30 +53,42 @@ export function collectPackageGraph(root: string, groupOrder: readonly string[],
       name: string
       peerDependencies?: Record<string, string>
     }
-    if (!json.name.startsWith(SCOPE)) continue
+    const short = packageShortName(json.name)
+    if (short === undefined) continue
     const [, group, leaf] = rel.split('/')
     if (group === undefined || leaf === undefined) throw new Error(`${gate}: unexpected package path ${rel}`)
-    const deps = Object.keys(json.peerDependencies ?? {})
-      .filter(dep => dep.startsWith(SCOPE))
-      .map(dep => dep.slice(SCOPE.length))
+    const dependencyNames: Record<string, string> = {}
+    for (const name of Object.keys(json.peerDependencies ?? {})) {
+      const dependency = packageShortName(name)
+      if (dependency !== undefined) dependencyNames[dependency] = name
+    }
+    const deps = Object.keys(dependencyNames)
       .sort()
     packages.push({
-      short: json.name.slice(SCOPE.length),
+      short,
       name: json.name,
       group,
       rel: dirname(rel),
       deps,
+      dependencyNames,
     })
   }
   return topoSort(packages, groupOrder, gate)
 }
 
 function topoSort(packages: PackageGraphNode[], groupOrder: readonly string[], gate: string): PackageGraphNode[] {
-  const byName = new Map(packages.map(pkg => [pkg.short, pkg]))
+  const byName = new Map<string, PackageGraphNode>()
+  for (const pkg of packages) {
+    const previous = byName.get(pkg.short)
+    if (previous !== undefined) {
+      throw new Error(`${gate}: ${pkg.name} and ${previous.name} share in-repository short name ${pkg.short}`)
+    }
+    byName.set(pkg.short, pkg)
+  }
   for (const pkg of packages) {
     for (const dependency of pkg.deps) {
       if (!byName.has(dependency)) {
-        throw new Error(`${gate}: ${pkg.name} references missing in-repo peer ${SCOPE}${dependency}`)
+        throw new Error(`${gate}: ${pkg.name} references missing in-repo peer ${pkg.dependencyNames?.[dependency] ?? dependency}`)
       }
     }
   }

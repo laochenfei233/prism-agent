@@ -77,7 +77,7 @@ describe('live session capability', () => {
     try {
       const spec = service.resolveStream({})
       expect(spec).toEqual({ provider: live.recognizer, streaming: live.recognizer.streaming, language: 'zh' })
-      expect(service.resolveStream({ providerId: live.recognizer.info.id as SpeechProviderId, language: 'auto' }))
+      expect(service.resolveStream({ providerId: live.recognizer.info.id, language: 'auto' }))
         .toMatchObject({ provider: live.recognizer, language: 'auto' })
       expect(() => service.resolveStream({ providerId: 'batch' as SpeechProviderId }))
         .toThrow('offers no live session: batch')

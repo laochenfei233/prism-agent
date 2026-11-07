@@ -78,6 +78,12 @@ flowchart LR
   cfg --> plugin_dsh_base_storage_json
   plugin_dsh_base_storage_domain["storage-domain<br/>@deepseek-ai/dsh-storage-domain"]
   cfg --> plugin_dsh_base_storage_domain
+  plugin_dsh_base_speech_to_text["speech-to-text<br/>@deepseek-ai/dsh-speech-to-text"]
+  cfg --> plugin_dsh_base_speech_to_text
+  plugin_dsh_base_speech_to_text_dashscope["speech-to-text-dashscope<br/>@deepseek-ai/dsh-speech-to-text-dashscope"]
+  cfg --> plugin_dsh_base_speech_to_text_dashscope
+  plugin_dsh_base_prism_meeting["prism-meeting<br/>@prism-ai/prism-meeting"]
+  cfg --> plugin_dsh_base_prism_meeting
   plugin_dsh_base_session_projection_cache["session-projection-cache<br/>@deepseek-ai/dsh-session-projection-cache"]
   cfg --> plugin_dsh_base_session_projection_cache
   plugin_dsh_base_otel["otel<br/>@deepseek-ai/dsh-otel"]
@@ -172,6 +178,8 @@ flowchart LR
   cfg --> plugin_dsh_base_image_offload
   plugin_dsh_base_tool_todo["tool-todo<br/>@deepseek-ai/dsh-tool-todo"]
   cfg --> plugin_dsh_base_tool_todo
+  plugin_dsh_base_tool_prism_meeting["tool-prism-meeting<br/>@prism-ai/prism-meeting/tools"]
+  cfg --> plugin_dsh_base_tool_prism_meeting
   plugin_dsh_base_tool_goal["tool-goal<br/>@deepseek-ai/dsh-tool-goal"]
   cfg --> plugin_dsh_base_tool_goal
   plugin_dsh_base_repeat_tool_reminder["repeat-tool-reminder<br/>@deepseek-ai/dsh-repeat-tool-reminder"]
@@ -239,6 +247,9 @@ flowchart LR
 | `storage` | `@deepseek-ai/dsh-storage` |
 | `storage-json` | `@deepseek-ai/dsh-storage-json` |
 | `storage-domain` | `@deepseek-ai/dsh-storage-domain` |
+| `speech-to-text` | `@deepseek-ai/dsh-speech-to-text` |
+| `speech-to-text-dashscope` | `@deepseek-ai/dsh-speech-to-text-dashscope` |
+| `prism-meeting` | `@prism-ai/prism-meeting` |
 | `session-projection-cache` | `@deepseek-ai/dsh-session-projection-cache` |
 | `otel` | `@deepseek-ai/dsh-otel` |
 | `session-telemetry-otel` | `@deepseek-ai/dsh-session-telemetry-otel` |
@@ -286,6 +297,7 @@ flowchart LR
 | `tool-result-pruner` | `@deepseek-ai/dsh-compaction-tool-result-pruner` |
 | `image-offload` | `@deepseek-ai/dsh-compaction-image-offload` |
 | `tool-todo` | `@deepseek-ai/dsh-tool-todo` |
+| `tool-prism-meeting` | `@prism-ai/prism-meeting/tools` |
 | `tool-goal` | `@deepseek-ai/dsh-tool-goal` |
 | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |
 | `web` | `@deepseek-ai/dsh-web` |

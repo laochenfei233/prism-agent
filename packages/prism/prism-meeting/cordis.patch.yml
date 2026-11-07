@@ -1,0 +1,22 @@
+# Prism meeting bundle patch. Insert reuses an existing row id and updates its
+# options, so a base-backed profile that already mounts the defaults keeps one
+# row while an older profile gains the service and tool rows from this bundle.
+
+- insert:
+    - id: prism-meeting
+      name: '@prism-ai/prism-meeting'
+      config:
+        summaryProvider: deepseek-official
+        summaryModel: deepseek-flash
+        summarySystemPrompt: You summarize meetings in the caller's language. Preserve decisions, owners, deadlines, and unresolved questions; do not invent facts.
+        answerSystemPrompt: You answer questions only from the supplied meeting transcript in the caller's language. Say what the transcript does not establish; do not invent facts.
+        maxTranscriptChars: 50000
+
+    - id: tool-prism-meeting
+      name: '@prism-ai/prism-meeting/tools'
+
+    # Browser channel and meeting page: needs the Web Connection and its web
+    # server, so a profile that composes either without the other leaves this
+    # row pending instead of failing it.
+    - id: prism-meeting-web
+      name: '@prism-ai/prism-meeting/web'

@@ -56,6 +56,10 @@
       "@deepseek-ai/dsh-experimental-client-ui-cot-translation/types": ["./packages/experimental/client-ui-cot-translation/src/types.ts"],
       "@deepseek-ai/dsh-experimental-client-ui-cot-translation/client": ["./packages/experimental/client-ui-cot-translation/src/client/index.ts"],
       "@deepseek-ai/dsh-experimental-cot-translation-bundle": ["./packages/experimental/cot-translation-bundle/src/index.ts"],
+      "@deepseek-ai/dsh-experimental-speech-to-text-http": ["./packages/speech/speech-to-text-http/src/index.ts"],
+      "@deepseek-ai/dsh-speech-to-text": ["./packages/speech/speech-to-text/src/index.ts"],
+      "@deepseek-ai/dsh-speech-to-text/wave": ["./packages/speech/speech-to-text/src/wave.ts"],
+      "@deepseek-ai/dsh-speech-to-text/types": ["./packages/speech/speech-to-text/src/types.ts"],
       "@deepseek-ai/dsh-experimental-speech-to-text-sensevoice": ["./packages/experimental/speech-to-text-sensevoice/src/index.ts"],
       "@deepseek-ai/dsh-experimental-api-speech-to-text": ["./packages/experimental/api-speech-to-text/src/index.ts"],
       "@deepseek-ai/dsh-experimental-client-ui-voice-input": ["./packages/experimental/client-ui-voice-input/src/index.ts"],
@@ -218,6 +222,7 @@
       // here. The aggregates' project references (tsconfig.host.json /
       // tsconfig.client.json) stay explicit — TS project references have no
       // wildcard form.
+      "@deepseek-ai/dsh-speech-to-text-dashscope": ["./packages/speech/speech-to-text-dashscope/src"],
       "@deepseek-ai/dsh-host-directory-picker": ["./packages/host/directory-picker/src"],
       "@deepseek-ai/dsh-host-directory-picker/*": ["./packages/host/directory-picker/src/*"],
       "@deepseek-ai/dsh-host-directory-picker-browse": ["./packages/host/directory-picker-browse/src"],
@@ -392,6 +397,10 @@
       "@deepseek-ai/dsh-experimental-speech-to-text-openai/protocol": ["./packages/experimental/speech-to-text-openai/src/protocol.ts"],
       "@deepseek-ai/dsh-experimental-tool-meeting-minutes": ["./packages/experimental/tool-meeting-minutes/src"],
       "@deepseek-ai/dsh-util-path-lock": ["./packages/util/path-lock/src"],
+      "@prism-ai/prism-meeting/tools": ["./packages/prism/prism-meeting/src/tools.ts"],
+      "@prism-ai/prism-meeting/web": ["./packages/prism/prism-meeting/src/web.ts"],
+      "@prism-ai/prism-meeting/client": ["./packages/prism/prism-meeting/src/client/index.tsx"],
+      "@prism-ai/prism-meeting": ["./packages/prism/prism-meeting/src"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],
@@ -519,6 +528,7 @@
       "@deepseek-ai/dsh-skill-badge": ["./packages/experimental/skill-badge/src"],
       "@deepseek-ai/dsh-skill-filesystem": ["./packages/skill/skill-filesystem/src"],
       "@deepseek-ai/dsh-skill-office": ["./packages/skill/skill-office/src"],
+      "@deepseek-ai/dsh-experimental-speech-to-text-http": ["./packages/speech/speech-to-text-http/src"],
       "@deepseek-ai/dsh-spill": ["./packages/spill/spill/src"],
       "@deepseek-ai/dsh-spill-local": ["./packages/spill/spill-local/src"],
       "@deepseek-ai/dsh-spill-policy": ["./packages/spill/spill-policy/src"],

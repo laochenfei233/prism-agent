@@ -107,6 +107,7 @@
     "@deepseek-ai/dsh-storage": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-tool-schedule": "workspace:*",
+    "@prism-ai/prism-meeting": "workspace:*",
     "@deepseek-ai/dsh-tool-workspace-dependencies": "workspace:*",
     "@deepseek-ai/dsh-spill": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",

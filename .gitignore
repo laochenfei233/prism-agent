@@ -50,6 +50,7 @@ worktrees/
 # Standalone repo staging (dsh-desktop)
 .standalone/
 native/system/test/bin/
+<<<<<<< HEAD
 
 # Local harness-home copies carry per-install identity and credentials; never commit them.
 home-mods/.credentials.yaml
@@ -67,3 +68,4 @@ esc-test.txt
 install.err.log
 install.out.log
 apps/desktop/.npm-cache/
+*.tgz

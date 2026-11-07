@@ -49,6 +49,23 @@ describe('collectPackageGraph', () => {
     expect(() => collectPackageGraph(root, ['client'], 'fixture'))
       .toThrow('fixture: @deepseek-ai/dsh-consumer references missing in-repo peer @deepseek-ai/dsh-missing')
   })
+
+  it('includes Prism-scoped packages and their DSH peer edges', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-package-graph-'))
+    roots.push(root)
+    const packageDir = join(root, 'packages', 'prism', 'prism-meeting')
+    mkdirSync(packageDir, { recursive: true })
+    writeFileSync(join(packageDir, 'package.json'), `${JSON.stringify({
+      name: '@prism-ai/prism-meeting',
+      peerDependencies: { '@deepseek-ai/dsh-tools': 'workspace:*' },
+    }, null, 2)}\n`)
+    const toolsDir = join(root, 'packages', 'core', 'tools')
+    mkdirSync(toolsDir, { recursive: true })
+    writeFileSync(join(toolsDir, 'package.json'), `${JSON.stringify({ name: '@deepseek-ai/dsh-tools' }, null, 2)}\n`)
+
+    expect(collectPackageGraph(root, ['core', 'prism'], 'fixture').map(pkg => pkg.short))
+      .toEqual(['tools', 'prism-meeting'])
+  })
 })
 
 describe('renderModuleGraph', () => {

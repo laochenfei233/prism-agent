@@ -1,0 +1,28 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/index.ts",
+    "src/spec.ts",
+    "src/tools.ts",
+    "src/types.ts",
+    "src/view.ts",
+    "src/web.ts",
+    "src/web-contract.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cosmokit" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../client/connection/tsconfig.host.json" },
+    { "path": "../../storage/storage-domain" },
+    { "path": "../../llm/llm" },
+    { "path": "../../speech/speech-to-text" },
+    { "path": "../../util/brand" },
+    { "path": "../../core/tools" }
+  ]
+}

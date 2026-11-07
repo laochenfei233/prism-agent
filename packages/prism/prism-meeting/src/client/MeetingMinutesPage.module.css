@@ -1,0 +1,482 @@
+/* Meetings page: the stored-record list beside one meeting's summary and transcript. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: 28px clamp(20px, 3vw, 40px) 24px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* macOS hiddenInset titlebar: keep the head below the window strip in both
+   sidebar states so it never jumps. */
+:global([data-platform='darwin']) .head {
+  padding-top: var(--dsh-frame-top-clearance, 0px);
+}
+
+.headText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.intro {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search {
+  width: 200px;
+}
+
+.speechSelect {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speechSelectLabel {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.speechSelect select {
+  max-width: 180px;
+  padding: 4px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.speechSelect select:focus-visible {
+  outline: 1.5px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.failure,
+.warning,
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.failure {
+  border-left-color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-state-error-secondary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.warning {
+  border-left-color: var(--dsw-alias-state-warn-label);
+  background: var(--dsw-alias-state-warn-secondary);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.notice {
+  border-left-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The speech notice carries actions, so it is a bar rather than a paragraph,
+   and reads exactly like the warning it replaced. */
+.speechBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--dsw-alias-state-warn-label);
+  border-radius: 8px;
+  background: var(--dsw-alias-state-warn-secondary);
+  color: var(--dsw-alias-state-warn-label);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.barText {
+  min-width: 0;
+}
+
+.barActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.dismiss {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  flex: 1;
+  gap: 20px;
+  min-height: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  border-right: 0.5px solid var(--dsw-alias-border-l2);
+  list-style: none;
+  overflow: auto;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.row[data-selected] {
+  background: var(--dsw-alias-interactive-bg-active);
+  box-shadow: inset 2px 0 0 0 var(--dsw-alias-state-business-primary);
+}
+
+.row:focus-visible,
+.dismiss:focus-visible {
+  outline: 1.5px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -1.5px;
+}
+
+.rowTitle {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rowMeta,
+.rowTime {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.detail {
+  min-height: 0;
+  overflow: auto;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* An empty detail column reads as an invitation, not a blank pane. */
+.detail > .placeholder {
+  justify-content: center;
+  padding: 56px 0;
+}
+
+.meeting {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.meetingHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.meetingTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta dt {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.meta dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.metaWide {
+  grid-column: 1 / -1;
+}
+
+.meetingActions {
+  display: flex;
+  gap: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.tabs button {
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.tabs button[data-active] {
+  color: var(--dsw-alias-label-primary);
+  box-shadow: inset 0 -1.5px 0 0 var(--dsw-alias-state-business-primary);
+}
+
+.tabs button:focus-visible {
+  border-radius: 4px;
+  outline: 1.5px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.text {
+  margin: 0;
+  max-width: 76ch;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.liveBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.liveText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.liveStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.liveHint {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.liveActions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.dialogFailure {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.field > span {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.question {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  resize: vertical;
+}
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.askRow {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.askRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.answerList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.answerQuestion {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.answerText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.answerTime {
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.audioState {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.menuAnchor {
+  display: inline-block;
+  width: 0;
+  height: 0;
+}

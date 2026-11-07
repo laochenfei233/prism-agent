@@ -121,7 +121,11 @@ export function clientBundle(
   const lib = clientLibraryConfig(manifest, libEntry, options.lib)
   return ({ env }) => {
     const face = buildFace(env?.DSH_BUILD_FACE)
-    const clientEntry = face === undefined ? 'src/client/index.ts' : 'lib/types/client/index.js'
+    // The entry resolves like the literal below it — against the invoking
+    // package's directory — so a TSX client entry needs its own probe.
+    const clientEntry = face === undefined
+      ? (existsSync('src/client/index.tsx') ? 'src/client/index.tsx' : 'src/client/index.ts')
+      : 'lib/types/client/index.js'
     const client = clientConfig(manifest, clientEntry, options.clientBanner, options.dualClient === true)
     const node = [lib, ...(options.companions ?? [])]
     const clientFaces = options.dualClient === true

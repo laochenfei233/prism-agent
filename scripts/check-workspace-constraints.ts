@@ -53,10 +53,12 @@ const publicNativePackages = new Set([
 const publicationSourceAllowlist: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/node-addon-system': ['src/main.c', 'src/flock.c'],
 }
-/** Public source home recorded in maintained package manifests. */
+/** Public source home for upstream DSH packages. */
 const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harness.git'
 /** PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8 — the fork's CLI is the one release member published from the fork's own repository. */
 const forkRepositoryUrl = 'git+https://github.com/laochenfei233/prism-agent.git'
+/** Public source home for Prism-owned packages maintained in this repository. */
+const publishedPrismRepositoryUrl = 'git+https://github.com/laochenfei233/prism-agent-e.git'
 /** Packages that participate in the experimental policy. */
 const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
 /** Private reference tool run from the repository; it publishes no files. */
@@ -469,18 +471,21 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     // package, and the repository field is how a consumer finds the source of
     // the package it installed.
     //
-    // Access is per release sequence, not per scope: the vendored framework and
-    // the Landlock packages publish publicly because outside consumers install
-    // them, and the dsh family published publicly with its own sequence on
-    // 2026-08-13. No publish path passes `--access`; each packed manifest declares
-    // it, and this gate requires every release member to be public.
+    // Access is per release sequence, not per scope: vendored, DSH, and Prism
+    // packages publish publicly so outside consumers can install them. No
+    // publish path passes `--access`; each packed manifest declares it, and this
+    // gate requires every release member to be public.
     if (manifest.private === true) {
       errors.push(`${label}: release member must not set "private": true`)
     }
     if (manifest.publishConfig?.access !== 'public') {
       errors.push(`${label}: release member must set publishConfig.access to "public"`)
     }
-    const expectedRepositoryUrl = manifest.name === 'prism-agent' ? forkRepositoryUrl : publishedRepositoryUrl
+    const expectedRepositoryUrl = manifest.name === 'prism-agent'
+      ? forkRepositoryUrl
+      : manifest.name?.startsWith('@prism-ai/') === true
+        ? publishedPrismRepositoryUrl
+        : publishedRepositoryUrl
     if (manifest.repository?.type !== 'git'
       || manifest.repository.url !== expectedRepositoryUrl
       || manifest.repository.directory !== dir) {

@@ -1,5 +1,5 @@
 /** JSON-safe inputs and results of the experimental speech Remote namespace. */
-import type { SpeechProviderId, SpeechSnapshot } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
+import type { SpeechProviderId, SpeechSnapshot } from '@deepseek-ai/dsh-speech-to-text/types'
 import type {} from '@deepseek-ai/dsh-typert-protocol'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {

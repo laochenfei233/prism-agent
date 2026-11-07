@@ -45,6 +45,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed. |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `create_worktree` | `ctx.tools`, `ctx.worktrees`, `a calling Agent` | `tool/call`, `Git branch and checkout`, `working-directory/change`, `tool/result` | - | Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout. |
+| `@prism-ai/prism-meeting` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
@@ -2661,6 +2662,130 @@ Create a new Git branch and worktree from a local commit, branch, or tag, then c
 Source: [`packages/experimental/tool-worktree/src/index.ts`](../packages/experimental/tool-worktree/src/index.ts)
 
 Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout.
+
+<a id="prism-aiprism-meeting"></a>
+
+## `@prism-ai/prism-meeting`
+
+### `meeting_minutes_ask`
+
+Ask one question about a meeting and persist the question/answer exchange.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    },
+    "question": {
+      "type": "string",
+      "description": "The question to answer from the meeting transcript."
+    }
+  },
+  "required": [
+    "id",
+    "question"
+  ]
+}
+```
+
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
+
+### `meeting_minutes_create`
+
+Create a durable meeting record from a complete transcript. Use this after transcript text is available.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short meeting title."
+    },
+    "participants": {
+      "type": "array",
+      "description": "Participant display names in meeting order.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "description": "Complete meeting transcript."
+    },
+    "audioSeconds": {
+      "type": "number",
+      "description": "Nonnegative recognized-audio duration in seconds; omit for a text import."
+    }
+  },
+  "required": [
+    "title",
+    "transcript"
+  ]
+}
+```
+
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
+
+### `meeting_minutes_get`
+
+Read one durable meeting, including its transcript and current summary.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
+
+### `meeting_minutes_list`
+
+List durable meetings without their transcripts. Read one meeting when its transcript is needed.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
+
+### `meeting_minutes_summarize`
+
+Generate and persist a summary for one meeting using the deployment-configured meeting model.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Meeting id."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/prism/prism-meeting/src/tools.ts`](../packages/prism/prism-meeting/src/tools.ts)
+
+Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies.
 
 <a id="deepseek-aidsh-tool-workflow"></a>
 

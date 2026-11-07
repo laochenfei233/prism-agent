@@ -18,10 +18,10 @@ use tauri_plugin_opener::OpenerExt;
 
 use dsh_runner::DshHandle;
 
-/// Default port the bundled `dsh web` process listens on. When occupied, the
-/// shell scans upward for a free port and delivers the actual port to the
-/// frontend through the `dsh://ready` event. CLI users who run their own
-/// `dsh web` keep the default 3080.
+/// Default loopback port for the bundled `dsh web` process. When occupied, the
+/// shell scans upward for a free port and delivers the authenticated launch
+/// URL through `dsh://ready`. CLI users who run their own `dsh web` keep the
+/// default 3080.
 pub const INTERNAL_PORT: u16 = 3081;
 
 /// The main window is declared in `tauri.conf.json` with `"create": false`
@@ -294,6 +294,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             dsh_runner::dsh_status,
+            dsh_runner::authenticate_webview,
             dsh_runner::restart_dsh,
             dsh_runner::open_ui,
             update::prism_update_state,

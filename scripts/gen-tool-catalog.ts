@@ -67,7 +67,9 @@ import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
 import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
+import type MeetingMinutesService from '@prism-ai/prism-meeting'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import * as PrismMeetingTools from '@prism-ai/prism-meeting/tools'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
@@ -670,6 +672,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolWorktree)
     },
     note: 'Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout.',
+  },
+  {
+    pkg: '@prism-ai/prism-meeting',
+    dir: 'prism-meeting',
+    source: 'packages/prism/prism-meeting/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.meetingMinutes'],
+    writes: ['meeting-minutes storage', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never executes a meeting operation or opens storage.
+      ctx.provide('meetingMinutes', {} as MeetingMinutesService)
+      await ctx.plugin(PrismMeetingTools)
+    },
+    note:
+      'Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-workflow',

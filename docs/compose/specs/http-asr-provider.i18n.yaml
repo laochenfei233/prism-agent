@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/http-asr-provider.md
+http-asr-provider.md: 577bb4de92c02625724b926d59f4e3cff6adf254
+http-asr-provider.zh.md: 9b808e396dc03e11ae1db3e910a0a9830d1242bb
