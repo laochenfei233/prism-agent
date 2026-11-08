@@ -3359,60 +3359,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-skill-office -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text -->
-<a id="deepseek-aidsh-speech-to-text"></a>
-
-## `@deepseek-ai/dsh-speech-to-text`
-
-- `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/speech/speech-to-text/src/index.ts:20`](../packages/speech/speech-to-text/src/index.ts)
-
-```ts config-catalog
-/** Live selection read before a transcription starts; `configure()` writes it through the profile. */
-export interface Config {
-  /** Registered provider selected when the caller omits an id. */
-  defaultProvider: Volatile<string>
-  /** Provider language hint selected when the caller omits one. */
-  language: Volatile<string>
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text -->
-
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text-dashscope -->
-<a id="deepseek-aidsh-speech-to-text-dashscope"></a>
-
-## `@deepseek-ai/dsh-speech-to-text-dashscope`
-
-- `inject`: `speechToText`
-- `source`: [`packages/speech/speech-to-text-dashscope/src/index.ts:42`](../packages/speech/speech-to-text-dashscope/src/index.ts)
-
-```ts config-catalog
-/** Plugin configuration; every field is resolved before the provider is registered. */
-export interface Config {
-  /** Literal DashScope key; prefer {@link Config.apiKeyEnv} so no secret enters configuration files. */
-  apiKey?: string
-  /** Credential reference holding the key; defaults to `DASHSCOPE_API_KEY`. */
-  apiKeyEnv: string
-  /** Registration identity this recognizer occupies. */
-  providerId: string
-  /** Language hints this recognizer accepts. */
-  languages: string[]
-  /** Duplex recognition endpoint. */
-  url: string
-  /** Realtime recognition model name. */
-  model: string
-  /** Whether the model labels speakers in its results. */
-  speakerDiarization: boolean
-  /** Maximum accepted recording duration in seconds. */
-  maxDurationSeconds: number
-  /** Deadline, in milliseconds, covering connect, upload, and result accumulation. */
-  timeoutMs: number
-  /** Deadline, in milliseconds, for the results sent after `task-finish`. */
-  drainTimeoutMs: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-speech-to-text-dashscope -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-spill-local -->
 <a id="deepseek-aidsh-spill-local"></a>
 

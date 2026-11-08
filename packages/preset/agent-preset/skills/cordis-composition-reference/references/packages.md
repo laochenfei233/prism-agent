@@ -358,6 +358,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-agent-preset-registry` | yes | Declarative Agent preset registry and profile-backed editing |
 | `@deepseek-ai/dsh-persona` | yes | Composition-authored deployment persona section for the DeepSeek Harness |
 
+## prism
+
+| Package | Config | Description |
+|---|---|---|
+| `@prism-ai/prism-meeting` | yes | Prism meeting-minutes plugin: durable records, transcribed audio, configured summaries, persisted answers, model-facing tools, and the Web meeting page |
+
 ## ptc-runtime
 
 | Package | Config | Description |
@@ -438,6 +444,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-skill-office` | yes | Bundled Word, PowerPoint, and Excel workflows and LibreOffice Kit operations |
 | `@deepseek-ai/dsh-tool-skill` | yes | Model-facing skill loading tool for the DeepSeek Harness |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | yes | The load_workspace_dependencies tool: absolute paths into a bundled Python, Node.js, and pnpm payload |
+
+## speech
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-experimental-speech-to-text-http` | yes | Config-driven HTTP transcription providers for the DeepSeek Harness speech capability seam (ctx.speechToText): OpenAI-compatible /audio/transcriptions services and any endpoint answering JSON text |
 
 ## spill
 

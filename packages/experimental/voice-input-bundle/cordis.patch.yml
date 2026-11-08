@@ -16,7 +16,7 @@
     # resolved per request, so registration itself needs no secret. Selecting a
     # cloud recognizer performs no download and reports readiness immediately.
     - id: speech-to-text-dashscope
-      name: '@deepseek-ai/dsh-speech-to-text-dashscope'
+      name: '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
     - id: api-speech-to-text
       name: '@deepseek-ai/dsh-experimental-api-speech-to-text'
     - id: ui-voice-input

@@ -62,7 +62,7 @@ describe('voice-input bundle composition', () => {
       'ui-voice-input',
     ])
     expect(rows.find(row => row.id === 'speech-to-text-dashscope')?.name)
-      .toBe('@deepseek-ai/dsh-speech-to-text-dashscope')
+      .toBe('@deepseek-ai/dsh-experimental-speech-to-text-dashscope')
     expect(rows.find(row => row.id === 'speech-to-text-sensevoice')?.name)
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-sensevoice')
   })

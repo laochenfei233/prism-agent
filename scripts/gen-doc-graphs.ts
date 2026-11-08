@@ -775,10 +775,10 @@ const SERVICE_ROLES: ServiceRole[] = [
   },
   {
     key: 'speechToText',
-    pkg: 'speech-to-text',
+    pkg: 'experimental-speech-to-text',
     title: 'Speech recognition providers',
     mode: 'seam',
-    implementations: ['experimental-speech-to-text-sensevoice', 'speech-to-text-dashscope'],
+    implementations: ['experimental-speech-to-text-sensevoice', 'experimental-speech-to-text-dashscope'],
     consumers: ['experimental-api-speech-to-text', 'prism-meeting'],
     note: 'Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission.',
   },

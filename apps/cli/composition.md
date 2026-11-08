@@ -78,9 +78,9 @@ flowchart LR
   cfg --> plugin_dsh_base_storage_json
   plugin_dsh_base_storage_domain["storage-domain<br/>@deepseek-ai/dsh-storage-domain"]
   cfg --> plugin_dsh_base_storage_domain
-  plugin_dsh_base_speech_to_text["speech-to-text<br/>@deepseek-ai/dsh-speech-to-text"]
+  plugin_dsh_base_speech_to_text["speech-to-text<br/>@deepseek-ai/dsh-experimental-speech-to-text"]
   cfg --> plugin_dsh_base_speech_to_text
-  plugin_dsh_base_speech_to_text_dashscope["speech-to-text-dashscope<br/>@deepseek-ai/dsh-speech-to-text-dashscope"]
+  plugin_dsh_base_speech_to_text_dashscope["speech-to-text-dashscope<br/>@deepseek-ai/dsh-experimental-speech-to-text-dashscope"]
   cfg --> plugin_dsh_base_speech_to_text_dashscope
   plugin_dsh_base_prism_meeting["prism-meeting<br/>@prism-ai/prism-meeting"]
   cfg --> plugin_dsh_base_prism_meeting
@@ -247,8 +247,8 @@ flowchart LR
 | `storage` | `@deepseek-ai/dsh-storage` |
 | `storage-json` | `@deepseek-ai/dsh-storage-json` |
 | `storage-domain` | `@deepseek-ai/dsh-storage-domain` |
-| `speech-to-text` | `@deepseek-ai/dsh-speech-to-text` |
-| `speech-to-text-dashscope` | `@deepseek-ai/dsh-speech-to-text-dashscope` |
+| `speech-to-text` | `@deepseek-ai/dsh-experimental-speech-to-text` |
+| `speech-to-text-dashscope` | `@deepseek-ai/dsh-experimental-speech-to-text-dashscope` |
 | `prism-meeting` | `@prism-ai/prism-meeting` |
 | `session-projection-cache` | `@deepseek-ai/dsh-session-projection-cache` |
 | `otel` | `@deepseek-ai/dsh-otel` |
