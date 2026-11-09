@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/subagent/subagent-jobs/README.md
+/:
+  en: 74681c211fd6c671
+  zh: 7cd71384fe3076e7
+/deepseek-ai-dsh-subagent-jobs:
+  en: 30a64686aaab125a
+  zh: 70e964dfdfdac3d3
+/deepseek-ai-dsh-subagent-jobs/summary:
+  en: 53d7972e8e275c35
+  zh: 7ba86c911bab83c9
+/deepseek-ai-dsh-subagent-jobs/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 76368b6b1da79c80
+/deepseek-ai-dsh-subagent-jobs/use-this-package:
+  en: 89cd8e391d343b5c
+  zh: 1a7d6b7c7cb533aa
+/deepseek-ai-dsh-subagent-jobs/use-this-package/minimal-configuration:
+  en: 668948a4e2051bb8
+  zh: ffd85f7537acd8e5
+/deepseek-ai-dsh-subagent-jobs/use-this-package/what-one-job-covers:
+  en: 8c91e616161650ee
+  zh: acf4d9f67859f889
+/deepseek-ai-dsh-subagent-jobs/use-this-package/job-outcomes:
+  en: c3a88218302c0e84
+  zh: 8f492f4520017f80
+/deepseek-ai-dsh-subagent-jobs/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/design-concept:
+  en: 20fd49967658a48b
+  zh: faa567598cb404cc
+/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/source-map:
+  en: 71ef2d0ec90178ef
+  zh: 95aa7837c4b6bc02
+/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/kill-path:
+  en: 5df4f6111785b4f6
+  zh: a4ae3ae905c54846
+/deepseek-ai-dsh-subagent-jobs/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-subagent-jobs/model-experience/what-the-model-sees:
+  en: b2e8ac4e9a603085
+  zh: 51541e2efba67d88
+/deepseek-ai-dsh-subagent-jobs/model-experience/token-effect:
+  en: f2256521bfca6f5c
+  zh: 892ca618c1e68e24
+/deepseek-ai-dsh-subagent-jobs/model-experience/kv-cache-effect:
+  en: f34a61e4b68d281b
+  zh: a015938ddac5bda1
+/deepseek-ai-dsh-subagent-jobs/known-limitations-and-deferred-work:
+  en: 1443769a0341f63a
+  zh: 141023e8404cb58c
+/deepseek-ai-dsh-subagent-jobs/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e67f633dc6fe7773
