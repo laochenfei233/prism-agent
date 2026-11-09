@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/prism-guardrails.md
 /:
-  en: fe87967ace68f230
-  zh: fe87967ace68f230
+  en: 1956a4c706157b38
+  zh: 1956a4c706157b38
 /prism-guardrails-microcompact-threshold-tracking:
   en: 64bf2adb9baede12
   zh: 5e4ae658d249fa62
 /prism-guardrails-microcompact-threshold-tracking/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 422050c4182d332a
+  zh: a8379fb809ca056f
 /prism-guardrails-microcompact-threshold-tracking/s1-problem:
   en: 52f185b8b31fb0c1
   zh: dfa1a8a5a0442a4e
@@ -24,8 +24,8 @@
   en: ee21079750e48fb7
   zh: 59e0d8850d0b5abc
 /prism-guardrails-microcompact-threshold-tracking/s2-design/s2-3-microcompact-threshold-own-headroom-not-the-compaction-formula:
-  en: 750e43fa9dfbf995
-  zh: d7eb0e6e62a0eeb8
+  en: 10176d12e18a0138
+  zh: 0ab6f5aaa9fd10aa
 /prism-guardrails-microcompact-threshold-tracking/s2-design/s2-4-stale-tool-result-selection:
   en: ad39864fb987003e
   zh: 72965d52108f5125
@@ -39,8 +39,8 @@
   en: 61690b8e09fe9102
   zh: 3b79792d137f16b4
 /prism-guardrails-microcompact-threshold-tracking/tasks:
-  en: 26c81b6426480cf0
-  zh: 036b922cec658c4a
+  en: e7e52da45c2f6237
+  zh: 12e464a6330031a7
 /prism-guardrails-microcompact-threshold-tracking/s4-acceptance:
-  en: d7c584f213cc56dc
-  zh: c748e66cb974b201
+  en: 360128d20e503caf
+  zh: 08b40d48c2f5d698

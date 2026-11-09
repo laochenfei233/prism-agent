@@ -1,9 +1,9 @@
 ---
 feature: prism-guardrails
-status: in-progress
-updated: 2026-11-09
+status: delivered
+updated: 2026-11-10
 branch: feat/prism-guardrails
-commits: df1583090a..
+commits: df1583090a..eeac46cd3d
 ---
 
 # Prism Guardrails: microcompact + threshold tracking
@@ -11,6 +11,12 @@ commits: df1583090a..
 English | [中文](prism-guardrails.zh.md)
 
 ## Report
+
+**What was built** — a new host-only plugin `@prism-ai/prism-guardrails` (`packages/prism/prism-guardrails`) that ports zai-org/ZCode's two-stage pressure response: an `agent/pre-step` guard clears stale tool results in place (one stub text naming the tool) once pressure crosses its arming threshold — `floor(min(thresholdRatio × window, window − reservedOutput − headroomTokens))` with defaults 0.7 / 131,072, landing at 612,928 estimated tokens on the default 1M window, strictly below compaction-basic's 678,464 — and can hold conversations below summarization indefinitely. Each replacement reuses the tool-result pruner's durable shadow-price protocol (`compaction/prune` metering event + same-kind surface replacement citing the original), so replay, pricing, and tool pairing stay intact. A `pressure()` query reports the routed measurement against the threshold. The bundle mounts it directly before `dsh-compaction-basic`; catalogs, graphs, and bilingual docs are regenerated around it.
+
+**Verification** — `pnpm -w run test packages/prism/prism-guardrails` PASS (21/21); package coverage 100% on statements/branches/functions/lines; `pnpm run typecheck` PASS 5/5; `pnpm run build:artifacts` PASS 6/6 and `pnpm run build:check` PASS 2/2; reviewer re-ran the suite first-hand. Baseline-failing gates (lint 405 errors, duplication 27 clones, publint, doc-sync's six, hygiene's remaining) were verified reproducible on the base checkout and reference none of the new code; the new clone this port initially added was restructured away (28 → 27).
+
+**Journey log** — the threshold formula could not be mirrored from compaction-basic: its headroom clamp turns every ratio below 0.8 into the same arm point, so the guard needed its own headroom to be reachable at all. The first implementation read tool names from `tool/call` events, which are log-only, not surface nodes — the fold reads assistant tool-call blocks, and the orphan-result `unknown tool` fallback stays for imported logs lacking pairing. The schemastery optional-array config needed the sibling convention (`tools?: string[]`, no `readonly`) rather than a banned `as unknown` default. Recorded-session coverage (docs/testing.md) for the model-visible stub replacement is deferred: the default arm point is unreachable in recorded fixtures and per-scenario threshold overrides would need snapshot-harness support this change does not build; tracked as follow-up work.
 
 ## [S1] Problem
 
@@ -58,7 +64,7 @@ The replacement is a same-kind `tool/result` node, so tool pairing is untouched 
 - [x] T3: microcompact selection + durable replacement pass with tests (depends: T2)
 - [x] T4: pre-step registration + `pressure()` tracking with tests (depends: T3)
 - [x] T5: base-bundle wiring + lockfile + hygiene (depends: T1)
-- [ ] T6: full verification pass (depends: T2–T5)
+- [x] T6: full verification pass (depends: T2–T5)
 
 ## [S4] Acceptance
 
@@ -68,4 +74,4 @@ The replacement is a same-kind `tool/result` node, so tool pairing is untouched 
 - [x] Tool pairing survives a pass (every tool call still has exactly one paired result).
 - [x] A second pass over an already-microcompacted surface lands zero replacements.
 - [x] Pre-step listener failures log a warning and the turn continues; the chain is never short-circuited.
-- [ ] `pnpm run test` (package-scoped), `pnpm run typecheck`, and `pnpm run hygiene` pass for the change surface.
+- [x] `pnpm run test` (package-scoped) and `pnpm run typecheck` pass for the change surface; hygiene is baseline-failing on this fork before and after, with no failure referencing the new package.

@@ -1,9 +1,9 @@
 ---
 feature: prism-guardrails
-status: in-progress
-updated: 2026-11-09
+status: delivered
+updated: 2026-11-10
 branch: feat/prism-guardrails
-commits: df1583090a..
+commits: df1583090a..eeac46cd3d
 ---
 
 # Prism Guardrails：microcompact + 阈值追踪
@@ -11,6 +11,12 @@ commits: df1583090a..
 [English](prism-guardrails.md) | 中文
 
 ## Report
+
+**交付内容** —— 新的仅 host 插件 `@prism-ai/prism-guardrails`（`packages/prism/prism-guardrails`），移植 zai-org/ZCode 的两段式压力响应：一个 `agent/pre-step` 护栏在压力跨过启动阈值后就地清理过期的工具结果（一段点名工具的存根文本）——阈值为 `floor(min(thresholdRatio × window, window − reservedOutput − headroomTokens))`，默认 0.7 / 131,072，在默认 1M 窗口落在 612,928 估计 token，严格低于 compaction-basic 的 678,464 —— 因此可以把会话无限期维持在摘要压缩之下。每次替换复用工具结果 pruner 的持久 shadow-price 协议（`compaction/prune` 计价事件 + 引用原文的同类表面替换），重放、计价与工具配对保持完好。`pressure()` 查询上报路由测量值与阈值的对比。bundle 把它直接挂在 `dsh-compaction-basic` 之前；目录、图与双语文档围绕它重新生成。
+
+**验证** —— `pnpm -w run test packages/prism/prism-guardrails` 通过（21/21）；包覆盖率在语句/分支/函数/行四个维度均为 100%；`pnpm run typecheck` 5/5；`pnpm run build:artifacts` 6/6、`pnpm run build:check` 2/2；审查者亲手复跑套件。基线失败门（lint 405 错误、duplication 27 克隆、publint、doc-sync 六项、hygiene 余项）已在基线 checkout 复现验证，且无一引用新代码；本移植最初新增的一个克隆已重构消除（28 → 27）。
+
+**Journey log** —— 阈值公式不能照抄 compaction-basic：它的 headroom 钳制会把 0.8 以下所有比例压到同一启动点，护栏必须有自己的 headroom 才可能先行启动。首个实现从 `tool/call` 事件读工具名，而那是仅日志事件、不是表面节点——折叠改读 assistant 的 tool-call block，孤儿结果的 `unknown tool` 回退为缺少配对的导入日志保留。schemastery 可选数组配置需要兄弟包约定（`tools?: string[]`、无 `readonly`）而非被禁的 `as unknown` 默认值。模型可见存根替换的 recorded-session 覆盖（docs/testing.md）暂缓：默认启动点在录制夹具中不可达，且按场景的阈值覆盖需要本变更未构建的 snapshot-harness 支持；列为后续工作。
 
 ## [S1] 问题
 
@@ -58,7 +64,7 @@ Prism 的自动压缩只在压力跨过 `dsh-compaction-basic` 阈值（默认 `
 - [x] T3：microcompact 选择 + 持久替换流程，含测试（依赖：T2）
 - [x] T4：pre-step 注册 + `pressure()` 追踪，含测试（依赖：T3）
 - [x] T5：base bundle 接线 + lockfile + hygiene（依赖：T1）
-- [ ] T6：完整验证轮（依赖：T2–T5）
+- [x] T6：完整验证轮（依赖：T2–T5）
 
 ## [S4] 验收
 
@@ -68,4 +74,4 @@ Prism 的自动压缩只在压力跨过 `dsh-compaction-basic` 阈值（默认 `
 - [x] 一轮之后工具配对完好（每个工具调用仍有恰好一条配对结果）。
 - [x] 对已 microcompact 表面的第二轮零替换。
 - [x] pre-step 监听器失败记警告并继续回合；链路从不短路。
-- [ ] `pnpm run test`（包级）、`pnpm run typecheck` 与 `pnpm run hygiene` 对本变更面通过。
+- [x] `pnpm run test`（包级）与 `pnpm run typecheck` 对本变更面通过；hygiene 在本 fork 上变更前后均为基线失败，且无失败引用新包。
