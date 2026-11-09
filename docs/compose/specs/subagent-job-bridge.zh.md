@@ -23,11 +23,11 @@ LangChain Deep Agents 的异步子 Agent 模型（`start_async_task` / `check_as
 新组合插件 `@deepseek-ai/dsh-subagent-jobs`，位于 `packages/subagent/subagent-jobs/`。它把 subagent 服务与任务注册表耦合起来，而两者互不依赖：
 
 - 声明 `JobKindMap` 合并：`subagent: 'subagent'`。
-- 注入 `subagents`、`jobs` 与 `agents`。
+- 注入 `subagents` 与 `jobs`。
 - 在 `ctx.effect()` 内订阅 subagent 生命周期总线事件：
   - `subagent/start` —— 启动一个 job：`kind: 'subagent'`，owner 为委派发起父会话的会话 id，label 为 `<provider> subagent <childId>`；hooks 在配对的 end 边上兑现。
   - `subagent/end` —— 结算配对的 job：`completed` → `completed`；`aborted` → `killed`；`max-tokens`/`error`/`refusal` → `failed`，停止原因作为终态 `detail`。`result` 保持未设置 —— 管理器的结算通知已经把子 Agent 的回答带给父会话，所以 job 是控制面记录，绝不是第二条投递通道。
-- job 句柄上的 `cancel` 委托给 subagent 服务对该子级的中断，由经 `ctx.agents` 解析出的归属父级授权；子级保留收件箱，与 `interrupt_agent` 一致。
+- job 句柄上的 `cancel` 以指名归属会话的人类父级授权，委托 subagent 服务对该子级的中断；服务再校验 job 归属围栏已证明的同一条父链路，子级保留收件箱，与 `interrupt_agent` 一致。
 - 归属组合中需要 job controller（`dsh-tool-jobs`）；没有 controller 时，`ctx.jobs.start` 抛出"no job controller serves this agent"错误，由生命周期包含逻辑接住并记录 —— 委派本身不受影响。
 
 ### S2.2 生命周期 payload 上的父级身份

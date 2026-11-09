@@ -23,11 +23,11 @@ The LangChain Deep Agents async-subagent model (`start_async_task` / `check_asyn
 New composition plugin `@deepseek-ai/dsh-subagent-jobs` at `packages/subagent/subagent-jobs/`. It couples the subagent service to the job registry without a dependency between them:
 
 - Declares a `JobKindMap` merge: `subagent: 'subagent'`.
-- Injects `subagents`, `jobs`, and `agents`.
+- Injects `subagents` and `jobs`.
 - Subscribes to the subagent lifecycle bus events inside `ctx.effect()`:
   - `subagent/start` — starts a job: `kind: 'subagent'`, owner = the delegating parent's session id, label `<provider> subagent <childId>`; hooks resolve on the paired end edge.
   - `subagent/end` — settles the paired job: `completed` → `completed`; `aborted` → `killed`; `max-tokens`/`error`/`refusal` → `failed`, with the stop reason as terminal `detail`. `result` stays unset — the manager's settlement notice already carries the child's answer to the parent, so the job is a control-plane record, never a second delivery channel.
-- `cancel` on the job handle delegates to the subagent service's interrupt for that child, authorized by the owning parent resolved through `ctx.agents`; the child keeps its inbox, matching `interrupt_agent`.
+- `cancel` on the job handle delegates to the subagent service's interrupt for that child under the human-parent authority naming the owner session; the service re-checks the same parent lineage the job-owner fence already proved, and the child keeps its inbox, matching `interrupt_agent`.
 - Requires a job controller in the owning composition (`dsh-tool-jobs`); without one, `ctx.jobs.start` throws its "no job controller serves this agent" error, contained by lifecycle containment and logged — delegation itself is unaffected.
 
 ### S2.2 Parent identity on the lifecycle payload
