@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/subagent-job-bridge.md
 /:
-  en: 5a8185bafdf57e60
-  zh: 722cde1e76385c60
+  en: 5eca9c7041a9fe35
+  zh: 4c16801268bc656f
 /subagent-job-bridge:
   en: 740a55c9b574f60a
   zh: 7dc8fb1d6c323617
 /subagent-job-bridge/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: ba8e0063b7041b1d
+  zh: 085c8451c2ab56ae
 /subagent-job-bridge/s1-problem:
   en: 8dd4b1dc0d422dcf
   zh: e4c5f8ee05a06eac
@@ -33,8 +33,8 @@
   en: 9d4a5b04b3bef005
   zh: 1c1c9bee243bad48
 /subagent-job-bridge/tasks:
-  en: a989941bcc5e74e3
-  zh: 77c8f6289524c9d6
+  en: 07b7306031621d25
+  zh: 84caa854396e7e31
 /subagent-job-bridge/s4-acceptance:
   en: ebdc58a313eb09cf
   zh: 925d5e2827616df0

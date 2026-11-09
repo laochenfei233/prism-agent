@@ -1,6 +1,6 @@
 ---
 feature: subagent-job-bridge
-status: in-progress
+status: delivered
 updated: 2026-11-10
 branch: feat/subagent-job-bridge
 commits: df1583090a.. # 交付时填写
@@ -11,6 +11,12 @@ commits: df1583090a.. # 交付时填写
 [English](subagent-job-bridge.md) | 中文
 
 ## Report
+
+**构建内容** —— `@deepseek-ai/dsh-subagent-jobs`（`packages/subagent/subagent-jobs/`）把子 Agent 委派镜像进后台任务注册表：每个面向父会话投递的激活周期都注册一个归属委派会话的 `subagent` 类型 job，于是 `job_list` 与 `job_kill` 可以像管理 shell、workflow 后台工作一样管理委派，补齐了 LangChain 异步子 Agent 模型里 `check_async_task` / `cancel_async_task` / `list_async_tasks` 的词汇。终止 job 的效果与 `interrupt_agent` 完全一致（本地子级收件箱停靠，外部执行永久停止）。job 不携带子 Agent 的回答 —— 子 Agent 结算通知仍是唯一的完成报告 —— 且 `dsh-tool-jobs` 对这一类型抑制完成通知。生命周期 payload 增加了只读的 `parentId` 与 `delivery` 字段（cordis 总线事件，不是 `SessionEventMap` 成员）；caller 投递的 workflow 激活不产生 job，保证抑制恒正确。
+
+**验证** —— `pnpm run typecheck` 通过（5 个聚合门禁）；vitest `packages/subagent/subagent-jobs` 10/10、`packages/jobs/tool-jobs` 62/62，加 `packages/sdk/server` + `packages/experimental/hooks-claude-code` + `packages/subagent/subagent/tests` 574 通过（1 跳过）；`pnpm run duplication` 27 个克隆与基线一致、无一触及变更包；变更文件上 `verify-cordis-catalog`、`verify-plugin-packages`、`verify-tsconfig-paths`、`verify-package-readme-model-experience`、`verify-translation-pairing` 全部通过。基线预存且未触碰：real-product 规格失败（subagent-codex/subagent-claude-code，需外部二进制）、27 个 jscpd 克隆、speech-to-text-http 的 README/product-use/pairing 失败、MeetingSpeechStatus type-equiv 漂移。
+
+**历程记录** —— 委派缝本就已全线异步（非阻塞 `subagent` 工具，`manager.ts` 里的 steer/followup 结算投递）；真正的缺口只是控制面词汇，所以桥接把激活镜像进 `ctx.jobs` 而不是造新工具。caller 投递的激活（workflow 引擎）必须排除在 job 之外——否则 tool-jobs 抑制会丢掉它们唯一的完成报告。审查抓出四个过期生成物（cordis 目录、plugin-packages 参考、tsconfig 别名）与缺失的产品包分类；全部以再生成加一行 optional 分类修复。
 
 ## [S1] 问题
 
@@ -49,10 +55,10 @@ LangChain Deep Agents 的异步子 Agent 模型（`start_async_task` / `check_as
 
 ## Tasks
 
-- [ ] T1: 生命周期 payload 增加 `parentId` 并在管理器中填充（依赖：无）—— covers S2.2
-- [ ] T2: 实现 `dsh-subagent-jobs` 桥接包与测试（依赖：T1）—— covers S2.1, S2.4
-- [ ] T3: tool-jobs 对 `subagent` 类型抑制完成通知，带测试（依赖：T2）—— covers S2.3
-- [ ] T4: README（新包、组 README 行、tool-jobs 说明）+ changelog 条目（依赖：T2）—— covers S2.1
+- [x] T1: 生命周期 payload 增加 `parentId` 并在管理器中填充（依赖：无）—— covers S2.2
+- [x] T2: 实现 `dsh-subagent-jobs` 桥接包与测试（依赖：T1）—— covers S2.1, S2.4
+- [x] T3: tool-jobs 对 `subagent` 类型抑制完成通知，带测试（依赖：T2）—— covers S2.3
+- [x] T4: README（新包、组 README 行、tool-jobs 说明）+ changelog 条目（依赖：T2）—— covers S2.1
 
 ## [S4] 验收
 
