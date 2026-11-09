@@ -5,6 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { SubagentRunId } from '@deepseek-ai/dsh-subagent'
+import type { SubagentStopReason } from '@deepseek-ai/dsh-subagent'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import type { JobView } from '@deepseek-ai/dsh-jobs'
 import * as SubagentJobs from '../src/index.ts'
@@ -47,19 +48,19 @@ function startEdge(overrides: { delivery?: 'parent' | 'caller' } = {}) {
     provider: 'spawn',
     id: CHILD,
     parentId: PARENT,
-    delivery: 'parent',
+    delivery: 'parent' as const,
     local: true,
     ...overrides,
   }
   return {
     runId,
     emitStart: (ctx: Context) => { ctx.emit('subagent/start', start) },
-    endWith: (stopReason: string) => ({
+    endWith: (stopReason: SubagentStopReason) => ({
       runId,
       provider: 'spawn',
       id: CHILD,
       parentId: PARENT,
-      delivery: 'parent',
+      delivery: 'parent' as const,
       local: true,
       stopReason,
     }),

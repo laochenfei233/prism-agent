@@ -80,7 +80,7 @@ async function startLifecycleFixture(
   const provider = ctx.subagents.getProvider(providerName)
   if (provider?.start === undefined) throw new Error('missing lifecycle fixture provider')
   const run = await provider.start({ ...request, cwd: request.cwd ?? process.cwd() })
-  const identity = { runId: SubagentRunId(randomUUID()), provider: providerName, id: run.id, local }
+  const identity = { runId: SubagentRunId(randomUUID()), provider: providerName, id: run.id, parentId: request.parent.id, delivery: 'parent' as const, local }
   const carrier = scopeTarget(ctx.subagents, request.parent)
   ctx.emit(carrier, 'subagent/start', identity)
   void run.result.then(
@@ -94,7 +94,7 @@ async function startLifecycleFixture(
 async function settleSubagent(
   ctx: Context,
   parent: Agent,
-  info: Omit<SubagentRunEndInfo, 'runId' | 'local'> & { localAgent?: Agent },
+  info: Omit<SubagentRunEndInfo, 'runId' | 'local' | 'parentId' | 'delivery'> & { localAgent?: Agent },
   beforeSettle?: () => Promise<void>,
 ): Promise<void> {
   const result = Promise.withResolvers<SubagentResult>()

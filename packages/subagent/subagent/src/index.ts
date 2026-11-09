@@ -216,7 +216,7 @@ export class SubagentRuntime extends TypertRemoteService {
           return provider.start(request)
         },
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
-        observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
+        observeActivation: (provider, childId, parent, delivery) => this.observeActivation(provider, childId, parent, delivery),
       }, () => this.config.maxActiveSubagents.get())
       this.manager = manager
       childCtx.effect(() => () => {
