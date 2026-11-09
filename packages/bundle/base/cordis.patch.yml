@@ -370,6 +370,11 @@
     - id: token-meter
       name: '@deepseek-ai/dsh-token-meter'
 
+    # Model-free microcompact of stale tool results. Its pre-step listener must
+    # register before compaction-basic's so the cheap pass arms first.
+    - id: prism-guardrails
+      name: '@prism-ai/prism-guardrails'
+
     - id: compaction-basic
       name: '@deepseek-ai/dsh-compaction-basic'
 

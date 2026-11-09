@@ -4821,6 +4821,33 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 
+<!-- BEGIN GENERATED config-catalog:@prism-ai/prism-guardrails -->
+<a id="prism-aiprism-guardrails"></a>
+
+## `@prism-ai/prism-guardrails`
+
+- `inject`: `llm` · `tokenMeter`
+- `source`: [`packages/prism/prism-guardrails/src/types.ts:7`](../packages/prism/prism-guardrails/src/types.ts)
+
+```ts config-catalog
+/** Raw plugin configuration for the microcompact guard. */
+export interface PrismGuardrailsConfig {
+  /** Arm microcompact at this fraction of the routed context window (default `0.7`). */
+  thresholdRatio?: number
+  /**
+   * Capacity withheld after the output reservation before microcompact arms
+   * (default `131072`). Keeping this below `dsh-compaction-basic`'s `headroomTokens`
+   * is what lets the cheaper pass arm before summarization does.
+   */
+  headroomTokens?: number
+  /** Most recent tool results always retained (default `4`). */
+  keepRecentResults?: number
+  /** Tool names eligible for stale clearing; omission clears every tool's stale results. */
+  tools?: string[]
+}
+```
+<!-- END GENERATED config-catalog:@prism-ai/prism-guardrails -->
+
 <!-- BEGIN GENERATED config-catalog:@prism-ai/prism-meeting -->
 <a id="prism-aiprism-meeting"></a>
 

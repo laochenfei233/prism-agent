@@ -138,6 +138,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   claudeCodeMods: 'claude-code-mods.md',
   tokenMeter: 'token-meter.md',
   toolResultPruner: 'compaction.md',
+  guardrails: 'compaction.md',
   tools: 'tools.md',
   typert: 'typert.md',
   typertGateway: 'typert.md',
@@ -1017,6 +1018,9 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   TerminalFrame: 'Browser terminal stream frames are owned by packages/api/terminal-controller/README.md',
   TerminalRetentionFrame: 'Browser terminal window holds are owned by packages/api/terminal-controller/README.md',
   WebTerminalId: 'Browser terminal identity is owned by packages/api/terminal-controller/README.md',
+  MicrocompactResult: 'microcompact outcome is owned by packages/prism/prism-guardrails/README.md',
+  PressureSnapshot: 'pressure tracking is owned by packages/prism/prism-guardrails/README.md',
+  GuardrailAgent: 'the guard agent surface is owned by packages/prism/prism-guardrails/README.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */

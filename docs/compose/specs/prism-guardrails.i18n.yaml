@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for prism-guardrails.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-guardrails.md
+/:
+  en: fe87967ace68f230
+  zh: fe87967ace68f230
+/prism-guardrails-microcompact-threshold-tracking:
+  en: 64bf2adb9baede12
+  zh: 5e4ae658d249fa62
+/prism-guardrails-microcompact-threshold-tracking/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/prism-guardrails-microcompact-threshold-tracking/s1-problem:
+  en: 52f185b8b31fb0c1
+  zh: dfa1a8a5a0442a4e
+/prism-guardrails-microcompact-threshold-tracking/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-1-new-package-packages-prism-prism-guardrails:
+  en: 3d44d0220fff52b0
+  zh: 2c70eb2d3a7b08cd
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-2-service:
+  en: ee21079750e48fb7
+  zh: 59e0d8850d0b5abc
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-3-microcompact-threshold-own-headroom-not-the-compaction-formula:
+  en: 750e43fa9dfbf995
+  zh: d7eb0e6e62a0eeb8
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-4-stale-tool-result-selection:
+  en: ad39864fb987003e
+  zh: 72965d52108f5125
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-5-durable-replacement-protocol:
+  en: c21856a6651fdb59
+  zh: 267e02716d26ea35
+/prism-guardrails-microcompact-threshold-tracking/s2-design/s2-6-threshold-tracking:
+  en: cdb697a3df76203d
+  zh: f05f9bbcb034a3cc
+/prism-guardrails-microcompact-threshold-tracking/s3-scope:
+  en: 61690b8e09fe9102
+  zh: 3b79792d137f16b4
+/prism-guardrails-microcompact-threshold-tracking/tasks:
+  en: 26c81b6426480cf0
+  zh: 036b922cec658c4a
+/prism-guardrails-microcompact-threshold-tracking/s4-acceptance:
+  en: d7c584f213cc56dc
+  zh: c748e66cb974b201

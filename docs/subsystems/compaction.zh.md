@@ -98,7 +98,7 @@ type ManualCompactionErrorCode =
 
 `changed` 和 `summary` 闭合失败尝试并将其持久化到日志，不写入摘要替换；恢复过程中记录的图片省略仍然有效。`commit` 可能发生在部分变更之后；`persistence` 表示内存中的标记对已闭合，但 flush 失败。取消独立于这些失败，并在完成必要清理后抛出原始 abort 原因。
 
-压力压缩在 `agent/pre-step` waterfall（瀑布式事件）中运行，先于请求推导。一旦压力或规范化溢出满足条件，compaction-basic 会在选择范围前调用可选的 [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.zh.md)，再通过 `ctx.tokenMeter` 重新测量，并且可以在不生成摘要的情况下推进 surface。失败请求的恢复在失败的步骤关闭后通过 `agent/request-error` 运行；仅当 surface replacement generation 前进时才返回重试动作，即便后续摘要工作在剪枝后抛异常亦如此；取消仍然优先。区域边界保持工具调用/结果配对，但不保持整个轮次，因此一个过大轮次中较早关闭的步骤可以被压缩。`dsh-compaction-basic` 拥有阈值、保留尾部策略、溢出上限与失败处理。
+压力压缩在 `agent/pre-step` waterfall（瀑布式事件）中运行，先于请求推导。可选的 [`ctx.guardrails`](../../packages/prism/prism-guardrails/README.zh.md) microcompact 流程会把自身的 `agent/pre-step` 监听器注册在 compaction-basic 之前，因此在其更低的启动阈值之上就地清理过期的工具结果，可以在不生成摘要的情况下把会话维持在压缩启动点之下。当压力或规范化溢出仍然满足条件时，compaction-basic 会在选择范围前调用可选的 [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.zh.md)，再通过 `ctx.tokenMeter` 重新测量，并且可以在不生成摘要的情况下推进 surface。失败请求的恢复在失败的步骤关闭后通过 `agent/request-error` 运行；仅当 surface replacement generation 前进时才返回重试动作，即便后续摘要工作在剪枝后抛异常亦如此；取消仍然优先。区域边界保持工具调用/结果配对，但不保持整个轮次，因此一个过大轮次中较早关闭的步骤可以被压缩。`dsh-compaction-basic` 拥有阈值、保留尾部策略、溢出上限与失败处理。
 
 该 Service Definition 导出 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`，用于检查 seq 之前与之后的工具调用/结果配对。两者都会验证当前 surface 成员关系，并拒绝缺失的 seq 与遗留结果；[包约定](../../packages/compaction/compaction/README.zh.md#tool-pairing-boundaries)定义其缓存行为。
 
@@ -208,6 +208,34 @@ abstract compactRegion( start: SessionSeq, end: SessionSeq, agent: CompactionAge
 Types: [CommandId](commands.zh.md) · [SessionSeq](session.zh.md)
 
 Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
+
+<a id="ctxguardrails--prismguardrails"></a>
+
+### `ctx.guardrails` — `PrismGuardrails`
+
+Model-free context guard. Above its arming threshold it clears stale tool results in place (no model call), which can hold a conversation below `dsh-compaction-basic`'s summarization threshold indefinitely. Guard failures log a warning and never block the step.
+
+```ts cordis-catalog
+/**
+ * Run one microcompact pass when the routed conversation is at or above the
+ * configured arming threshold.
+ * @param agent - agent owning the measured session surface.
+ * @param signal - live turn cancellation signal forwarded to route resolution.
+ * @returns the landed pass, or `null` when no durable routed request exists,
+ * the routed model declares no context capacity, or pressure is below threshold.
+ */
+async microcompactIfNeeded( agent: GuardrailAgent, signal: AbortSignal, ): Promise<MicrocompactResult | null>
+
+/**
+ * Measure the routed conversation against the microcompact arming threshold.
+ * @param agent - agent owning the measured session surface.
+ * @returns a detached snapshot, or `null` when no durable routed request
+ * exists yet or the routed model declares no context capacity.
+ */
+async pressure(agent: GuardrailAgent): Promise<PressureSnapshot | null>
+```
+
+Source: [`packages/prism/prism-guardrails/src/index.ts`](../../packages/prism/prism-guardrails/src/index.ts)
 
 <a id="ctxtoolresultpruner--toolresultpruner"></a>
 
