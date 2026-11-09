@@ -17,6 +17,7 @@ import { publicJob, renderModelDelta, statusLine } from '../src/render.ts'
 declare module '@deepseek-ai/dsh-jobs' {
   interface JobKindMap {
     'test-task': 'test-task'
+    subagent: 'subagent'
   }
 }
 
@@ -751,6 +752,21 @@ describe('completion notice delivery', () => {
     p.settle({ status: 'completed', detail: 'exit code: 0' })
     await tick()
     expect(followup).toHaveBeenCalledTimes(1)
+    expect(inject).not.toHaveBeenCalled()
+  })
+
+  it('sends no completion notice for a settled subagent job', async () => {
+    const { ctx } = await setup()
+    const inject = vi.fn()
+    const followup = vi.fn()
+    const owner = await fakeAgent(ctx, 'sess-1', { inject, followup, status: 'idle' })
+    const p = producer({ kind: 'subagent', owner: owner.id, label: 'spawn subagent child-1' })
+    ctx.jobs.start(p.spec)
+
+    // The subagent settlement notice owns this report.
+    p.settle({ status: 'completed' })
+    await tick()
+    expect(followup).not.toHaveBeenCalled()
     expect(inject).not.toHaveBeenCalled()
   })
 

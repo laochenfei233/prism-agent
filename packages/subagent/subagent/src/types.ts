@@ -87,6 +87,10 @@ export interface SubagentRunInfo {
   readonly provider: string
   /** The child agent's id. */
   readonly id: SessionId
+  /** The delegating parent agent's id. */
+  readonly parentId: SessionId
+  /** Whether the settled result notifies the parent or returns only to the caller. */
+  readonly delivery: 'parent' | 'caller'
   /** Whether this activation owns a local Agent, fixed at publication. */
   readonly local: boolean
 }
@@ -102,6 +106,10 @@ export interface SubagentRunEndInfo {
   readonly provider: string
   /** The child agent's id. */
   readonly id: SessionId
+  /** The delegating parent agent's id. */
+  readonly parentId: SessionId
+  /** Whether the settled result notifies the parent or returns only to the caller. */
+  readonly delivery: 'parent' | 'caller'
   /** Whether this activation owns a local Agent, fixed at publication. */
   readonly local: boolean
   /** The terminal stop reason. */

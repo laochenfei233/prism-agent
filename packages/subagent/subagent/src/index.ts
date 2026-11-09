@@ -623,8 +623,9 @@ export class SubagentRuntime extends TypertRemoteService {
     provider: string,
     childId: SessionId,
     parent: Agent,
+    delivery: 'parent' | 'caller',
   ): ActivationObserver {
-    return createActivationObserver(this.emitLifecycle, provider, childId, parent)
+    return createActivationObserver(this.emitLifecycle, provider, childId, parent, delivery)
   }
 
   /** Reject the first requested capability that the provider lacks. */

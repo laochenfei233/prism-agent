@@ -275,6 +275,10 @@ export function apply(ctx: Context, config: Config): void {
       return
     }
     if (event.type !== 'settled') return
+    // A subagent job's completion is already reported to its owner by the
+    // subagent settlement notice, answer included; this notice would only
+    // duplicate it against an empty ring.
+    if (event.job.kind === 'subagent') return
     const delivered = killedByModel.delete(event.job.id) || event.awaited
     if (delivered || event.cause === 'teardown' || event.job.owner === undefined) return
     // The destination is the agent registered for the owner session now. An

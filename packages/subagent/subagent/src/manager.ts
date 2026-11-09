@@ -62,7 +62,7 @@ interface SubagentHost {
   /** Resolve one provider's detached continuable-creation contribution. */
   prepareContinuable(name: string, request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>
   /** Build the lifecycle observer for one Activation residency epoch. */
-  observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
+  observeActivation(provider: string, childId: SessionId, parent: Agent, delivery: 'parent' | 'caller'): ActivationObserver
 }
 
 /** Inputs shared by fresh and resumed Activation materialization. */
@@ -923,7 +923,7 @@ export class SubagentManager {
 
       resource = { kind: 'local', handle, outputStart: handle.agent.session.seq, structured, failureAt: undefined, poke: Promise.withResolvers<void>() }
     }
-    const observer = this.host.observeActivation(provider, childId, parent)
+    const observer = this.host.observeActivation(provider, childId, parent, inputs.delivery ?? 'parent')
 
     const activation: Activation = {
       pool,
