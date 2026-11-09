@@ -83,6 +83,8 @@ kind: "package-reference"
 <a id="model-experience"></a>
 ## Model Experience
 
+### 通过 job 控制委派
+
 #### What the model sees
 
 `job_list` 新增 `subagent` 类型行（`<id> [subagent] <status> — <provider> subagent <childId>`）。对它调用 `job_output` 不会有输出环内容，只有状态行。委派结算不产生 `tool-jobs` 通知；父会话的结算通知是唯一的完成报告。
@@ -95,10 +97,9 @@ kind: "package-reference"
 
 Append-only；新可见内容跟随可复用的请求前缀。
 
------
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 这些限制定义了桥接何时不适用；它们是当前的包约束。
 

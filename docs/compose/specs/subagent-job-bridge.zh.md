@@ -1,0 +1,63 @@
+---
+feature: subagent-job-bridge
+status: in-progress
+updated: 2026-11-10
+branch: feat/subagent-job-bridge
+commits: df1583090a.. # 交付时填写
+---
+
+# 子 Agent 任务桥接
+
+[English](subagent-job-bridge.md) | 中文
+
+## Report
+
+## [S1] 问题
+
+LangChain Deep Agents 的异步子 Agent 模型（`start_async_task` / `check_async_task` / `cancel_async_task` / `list_async_tasks`）与本仓库已发布的能力几乎一一对应：非阻塞委派加自动送达的结算通知、`send_message`、`interrupt_agent` 与 `list_agents`。唯一真正的缺口是控制面词汇：运行中的子级无法通过模型控制其余一切后台工作的同一族工具（`job_list`、`job_kill`）来列出或停止，因为子 Agent 激活从未注册进任务注册表。
+
+## [S2] 设计
+
+### S2.1 桥接包
+
+新组合插件 `@deepseek-ai/dsh-subagent-jobs`，位于 `packages/subagent/subagent-jobs/`。它把 subagent 服务与任务注册表耦合起来，而两者互不依赖：
+
+- 声明 `JobKindMap` 合并：`subagent: 'subagent'`。
+- 注入 `subagents`、`jobs` 与 `agents`。
+- 在 `ctx.effect()` 内订阅 subagent 生命周期总线事件：
+  - `subagent/start` —— 启动一个 job：`kind: 'subagent'`，owner 为委派发起父会话的会话 id，label 为 `<provider> subagent <childId>`；hooks 在配对的 end 边上兑现。
+  - `subagent/end` —— 结算配对的 job：`completed` → `completed`；`aborted` → `killed`；`max-tokens`/`error`/`refusal` → `failed`，停止原因作为终态 `detail`。`result` 保持未设置 —— 管理器的结算通知已经把子 Agent 的回答带给父会话，所以 job 是控制面记录，绝不是第二条投递通道。
+- job 句柄上的 `cancel` 委托给 subagent 服务对该子级的中断，由经 `ctx.agents` 解析出的归属父级授权；子级保留收件箱，与 `interrupt_agent` 一致。
+- 归属组合中需要 job controller（`dsh-tool-jobs`）；没有 controller 时，`ctx.jobs.start` 抛出"no job controller serves this agent"错误，由生命周期包含逻辑接住并记录 —— 委派本身不受影响。
+
+### S2.2 生命周期 payload 上的父级身份
+
+生命周期 payload（`SubagentRunInfo`、`SubagentRunEndInfo`）增加只读的 `parentId: SessionId` 与 `delivery` 字段，由在创建观察者时已持有父级的管理器填充。仅限 cordis 总线 payload 扩展 —— 这些 payload 不是 `SessionEventMap` 成员，因此不触发会话格式或读取者兼容性工作。
+
+### S2.3 完成通知抑制
+
+`dsh-tool-jobs` 对 `subagent` 类型的 job 跳过完成通知：子 Agent 结算通知是该子级唯一的完成报告，第二条"job 已完成，读取其输出"的通知会在空输出环上重复它。其他类型保持现状。
+
+### S2.4 一个 job 对应一个激活周期
+
+一个 job 恰好覆盖一个激活周期（start 边 → end 边）。可续聊子级之后接受追加消息会开启新周期，因而产生新 job，与仓库报告子级工作的方式一致。已结算的 job 记录像已结算的 `bash` job 一样保留在 `job_list` 中。
+
+## [S3] 范围
+
+- 范围内：带单元测试的桥接包；新增的 `parentId`/`delivery` payload 字段；带测试的 tool-jobs 抑制；新包 README、subagent 组 README 行、tool-jobs 说明；changelog 条目。
+- 范围外：把子 Agent 转录活动流进 job 输出环；通过 job 记录携带委派任务文本或回答；子级的审批/`waiting` 状态（固定的子级权限范围是刻意的安全立场）；把进行中的子级注入父级系统提示词（触碰 model-visible ⟺ logged 规则）；开放字符串 `kind` 之外的远端/浏览器投影变更。
+
+## Tasks
+
+- [ ] T1: 生命周期 payload 增加 `parentId` 并在管理器中填充（依赖：无）—— covers S2.2
+- [ ] T2: 实现 `dsh-subagent-jobs` 桥接包与测试（依赖：T1）—— covers S2.1, S2.4
+- [ ] T3: tool-jobs 对 `subagent` 类型抑制完成通知，带测试（依赖：T2）—— covers S2.3
+- [ ] T4: README（新包、组 README 行、tool-jobs 说明）+ changelog 条目（依赖：T2）—— covers S2.1
+
+## [S4] 验收
+
+- [ ] 一次委派产生一个归属委派会话的 `subagent` 类型 job；运行期间在 `ctx.jobs.list(owner)` 可见，子级结算时以映射后的状态结算。
+- [ ] 对运行中的 subagent job 执行 `ctx.jobs.kill` 会停止子级当前轮次（收件箱停靠），job 结算为 `killed`。
+- [ ] 已结算的 subagent job 不产生 tool-jobs 完成通知；已结算的 `bash` job 仍然产生。
+- [ ] 缺少 job controller 时，委派仍然完成，失败的注册被记录而不是抛进委派路径。
+- [ ] `pnpm run typecheck` 通过；焦点单元测试通过；`pnpm run duplication` 无新增克隆。

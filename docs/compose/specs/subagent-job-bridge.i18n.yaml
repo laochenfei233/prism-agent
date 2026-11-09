@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for subagent-job-bridge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/subagent-job-bridge.md
+/:
+  en: 5a8185bafdf57e60
+  zh: 722cde1e76385c60
+/subagent-job-bridge:
+  en: 740a55c9b574f60a
+  zh: 7dc8fb1d6c323617
+/subagent-job-bridge/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/subagent-job-bridge/s1-problem:
+  en: 8dd4b1dc0d422dcf
+  zh: e4c5f8ee05a06eac
+/subagent-job-bridge/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/subagent-job-bridge/s2-design/s2-1-bridge-package:
+  en: 7be09b7c2c782ab3
+  zh: 8c43447620bc7996
+/subagent-job-bridge/s2-design/s2-2-parent-identity-on-the-lifecycle-payload:
+  en: af932505204e14f0
+  zh: 35c5b5e47a039e5c
+/subagent-job-bridge/s2-design/s2-3-completion-notice-suppression:
+  en: f996c8dc0349ec63
+  zh: 3e7b0838d1d68a5a
+/subagent-job-bridge/s2-design/s2-4-job-activation-epoch:
+  en: 85fddc4230f8e61f
+  zh: 9360176bee866a76
+/subagent-job-bridge/s3-scope:
+  en: 9d4a5b04b3bef005
+  zh: 1c1c9bee243bad48
+/subagent-job-bridge/tasks:
+  en: a989941bcc5e74e3
+  zh: 77c8f6289524c9d6
+/subagent-job-bridge/s4-acceptance:
+  en: ebdc58a313eb09cf
+  zh: 925d5e2827616df0

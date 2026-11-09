@@ -8,6 +8,8 @@ commits: df1583090a.. # filled at delivery
 
 # Subagent Job Bridge
 
+English | [中文](subagent-job-bridge.zh.md)
+
 ## Report
 
 ## [S1] Problem

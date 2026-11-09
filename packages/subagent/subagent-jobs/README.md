@@ -83,6 +83,8 @@ A thin adapter over the subagent lifecycle bus events (`subagent/start`, `subage
 <a id="model-experience"></a>
 ## Model Experience
 
+### Job controls over delegations
+
 #### What the model sees
 
 `job_list` gains `subagent`-kind rows (`<id> [subagent] <status> — <provider> subagent <childId>`). `job_output` on one returns no output ring content, only the status line. Settling a delegation produces no `tool-jobs` notice; the parent's settlement notice remains the single completion report.
@@ -95,10 +97,9 @@ One `job_list` row per live epoch; no per-settlement notice cost beyond the exis
 
 Append-only; newly visible content follows the reusable request prefix.
 
------
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 These limits define when the bridge is the wrong choice; they are current package constraints.
 
