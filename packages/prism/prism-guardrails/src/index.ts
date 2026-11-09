@@ -112,7 +112,7 @@ export class PrismGuardrails extends Service {
           if (error instanceof GuardrailPressureConfigError) {
             if (!this.warnedThresholdTargets.has(error.targetKey)) {
               this.warnedThresholdTargets.add(error.targetKey)
-              this.ctx.logger.warn(error.message)
+              this.ctx.logger.warn(`microcompact failed: ${error.message}; continuing the turn`)
             }
           } else {
             const message = error instanceof Error ? error.message : String(error)

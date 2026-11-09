@@ -28,7 +28,7 @@ Prism 的自动压缩只在压力跨过 `dsh-compaction-basic` 阈值（默认 `
 
 ### S2.3 Microcompact 阈值（自有 headroom，不照抄压缩公式）
 
-`resolveThreshold(config, contextWindow, reservedCompletionTokens)` = `floor(min(contextWindow × thresholdRatio, contextWindow − reservedCompletionTokens − headroomTokens))`，沿用 `dsh-compaction-basic` 的包络形状但使用护栏自己的 `headroomTokens`，让结果能真正落到压缩阈值之下。默认 `thresholdRatio: 0.7`、`headroomTokens: 131_072`：在默认 1M 窗口、预留 256k 时，microcompact 在 612,928 启动，压缩在 678,464 启动，廉价流程先行。产生非正阈值的配置在解析时抛出本地 `GuardrailPressureConfigError`（响亮失败，同 `TargetPressureConfigError`）。"必须落在 compaction-basic 阈值之下才有效"这一关系写在配置字段文档上；不做跨包校验。
+`resolveThreshold(config, targetKey, contextWindow, reservedCompletionTokens)` = `floor(min(contextWindow × thresholdRatio, contextWindow − reservedCompletionTokens − headroomTokens))`，沿用 `dsh-compaction-basic` 的包络形状但使用护栏自己的 `headroomTokens`，让结果能真正落到压缩阈值之下。默认 `thresholdRatio: 0.7`、`headroomTokens: 131_072`：在默认 1M 窗口、预留 256k 时，microcompact 在 612,928 启动，压缩在 678,464 启动，廉价流程先行。产生非正阈值的配置在解析时抛出本地 `GuardrailPressureConfigError`（响亮失败，同 `TargetPressureConfigError`）。"必须落在 compaction-basic 阈值之下才有效"这一关系写在配置字段文档上；不做跨包校验。
 
 `thresholdRatio ∈ (0, 1]`、`headroomTokens ≥ 0` 整数、`keepRecentResults ≥ 1` 整数、`tools` 为非空字符串的可选数组。全部在 `resolveConfig` 中校验（`run()` 内没有 `?? default`；resolve 步骤拥有默认值）。
 

@@ -41,7 +41,7 @@ With these rows, stale tool results are cleared automatically between steps. You
 
 ### What gets cleared
 
-Every tool result older than the most recent `keepRecentResults` results is replaced by one text stub: `[Earlier <tool> result cleared by microcompact to free context; re-run the tool if you still need it.]`. The replacement keeps the tool call, step, errors, and metadata — only the content changes. Results already no longer than the stub are left alone, so repeated passes converge. Results whose surface `tool/call` event is absent are cleared under the name `unknown tool`.
+Every tool result older than the most recent `keepRecentResults` results is replaced by one text stub: `[Earlier <tool> result cleared by microcompact to free context; re-run the tool if you still need it.]`. The replacement keeps the tool call, step, errors, and metadata — only the content changes. Results already no longer than the stub are left alone, so repeated passes converge. Results with no surface pairing (no assistant tool-call block carrying their callId) are cleared under the name `unknown tool`.
 
 ### Setting the thresholds
 
@@ -80,7 +80,7 @@ The guard is built on three commitments:
 
 ### Clearing mechanics
 
-One pass folds the current surface into a `callId → toolName` map from `tool/call` events plus the tool-result sequence. Stale results are replaced by one newly appended `tool/result` that replaces the original node and cites it. Replacing a `tool/result` node with another `tool/result` node keeps tool pairing intact by construction, so no pairing helpers are consulted. The `tools` filter and the stub-length idempotency check skip candidates before any event is appended; a pass that clears nothing lands no events. Exact signatures are in [`src/index.ts`](src/index.ts).
+One pass folds the current surface into a `callId → toolName` map from assistant tool-call blocks plus the tool-result sequence. Stale results are replaced by one newly appended `tool/result` that replaces the original node and cites it. Replacing a `tool/result` node with another `tool/result` node keeps tool pairing intact by construction, so no pairing helpers are consulted. The `tools` filter and the stub-length idempotency check skip candidates before any event is appended; a pass that clears nothing lands no events. Exact signatures are in [`src/index.ts`](src/index.ts).
 
 ### Source map
 

@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 什么会被清理
 
-每条比最近 `keepRecentResults` 条更早的工具结果都会被替换为一段文本存根：`[Earlier <tool> result cleared by microcompact to free context; re-run the tool if you still need it.]`。替换保留工具调用、步骤、错误与元数据——只有内容变化。文本长度已不超过存根的结果保持原样，因此重复执行会收敛。表面上缺少对应 `tool/call` 事件的结果以 `unknown tool` 的名义清理。
+每条比最近 `keepRecentResults` 条更早的工具结果都会被替换为一段文本存根：`[Earlier <tool> result cleared by microcompact to free context; re-run the tool if you still need it.]`。替换保留工具调用、步骤、错误与元数据——只有内容变化。文本长度已不超过存根的结果保持原样，因此重复执行会收敛。表面上缺少配对（没有携带其 callId 的 assistant tool-call block）的结果以 `unknown tool` 的名义清理。
 
 ### 设置阈值
 
@@ -80,7 +80,7 @@ kind: "package-reference"
 
 ### 清理机制
 
-一轮扫描把当前表面折叠为 `callId → toolName` 映射（来自 `tool/call` 事件）加上工具结果序列。过期结果被替换为一条新追加的 `tool/result`，替换原节点并引用原文。`tool/result` 节点被替换为另一条 `tool/result` 节点，工具配对按构造保持完整，因此无需查询配对辅助器。`tools` 过滤与存根长度的幂等检查在任何事件追加之前跳过候选；一轮没有清理任何内容的执行不会落地任何事件。精确签名见 [`src/index.ts`](src/index.ts)。
+一轮扫描把当前表面折叠为 `callId → toolName` 映射（来自 assistant 的 tool-call block）加上工具结果序列。过期结果被替换为一条新追加的 `tool/result`，替换原节点并引用原文。`tool/result` 节点被替换为另一条 `tool/result` 节点，工具配对按构造保持完整，因此无需查询配对辅助器。`tools` 过滤与存根长度的幂等检查在任何事件追加之前跳过候选；一轮没有清理任何内容的执行不会落地任何事件。精确签名见 [`src/index.ts`](src/index.ts)。
 
 ### 源码地图
 
