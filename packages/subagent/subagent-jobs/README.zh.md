@@ -3,13 +3,13 @@ description: "面向需要在组合中把子 Agent 委派纳入后台任务控�
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-subagent-jobs
+# @prism/prism-subagent-jobs
 
 [English](README.md) | 中文
 
 ## Summary
 
-`dsh-subagent-jobs` 把子 Agent 委派镜像进后台任务注册表：每个面向父会话投递的激活周期都会注册一个 `subagent` 类型的 job，归属委派发起会话，于是 `job_list`、`job_kill` 和作业名册可以像管理 shell、workflow 后台工作一样管理委派。job 不携带子 Agent 的回答 —— 子 Agent 结算通知已经把它报告给父会话 —— 而且 `dsh-tool-jobs` 对这一类型不发送完成通知。停止 job 的效果与 `interrupt_agent` 完全一致。
+`@prism/prism-subagent-jobs` 把子 Agent 委派镜像进后台任务注册表：每个面向父会话投递的激活周期都会注册一个 `subagent` 类型的 job，归属委派发起会话，于是 `job_list`、`job_kill` 和作业名册可以像管理 shell、workflow 后台工作一样管理委派。job 不携带子 Agent 的回答 —— 子 Agent 结算通知已经把它报告给父会话 —— 而且 `dsh-tool-jobs` 对这一类型不发送完成通知。停止 job 的效果与 `interrupt_agent` 完全一致。
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-tool-subagent'
   config:
     provider: spawn
-- name: '@deepseek-ai/dsh-subagent-jobs'
+- name: '@prism/prism-subagent-jobs'
 ```
 
 本包不接受任何配置。

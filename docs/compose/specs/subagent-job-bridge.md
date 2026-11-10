@@ -12,7 +12,7 @@ English | [中文](subagent-job-bridge.zh.md)
 
 ## Report
 
-**What was built** — `@deepseek-ai/dsh-subagent-jobs` (`packages/subagent/subagent-jobs/`) bridges subagent delegations into the background-job registry: every parent-delivered activation epoch registers a `subagent`-kind job owned by the delegating session, so `job_list` and `job_kill` govern delegations alongside shell and workflow background work, closing the `check_async_task` / `cancel_async_task` / `list_async_tasks` vocabulary of the LangChain async-subagent model. Killing a job interrupts the child exactly like `interrupt_agent` (inbox parked; external executions stop permanently). The child's answer is never carried by the job — the subagent settlement notice remains the single completion report — and `dsh-tool-jobs` suppresses its completion notice for this kind. The lifecycle payloads gained additive observe-only `parentId` and `delivery` fields (cordis bus events, not `SessionEventMap` members), and caller-delivered workflow activations produce no job so the suppression is always correct.
+**What was built** — `@prism/prism-subagent-jobs` (`packages/subagent/subagent-jobs/`) bridges subagent delegations into the background-job registry: every parent-delivered activation epoch registers a `subagent`-kind job owned by the delegating session, so `job_list` and `job_kill` govern delegations alongside shell and workflow background work, closing the `check_async_task` / `cancel_async_task` / `list_async_tasks` vocabulary of the LangChain async-subagent model. Killing a job interrupts the child exactly like `interrupt_agent` (inbox parked; external executions stop permanently). The child's answer is never carried by the job — the subagent settlement notice remains the single completion report — and `dsh-tool-jobs` suppresses its completion notice for this kind. The lifecycle payloads gained additive observe-only `parentId` and `delivery` fields (cordis bus events, not `SessionEventMap` members), and caller-delivered workflow activations produce no job so the suppression is always correct.
 
 **Verification** — `pnpm run typecheck` PASS (5 aggregate gates); vitest `packages/subagent/subagent-jobs` 10/10, `packages/jobs/tool-jobs` 62/62, plus `packages/sdk/server` + `packages/experimental/hooks-claude-code` + `packages/subagent/subagent/tests` 574 passed (1 skipped); `pnpm run duplication` 27 clones, identical to base, none in changed packages; `verify-cordis-catalog`, `verify-plugin-packages`, `verify-tsconfig-paths`, `verify-package-readme-model-experience` PASS on changed files; `verify-translation-pairing` PASS on changed files. Pre-existing on base and left untouched: real-product spec failures (subagent-codex/subagent-claude-code, need external binaries), 27 jscpd clones, speech-to-text-http README/product-use/pairing failures, MeetingSpeechStatus type-equiv drift.
 
@@ -26,7 +26,7 @@ The LangChain Deep Agents async-subagent model (`start_async_task` / `check_asyn
 
 ### S2.1 Bridge package
 
-New composition plugin `@deepseek-ai/dsh-subagent-jobs` at `packages/subagent/subagent-jobs/`. It couples the subagent service to the job registry without a dependency between them:
+New composition plugin `@prism/prism-subagent-jobs` at `packages/subagent/subagent-jobs/`. It couples the subagent service to the job registry without a dependency between them:
 
 - Declares a `JobKindMap` merge: `subagent: 'subagent'`.
 - Injects `subagents` and `jobs`.
@@ -56,7 +56,7 @@ One job covers exactly one activation epoch (start edge → end edge). A continu
 ## Tasks
 
 - [x] T1: Add `parentId` to the lifecycle payloads and populate it in the manager (depends: none) — covers S2.2
-- [x] T2: Implement `dsh-subagent-jobs` bridge package with tests (depends: T1) — covers S2.1, S2.4
+- [x] T2: Implement `prism-subagent-jobs` bridge package with tests (depends: T1) — covers S2.1, S2.4
 - [x] T3: Suppress tool-jobs completion notices for `subagent` kind, with a test (depends: T2) — covers S2.3
 - [x] T4: READMEs (new package, group map row, tool-jobs note) + changelog entry (depends: T2) — covers S2.1
 

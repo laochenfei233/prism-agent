@@ -5,57 +5,57 @@
 /:
   en: 74681c211fd6c671
   zh: 7cd71384fe3076e7
-/deepseek-ai-dsh-subagent-jobs:
-  en: 30a64686aaab125a
-  zh: 70e964dfdfdac3d3
-/deepseek-ai-dsh-subagent-jobs/summary:
-  en: 53d7972e8e275c35
-  zh: 7ba86c911bab83c9
-/deepseek-ai-dsh-subagent-jobs/table-of-contents:
+/prism-prism-subagent-jobs:
+  en: 77e42427f1e5579c
+  zh: dd6c233c499f0d02
+/prism-prism-subagent-jobs/summary:
+  en: a255e209b4a1b640
+  zh: e320396b127cf5a1
+/prism-prism-subagent-jobs/table-of-contents:
   en: 76368b6b1da79c80
   zh: 76368b6b1da79c80
-/deepseek-ai-dsh-subagent-jobs/use-this-package:
+/prism-prism-subagent-jobs/use-this-package:
   en: 89cd8e391d343b5c
   zh: 1a7d6b7c7cb533aa
-/deepseek-ai-dsh-subagent-jobs/use-this-package/minimal-configuration:
+/prism-prism-subagent-jobs/use-this-package/minimal-configuration:
   en: 668948a4e2051bb8
   zh: ffd85f7537acd8e5
-/deepseek-ai-dsh-subagent-jobs/use-this-package/what-one-job-covers:
+/prism-prism-subagent-jobs/use-this-package/what-one-job-covers:
   en: 8c91e616161650ee
   zh: acf4d9f67859f889
-/deepseek-ai-dsh-subagent-jobs/use-this-package/job-outcomes:
+/prism-prism-subagent-jobs/use-this-package/job-outcomes:
   en: c3a88218302c0e84
   zh: 8f492f4520017f80
-/deepseek-ai-dsh-subagent-jobs/understand-the-implementation:
+/prism-prism-subagent-jobs/understand-the-implementation:
   en: 42b15ac6321706aa
   zh: 42b15ac6321706aa
-/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/design-concept:
+/prism-prism-subagent-jobs/understand-the-implementation/design-concept:
   en: 20fd49967658a48b
   zh: faa567598cb404cc
-/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/source-map:
+/prism-prism-subagent-jobs/understand-the-implementation/source-map:
   en: 71ef2d0ec90178ef
   zh: 95aa7837c4b6bc02
-/deepseek-ai-dsh-subagent-jobs/understand-the-implementation/kill-path:
+/prism-prism-subagent-jobs/understand-the-implementation/kill-path:
   en: 5df4f6111785b4f6
   zh: a4ae3ae905c54846
-/deepseek-ai-dsh-subagent-jobs/model-experience:
+/prism-prism-subagent-jobs/model-experience:
   en: 215e7ba838619b7b
   zh: 215e7ba838619b7b
-/deepseek-ai-dsh-subagent-jobs/model-experience/job-controls-over-delegations:
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations:
   en: 3ab854b9ab03145a
   zh: 3dda644ff0cff9fc
-/deepseek-ai-dsh-subagent-jobs/model-experience/job-controls-over-delegations/what-the-model-sees:
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/what-the-model-sees:
   en: b2e8ac4e9a603085
   zh: 51541e2efba67d88
-/deepseek-ai-dsh-subagent-jobs/model-experience/job-controls-over-delegations/token-effect:
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/token-effect:
   en: f2256521bfca6f5c
   zh: 892ca618c1e68e24
-/deepseek-ai-dsh-subagent-jobs/model-experience/job-controls-over-delegations/kv-cache-effect:
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/kv-cache-effect:
   en: 19f4d26f590d11ac
   zh: fb09c093d59059aa
-/deepseek-ai-dsh-subagent-jobs/known-limitations-and-deferred-work:
+/prism-prism-subagent-jobs/known-limitations-and-deferred-work:
   en: dcbc7b089bcd67d8
   zh: fe26ffcbcc900ec3
-/deepseek-ai-dsh-subagent-jobs/known-limitations-and-deferred-work/dev-note:
+/prism-prism-subagent-jobs/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: e67f633dc6fe7773

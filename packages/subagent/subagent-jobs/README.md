@@ -3,13 +3,13 @@ description: "Job-registry bridge for users and maintainers composing subagent d
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-subagent-jobs
+# @prism/prism-subagent-jobs
 
 English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-subagent-jobs` mirrors subagent delegations into the background-job registry: every parent-delivered activation epoch registers a `subagent`-kind job owned by the delegating session, so `job_list`, `job_kill`, and the job roster govern delegations alongside shell and workflow background work. The child's answer itself is not carried by the job — the subagent settlement notice already reports it to the parent — and `dsh-tool-jobs` sends no completion notice for this kind. Stopping the job interrupts the child exactly like `interrupt_agent`.
+`@prism/prism-subagent-jobs` mirrors subagent delegations into the background-job registry: every parent-delivered activation epoch registers a `subagent`-kind job owned by the delegating session, so `job_list`, `job_kill`, and the job roster govern delegations alongside shell and workflow background work. The child's answer itself is not carried by the job — the subagent settlement notice already reports it to the parent — and `dsh-tool-jobs` sends no completion notice for this kind. Stopping the job interrupts the child exactly like `interrupt_agent`.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Mount this bridge in any composition that should control delegations through the
 - name: '@deepseek-ai/dsh-tool-subagent'
   config:
     provider: spawn
-- name: '@deepseek-ai/dsh-subagent-jobs'
+- name: '@prism/prism-subagent-jobs'
 ```
 
 This package takes no configuration.

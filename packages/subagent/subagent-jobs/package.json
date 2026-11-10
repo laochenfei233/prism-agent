@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-subagent-jobs",
+  "name": "@prism/prism-subagent-jobs",
   "description": "Bridges subagent activation lifecycles into the ctx.jobs background-job registry as subagent-kind jobs",
   "version": "0.2.1-rc.4",
   "publishConfig": {

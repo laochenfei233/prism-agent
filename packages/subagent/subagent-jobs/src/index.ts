@@ -5,7 +5,7 @@
  * work also govern delegations. The child's answer itself is not carried by the
  * job — the subagent settlement notice already reports it to the delegating
  * parent — and `dsh-tool-jobs` suppresses its completion notice for this kind.
- * @module @deepseek-ai/dsh-subagent-jobs
+ * @module @prism/prism-subagent-jobs
  */
 
 import type { Context } from '@deepseek-ai/cordis'
