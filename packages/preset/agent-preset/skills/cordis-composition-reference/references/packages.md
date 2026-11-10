@@ -362,7 +362,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 
 | Package | Config | Description |
 |---|---|---|
-| `@prism-ai/prism-meeting` | yes | Prism meeting-minutes plugin: durable records, transcribed audio, configured summaries, persisted answers, model-facing tools, and the Web meeting page |
+| `@prism/prism-meeting` | yes | Prism meeting-minutes plugin: durable records, transcribed audio, configured summaries, persisted answers, model-facing tools, and the Web meeting page |
 
 ## ptc-runtime
 

@@ -2,7 +2,7 @@
  * One projection per durable meeting record for the consumers that read it:
  * the model-facing tools include the transcript only when the operation asks
  * for it, the browser list reads a transcript length instead.
- * @module @prism-ai/prism-meeting/src/view
+ * @module @prism/prism-meeting/src/view
  */
 
 import type { MeetingAnswerRecord, MeetingMinutesRecord } from './types.ts'

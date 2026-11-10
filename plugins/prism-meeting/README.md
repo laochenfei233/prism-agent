@@ -3,7 +3,7 @@ description: "The Prism meetings profile layer: durable meeting records, live mi
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-meeting
+# @prism/prism-meeting
 
 English | [中文](README.zh.md)
 
@@ -32,7 +32,7 @@ Install the tarball into a base-backed DSH profile, then restart that profile:
 ```sh
 dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-meeting
+dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
 
 The package declares `dsh.bundle.patch`, so `dsh plugin` reconciles it as a profile layer instead of mounting one plugin. The profile needs the base LLM, storage-domain, speech-to-text, and tools services. Set `DASHSCOPE_API_KEY` for audio recognition, or configure another speech provider for the profile.

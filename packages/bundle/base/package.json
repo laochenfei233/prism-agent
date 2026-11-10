@@ -87,7 +87,7 @@
     "@deepseek-ai/dsh-spill-policy": "workspace:*",
     "@deepseek-ai/dsh-storage": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
-    "@prism-ai/prism-meeting": "workspace:*",
+    "@prism/prism-meeting": "workspace:*",
     "@deepseek-ai/dsh-experimental-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-experimental-speech-to-text-dashscope": "workspace:*",
     "@deepseek-ai/dsh-storage-json": "workspace:*",

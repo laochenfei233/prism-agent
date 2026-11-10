@@ -2,7 +2,7 @@
  * Browser client for the meeting routes: one typed request per operation, with
  * every response narrowed at this wire boundary before the page renders it.
  * Requests are document-relative so a host mount prefix keeps working.
- * @module @prism-ai/prism-meeting/src/client/api
+ * @module @prism/prism-meeting/src/client/api
  */
 
 import type { AnswerView, MeetingView } from '../view.ts'

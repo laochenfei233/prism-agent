@@ -45,7 +45,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed. |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `create_worktree` | `ctx.tools`, `ctx.worktrees`, `a calling Agent` | `tool/call`, `Git branch and checkout`, `working-directory/change`, `tool/result` | - | Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout. |
-| `@prism-ai/prism-meeting` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
+| `@prism/prism-meeting` | `meeting_minutes_ask`, `meeting_minutes_create`, `meeting_minutes_get`, `meeting_minutes_list`, `meeting_minutes_summarize` | `ctx.tools`, `ctx.meetingMinutes` | `meeting-minutes storage`, `tool/result` | - | Five explicit durable-meeting operations. The catalog stubs only the service identity because schema harvest never executes; live execution requires the meeting service and its configured storage, speech, and LLM dependencies. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
@@ -2663,9 +2663,9 @@ Source: [`packages/experimental/tool-worktree/src/index.ts`](../packages/experim
 
 Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout.
 
-<a id="prism-aiprism-meeting"></a>
+<a id="prismprism-meeting"></a>
 
-## `@prism-ai/prism-meeting`
+## `@prism/prism-meeting`
 
 ### `meeting_minutes_ask`
 

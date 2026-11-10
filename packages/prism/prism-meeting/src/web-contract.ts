@@ -2,7 +2,7 @@
  * Wire vocabulary of the browser meeting routes: the JSON bodies the page
  * sends and the values it renders. Types only; the host entry validates every
  * body at the HTTP boundary.
- * @module @prism-ai/prism-meeting/src/web-contract
+ * @module @prism/prism-meeting/src/web-contract
  */
 
 import type { AnswerView, MeetingView } from './view.ts'

@@ -1,7 +1,7 @@
 /**
  * Public type vocabulary of the meeting-minutes capability. This module carries
  * types only; the service and zod schemas own runtime behavior.
- * @module @prism-ai/prism-meeting/src/types
+ * @module @prism/prism-meeting/src/types
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'

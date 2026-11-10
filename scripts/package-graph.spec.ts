@@ -56,7 +56,7 @@ describe('collectPackageGraph', () => {
     const packageDir = join(root, 'packages', 'prism', 'prism-meeting')
     mkdirSync(packageDir, { recursive: true })
     writeFileSync(join(packageDir, 'package.json'), `${JSON.stringify({
-      name: '@prism-ai/prism-meeting',
+      name: '@prism/prism-meeting',
       peerDependencies: { '@deepseek-ai/dsh-tools': 'workspace:*' },
     }, null, 2)}\n`)
     const toolsDir = join(root, 'packages', 'core', 'tools')

@@ -8,7 +8,7 @@
 import { globSync, readFileSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 
-const SCOPES = ['@deepseek-ai/dsh-', '@prism-ai/'] as const
+const SCOPES = ['@deepseek-ai/dsh-', '@prism/'] as const
 
 /** One harness package and its in-repo peer-dependency edges. */
 export interface PackageGraphNode {

@@ -2,7 +2,7 @@
  * Push one meeting question into the workspace: the page hands the question to
  * a fresh Session prompt and opens the Conversation on it, so answers come from
  * the agent that already holds the meeting tools.
- * @module @prism-ai/prism-meeting/src/client/push
+ * @module @prism/prism-meeting/src/client/push
  */
 
 import type { Context } from '@deepseek-ai/cordis'

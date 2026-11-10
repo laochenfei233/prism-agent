@@ -6,7 +6,7 @@
  * read in the same list and pane as every stored one. The page reads and writes
  * only through the injected meeting face, so every model call runs on the
  * deployment's configured route.
- * @module @prism-ai/prism-meeting/src/client/MeetingMinutesPage
+ * @module @prism/prism-meeting/src/client/MeetingMinutesPage
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'

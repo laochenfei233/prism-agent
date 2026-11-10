@@ -9,7 +9,7 @@ kind: "package-group"
 
 ## Summary
 
-prism 组拥有扩展 DeepSeek Harness 的产品包，但不占用上游 DSH 包命名空间。`@prism-ai/prism-meeting` 在 Session 日志之外持久化会议记录，提供录音转写、配置化摘要和持久化问答，把受控操作暴露为显式模型工具，并通过 `./web` 与 `./client` 两个半侧向[Web 客户端](../../docs/subsystems/web-client.zh.md)贡献会议页面。
+prism 组拥有扩展 DeepSeek Harness 的产品包，但不占用上游 DSH 包命名空间。`@prism/prism-meeting` 在 Session 日志之外持久化会议记录，提供录音转写、配置化摘要和持久化问答，把受控操作暴露为显式模型工具，并通过 `./web` 与 `./client` 两个半侧向[Web 客户端](../../docs/subsystems/web-client.zh.md)贡献会议页面。
 
 ## Table of Contents
 

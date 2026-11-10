@@ -1,9 +1,9 @@
 /**
- * Browser half of `@prism-ai/prism-meeting`: the Meetings icon in the sidebar
+ * Browser half of `@prism/prism-meeting`: the Meetings icon in the sidebar
  * panel rail and the full central page it opens. Every operation reaches the
  * host through this plugin's own routes under `/api`, so the page runs the
  * deployment's configured meeting model rather than a second route.
- * @module @prism-ai/prism-meeting/src/client
+ * @module @prism/prism-meeting/src/client
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

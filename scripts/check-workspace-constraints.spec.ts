@@ -397,7 +397,7 @@ describe('package payload constraints', () => {
         repository: { ...manifest.repository, url: 'git+https://example.com/prism.git' },
       },
     })).toEqual([
-      expect.stringContaining(`@prism-ai/prism-meeting: release member repository must use git+https://github.com/laochenfei233/prism-agent-e.git with directory ${dir}`),
+      expect.stringContaining(`@prism/prism-meeting: release member repository must use git+https://github.com/laochenfei233/prism-agent-e.git with directory ${dir}`),
     ])
   })
 

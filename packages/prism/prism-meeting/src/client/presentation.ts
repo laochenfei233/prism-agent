@@ -1,7 +1,7 @@
 /**
  * Pure folds and formatters the meeting page renders; nothing here touches a
  * service, so the presentation stays testable without a Client runtime.
- * @module @prism-ai/prism-meeting/src/client/presentation
+ * @module @prism/prism-meeting/src/client/presentation
  */
 
 import type { MeetingSpeechStatus } from '../types.ts'

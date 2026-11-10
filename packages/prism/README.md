@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The prism group owns product packages that extend DeepSeek Harness without taking the upstream DSH package namespace. `@prism-ai/prism-meeting` persists durable meeting records outside Session logs, provides transcription ingestion, configured-model summaries, and persisted question/answer exchanges, exposes controlled operations as explicit model tools, and contributes the Meetings page to the [Web Client](../../docs/subsystems/web-client.md) through its `./web` and `./client` halves.
+The prism group owns product packages that extend DeepSeek Harness without taking the upstream DSH package namespace. `@prism/prism-meeting` persists durable meeting records outside Session logs, provides transcription ingestion, configured-model summaries, and persisted question/answer exchanges, exposes controlled operations as explicit model tools, and contributes the Meetings page to the [Web Client](../../docs/subsystems/web-client.md) through its `./web` and `./client` halves.
 
 ## Table of Contents
 

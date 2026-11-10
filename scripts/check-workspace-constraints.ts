@@ -483,7 +483,7 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     }
     const expectedRepositoryUrl = manifest.name === 'prism-agent'
       ? forkRepositoryUrl
-      : manifest.name?.startsWith('@prism-ai/') === true
+      : manifest.name?.startsWith('@prism/') === true
         ? publishedPrismRepositoryUrl
         : publishedRepositoryUrl
     if (manifest.repository?.type !== 'git'

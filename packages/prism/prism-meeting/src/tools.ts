@@ -1,6 +1,6 @@
 /**
  * Model-facing meeting tools over `ctx.meetingMinutes`.
- * @module @prism-ai/prism-meeting/tools
+ * @module @prism/prism-meeting/tools
  */
 
 import type { Context } from '@deepseek-ai/cordis'

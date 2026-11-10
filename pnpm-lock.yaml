@@ -2455,7 +2455,7 @@ importers:
       '@deepseek-ai/dsh-working-directory':
         specifier: workspace:*
         version: link:../../session/working-directory
-      '@prism-ai/prism-meeting':
+      '@prism/prism-meeting':
         specifier: workspace:*
         version: link:../../prism/prism-meeting
     devDependencies:
@@ -16657,7 +16657,7 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../vendor/schemastery
         version: link:../../vendor/schemastery
-      '@prism-ai/prism-meeting':
+      '@prism/prism-meeting':
         specifier: workspace:*
         version: link:../../packages/prism/prism-meeting
       prism-agent:

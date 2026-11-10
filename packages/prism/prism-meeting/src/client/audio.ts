@@ -3,7 +3,7 @@
  * container exactly — canonical 16 kHz mono PCM16 WAV with a 44-byte header —
  * so live capture samples at that rate directly and imported files are decoded
  * and re-encoded before upload.
- * @module @prism-ai/prism-meeting/src/client/audio
+ * @module @prism/prism-meeting/src/client/audio
  */
 
 /** Sample rate the speech providers read. */

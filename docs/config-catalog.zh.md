@@ -4823,32 +4823,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 
-<!-- BEGIN GENERATED config-catalog:@prism-ai/prism-meeting -->
-<a id="prism-aiprism-meeting"></a>
-
-## `@prism-ai/prism-meeting`
-
-- `inject`: `storageDomain` · `speechToText` · `llm`
-- `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/prism/prism-meeting/src/index.ts:38`](../packages/prism/prism-meeting/src/index.ts)
-
-```ts config-catalog
-/** Deployment-owned model and bound choices; there are no service-level model defaults. */
-export interface Config {
-  /** Registered LLM provider used for summaries and meeting questions. */
-  summaryProvider: Volatile<string>
-  /** Registered model id used for summaries and meeting questions. */
-  summaryModel: Volatile<string>
-  /** System prompt that establishes summary behavior. */
-  summarySystemPrompt: Volatile<string>
-  /** System prompt that establishes meeting-question behavior. */
-  answerSystemPrompt: Volatile<string>
-  /** Maximum accepted transcript length in Unicode code units. */
-  maxTranscriptChars: Volatile<number>
-}
-```
-<!-- END GENERATED config-catalog:@prism-ai/prism-meeting -->
-
 <!-- BEGIN GENERATED config-catalog:@prism/prism-backup -->
 <a id="prismprism-backup"></a>
 
@@ -4897,6 +4871,32 @@ export interface Config {
 export type BackupTargetType = 'webdav' | 's3' | 'smb'
 ```
 <!-- END GENERATED config-catalog:@prism/prism-backup -->
+
+<!-- BEGIN GENERATED config-catalog:@prism/prism-meeting -->
+<a id="prismprism-meeting"></a>
+
+## `@prism/prism-meeting`
+
+- `inject`: `storageDomain` · `speechToText` · `llm`
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/prism/prism-meeting/src/index.ts:38`](../packages/prism/prism-meeting/src/index.ts)
+
+```ts config-catalog
+/** Deployment-owned model and bound choices; there are no service-level model defaults. */
+export interface Config {
+  /** Registered LLM provider used for summaries and meeting questions. */
+  summaryProvider: Volatile<string>
+  /** Registered model id used for summaries and meeting questions. */
+  summaryModel: Volatile<string>
+  /** System prompt that establishes summary behavior. */
+  summarySystemPrompt: Volatile<string>
+  /** System prompt that establishes meeting-question behavior. */
+  answerSystemPrompt: Volatile<string>
+  /** Maximum accepted transcript length in Unicode code units. */
+  maxTranscriptChars: Volatile<number>
+}
+```
+<!-- END GENERATED config-catalog:@prism/prism-meeting -->
 
 <!-- BEGIN GENERATED config-catalog:@prism/prism-session-import -->
 <a id="prismprism-session-import"></a>
@@ -5050,6 +5050,7 @@ export type ImportSourceId =
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/experimental/webhook/src/index.ts`](../packages/experimental/webhook/src/index.ts) |
 | `@deepseek-ai/dsh-workspace` | `storageDomain` · `sessionPersistence` | [`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts) |
 | `@prism/prism-data` | `connection` | [`packages/data/prism-data/src/index.ts`](../packages/data/prism-data/src/index.ts) |
+| `@prism/prism-subagent-jobs` | `subagents` · `jobs` | [`packages/subagent/subagent-jobs/src/index.ts`](../packages/subagent/subagent-jobs/src/index.ts) |
 | `@prism/prism-transfer` | `connection` · `sessionPersistence` · `workspaceRegistry` · `attachments` · `settings` | [`packages/transfer/prism-transfer/src/index.ts`](../packages/transfer/prism-transfer/src/index.ts) |
 <!-- END GENERATED config-catalog:no-config -->
 

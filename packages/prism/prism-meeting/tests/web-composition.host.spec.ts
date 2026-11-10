@@ -21,7 +21,7 @@ import * as Connection from '@deepseek-ai/dsh-client-connection'
 import * as web from '../src/web.ts'
 
 /** The entry id every case loads. */
-const ENTRY = '@prism-ai/prism-meeting/web'
+const ENTRY = '@prism/prism-meeting/web'
 
 /**
  * `FiberState` values from `vendor/cordis/src/fiber.ts`. It is a `const enum`,

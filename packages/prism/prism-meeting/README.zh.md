@@ -3,7 +3,7 @@ description: "Prism 会议 profile 层：持久会议记录、实时麦克风转
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-meeting
+# @prism/prism-meeting
 
 [English](README.md) | 中文
 
@@ -32,7 +32,7 @@ kind: "package-bundle"
 ```sh
 dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-meeting
+dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
 
 本包声明了 `dsh.bundle.patch`，因此 `dsh plugin` 会把它作为 profile 层来协调，而不是挂载单个插件。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`，或为该 profile 配置其他语音提供者。
@@ -86,8 +86,8 @@ patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 
 ## 进一步探索
 
 - [会议子系统](../../../docs/subsystems/meetings.zh.md) —— 记录词汇、录音生命周期、服务语义和浏览器接口。
-- [语音转文字](../../speech/speech-to-text/README.zh.md) —— `ctx.meetingMinutes` 解析的识别接缝。
-- [生成的工具目录](../../../docs/tool-catalog.zh.md#prism-aiprism-meeting) —— 模型看到的精确 schema。
+- [语音转文字](../../speech/speech-to-text-http/README.zh.md) —— `ctx.meetingMinutes` 解析的识别接缝。
+- [生成的工具目录](../../../docs/tool-catalog.zh.md#prismprism-meeting) —— 模型看到的精确 schema。
 - [生成的组合图](../../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
 - [Prism 包分组](../README.zh.md) —— 其他 Prism 能力面。
 
@@ -100,7 +100,7 @@ patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 
 
 #### 模型看到的内容
 
-`./tools` 子路径在[生成的工具目录](../../../docs/tool-catalog.zh.md#prism-aiprism-meeting)中注册 `meeting_minutes_create`、`meeting_minutes_list`、`meeting_minutes_get`、`meeting_minutes_summarize` 和 `meeting_minutes_ask`。创建需要标题和完整转写；列表无输入；读取、摘要和提问需要会议 id，提问还需要问题。成功结果是紧凑 JSON 投影；失败保留验证、未找到、模型、存储和取消错误。
+`./tools` 子路径在[生成的工具目录](../../../docs/tool-catalog.zh.md#prismprism-meeting)中注册 `meeting_minutes_create`、`meeting_minutes_list`、`meeting_minutes_get`、`meeting_minutes_summarize` 和 `meeting_minutes_ask`。创建需要标题和完整转写；列表无输入；读取、摘要和提问需要会议 id，提问还需要问题。成功结果是紧凑 JSON 投影；失败保留验证、未找到、模型、存储和取消错误。
 
 #### Token 影响
 

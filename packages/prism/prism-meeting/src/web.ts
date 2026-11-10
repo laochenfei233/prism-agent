@@ -17,7 +17,7 @@
  * Declaring it also keeps the row pending — rather than failing — in a profile
  * that composes no web server, which is the same profile that composes no
  * browser Connection.
- * @module @prism-ai/prism-meeting/web
+ * @module @prism/prism-meeting/web
  */
 
 import type { Context } from '@deepseek-ai/cordis'
