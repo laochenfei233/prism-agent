@@ -657,17 +657,17 @@ export class BridgeServer {
   private async handleVoice(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
     const b = await readJsonBody(req)
     checkBody(b, ['sessionId', 'utteranceId', 'revision', 'text', 'epoch', 'lease'])
-    if (!validId(String(b.sessionId)) || !validId(String(b.utteranceId))) throw httpError(400, 'exact-target-required')
+    if (!validId(b.sessionId) || !validId(b.utteranceId)) throw httpError(400, 'exact-target-required')
     for (const [id, u] of this.utterances) if (Date.now() - u.created > 120_000) this.utterances.delete(id)
     const currentSession = this.listSessions().find(s => s.id === b.sessionId)
     if (currentSession?.state === 'waiting_user' && currentSession.waitKind === 'question') throw httpError(409, 'question-pending')
     const owner = this.voiceOwners.get(String(b.sessionId))
     if (!owner || owner.ended || (owner.expires ?? 0) <= Date.now()) throw httpError(409, 'composer-unavailable')
-    let u = this.utterances.get(String(b.utteranceId))
+    let u = this.utterances.get(validId(b.utteranceId) ? b.utteranceId : '')
     if (path === '/voice/begin') {
       if (u || this.utterances.size >= 64) throw httpError(409, 'utterance-already-used')
       u = { sessionId: String(b.sessionId), owner: owner.clientId, epoch: this.epoch, lease: owner.lease, state: 'capturing', created: Date.now() }
-      this.utterances.set(String(b.utteranceId), u)
+      this.utterances.set(b.utteranceId as string, u)
     } else if (!u || u.sessionId !== b.sessionId || u.owner !== owner.clientId || b.epoch !== this.epoch || b.lease !== u.lease || Date.now() - u.created > 120_000) {
       throw httpError(409, 'stale-utterance')
     }
@@ -711,8 +711,8 @@ export class BridgeServer {
   private async handleVoiceAck(req: IncomingMessage, res: ServerResponse, caller: Caller): Promise<void> {
     const b = await readJsonBody(req)
     checkBody(b, ['actionId', 'utteranceId', 'sessionId', 'epoch', 'lease', 'ok', 'status'])
-    const w = this.voiceWaiters.get(String(b.actionId))
-    const u = this.utterances.get(String(b.utteranceId))
+    const w = this.voiceWaiters.get(validId(b.actionId) ? b.actionId : '')
+    const u = this.utterances.get(validId(b.utteranceId) ? b.utteranceId : '')
     if (!w || !u || w.owner !== caller.clientId || w.utteranceId !== b.utteranceId || u.sessionId !== caller.sessionId
       || b.sessionId !== u.sessionId || b.epoch !== this.epoch || b.lease !== u.lease || typeof b.ok !== 'boolean') {
       throw httpError(409, 'stale-ack')
@@ -809,7 +809,7 @@ export class BridgeServer {
     if (path === '/voice/status' && method === 'POST') {
       const b = await readJsonBody(req)
       checkBody(b, ['sessionId'])
-      const sessionId = String(b.sessionId)
+      const sessionId = typeof b.sessionId === 'string' ? b.sessionId : ''
       if (sessionId !== '' && !validId(sessionId)) throw httpError(400, 'exact-session-required')
       const session = validId(sessionId) ? this.listSessions().find(s => s.id === sessionId) : undefined
       const sessionKnown = session !== undefined
@@ -832,22 +832,22 @@ export class BridgeServer {
         clientBundleAvailable: caps?.clientBundle === true,
         composerMount: composerMounted ? 'paired-connected' : 'unverified',
         scopedInput: { capture: composerReady, insert: composerReady, submit: composerReady },
-        capabilities: caps ?? { sessions: false, sessionList: false, liveState: false, events: false, readonlyStatus: false, approval: 'independent-relay' },
+        capabilities: caps ?? { sessions: false, sessionList: false, liveState: false, events: false, readonlyStatus: false, approval: false },
         reason: !sessionKnown ? 'exact-session-required' : questionPending ? 'question-pending' : !composerReady ? 'composer-unpaired' : 'ready',
       })
     }
     if (path === '/pair/ticket' && method === 'POST') {
       const b = await readJsonBody(req)
       checkBody(b, ['sessionId', 'origin'])
-      if (!this.origins.has(String(b.origin)) || !validId(String(b.sessionId))
+      if (!this.origins.has(typeof b.origin === 'string' ? b.origin : '') || !validId(b.sessionId)
         || !this.listSessions().some(s => s.id === b.sessionId)) {
         throw httpError(400, 'exact-pair-target-required')
       }
       this.pairingCode = secret()
       this.pairingExpires = Date.now() + 120_000
       this.pairingAttempts = 0
-      this.pairingSessionId = String(b.sessionId)
-      this.pairingOrigin = String(b.origin)
+      this.pairingSessionId = validId(b.sessionId) ? b.sessionId : undefined
+      this.pairingOrigin = typeof b.origin === 'string' ? b.origin : undefined
       return sendJson(res, 200, { ok: true, epoch: this.epoch, code: this.pairingCode, expiresAtMs: this.pairingExpires })
     }
     if (path === '/voice/ack' && method === 'POST') return this.handleVoiceAck(req, res, caller)
@@ -922,7 +922,7 @@ export class BridgeServer {
       return
     }
     checkBody(body, ['sessionId'])
-    const sessionId = String(body.sessionId)
+    const sessionId = validId(body.sessionId) ? body.sessionId : ''
     if (!validId(sessionId) || !this.listSessions().some(s => s.id === sessionId)) throw httpError(400, 'exact-session-required')
     if (this.activate) this.activate({ sessionId })
     sendJson(res, 200, { ok: true, sessionId })
@@ -940,7 +940,7 @@ export class BridgeServer {
       return
     }
     checkBody(body, ['sessionId'])
-    const sessionId = String(body.sessionId)
+    const sessionId = validId(body.sessionId) ? body.sessionId : ''
     if (!validId(sessionId) || !this.listSessions().some(s => s.id === sessionId)) throw httpError(400, 'exact-session-required')
     try {
       const result = await this.interrupt({ sessionId })
@@ -970,8 +970,8 @@ export class BridgeServer {
       return
     }
     checkBody(body, ['sessionId', 'text', 'requestId'])
-    const sessionId = String(body.sessionId)
-    if (!validId(sessionId) || !validId(String(body.requestId)) || !this.listSessions().some(s => s.id === sessionId)) {
+    const sessionId = validId(body.sessionId) ? body.sessionId : ''
+    if (!validId(sessionId) || !validId(body.requestId) || !this.listSessions().some(s => s.id === sessionId)) {
       throw httpError(400, 'exact-session-required')
     }
     if (this.activeInjects >= 8 || this.injecting.has(String(body.requestId))) throw httpError(409, 'request-already-used')
@@ -992,7 +992,7 @@ export class BridgeServer {
     // Invalid requests must not consume receipts; bounded history may evict
     // completed entries, but never an admission that is still in flight.
     const receipt = { pending: true }
-    this.injecting.set(String(body.requestId), receipt)
+    this.injecting.set(body.requestId as string, receipt)
     for (const [id, retained] of this.injecting) {
       if (this.injecting.size <= 256) break
       if (!retained.pending) this.injecting.delete(id)

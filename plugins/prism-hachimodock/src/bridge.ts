@@ -85,6 +85,27 @@ export function normalizeOptions(config: BridgeConfig = {}): BridgeOptions {
   }
 }
 
+/** Read the host services the bridge consumes, structurally like `prism-pocket`. */
+export function hostBridgeContext(ctx: object): BridgeContextLike {
+  const read = (name: string): unknown => Reflect.get(ctx, name)
+  const service = (name: string): unknown => {
+    const value = read(name)
+    return value !== null && typeof value === 'object' ? value : undefined
+  }
+  const fn = (name: string): unknown => {
+    const value = read(name)
+    return typeof value === 'function' ? value : undefined
+  }
+  return {
+    sessions: service('sessions') as BridgeContextLike['sessions'],
+    agents: service('agents') as BridgeContextLike['agents'],
+    sessionController: service('sessionController') as BridgeContextLike['sessionController'],
+    logger: service('logger') as BridgeContextLike['logger'],
+    on: fn('on') as BridgeContextLike['on'],
+    get: fn('get') as BridgeContextLike['get'],
+  }
+}
+
 /** Build a logger that never lets a logging failure break the bridge. */
 export function safeLogger(ctx: BridgeContextLike): Required<LoggerLike> {
   const log = (level: 'info' | 'warn' | 'error', detail: unknown): void => {
@@ -426,7 +447,10 @@ export async function handleApprovalRequest(bridge: Bridge, request: {
     if (request.signal?.aborted) return 'cancelled'
     if (getLiveSession(bridge.ctx, sessionId) !== request.agent?.session) return 'unavailable'
     if (!bridge.server.hasEventSubscriber()) {
-      if (bridge.options.approvalFallback === 'delegate') return String(await delegate())
+      if (bridge.options.approvalFallback === 'delegate') {
+        const outcome = await delegate()
+        return typeof outcome === 'string' ? outcome : 'unavailable'
+      }
       return 'unavailable'
     }
     const prompt = bridge.server.requestApproval({
@@ -486,25 +510,10 @@ export interface Bridge {
 export function createBridge(ctx: BridgeContextLike, config: BridgeConfig = {}, activation?: ActivationHub): Bridge {
   const options = normalizeOptions(config)
   const logger = safeLogger(ctx)
-  const bridge: Bridge = {
-    ctx,
-    options,
-    logger,
-    titleMap: new Map(),
-    lastModified: new Map(),
-    stateContract: createStateContract({ limit: CACHE_LIMIT }),
-    sessionText: new Map(),
-    server: null as unknown as BridgeServer,
-    start: async () => 0,
-    stop: async () => {},
-    handleApprovalRequest: (request, next) => handleApprovalRequest(bridge, request, next),
-    interruptSession: args => interruptSession(bridge, args),
-    injectToSession: args => injectToSession(bridge, args),
-    listSessions: () => bridge.server.listSessions(),
-    resolveTargetSession: sessionId => resolveTargetSession(bridge, sessionId),
-    summarizeSession: session => summarizeSession(bridge, session),
-  }
-  bridge.server = new BridgeServer({
+  // The adapter callbacks close over the finished bridge through this holder;
+  // the server only invokes them after `listen()`, once the holder is set.
+  const holder: { current?: Bridge } = {}
+  const server = new BridgeServer({
     port: options.port,
     approvalTimeoutMs: options.approvalTimeoutMs,
     injectTimeoutMs: options.injectTimeoutMs,
@@ -513,19 +522,28 @@ export function createBridge(ctx: BridgeContextLike, config: BridgeConfig = {}, 
     bootstrapFile: options.bootstrapFile,
     writeBootstrap: options.writeBootstrap,
     listSessions: () => {
-      const sessions = getLiveSessions(ctx)
+      const current = holder.current
+      if (current === undefined) return []
       const summaries: SessionSummary[] = []
-      for (const session of sessions) {
+      for (const session of getLiveSessions(ctx)) {
         try {
-          summaries.push(summarizeSession(bridge, session))
+          summaries.push(summarizeSession(current, session))
         } catch (error) {
           logger.warn(error)
         }
       }
       return summaries
     },
-    inject: args => injectToSession(bridge, args),
-    interrupt: args => interruptSession(bridge, args),
+    inject: (args) => {
+      const current = holder.current
+      if (current === undefined) return Promise.resolve()
+      return injectToSession(current, args)
+    },
+    interrupt: (args) => {
+      const current = holder.current
+      if (current === undefined) return Promise.resolve({ ok: false, error: 'interrupt-unavailable' })
+      return interruptSession(current, args)
+    },
     activate: (args) => {
       // The device picked a conversation; push it to same-origin web clients.
       try {
@@ -535,23 +553,42 @@ export function createBridge(ctx: BridgeContextLike, config: BridgeConfig = {}, 
       }
     },
   })
+  const bridge: Bridge = {
+    ctx,
+    options,
+    logger,
+    titleMap: new Map(),
+    lastModified: new Map(),
+    stateContract: createStateContract({ limit: CACHE_LIMIT }),
+    sessionText: new Map(),
+    server,
+    start: async () => server.listen(),
+    stop: async () => server.close(),
+    handleApprovalRequest: (request, next) => handleApprovalRequest(bridge, request, next),
+    interruptSession: args => interruptSession(bridge, args),
+    injectToSession: args => injectToSession(bridge, args),
+    listSessions: () => server.listSessions(),
+    resolveTargetSession: sessionId => resolveTargetSession(bridge, sessionId),
+    summarizeSession: session => summarizeSession(bridge, session),
+  }
+  holder.current = bridge
 
   // Compact control-plane forwarding to GET /events.
-  ctx.on?.('session/event', ((session: SessionLike, event: SessionEventLike) => {
+  ctx.on?.('session/event', (session: SessionLike, event: SessionEventLike) => {
     try {
       forwardSessionEvent(bridge, session, event)
     } catch (error) {
       logger.warn(error)
     }
-  }) as never)
-  ctx.on?.('session/created', ((session: SessionLike) => {
+  })
+  ctx.on?.('session/created', (session: SessionLike) => {
     try {
       publishSessionSummary(bridge, session)
     } catch (error) {
       logger.warn(error)
     }
-  }) as never)
-  ctx.on?.('session/disposed', ((session: SessionLike) => {
+  })
+  ctx.on?.('session/disposed', (session: SessionLike) => {
     try {
       if (session && typeof session.id === 'string') {
         const current = getLiveSession(bridge.ctx, session.id)
@@ -563,19 +600,19 @@ export function createBridge(ctx: BridgeContextLike, config: BridgeConfig = {}, 
     } catch (error) {
       logger.warn(error)
     }
-  }) as never)
-  ctx.on?.('agent/status', ((payload: { agent?: { session?: SessionLike } }) => {
+  })
+  ctx.on?.('agent/status', (payload: { agent?: { session?: SessionLike } }) => {
     try {
       const session = payload?.agent?.session
       if (session) publishSessionSummary(bridge, session)
     } catch (error) {
       logger.warn(error)
     }
-  }) as never)
+  })
 
   // The answerer itself: terminal for HachimoDock, delegating by config.
-  ctx.on?.('approval/request', ((request: Parameters<typeof handleApprovalRequest>[1], next: () => unknown) =>
-    handleApprovalRequest(bridge, request, next)) as never)
+  ctx.on?.('approval/request', (request: Parameters<typeof handleApprovalRequest>[1], next: () => unknown) =>
+    handleApprovalRequest(bridge, request, next))
 
   bridge.start = async () => bridge.server.listen()
   bridge.stop = async () => bridge.server.close()

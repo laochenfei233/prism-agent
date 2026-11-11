@@ -67,14 +67,14 @@ export interface ProjectionsLike {
  * profile.
  */
 export interface BridgeContextLike {
-  readonly sessions?: { get?(sessionId: string): SessionLike | undefined; list?(): SessionLike[] | null }
-  readonly agents?: AgentRegistryLike
-  readonly sessionController?: SessionControllerLike
-  readonly logger?: LoggerLike
+  readonly sessions?: { get?(sessionId: string): SessionLike | undefined; list?(): SessionLike[] | null } | undefined
+  readonly agents?: AgentRegistryLike | undefined
+  readonly sessionController?: SessionControllerLike | undefined
+  readonly logger?: LoggerLike | undefined
   /** Cordis event subscription; returns a disposer when supported. */
-  on?(event: string, listener: (...args: never[]) => unknown): unknown
+  on?: ((event: string, listener: (...args: never[]) => unknown) => unknown) | undefined
   /** Public optional-service lookup. */
-  get?(name: string): unknown
+  get?: ((name: string) => unknown) | undefined
 }
 
 /** Resolved bridge options. */

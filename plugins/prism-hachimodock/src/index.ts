@@ -16,10 +16,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-import { createBridge, PLUGIN_NAME, type BridgeConfig } from './bridge.ts'
+import { createBridge, hostBridgeContext, PLUGIN_NAME, type BridgeConfig } from './bridge.ts'
 import { capabilities, serviceView } from './host-contract.ts'
 import { ActivationHub, ACTIVATION_PATH } from './activation.ts'
-import type { LoggerLike } from './types.ts'
 
 export { AGENT_ID, PLUGIN_NAME, createBridge, forwardSessionEvent, handleApprovalRequest, injectToSession, interruptSession, normalizeOptions, resolveTargetSession, summarizeSession } from './bridge.ts'
 export { ACTIVATION_PATH, ActivationHub } from './activation.ts'
@@ -83,8 +82,9 @@ export const inject = ['sessions', 'agents', 'sessionController']
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = Config(config) as ResolvedConfig
-  const hub = new ActivationHub(ctx.logger as unknown as LoggerLike | null)
-  const bridge = createBridge(ctx as never, resolved as BridgeConfig, hub)
+  const bridgeCtx = hostBridgeContext(ctx)
+  const hub = new ActivationHub(bridgeCtx.logger ?? null)
+  const bridge = createBridge(bridgeCtx, resolved as BridgeConfig, hub)
   bridge.ctx = serviceView(bridge.ctx)
   bridge.server.capabilities = () => capabilities(bridge.ctx)
 

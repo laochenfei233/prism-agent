@@ -33,6 +33,8 @@ The HachimoDock desktop app discovers the bridge by reading the capability descr
 - `allowedOrigins` — exact browser Origins allowed to pair; empty disables browser voice.
 - `descriptorPath` — capability descriptor override (tests).
 
+The live approval wait can also be tuned without a profile rebuild through the shared HachimoDock bridge profile (`~/.claw-pet/pet-bridge.json`, key `dshApprovalTimeoutMs`, or env `HACHIMODOCK_PRISM_APPROVAL_TIMEOUT_MS`); `0` means wait forever. Absent or invalid values fall back to `approvalTimeoutMs`.
+
 ## Notes and limits
 
 - Transport bounds carry over from the upstream contract: strict JSON objects ≤64KiB with prototype keys rejected, loopback-only bind with exact Host checks, bounded SSE queues and replay rings, epoch-bound cursors, and no replay of old approval or voice commands.

@@ -29,6 +29,7 @@ interface ActivationClient {
   writable: boolean
   send: (text: string) => boolean
   close: () => void
+  stopKeepAlive: () => void
 }
 
 /**
@@ -56,7 +57,6 @@ export class ActivationHub {
     }
     const encoder = new TextEncoder()
     let client: ActivationClient | undefined
-    let keepAlive: ReturnType<typeof setInterval> | undefined
     const stream = new ReadableStream<Uint8Array>({
       start: (controller) => {
         const send = (text: string): boolean => {
@@ -74,7 +74,14 @@ export class ActivationHub {
             /* already closed */
           }
         }
-        client = { writable: true, send, close }
+        let keepAlive: ReturnType<typeof setInterval> | undefined
+        const stopKeepAlive = (): void => {
+          if (keepAlive !== undefined) {
+            clearInterval(keepAlive)
+            keepAlive = undefined
+          }
+        }
+        client = { writable: true, send, close, stopKeepAlive }
         this.clients.add(client)
         send(': connected\n\n')
         keepAlive = setInterval(() => {
@@ -82,12 +89,10 @@ export class ActivationHub {
         }, KEEPALIVE_MS)
       },
       cancel: () => {
-        if (keepAlive !== undefined) clearInterval(keepAlive)
         this.drop(client)
       },
     })
     request.signal.addEventListener('abort', () => {
-      if (keepAlive !== undefined) clearInterval(keepAlive)
       this.drop(client)
     })
     return new Response(stream, {
@@ -118,7 +123,7 @@ export class ActivationHub {
   /** End every subscription; used on plugin dispose. */
   close(): void {
     for (const client of [...this.clients]) {
-      client.writable = false
+      this.drop(client)
       client.close()
     }
     this.clients.clear()
@@ -126,6 +131,7 @@ export class ActivationHub {
 
   private drop(client: ActivationClient | undefined): void {
     if (client === undefined) return
+    client.stopKeepAlive()
     client.writable = false
     this.clients.delete(client)
   }

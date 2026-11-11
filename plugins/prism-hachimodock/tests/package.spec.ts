@@ -116,10 +116,14 @@ describe('apply wiring', () => {
       },
       effect: (run: () => unknown, label: string) => {
         effects.push({ label, run })
-        try {
-          void run()
-        } catch {
-          /* the bridge effect starts an async server; failures are logged */
+        // Run only the registration effects; starting the HTTP bridge would
+        // bind a port and write the real capability descriptor.
+        if (label !== 'hachimodock: http bridge') {
+          try {
+            void run()
+          } catch {
+            /* registration failures surface through the assertions below */
+          }
         }
       },
       logger: { info() {}, warn() {}, error() {} },

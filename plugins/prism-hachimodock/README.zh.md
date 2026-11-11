@@ -33,6 +33,8 @@ HachimoDock 桌面管理端通过读取 capability descriptor 发现本桥；不
 - `allowedOrigins` — 允许配对的精确浏览器 Origin；为空即禁用浏览器语音。
 - `descriptorPath` — capability descriptor 覆盖（测试用）。
 
+审批等待还可以不经 profile 重建在线调整：共享的 HachimoDock 桥接 profile（`~/.claw-pet/pet-bridge.json`，键 `dshApprovalTimeoutMs`，或环境变量 `HACHIMODOCK_PRISM_APPROVAL_TIMEOUT_MS`）；`0` 表示永久等待。缺省或非法值回落到 `approvalTimeoutMs`。
+
 ## Notes and limits
 
 - 传输边界照搬上游契约：严格 JSON 对象 ≤64KiB 且拒绝原型链键、仅 loopback 绑定并精确校验 Host、有界 SSE 队列与重放环、epoch 绑定的游标、旧的审批/语音命令永不重放。
