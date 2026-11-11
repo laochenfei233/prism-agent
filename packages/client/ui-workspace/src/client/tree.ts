@@ -64,6 +64,8 @@ export interface SessionNode {
   updatedAt: number
   /** The row's own user annotation; absent at every default. */
   annotation?: SessionAnnotation
+  /** Session working directory; absent when the Host reports none or an empty path. */
+  cwd?: string
 }
 
 /** Session order selected by the Workspace browser. */
@@ -171,12 +173,12 @@ export function orderByRecency(
 
 /**
  * Reconcile a browser-local manual order with current account membership.
- * New ordinary forks precede their sources without changing saved entries' relative order.
+ * Saved entries retain their relative order; new ordinary members follow them by recency.
  * @param memberIds - authoritative account membership.
  * @param savedOrder - previously saved browser-local order.
  * @param summaries - current Session metadata; unknown new members wait for their summaries.
  * @param rowState - global pin and archive membership; only account members can supplement the order.
- * @returns saved relative positions plus missing members ordered by pin, fork source, recency, and archive status.
+ * @returns saved relative positions plus missing members ordered by pin, recency, and archive status.
  */
 export function reconcileManualOrder(
   memberIds: readonly SessionId[],
@@ -207,18 +209,7 @@ export function reconcileManualOrder(
     if (archived.has(id)) archives.push(id)
     else ordinary.push(id)
   }
-  const result = [...pins, ...ordered, ...ordinary, ...archives]
-  const pending = new Set(ordinary)
-  const placeFork = (id: SessionId): void => {
-    if (!pending.delete(id)) return
-    const parentId = summaries[id]?.parentId
-    if (parentId === undefined || parentId === id || !result.includes(parentId)) return
-    placeFork(parentId)
-    result.splice(result.indexOf(id), 1)
-    result.splice(result.indexOf(parentId), 0, id)
-  }
-  for (const id of [...ordinary].reverse()) placeFork(id)
-  return result
+  return [...pins, ...ordered, ...ordinary, ...archives]
 }
 
 /**
@@ -503,6 +494,7 @@ function sessionNode(
     archived: visibility.archived.has(s.id),
     updatedAt: s.updatedAt,
     ...(annotation === undefined ? {} : { annotation }),
+    ...(s.cwd === undefined || s.cwd === '' ? {} : { cwd: s.cwd }),
     ...(pendingInteraction === undefined ? {} : { pendingInteraction }),
   }
 }
@@ -658,9 +650,10 @@ export function deriveFlat(
 }
 
 /**
- * Merge immediate title/Workspace/tag/note substring matches with ranked Host
- * content matches. Local rows lead newest-first, content-only rows retain
- * backend order, and duplicate sessions receive the backend snippet in place.
+ * Merge immediate title/Workspace/tag/note/Session id substring matches with
+ * ranked Host content matches. Local rows lead newest-first, content-only rows
+ * retain backend order, and duplicate sessions receive the backend snippet in
+ * place.
  * @param list - session metadata authority.
  * @param workspaces - Workspace membership and display labels.
  * @param query - caller text; surrounding whitespace is ignored.
@@ -714,6 +707,7 @@ export function deriveSearchResults(
       sessionTitle(summary).toLowerCase().includes(q)
       || labelOf(summary).toLowerCase().includes(q)
       || annotationMatches(summary.id)
+      || summary.id.toLowerCase().includes(q)
     ) {
       local.push(summary)
     }

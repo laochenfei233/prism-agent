@@ -50,7 +50,6 @@ worktrees/
 # Standalone repo staging (dsh-desktop)
 .standalone/
 native/system/test/bin/
-<<<<<<< HEAD
 
 # Local harness-home copies carry per-install identity and credentials; never commit them.
 home-mods/.credentials.yaml
@@ -69,3 +68,6 @@ install.err.log
 install.out.log
 apps/desktop/.npm-cache/
 *.tgz
+
+# Generated company-signed CUA release record.
+/packages/experimental/cua-macos/cua-helper.json

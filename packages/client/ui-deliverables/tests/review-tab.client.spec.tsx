@@ -161,7 +161,7 @@ describe('ReviewTab', () => {
       loadChangesSummary: vi.fn<ReviewInjected['loadChangesSummary']>(() => Promise.resolve()),
       loadChangesDiff: vi.fn<ReviewInjected['loadChangesDiff']>(() => Promise.resolve()),
       reloadPresentedHost: vi.fn<ReviewInjected['reloadPresentedHost']>(() => Promise.resolve()),
-      openChanged: vi.fn<ReviewInjected['openChanged']>(() => Promise.resolve(null)),
+      openChanged: vi.fn<ReviewInjected['openChanged']>(() => Promise.resolve({ kind: 'opened' })),
     }
     const sessions: SessionListState = {
       ids: [SESSION],
@@ -173,7 +173,7 @@ describe('ReviewTab', () => {
     const runtime = {
       renderSlot: renderFileActions,
       useTabInfo: () => ({
-        sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane-1' },
+        sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane-1', isFloating: false },
         tab: { id: TAB, kind: 'changes-review', contentId: options.address ?? ADDRESS, title: 'Review', visible: true, navigation, signal: aborter.signal, actions: tabActions },
       }),
       sessionId: SESSION,

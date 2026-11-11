@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-backup",
   "description": "Back up configuration, memory, and project folders to WebDAV, SMB, or S3 from the settings page",
-  "version": "0.2.1-rc.4",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },

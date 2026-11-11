@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-sidebar-git",
   "description": "Git workbench tab type for the right Sidebar: repository status, staged, unstaged, and untracked sections, file comparisons, and staging or committing from the panel",
-  "version": "0.2.1-rc.4",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },
