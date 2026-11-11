@@ -1,0 +1,62 @@
+{
+  "name": "@prism/prism-hachimodock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HachimoDock bridge for Prism: loopback session status, approval relay, voice targets, and device-driven conversation switching as a patch plugin",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    },
+    "compatibility": {
+      "hachimodock": "main 361cb0e",
+      "protocol": "hachimodock-bridge-v2",
+      "contracts": [
+        "cordis-session-store-v1",
+        "live-session-seq-turn-call-v1",
+        "hachimodock-scoped-input-v1"
+      ]
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client.js.map",
+    "cordis.patch.yml",
+    "windows-acl.ps1",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsdown --config tsdown.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1"
+  }
+}
