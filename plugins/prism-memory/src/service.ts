@@ -372,8 +372,6 @@ export interface BootstrapSessionPlan {
   readonly sessionId: string
   /** Model-visible messages on the session's current surface, or `null` when not read. */
   readonly messageCount: number | null
-  /** Whether a completed bootstrap apply already processed it. */
-  readonly processed: boolean
 }
 
 /** What one bootstrap invocation selected and, when applied, wrote. */
@@ -541,6 +539,8 @@ export interface PrismMemoryConfig {
   bootstrapClaimsPerSession: Volatile<number>
   /** Dialogue characters one bootstrapped session contributes to its prompt. */
   bootstrapMaxChars: Volatile<number>
+  /** Token cap one assisted model call may spend. */
+  assistedDistillMaxTokens: Volatile<number>
 }
 
 /** Convert a day count to an absolute deadline, or `null` for "never". */
@@ -654,6 +654,8 @@ async function readSurfaceDialogue(
   try {
     snapshot = await reader.readSurface(sessionId as SessionId)
   } catch {
+    // Unknown session, unparsable log, or backend failure: the session
+    // contributes nothing, and no outcome in between is knowable here.
     return undefined
   }
   const dialogue: AssistedMessage[] = []
@@ -830,6 +832,7 @@ export class PrismMemoryService extends Service {
     bootstrapMaxSessions: z.number().step(1).min(1).default(10).volatile(),
     bootstrapClaimsPerSession: z.number().step(1).min(1).default(3).volatile(),
     bootstrapMaxChars: z.number().step(1).min(1).default(24_000).volatile(),
+    assistedDistillMaxTokens: z.number().step(1).min(1).default(1024).volatile(),
   })
 
   /** The durable record table; assigned by {@link PrismMemoryService.init}. */
@@ -1782,14 +1785,19 @@ export class PrismMemoryService extends Service {
     const limit = this.config.assistedDistillLimit.get()
     let raw: string
     try {
-      raw = await runAssistedCall(llm, target, renderAssistedPrompt(dialogue, limit))
+      raw = await runAssistedCall(llm, target, renderAssistedPrompt(dialogue, limit), this.config.assistedDistillMaxTokens.get())
     } catch (error) {
       this.ctx.logger.warn('prism-memory: assisted distillation call failed; skipping this window')
       this.ctx.logger.warn(error)
       return
     }
     const candidates = parseAssistedOutput(raw, limit)
-    if (candidates.length === 0) return
+    if (candidates.length === 0) {
+      // An unusable reply is the model's failure, not the store's; the window
+      // still happened and the next one pays for it, so it leaves a trace.
+      this.ctx.logger.warn('prism-memory: assisted distillation window produced no readable candidate')
+      return
+    }
     const admission = this.admission(agent)
     const now = Date.now()
     for (const candidate of candidates) {
@@ -1895,7 +1903,7 @@ export class PrismMemoryService extends Service {
       } catch {
         // An unreadable surface still belongs in the plan; apply reports it as failed.
       }
-      sessions.push({ sessionId: record.header.id, messageCount, processed: false })
+      sessions.push({ sessionId: record.header.id, messageCount })
     }
     const applied = options.apply ?? false
     if (!applied) {
@@ -1918,7 +1926,7 @@ export class PrismMemoryService extends Service {
       const bounded = boundDialogue(dialogue, maxChars)
       let raw: string
       try {
-        raw = await runAssistedCall(llm, target, renderAssistedPrompt(bounded, claimsPerSession))
+        raw = await runAssistedCall(llm, target, renderAssistedPrompt(bounded, claimsPerSession), this.config.assistedDistillMaxTokens.get())
       } catch (error) {
         this.ctx.logger.warn(`prism-memory: bootstrap call failed for ${session.sessionId}; skipping it`)
         this.ctx.logger.warn(error)
@@ -2177,13 +2185,17 @@ export class PrismMemoryService extends Service {
 
   /**
    * The consolidation journal: what each pass concluded, and the daily accounts.
+   * A bootstrap pass's self-record reads here too, so an operator can see which
+   * sessions a completed apply already processed.
    * @param agent - The calling agent, when the caller is model-facing.
    * @param limit - Maximum entries, newest first.
    * @returns the journal entries.
    */
   journal(agent: Agent | undefined, limit = 20): MemoryRecord[] {
     return this.visible(agent)
-      .filter(record => record.tags.includes(DREAM_TAG) || record.tags.includes(REFLECTION_TAG))
+      .filter(record => record.tags.includes(DREAM_TAG)
+        || record.tags.includes(REFLECTION_TAG)
+        || record.tags.includes(BOOTSTRAP_TAG))
       .sort((left, right) => right.createdAt - left.createdAt || (left.id < right.id ? -1 : 1))
       .slice(0, limit)
   }

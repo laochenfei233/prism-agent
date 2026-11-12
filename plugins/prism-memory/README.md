@@ -133,7 +133,7 @@ The trade is stated plainly: a form-recognizing reader has false negatives (a cl
 
 ### Model-assisted distillation, on a window
 
-With `assistedDistill` on, a second `agent/turn-stopping` listener keeps a rolling buffer of the last `assistedDistillBufferTurns` turns and, every `assistedDistillEveryTurns` turns, hands that dialogue to the deployment's own model with one instruction: propose the durable claims the form-recognizing reader cannot see. The route is `assistedDistillProvider`/`assistedDistillModel` when both are set, otherwise the calling turn's routed model. Each candidate names the message it is grounded in, and the write cites that message with the same fingerprint `/memory verify` re-reads.
+With `assistedDistill` on, the turn-stopping path also keeps a rolling buffer of the last `assistedDistillBufferTurns` turns and, every `assistedDistillEveryTurns` turns, hands that dialogue to the deployment's own model with one instruction: propose the durable claims the form-recognizing reader cannot see. The route is `assistedDistillProvider`/`assistedDistillModel` when both are set, otherwise the calling turn's routed model. Each candidate names the message it is grounded in, and the write cites that message with the same fingerprint `/memory verify` re-reads.
 
 Every candidate is written `pending` with `assistedDistillConfidence`, whatever the model said about it — the model proposes, and only a person promotes. A claim the corpus already holds is dropped, the way the form reader drops one.
 
@@ -286,6 +286,7 @@ A record outside the caller's scope is not merely ranked lower; it is filtered o
 | `bootstrapMaxSessions` | `10` | Sessions one `/memory bootstrap apply` may read |
 | `bootstrapClaimsPerSession` | `3` | Candidates one bootstrapped session may contribute |
 | `bootstrapMaxChars` | `24000` | Dialogue characters one bootstrapped session contributes to its prompt |
+| `assistedDistillMaxTokens` | `1024` | Token cap one assisted model call may spend |
 
 `dedupeReplaceJaccard` below `dedupeJaccard`, an unknown or repeated name in `identityLayers`, `dreamClusterFloor` below `2`, and an unknown name in `importSources` all fail plugin load. Every field is volatile, so it is editable from the running configuration surface.
 
@@ -372,7 +373,7 @@ Token effect: none. The page reads and writes through its own routes, and what i
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 207 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 210 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```

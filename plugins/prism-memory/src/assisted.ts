@@ -61,10 +61,11 @@ export interface AssistedTarget {
 const ASSISTED_SYSTEM = [
   'You read a conversation and propose durable memory claims worth keeping for later sessions.',
   'Propose only: a constraint that must hold (decision), a preference or habit of the person (preference),',
-  'a cause the conversation established (pitfall), or a convention of the workspace or an established fact (fact).',
+  'a cause the conversation established (pitfall), a convention of the workspace or an established fact (fact),',
+  'or a way of doing things this workspace follows (procedure).',
   'Do not propose one-off events, plans, questions, or anything already obvious from the code.',
   'Answer with a JSON array only, at most the requested number of items, each item:',
-  '{"text": one self-contained sentence, "kind": decision|preference|pitfall|fact,',
+  '{"text": one self-contained sentence, "kind": decision|preference|pitfall|fact|procedure,',
   ' "layer": soul|user|project|fact|lesson|topic|rule (optional), "sourceMessage": <1-based message number> (optional)}.',
   'An empty array is a valid answer. No prose outside the array.',
 ].join(' ')
@@ -83,10 +84,17 @@ export function renderAssistedPrompt(messages: readonly AssistedMessage[], maxCl
   return `Conversation:\n${dialogue}\n\nPropose at most ${maxClaims} durable memory claim(s) as the JSON array.`
 }
 
-/** Extract the first JSON array embedded in a model reply, fences included. */
-function jsonArraySlice(raw: string): string | undefined {
-  const start = raw.indexOf('[')
-  if (start < 0) return undefined
+/**
+ * Every balanced bracketed region in a model reply, in order. A reply may
+ * bracket incidental prose before the array it was asked for, so the caller
+ * tries each region and keeps the first one that parses as JSON.
+ * @param raw - the model's full text output.
+ * @returns the balanced regions, or none.
+ */
+function jsonArraySlices(raw: string): string[] {
+  const slices: string[] = []
+  let start = raw.indexOf('[')
+  if (start < 0) return slices
   let depth = 0
   let inString = false
   let escaped = false
@@ -100,54 +108,60 @@ function jsonArraySlice(raw: string): string | undefined {
     }
     if (character === '"') inString = true
     else if (character === '[') depth += 1
-    else if (character === ']' && --depth === 0) return raw.slice(start, index + 1)
+    else if (character === ']' && --depth === 0) {
+      slices.push(raw.slice(start, index + 1))
+      start = raw.indexOf('[', index + 1)
+      if (start < 0) break
+    }
   }
-  return undefined
+  return slices
 }
 
 /**
  * Parse one model reply into candidates.
  *
- * A reply with no array, unparsable JSON, or items that name no readable claim
- * contributes nothing; the model hallucinating a schema is an empty result, not
- * a failure — the window simply produced no candidates.
+ * Each bracketed region is tried in order; the first one that parses as a JSON
+ * array is the answer. A reply with no array, unparsable JSON, or items that
+ * name no readable claim contributes nothing; the model hallucinating a schema
+ * is an empty result, not a failure — the window simply produced no candidates.
  * @param raw - the model's full text output.
  * @param maxClaims - the cap the prompt named; extra items are dropped.
  * @returns the readable candidates, in model order.
  */
 export function parseAssistedOutput(raw: string, maxClaims: number): AssistedCandidate[] {
-  const slice = jsonArraySlice(raw)
-  if (slice === undefined) return []
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(slice)
-  } catch {
-    return []
-  }
-  if (!Array.isArray(parsed)) return []
-  const candidates: AssistedCandidate[] = []
-  for (const item of parsed) {
-    if (candidates.length >= maxClaims) break
-    if (typeof item !== 'object' || item === null) continue
-    const record = item as Record<string, unknown>
-    const text = typeof record.text === 'string' ? record.text.replace(/\s+/g, ' ').trim() : ''
-    if (text === '') continue
-    const kind = record.kind
-    if (typeof kind !== 'string' || !MEMORY_KINDS.includes(kind as MemoryKind)) continue
-    const layer = record.layer
-    const candidate: AssistedCandidate = {
-      text,
-      kind: kind as MemoryKind,
-      ...(typeof layer === 'string' && MEMORY_LAYERS.includes(layer as MemoryLayer)
-        ? { layer: layer as MemoryLayer }
-        : {}),
-      ...(Number.isInteger(record.sourceMessage) && (record.sourceMessage as number) >= 1
-        ? { sourceMessage: record.sourceMessage as number }
-        : {}),
+  for (const slice of jsonArraySlices(raw)) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(slice)
+    } catch {
+      continue
     }
-    candidates.push(candidate)
+    if (!Array.isArray(parsed)) continue
+    const candidates: AssistedCandidate[] = []
+    for (const item of parsed) {
+      if (candidates.length >= maxClaims) break
+      if (typeof item !== 'object' || item === null) continue
+      const record = item as Record<string, unknown>
+      const text = typeof record.text === 'string' ? record.text.replace(/\s+/g, ' ').trim() : ''
+      if (text === '') continue
+      const kind = record.kind
+      if (typeof kind !== 'string' || !MEMORY_KINDS.includes(kind as MemoryKind)) continue
+      const layer = record.layer
+      const candidate: AssistedCandidate = {
+        text,
+        kind: kind as MemoryKind,
+        ...(typeof layer === 'string' && MEMORY_LAYERS.includes(layer as MemoryLayer)
+          ? { layer: layer as MemoryLayer }
+          : {}),
+        ...(Number.isInteger(record.sourceMessage) && (record.sourceMessage as number) >= 1
+          ? { sourceMessage: record.sourceMessage as number }
+          : {}),
+      }
+      candidates.push(candidate)
+    }
+    return candidates
   }
-  return candidates
+  return []
 }
 
 /**
@@ -159,6 +173,7 @@ export function parseAssistedOutput(raw: string, maxClaims: number): AssistedCan
  * @param llm - the LLM runtime to dispatch through.
  * @param target - the provider route to call.
  * @param prompt - the rendered user message.
+ * @param maxTokens - the token cap the deployment allows one assisted call.
  * @param signal - optional cancellation forwarded to the adapter.
  * @returns the model's text output.
  */
@@ -166,6 +181,7 @@ export async function runAssistedCall(
   llm: LlmRuntime,
   target: AssistedTarget,
   prompt: string,
+  maxTokens: number,
   signal?: AbortSignal,
 ): Promise<string> {
   const assembler = new BlockAssembler()
@@ -174,7 +190,7 @@ export async function runAssistedCall(
     model: target.model,
     system: ASSISTED_SYSTEM,
     messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
-    maxTokens: 1024,
+    maxTokens,
     ...signal === undefined ? {} : { signal },
   }
   for await (const chunk of llm.stream(options)) assembler.push(chunk)

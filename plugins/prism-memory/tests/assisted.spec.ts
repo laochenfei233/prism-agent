@@ -142,6 +142,27 @@ describe('the assisted distillation window', () => {
     expect(report.verdicts).toHaveLength(1)
     expect(report.verdicts[0]?.outcome).toBe('intact')
   })
+
+  it('leaves a candidate without a source message uncited', async () => {
+    const cwd = await scratch()
+    const ctx = await boot(
+      { assistedDistill: true, assistedDistillEveryTurns: 1, autoDistill: false },
+      { llm: true, sessionQuery: true },
+    )
+    llmOf(ctx).reply = JSON.stringify([
+      { text: 'a claim the model grounded in nothing in particular', kind: 'fact' },
+    ])
+    const agent = await createAgent(ctx, 'assisted-uncited', cwd)
+    appendUser(agent, 'hello there, nothing durable in this line')
+    appendAssistant(agent, 'a plain reply')
+    await driveTurnStopping(ctx, agent)
+
+    const stored = ctx.prismMemory.all()
+    expect(stored).toHaveLength(1)
+    expect(stored[0]?.evidence.messageId).toBeNull()
+    const report = await ctx.prismMemory.verifyEvidence()
+    expect(report.uncited).toBe(1)
+  })
 })
 
 describe('the bootstrap pass', () => {
@@ -152,6 +173,15 @@ describe('the bootstrap pass', () => {
     )
     const agent = await createAgent(ctx, 'bootstrap-no-reader')
     await expect(ctx.prismMemory.bootstrap({ agent })).rejects.toMatchObject({
+      code: 'PRISM_MEMORY_BOOTSTRAP_UNAVAILABLE',
+    })
+
+    const ctxNoCwd = await boot(
+      { assistedDistillProvider: 'mock', assistedDistillModel: 'mock' },
+      { llm: true, sessionQuery: true },
+    )
+    const noCwd = await createAgent(ctxNoCwd, 'bootstrap-no-cwd')
+    await expect(ctxNoCwd.prismMemory.bootstrap({ agent: noCwd })).rejects.toMatchObject({
       code: 'PRISM_MEMORY_BOOTSTRAP_UNAVAILABLE',
     })
   })
@@ -207,6 +237,52 @@ describe('the bootstrap pass', () => {
     expect(again.sessions).toHaveLength(0)
     expect(llmOf(ctx).calls).toHaveLength(1)
     expect(again.created).toHaveLength(0)
+  })
+
+  it('honors the session cap and records its pass in the journal', async () => {
+    const cwd = await scratch()
+    const ctx = await boot(
+      { assistedDistillProvider: 'mock', assistedDistillModel: 'mock', autoDistill: false },
+      { llm: true, sessionQuery: true },
+    )
+    for (const id of ['oldest', 'middle', 'newest']) {
+      const past = await createAgent(ctx, id, cwd)
+      appendUser(past, 'a past turn of this workspace')
+    }
+    const agent = await createAgent(ctx, 'bootstrap-cap', cwd)
+    llmOf(ctx).reply = ONE_CLAIM
+
+    const report = await ctx.prismMemory.bootstrap({ apply: true, limit: 2, agent })
+
+    expect(report.sessions.map(session => session.sessionId)).toEqual(['session-newest', 'session-middle'])
+    expect(llmOf(ctx).calls).toHaveLength(2)
+    // The scripted reply proposes the same claim for both sessions; the second
+    // write is what the dedupe path exists to stop.
+    expect(report.created).toHaveLength(1)
+    expect(report.skipped).toBe(1)
+    const journal = ctx.prismMemory.journal(agent, 10)
+    expect(journal.some(record => record.tags.includes('bootstrap-log'))).toBe(true)
+    expect(journal.find(record => record.tags.includes('bootstrap-log'))?.text).toContain('session-middle')
+  })
+
+  it('counts a claim the corpus already holds as skipped', async () => {
+    const cwd = await scratch()
+    const ctx = await boot(
+      { assistedDistillProvider: 'mock', assistedDistillModel: 'mock', autoDistill: false },
+      { llm: true, sessionQuery: true },
+    )
+    const past = await createAgent(ctx, 'past', cwd)
+    appendUser(past, 'a past turn of this workspace')
+    appendAssistant(past, 'its plain reply')
+    const agent = await createAgent(ctx, 'bootstrap-dupe', cwd)
+    await ctx.prismMemory.remember({ text: 'the staging cluster resets every monday', kind: 'fact', scope: 'project' }, agent)
+    llmOf(ctx).reply = ONE_CLAIM
+
+    const report = await ctx.prismMemory.bootstrap({ apply: true, agent })
+
+    expect(report.created).toHaveLength(0)
+    expect(report.skipped).toBe(1)
+    expect(llmOf(ctx).calls).toHaveLength(1)
   })
 })
 

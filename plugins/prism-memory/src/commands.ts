@@ -353,9 +353,7 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
         `selected: ${report.sessions.length === 0 ? 'none' : `${report.sessions.length} session(s), newest first`}`,
       ]
       for (const session of report.sessions) {
-        lines.push(`  ${session.sessionId} — ${session.processed
-          ? 'already processed'
-          : `${session.messageCount === null ? 'unreadable' : `${session.messageCount} message(s)`} on the surface`}`)
+        lines.push(`  ${session.sessionId} — ${session.messageCount === null ? 'unreadable' : `${session.messageCount} message(s)`} on the surface`)
       }
       if (report.applied) {
         lines.push(

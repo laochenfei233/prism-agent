@@ -133,7 +133,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ### 模型辅助沉淀：按窗口
 
-`assistedDistill` 开启后，第二个 `agent/turn-stopping` 监听器维护最近 `assistedDistillBufferTurns` 个轮次的滚动缓冲，并且每满 `assistedDistillEveryTurns` 个轮次，就把这段对话交给部署自己的模型，附一条指令：提出句式读取器看不见的持久主张。路由在 `assistedDistillProvider`/`assistedDistillModel` 都设置时用配置，否则用调用轮次已路由的模型。每个候选指明它依据的消息，写入时以 `/memory verify` 之后会重读的同款指纹引用该消息。
+`assistedDistill` 开启后，turn-stopping 路径还会维护最近 `assistedDistillBufferTurns` 个轮次的滚动缓冲，并且每满 `assistedDistillEveryTurns` 个轮次，就把这段对话交给部署自己的模型，附一条指令：提出句式读取器看不见的持久主张。路由在 `assistedDistillProvider`/`assistedDistillModel` 都设置时用配置，否则用调用轮次已路由的模型。每个候选指明它依据的消息，写入时以 `/memory verify` 之后会重读的同款指纹引用该消息。
 
 每个候选都以 `pending` 状态、`assistedDistillConfidence` 置信度写入，无论模型怎么宣称 —— 模型只负责提出，提升永远由人完成。语料已经持有的主张被丢弃，与句式读取器丢弃一条的方式相同。
 
@@ -286,6 +286,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `bootstrapMaxSessions` | `10` | 一次 `/memory bootstrap apply` 可读取的会话上限 |
 | `bootstrapClaimsPerSession` | `3` | 每个被 bootstrap 的会话可贡献的候选上限 |
 | `bootstrapMaxChars` | `24000` | 每个被 bootstrap 的会话贡献给提示词的对话字符上限 |
+| `assistedDistillMaxTokens` | `1024` | 一次辅助模型调用可花费的 token 上限 |
 
 `dedupeReplaceJaccard` 低于 `dedupeJaccard`、`identityLayers` 中出现未知或重复的名字、`dreamClusterFloor` 低于 `2`，以及 `importSources` 中出现未知的名字，都会让插件加载失败。每个字段都是易变的，因此可以从运行中的配置面编辑。
 
@@ -372,7 +373,7 @@ token 影响：无。页面通过自己的路由读写，而它所结算的东�
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 207 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 210 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
