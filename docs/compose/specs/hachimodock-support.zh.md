@@ -1,9 +1,9 @@
 ---
 feature: hachimodock-support
-status: designed
-updated: 2026-11-11
+status: delivered
+updated: 2026-11-12
 branch: feat/hachimodock-support
-commits: b898399b3c..(交付时填写)
+commits: b898399b3c..2ce3993e0f
 ---
 
 # HachimoDock 桥接支持：设备状态、审批中继、语音与对话切换
@@ -11,6 +11,17 @@ commits: b898399b3c..(交付时填写)
 [English](hachimodock-support.md) | 中文
 
 ## Report
+
+**交付内容** — `plugins/prism-hachimodock`（@prism/prism-hachimodock），HachimoDock DSH 桥接协议 v2（上游 main `361cb0e`）的 TS/ESM 移植：带 relay/bus/voice 三种 token 角色的 loopback HTTP/SSE 服务、以仅属主权限写到 `~/.claw-pet/prism-bridge/capability.json` 的 capability descriptor v2、紧凑会话摘要与有界事件流、终局 `approval/request` 应答器（认领一次、仅认领前委托）、`/inject` 准入流、以及保持上游 fail-closed 语义的语音端点（prism 不随附浏览器 InputActions 消费者；设备语音走 OS composer 适配器）。在移植之上是新的会话切换能力：`POST /sessions/activate`（bus token）校验活跃会话后经 `GET /api/hachimodock/activation` 扇出给同源 web 客户端；客户端半边经 `uiWorkspace.openSession` 切换列表内会话、不重放、不抢焦点。配置是 patch 行上的 schemastery schema（默认空闲端口并记录进 descriptor；`approvalFallback: delegate`）。
+
+**验证** — `tsc -p tsconfig.json --noEmit` 退出码 0；`tsdown` 产出 `lib/index.js` + `lib/client.js`；vitest 10 文件 / 101 测试通过，含移植的上游套件（approval、events、security、health-sessions、inject+interrupt、语音 fail-closed、windows-acl、package 不变量）与新增的 activation、构建产物 client 套件。`verify-translation-pairing` 已记录 README 三件套。一轮评审（REQUEST_CHANGES：中继自撤销属 HachimoDock 侧；hub keep-alive 泄漏；禁用断言清理；一个会启动真实服务并写真实 descriptor 的 apply 测试）——全部修复并从干净 HEAD `2ce3993e0f` 重验；评审结论 PASS-with-minors。
+
+**Journey log** —
+- 上游移植不能砍掉"旧版"语音端点：HachimoDock 的 Rust 调用方（`dsh_desktop.rs`、`dsh_approval.rs`）仍在打 `/voice/status`、`/pair/ticket`、`/approval/decision`、`/relay/close`，协议面没有子集可选；真正无用的只有浏览器 InputActions 消费者。
+- `Number.isSafeInteger` 不会窄化 `unknown`——先绑到常量再做 `typeof` 判断；`exactOptionalPropertyTypes` 还要求所有可能收到显式 undefined 的可选字段写成 `prop?: T | undefined`。
+- schemastery 字段天然 optional-at-input，没有 `.optional()`（`Schema<number>` 上不存在）；gateway 模式（`z<Config>` + 每字段 `.default()`、接口字段可选）类型最顺。
+- out-of-tree 插件的 typecheck 必须把 `@deepseek-ai/cordis` 指向构建好的 `vendor/cordis/lib/types`——tsconfig.base 的 paths 会把 vendor 源码拉进程序并在插件 flags 下报错（master 上 prism-pocket 自己的 tsc 也是这么红的）。
+- "执行已记录 effect" 的 vitest 替身必须限定哪些 effect 会执行：执行 bridge effect 会启动真实服务并在插件 cwd 铸造真实 descriptor 凭据。
 
 ## [S1] 问题
 
@@ -51,13 +62,13 @@ patch 入口上的 schemastery `Config`，加载期 fail-loud：`port?: number`�
 
 ## Tasks
 
-- [ ] T1: 搭建 `plugins/prism-hachimodock`（package.json、cordis.patch.yml、tsdown、tsconfig、vitest）（依赖：无）
-- [ ] T2: capability descriptor 存取 + Windows ACL 移植（依赖：T1）（覆盖：S2.1）
-- [ ] T3: loopback HTTP+SSE 服务、token 认证与传输边界（依赖：T1）（覆盖：S2.1）
-- [ ] T4: bridge 胶水——会话摘要、事件流、审批应答、inject/interrupt、语音端点（依赖：T3）（覆盖：S2.3、S2.4）
-- [ ] T5: 激活推送路由 + 客户端模块（依赖：T3）（覆盖：S2.5）
-- [ ] T6: 上游协议测试的 vitest 移植 + 激活测试（依赖：T2、T4、T5）（覆盖：S2.1–S2.5）
-- [ ] T7: README 三件套（依赖：T6）（覆盖：S2.6）
+- [x] T1: 搭建 `plugins/prism-hachimodock`（package.json、cordis.patch.yml、tsdown、tsconfig、vitest）（依赖：无）
+- [x] T2: capability descriptor 存取 + Windows ACL 移植（依赖：T1）（覆盖：S2.1）
+- [x] T3: loopback HTTP+SSE 服务、token 认证与传输边界（依赖：T1）（覆盖：S2.1）
+- [x] T4: bridge 胶水——会话摘要、事件流、审批应答、inject/interrupt、语音端点（依赖：T3）（覆盖：S2.3、S2.4）
+- [x] T5: 激活推送路由 + 客户端模块（依赖：T3）（覆盖：S2.5）
+- [x] T6: 上游协议测试的 vitest 移植 + 激活测试（依赖：T2、T4、T5）（覆盖：S2.1–S2.5）
+- [x] T7: README 三件套（依赖：T6）（覆盖：S2.6）
 
 ## [S4] 验收
 

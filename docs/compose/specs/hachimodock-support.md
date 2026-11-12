@@ -1,9 +1,9 @@
 ---
 feature: hachimodock-support
-status: designed
-updated: 2026-11-11
+status: delivered
+updated: 2026-11-12
 branch: feat/hachimodock-support
-commits: b898399b3c..(fill at delivery)
+commits: b898399b3c..2ce3993e0f
 ---
 
 # HachimoDock bridge support: device status, approval relay, voice, and conversation switching
@@ -11,6 +11,17 @@ commits: b898399b3c..(fill at delivery)
 English | [中文](hachimodock-support.zh.md)
 
 ## Report
+
+**What was built** — `plugins/prism-hachimodock` (@prism/prism-hachimodock), a TS/ESM port of the HachimoDock DSH bridge protocol v2 (upstream main `361cb0e`): a loopback HTTP/SSE server with token roles relay/bus/voice, the capability descriptor v2 written owner-only to `~/.claw-pet/prism-bridge/capability.json`, compact session summaries and the bounded event feed, the terminal `approval/request` answerer (claim-once, delegate-before-claim only), `/inject` admission streaming, and the voice endpoints with upstream's fail-closed semantics (prism ships no browser InputActions consumer; device voice runs through the OS composer adapter). On top of the port sits the new conversation-switch capability: `POST /sessions/activate` (bus token) validates a live session and fans it to same-origin web clients over `GET /api/hachimodock/activation`; the client half switches the conversation through `uiWorkspace.openSession` for listed ids, never replays, and never steals window focus. Config is a schemastery schema on the patch row (free-port default recorded in the descriptor; `approvalFallback: delegate`).
+
+**Verification** — `tsc -p tsconfig.json --noEmit` exit 0; `tsdown` builds `lib/index.js` + `lib/client.js`; vitest 10 files / 101 tests pass, including the ported upstream suites (approval, events, security, health-sessions, inject+interrupt, voice fail-closed, windows-acl, package invariants) plus the activation and built-bundle client suites. `verify-translation-pairing` recorded the README trio. One review round (REQUEST_CHANGES: relay self-revocation was HachimoDock-side; hub keep-alive leak; banned-cast cleanups; an apply-wiring test that started the real server and wrote a real descriptor) — all fixed and re-verified from clean HEAD `2ce3993e0f`; reviewer verdict PASS-with-minors.
+
+**Journey log** —
+- The upstream port cannot drop the "legacy" voice endpoints: HachimoDock's Rust callers (`dsh_desktop.rs`, `dsh_approval.rs`) still hit `/voice/status`, `/pair/ticket`, `/approval/decision`, `/relay/close`, so the protocol surface has no subset; only the browser InputActions consumer is genuinely unused.
+- `Number.isSafeInteger` does not narrow `unknown` — bind to a const with a `typeof` check; `exactOptionalPropertyTypes` also forces `prop?: T | undefined` on every optional that receives an explicit undefined.
+- schemastery fields are optional-at-input without `.optional()` (which does not exist on `Schema<number>`); the gateway pattern (`z<Config>` with `.default()` per field, interface optional) types cleanly.
+- Out-of-tree plugin typecheck must point `@deepseek-ai/cordis` at the BUILT `vendor/cordis/lib/types` — the tsconfig.base paths map pulls vendor source into the program and fails under plugin flags (prism-pocket's own tsc fails this way on master).
+- A vitest double that "runs" recorded effects must scope which effects execute: running the bridge effect started a real server and minted real descriptor credentials at the plugin cwd.
 
 ## [S1] Problem
 
@@ -51,13 +62,13 @@ The voice endpoints port with upstream's fail-closed semantics. The browser Inpu
 
 ## Tasks
 
-- [ ] T1: scaffold `plugins/prism-hachimodock` (package.json, cordis.patch.yml, tsdown, tsconfig, vitest) (depends: none)
-- [ ] T2: capability descriptor store + Windows ACL port (depends: T1) (covers: S2.1)
-- [ ] T3: loopback HTTP+SSE server with token auth and transport bounds (depends: T1) (covers: S2.1)
-- [ ] T4: bridge glue — session summaries, event feed, approval answerer, inject/interrupt, voice endpoints (depends: T3) (covers: S2.3, S2.4)
-- [ ] T5: activation push route + client module (depends: T3) (covers: S2.5)
-- [ ] T6: vitest ports of the upstream protocol tests + activation tests (depends: T2, T4, T5) (covers: S2.1–S2.5)
-- [ ] T7: README trio (depends: T6) (covers: S2.6)
+- [x] T1: scaffold `plugins/prism-hachimodock` (package.json, cordis.patch.yml, tsdown, tsconfig, vitest) (depends: none)
+- [x] T2: capability descriptor store + Windows ACL port (depends: T1) (covers: S2.1)
+- [x] T3: loopback HTTP+SSE server with token auth and transport bounds (depends: T1) (covers: S2.1)
+- [x] T4: bridge glue — session summaries, event feed, approval answerer, inject/interrupt, voice endpoints (depends: T3) (covers: S2.3, S2.4)
+- [x] T5: activation push route + client module (depends: T3) (covers: S2.5)
+- [x] T6: vitest ports of the upstream protocol tests + activation tests (depends: T2, T4, T5) (covers: S2.1–S2.5)
+- [x] T7: README trio (depends: T6) (covers: S2.6)
 
 ## [S4] Acceptance
 
