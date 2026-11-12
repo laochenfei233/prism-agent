@@ -8,7 +8,7 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { allowAllAccess, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
-import { HoverCardGroup, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { HoverCardGroup, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { menuOpenStateFactory } from '../src/client/contract/slots.ts'
 import type { MenuOpenState, ProjectMenuOpenState, ProjectRowOwnerProps, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
@@ -1682,7 +1682,8 @@ describe('annotation marks', () => {
       runningSubagentCount: 0, completed: false, archived: false,
       annotation: { favorite: true },
     }
-    render(<SearchResultItem result={result} currentId={undefined} onOpen={vi.fn()} onUnarchive={vi.fn()} t={t} />)
+    render(<SearchResultItem result={result} currentId={undefined} onOpen={vi.fn()} onUnarchive={vi.fn()}
+      useSessionAccess={allowAllAccess.useSessionAccess} t={t} />)
     expect(screen.getByRole('img', { name: zh['annotation.favorite'] })).toBeTruthy()
   })
 

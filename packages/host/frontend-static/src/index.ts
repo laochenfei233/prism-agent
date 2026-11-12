@@ -153,9 +153,15 @@ export function apply(ctx: Context, config: Config): void {
     let headers = new Headers()
     let body: string | undefined
     const admitted = ctx.connection.authorizeIndex(request, {
+      // The fork's ConnectionIndexResponse carries array-valued headers (multi-cookie set-cookie), which
+      // HeadersInit rejects; combine repeats the way the platform combines same-named headers.
       writeHead(nextStatus, nextHeaders) {
         status = nextStatus
-        headers = new Headers(nextHeaders)
+        headers = new Headers()
+        for (const [name, value] of Object.entries(nextHeaders ?? {})) {
+          if (typeof value === 'string') headers.set(name, value)
+          else if (value !== undefined) headers.set(name, value.join(', '))
+        }
       },
       end(text) { body = text },
     })

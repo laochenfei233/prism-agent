@@ -85,6 +85,7 @@
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-experimental-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
+    "@deepseek-ai/dsh-tool-testkit": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~18.3.1",

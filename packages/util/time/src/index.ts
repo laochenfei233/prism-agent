@@ -16,7 +16,7 @@
  * @module @deepseek-ai/dsh-util-time
  */
 
-import { canonicalizeTimeZone } from './instant.ts'
+import { MAX_FOUR_DIGIT_YEAR_MS, MIN_FOUR_DIGIT_YEAR_MS, canonicalizeTimeZone, type LocalCalendarTime } from './instant.ts'
 
 export { Duration } from './duration.ts'
 export {
@@ -31,17 +31,6 @@ export {
   resolveLocalInstant,
 } from './instant.ts'
 export type { InstantRejection, LocalCalendarRejection, LocalCalendarTime, TimeZoneRejection } from './instant.ts'
-
-/** One wall-clock reading with no implied offset. */
-export interface LocalCalendarTime {
-  readonly year: number
-  readonly month: number
-  readonly day: number
-  readonly hour: number
-  readonly minute: number
-  readonly second: number
-  readonly millisecond: number
-}
 
 /** The instants one wall-clock reading denotes in one zone. */
 export interface LocalInstantCandidates {

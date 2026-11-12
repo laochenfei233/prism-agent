@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 /** Pointer-anchored context menus: suppression, placement, selection, dismissal. */
+import { contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Menu, MenuItemButton } from '../src/Menu.tsx'

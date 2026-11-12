@@ -11,7 +11,8 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { unsupportedInbox, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as SpeechToTextDefinition from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { SpeechProviderId } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import * as FileSystemLocal from '@deepseek-ai/dsh-fs-local'
@@ -78,7 +79,7 @@ async function agent(ctx: Context): Promise<Agent> {
   const id = SessionId('meeting-minutes-agent')
   const session = Session.create(id)
   const value: Agent = {
-    id, options: {}, session, inbox: unsupportedInbox(),
+    id, options: {}, session, model: unsupportedModel(), inbox: unsupportedInbox(),
     status: 'idle', ctx: scope.ctx,
     followup: () => {}, steer: () => {}, inject: () => {}, send: () => {}, cancel() {},
     runMaintenance: task => task(new AbortController().signal),
@@ -157,7 +158,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot()
     const audioPath = await recording('weekly.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('minutes'),
       name: 'meeting_minutes',
@@ -184,7 +185,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot()
     const audioPath = await recording('standup.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('default-template'),
       name: 'meeting_minutes',
@@ -199,7 +200,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot(['    maxPreviewCharacters: 12'])
     const audioPath = await recording('long.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('bounded'),
       name: 'meeting_minutes',
@@ -215,7 +216,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
   it('rejects a recording that does not exist', async () => {
     const ctx = await boot()
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('missing'),
       name: 'meeting_minutes',

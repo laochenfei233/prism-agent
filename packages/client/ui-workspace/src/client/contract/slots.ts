@@ -301,6 +301,13 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
 export type WorkspaceBrowserInjected = {
   /** Open the registered Workspace actions without changing expansion or selection. */
   openWorkspaceMenu: (workspaceId: WorkspaceId, path: string, displayTitle: string, point: { x: number; y: number }, mode?: 'toggle') => void
+  /**
+   * Open the browser-owned Workspace rename or delete dialog for one real
+   * Workspace. The project row menu's rename and delete rows raise the same
+   * dialogs the Workspace context-menu actions do; the request no-ops when the
+   * Workspace is absent or the action's remote access is denied.
+   */
+  requestWorkspaceAction: (workspaceId: WorkspaceId, displayTitle: string, action: 'rename' | 'delete') => void
   /** Dismiss the settled Workspace dialog. */
   settleWorkspaceAction: () => void
   /** Open actions for the clicked Session without selecting it. */
@@ -654,6 +661,8 @@ export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
   & PropsRenderSlots<
     | 'sidebar.workspaces.directoryFlow'
+    | 'sidebar.workspaces.session.menu.item'
+    | 'sidebar.workspaces.project.menu.item'
     | 'sidebar.workspaces.session.row.action'
     | 'sidebar.workspaces.session.pending'
     | 'sidebar.session.row.trailing'

@@ -309,6 +309,7 @@ type SessionTreeProps = Pick<
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.project.menu.item'
   | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.session.pending'
   | 'sidebar.session.row.trailing'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
@@ -1022,7 +1023,7 @@ export function WorkspaceBrowser({
   open,
   requestSessionRename,
   notifyArchivedNotOpenable,
-  renameWorkspace, useWorkspaceActionRequest, settleWorkspaceAction,
+  renameWorkspace, useWorkspaceActionRequest, settleWorkspaceAction, requestWorkspaceAction,
   deleteWorkspace,
   insertWorkspaceBefore,
   revealWorkspace,
@@ -1579,6 +1580,8 @@ export function WorkspaceBrowser({
                 shortcuts={shortcuts}
                 useSessionStatus={useSessionStatus}
                 onSessionRenameRequest={requestSessionRename}
+                onRenameRequest={(workspaceId, displayTitle) => requestWorkspaceAction(workspaceId, displayTitle, 'rename')}
+                onDeleteRequest={(workspaceId, title) => requestWorkspaceAction(workspaceId, title, 'delete')}
                 renderSlot={renderSlot}
                 openSessionMenu={openSessionMenu} useContextMenu={useContextMenu}
                 openWorkspaceMenu={openWorkspaceMenu}

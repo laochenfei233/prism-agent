@@ -5,6 +5,7 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@prism-ai/prism-meeting'
 import MeetingMinutesService from '@prism-ai/prism-meeting'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import ToolMeetingMinutes from '../src/tools.ts'
 
@@ -93,7 +94,7 @@ async function setup(calls: string[] = []): Promise<Context> {
 
 
 function call(ctx: Context, name: string, args: unknown = {}) {
-  return ctx.tools.execute({
+  return executeModelToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId(`meeting-tool-${name}`),
     name,

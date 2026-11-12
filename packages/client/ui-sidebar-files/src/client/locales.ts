@@ -107,6 +107,12 @@ export const ja = {
   'error.outsideWorkspace': 'そのディレクトリはワークスペース外のため、サイドバーでは読み取りません。',
   'error.notDirectory': 'それはディレクトリではありません。',
   'error.unavailable': '読み取りに失敗しました: {message}',
+  'error.openFailed': 'このファイルを開けませんでした。再試行してください。',
+  'menu.preview': 'プレビュー',
+  'menu.open': '開く',
+  'menu.openWith': 'アプリで開く',
+  'menu.copyRelative': '相対パスをコピー',
+  'menu.copyAbsolute': '絶対パスをコピー',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -132,6 +138,12 @@ export const es = {
   'error.outsideWorkspace': 'Ese directorio está fuera del espacio de trabajo, por lo que la barra lateral no lo leerá.',
   'error.notDirectory': 'Eso no es un directorio.',
   'error.unavailable': 'Error de lectura: {message}',
+  'error.openFailed': 'No se pudo abrir este archivo. Inténtelo de nuevo.',
+  'menu.preview': 'Vista previa',
+  'menu.open': 'Abrir',
+  'menu.openWith': 'Abrir con',
+  'menu.copyRelative': 'Copiar ruta relativa',
+  'menu.copyAbsolute': 'Copiar ruta absoluta',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -157,6 +169,12 @@ export const fr = {
   'error.outsideWorkspace': 'Ce répertoire se trouve en dehors de l’espace de travail, donc la barre latérale ne le lira pas.',
   'error.notDirectory': "Ce n'est pas un répertoire.",
   'error.unavailable': 'Échec de lecture : {message}',
+  'error.openFailed': "Impossible d'ouvrir ce fichier. Réessayez.",
+  'menu.preview': 'Aperçu',
+  'menu.open': 'Ouvrir',
+  'menu.openWith': 'Ouvrir avec',
+  'menu.copyRelative': 'Copier le chemin relatif',
+  'menu.copyAbsolute': 'Copier le chemin absolu'
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -182,6 +200,12 @@ export const de = {
   'error.outsideWorkspace': 'Dieses Verzeichnis liegt außerhalb des Arbeitsbereichs und wird daher von der Seitenleiste nicht gelesen.',
   'error.notDirectory': 'Das ist kein Verzeichnis.',
   'error.unavailable': 'Lesen fehlgeschlagen: {message}',
+  'error.openFailed': 'Diese Datei konnte nicht geöffnet werden. Versuchen Sie es erneut.',
+  'menu.preview': 'Vorschau',
+  'menu.open': 'Öffnen',
+  'menu.openWith': 'Öffnen mit',
+  'menu.copyRelative': 'Relativen Pfad kopieren',
+  'menu.copyAbsolute': 'Absoluten Pfad kopieren',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -207,6 +231,12 @@ export const ru = {
   'error.outsideWorkspace': 'Этот каталог находится за пределами рабочей области, поэтому боковая панель его не читает.',
   'error.notDirectory': 'Это не каталог.',
   'error.unavailable': 'Не удалось прочитать: {message}.',
+  'error.openFailed': 'Не удалось открыть этот файл. Попробуйте ещё раз.',
+  'menu.preview': 'Предпросмотр',
+  'menu.open': 'Открыть',
+  'menu.openWith': 'Открыть с помощью',
+  'menu.copyRelative': 'Копировать относительный путь',
+  'menu.copyAbsolute': 'Копировать абсолютный путь',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -232,4 +262,10 @@ export const pt = {
   'error.outsideWorkspace': 'Esse diretório está fora da área de trabalho, portanto a barra lateral não o lerá.',
   'error.notDirectory': 'Isso não é um diretório.',
   'error.unavailable': 'Falha na leitura: {message}',
+  'error.openFailed': 'Não foi possível abrir este arquivo. Tente novamente.',
+  'menu.preview': 'Pré-visualizar',
+  'menu.open': 'Abrir',
+  'menu.openWith': 'Abrir com',
+  'menu.copyRelative': 'Copiar caminho relativo',
+  'menu.copyAbsolute': 'Copiar caminho absoluto',
 } satisfies Record<keyof typeof en, string>

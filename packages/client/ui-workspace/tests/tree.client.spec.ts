@@ -709,8 +709,7 @@ describe('deriveSearchResults branch marks', () => {
       branchedList([source, branch], branch.id, { sourceSessionId: source.id }),
       [workspace('first', ['shared', 'my-branch'])],
       'needle',
-      noArchive,
-      'default',
+      noRows,
       noAttention,
       { items: [], hasMore: false },
       10,
@@ -794,7 +793,7 @@ describe('deriveSearchResults', () => {
     const other = summary('b7e0d4aa-session', 1)
     other.title = other.displayTitle = 'Another title'
     const result = deriveSearchResults(
-      list(idHit, other), [], '9A2C71', noArchive, 'default', noAttention, { items: [], hasMore: false }, 10,
+      list(idHit, other), [], '9A2C71', noRows, noAttention, { items: [], hasMore: false }, 10,
     )
     expect(result.items.map(item => [item.id, item.title])).toEqual([[idHit.id, 'Ordinary title']])
   })

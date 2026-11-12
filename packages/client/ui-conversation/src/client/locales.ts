@@ -399,8 +399,7 @@ export const zh = {
   'terminal.expandAria': '展开其余 {n} 行输出',
   'terminal.expandRest': '… 其余 {n} 行',
   'terminal.sendInput': '（发送输入）',
-  'terminal.session': '终端 {sessionId}',
-} satisfies Record<string, string>
+  'terminal.session': '终端 {sessionId}' } satisfies Record<string, string>
 
 /** The conversation namespace key union. */
 export type ConversationKey = keyof typeof zh
@@ -798,8 +797,7 @@ export const en = {
   // The Host terminal_send presenter has no locale seat; keep its fallbacks
   // aligned with these English values.
   'terminal.sendInput': '(send input)',
-  'terminal.session': 'Terminal {sessionId}',
-} satisfies Record<ConversationKey, string>
+  'terminal.session': 'Terminal {sessionId}' } satisfies Record<ConversationKey, string>
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
@@ -808,6 +806,8 @@ export const ja = {
   'shortcut.complementary': '補助のキュー / 実行中の指示変更を使用',
   'shortcut.slash': 'コマンドメニューを開く',
   'shortcut.mention': '参照メニューを開く',
+  'shortcut.focusComposer': '入力欄にフォーカス',
+  'shortcut.noComposer': 'フォーカスできる入力欄がありません',
   'hint.plan': '計画を生成するにはタスクを説明してください',
   'hint.goal': '長時間実行するタスクの目標を説明してください',
   'hint.goal.active': '目標アクティブ — 編集 / 一時停止 / 再開 / クリア',
@@ -825,6 +825,12 @@ export const ja = {
   'input.sending': 'メッセージを送信中',
   'input.send.queue': 'メッセージをキューに追加',
   'input.send.steer': '実行中の指示にメッセージを追加',
+  'menu.undo': '元に戻す',
+  'menu.redo': 'やり直す',
+  'menu.cut': '切り取り',
+  'menu.paste': '貼り付け',
+  'menu.selectAll': 'すべて選択',
+  'menu.pasteUnavailable': 'クリップボードにアクセスできないため、貼り付けのショートカットキーを使用してください',
   'attachment.pending': '保留中の添付ファイル',
   'attachment.scrollLeft': '添付ファイルを左にスクロール',
   'attachment.scrollRight': '添付ファイルを右にスクロール',
@@ -871,7 +877,6 @@ export const ja = {
   'settings.enter.queue': 'キュー',
   'settings.enter.steer': '指示を変更',
   'hero.headline': '未知への挑戦',
-  'hero.preview': 'プレビュー',
   'hero.chooseWorkspace': 'ワークスペースを選択',
   'session.hierarchy': 'セッション階層',
   'session.moreViews': 'その他の会話ビュー',
@@ -1185,8 +1190,7 @@ export const ja = {
   'terminal.expandAria': '残り{n}行の出力を表示',
   'terminal.expandRest': '… 残り{n}行',
   'terminal.sendInput': '(入力を送信)',
-  'terminal.session': 'ターミナル {sessionId}',
-} satisfies Record<keyof typeof en, string>
+  'terminal.session': 'ターミナル {sessionId}' } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
@@ -1195,6 +1199,8 @@ export const es = {
   'shortcut.complementary': 'Usar la acción alternativa de poner en cola o redirigir',
   'shortcut.slash': 'Abrir menú de comandos',
   'shortcut.mention': 'Abrir menú de referencia',
+  'shortcut.focusComposer': 'Enfocar el campo de mensaje',
+  'shortcut.noComposer': 'No hay ningún campo de mensaje para enfocar',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': 'describir el objetivo de una tarea de larga duración',
   'hint.goal.active': 'Objetivo activo: editar/pausar/reanudar/borrar',
@@ -1212,6 +1218,12 @@ export const es = {
   'input.sending': 'Enviando mensaje',
   'input.send.queue': 'mensaje de cola',
   'input.send.steer': 'Redirigir mensaje',
+  'menu.undo': 'Deshacer',
+  'menu.redo': 'Rehacer',
+  'menu.cut': 'Cortar',
+  'menu.paste': 'Pegar',
+  'menu.selectAll': 'Seleccionar todo',
+  'menu.pasteUnavailable': 'No se pudo acceder al portapapeles. Use el atajo de pegado.',
   'attachment.pending': 'Anexos pendientes',
   'attachment.scrollLeft': 'Desplazar archivos adjuntos hacia la izquierda',
   'attachment.scrollRight': 'Desplazar archivos adjuntos hacia la derecha',
@@ -1258,7 +1270,6 @@ export const es = {
   'settings.enter.queue': 'cola',
   'settings.enter.steer': 'Redirigir',
   'hero.headline': 'Hacia lo desconocido',
-  'hero.preview': 'Vista previa',
   'hero.chooseWorkspace': 'Elige espacio de trabajo',
   'session.hierarchy': 'Jerarquía de sesiones',
   'session.moreViews': 'Más vistas de conversación',
@@ -1574,8 +1585,7 @@ export const es = {
   'tool.title.editSchedule': 'Editar tarea de automatización',
   'detail.schedule.active': 'Habilitado',
   'detail.schedule.paused': 'Pausada',
-  'detail.schedule.ended': 'Finalizada',
-} satisfies Record<keyof typeof en, string>
+  'detail.schedule.ended': 'Finalizada' } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
@@ -1584,6 +1594,8 @@ export const fr = {
   'shortcut.complementary': 'Utiliser l’action alternative de mise en attente ou de guidage',
   'shortcut.slash': 'Ouvrir le menu des commandes',
   'shortcut.mention': 'Ouvrir le menu de référence',
+  'shortcut.focusComposer': 'Activer le champ de message',
+  'shortcut.noComposer': 'Aucun champ de message ne peut être activé',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': "décrire l'objectif d'une tâche de longue durée",
   'hint.goal.active': 'objectif actif — modifier/mettre en pause/reprendre/effacer',
@@ -1601,6 +1613,12 @@ export const fr = {
   'input.sending': 'Envoi du message',
   'input.send.queue': "Message de file d'attente",
   'input.send.steer': 'Guider avec ce message',
+  'menu.undo': 'Annuler',
+  'menu.redo': 'Rétablir',
+  'menu.cut': 'Couper',
+  'menu.paste': 'Coller',
+  'menu.selectAll': 'Tout sélectionner',
+  'menu.pasteUnavailable': "L'accès au presse-papiers a été bloqué. Utilisez le raccourci de collage.",
   'attachment.pending': 'Pièces jointes en attente',
   'attachment.scrollLeft': 'Faire défiler les pièces jointes vers la gauche',
   'attachment.scrollRight': 'Faire défiler les pièces jointes vers la droite',
@@ -1647,7 +1665,6 @@ export const fr = {
   'settings.enter.queue': "File d'attente",
   'settings.enter.steer': 'Guider',
   'hero.headline': "Dans l'inconnu",
-  'hero.preview': 'Aperçu',
   'hero.chooseWorkspace': 'Choisir un espace de travail',
   'session.hierarchy': 'Hiérarchie des sessions',
   'session.moreViews': 'Plus de vues de conversations',
@@ -1963,8 +1980,7 @@ export const fr = {
   'tool.title.editSchedule': 'Modifier la tâche d\'automatisation',
   'detail.schedule.active': 'Activé',
   'detail.schedule.paused': 'Suspendue',
-  'detail.schedule.ended': 'Terminée',
-} satisfies Record<keyof typeof en, string>
+  'detail.schedule.ended': 'Terminée' } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
 export const de = {
@@ -1973,6 +1989,8 @@ export const de = {
   'shortcut.complementary': 'Die alternative Aktion zum Vormerken oder Lenken verwenden',
   'shortcut.slash': 'Befehlsmenü öffnen',
   'shortcut.mention': 'Referenzmenü öffnen',
+  'shortcut.focusComposer': 'Eingabefeld fokussieren',
+  'shortcut.noComposer': 'Kein Eingabefeld zum Fokussieren vorhanden',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': 'Beschreiben Sie das Ziel einer lang andauernden Aufgabe',
   'hint.goal.active': 'Ziel aktiv – Bearbeiten / Anhalten / Fortsetzen / Löschen',
@@ -1990,6 +2008,12 @@ export const de = {
   'input.sending': 'Nachricht wird gesendet',
   'input.send.queue': 'Warteschlangennachricht',
   'input.send.steer': 'Mit Nachricht lenken',
+  'menu.undo': 'Rückgängig',
+  'menu.redo': 'Wiederholen',
+  'menu.cut': 'Ausschneiden',
+  'menu.paste': 'Einfügen',
+  'menu.selectAll': 'Alles auswählen',
+  'menu.pasteUnavailable': 'Der Zugriff auf die Zwischenablage wurde blockiert. Verwenden Sie die Einfügen-Tastenkombination.',
   'attachment.pending': 'Ausstehende Anhänge',
   'attachment.scrollLeft': 'Anhänge nach links scrollen',
   'attachment.scrollRight': 'Anhänge nach rechts scrollen',
@@ -2036,7 +2060,6 @@ export const de = {
   'settings.enter.queue': 'Warteschlange',
   'settings.enter.steer': 'Lenken',
   'hero.headline': 'Ins Unbekannte',
-  'hero.preview': 'Vorschau',
   'hero.chooseWorkspace': 'Wählen Sie einen Arbeitsbereich',
   'session.hierarchy': 'Sitzungshierarchie',
   'session.moreViews': 'Weitere Konversationsansichten',
@@ -2352,8 +2375,7 @@ export const de = {
   'tool.title.editSchedule': 'Automatisierungsaufgabe bearbeiten',
   'detail.schedule.active': 'Aktiviert',
   'detail.schedule.paused': 'Pausiert',
-  'detail.schedule.ended': 'Beendet',
-} satisfies Record<keyof typeof en, string>
+  'detail.schedule.ended': 'Beendet' } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
@@ -2362,6 +2384,8 @@ export const ru = {
   'shortcut.complementary': 'Использовать альтернативное действие: поставить в очередь или направить',
   'shortcut.slash': 'Открыть командное меню',
   'shortcut.mention': 'Открыть справочное меню',
+  'shortcut.focusComposer': 'Перейти в поле ввода',
+  'shortcut.noComposer': 'Нет поля ввода для фокуса',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': 'описать цель долгосрочной задачи',
   'hint.goal.active': 'цель активна — изменить/приостановить/возобновить/очистить',
@@ -2379,6 +2403,12 @@ export const ru = {
   'input.sending': 'Отправка сообщения',
   'input.send.queue': 'Сообщение в очереди',
   'input.send.steer': 'Направить сообщение',
+  'menu.undo': 'Отменить',
+  'menu.redo': 'Повторить',
+  'menu.cut': 'Вырезать',
+  'menu.paste': 'Вставить',
+  'menu.selectAll': 'Выбрать всё',
+  'menu.pasteUnavailable': 'Доступ к буферу обмена заблокирован. Используйте сочетание клавиш для вставки.',
   'attachment.pending': 'Ожидающие вложения',
   'attachment.scrollLeft': 'Прокрутить вложения влево',
   'attachment.scrollRight': 'Прокрутить вложения вправо',
@@ -2425,7 +2455,6 @@ export const ru = {
   'settings.enter.queue': 'Очередь',
   'settings.enter.steer': 'Направить',
   'hero.headline': 'В неизвестность',
-  'hero.preview': 'Предварительный просмотр',
   'hero.chooseWorkspace': 'Выберите рабочее пространство',
   'session.hierarchy': 'Иерархия сеансов',
   'session.moreViews': 'Больше просмотров беседы',
@@ -2741,8 +2770,7 @@ export const ru = {
   'tool.title.editSchedule': 'Изменить задачу автоматизации',
   'detail.schedule.active': 'Включено',
   'detail.schedule.paused': 'Приостановлена',
-  'detail.schedule.ended': 'Завершена',
-} satisfies Record<keyof typeof en, string>
+  'detail.schedule.ended': 'Завершена' } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
@@ -2751,6 +2779,8 @@ export const pt = {
   'shortcut.complementary': 'Usar a ação alternativa de enfileirar ou orientar',
   'shortcut.slash': 'Abrir menu de comando',
   'shortcut.mention': 'Abrir menu de referência',
+  'shortcut.focusComposer': 'Focar o campo de mensagem',
+  'shortcut.noComposer': 'Nenhum campo de mensagem para focar',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': 'descrever o objetivo de uma tarefa de longa duração',
   'hint.goal.active': 'meta ativa — editar/pausar/resumir/limpar',
@@ -2768,6 +2798,12 @@ export const pt = {
   'input.sending': 'Enviando mensagem',
   'input.send.queue': 'Mensagem de fila',
   'input.send.steer': 'Orientar com mensagem',
+  'menu.undo': 'Desfazer',
+  'menu.redo': 'Refazer',
+  'menu.cut': 'Recortar',
+  'menu.paste': 'Colar',
+  'menu.selectAll': 'Selecionar tudo',
+  'menu.pasteUnavailable': 'O acesso à área de transferência foi bloqueado. Use o atalho de colagem.',
   'attachment.pending': 'Anexos pendentes',
   'attachment.scrollLeft': 'Rolar anexos para a esquerda',
   'attachment.scrollRight': 'Rolar os anexos para a direita',
@@ -2814,7 +2850,6 @@ export const pt = {
   'settings.enter.queue': 'Fila',
   'settings.enter.steer': 'Orientar',
   'hero.headline': 'Para o desconhecido',
-  'hero.preview': 'Visualização',
   'hero.chooseWorkspace': 'Escolha o espaço de trabalho',
   'session.hierarchy': 'Hierarquia de sessão',
   'session.moreViews': 'Mais visualizações de conversas',
@@ -3130,5 +3165,4 @@ export const pt = {
   'tool.title.editSchedule': 'Editar tarefa de automação',
   'detail.schedule.active': 'Habilitado',
   'detail.schedule.paused': 'Pausada',
-  'detail.schedule.ended': 'Concluída',
-} satisfies Record<keyof typeof en, string>
+  'detail.schedule.ended': 'Concluída' } satisfies Record<keyof typeof en, string>

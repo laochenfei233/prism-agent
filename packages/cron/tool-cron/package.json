@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-storage-json": "workspace:*",
     "@deepseek-ai/dsh-tool-goal": "workspace:*",
+    "@deepseek-ai/dsh-tool-testkit": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*"
   }
 }

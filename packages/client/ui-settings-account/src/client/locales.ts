@@ -33,8 +33,7 @@ export const en = {
   quotaTitle: 'No balance available',
   quotaDescription: 'DeepSeek Harness cannot start a new task with this account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.',
   quotaTopUp: 'Top up',
-  bonusNoticeTitle: 'Bonus credited',
-} as const
+  bonusNoticeTitle: 'Bonus credited' } as const
 /** Account locale keys. */
 export type AccountKey = keyof typeof en
 /** Chinese account settings copy. */
@@ -69,8 +68,7 @@ export const zh: Record<AccountKey, string> = {
   quotaTitle: '当前无可用余额',
   quotaDescription: '没有可用额度时，DeepSeek Harness 无法开始新的任务，是否前往充值？或者可以稍后前往 设置 → 账号与余额 进行充值。',
   quotaTopUp: '去充值',
-  bonusNoticeTitle: '赠金已到账',
-}
+  bonusNoticeTitle: '赠金已到账' }
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
@@ -96,7 +94,7 @@ export const ja = {
   'loading': '読み込み中…',
   'backToHarness': 'DeepSeek Harness に戻る',
   'settings': '設定',
-  'contactUs': 'フィードバック',
+  'feedback': 'フィードバック',
   'menu': 'アカウントメニュー',
   'nav': 'アカウント',
   'signedIn': 'DeepSeek にログイン済み',
@@ -129,8 +127,7 @@ export const ja = {
   'quotaTitle': '残高がありません',
   'quotaDescription': '残高がない場合、DeepSeek Harness はこのアカウントで新しいタスクを開始できません。チャージしますか？後から設定 → アカウントでチャージすることもできます。',
   'quotaTopUp': 'チャージ',
-  'bonusNoticeTitle': 'ボーナスが付与されました',
-} satisfies Record<keyof typeof en, string>
+  'bonusNoticeTitle': 'ボーナスが付与されました' } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
@@ -145,7 +142,7 @@ export const es = {
   failureTitle: 'No se pudo iniciar sesión',
   platformFailed: 'No se pudo completar la operación. Intentar otra vez.', platformRetry: 'Reintentar',
   loading: 'Cargando…', backToHarness: 'Volver a DeepSeek Harness',
-  settings: 'Configuración', contactUs: 'Comentarios', menu: 'Menú de cuenta',
+  settings: 'Configuración',feedback: 'Comentarios',menu: 'Menú de cuenta',
   nav: 'Cuenta', signedIn: 'Iniciado sesión en DeepSeek', signedOut: 'No iniciado sesión',
   signIn: 'Iniciar sesión', signOut: 'Cerrar sesión',
   signOutUnknownDescription: 'No se pudieron verificar las tareas en ejecución. Cerrar sesión puede interrumpir las tareas que utilizan esta cuenta. ¿Cerrar sesión ahora?',
@@ -164,8 +161,7 @@ export const es = {
   quotaTitle: 'No hay saldo disponible',
   quotaDescription: 'DeepSeek Harness no puede iniciar una nueva tarea con esta cuenta cuando no hay saldo disponible. ¿Quieres recargar? También puedes recargar más tarde en Configuración → Cuenta.',
   quotaTopUp: 'Recargar',
-  bonusNoticeTitle: 'Bono acreditado',
-} satisfies Record<keyof typeof en, string>
+  bonusNoticeTitle: 'Bono acreditado' } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
@@ -180,7 +176,7 @@ export const fr = {
   failureTitle: 'Impossible de se connecter',
   platformFailed: "Impossible de terminer l'opération. Essayer à nouveau.", platformRetry: 'Réessayer',
   loading: 'Chargement…', backToHarness: 'Retour à DeepSeek Harness',
-  settings: 'Paramètres', contactUs: 'Commentaires', menu: 'Menu du compte',
+  settings: 'Paramètres',feedback: 'Commentaires',menu: 'Menu du compte',
   nav: 'Compte', signedIn: 'Connecté à DeepSeek', signedOut: 'Non connecté',
   signIn: 'Connectez-vous', signOut: 'Se déconnecter',
   signOutUnknownDescription: "Impossible de vérifier les tâches en cours d'exécution. La déconnexion peut interrompre les tâches utilisant ce compte. Se déconnecter maintenant ?",
@@ -199,8 +195,7 @@ export const fr = {
   quotaTitle: 'Aucun solde disponible',
   quotaDescription: "DeepSeek Harness ne peut pas démarrer une nouvelle tâche avec ce compte lorsqu'aucun solde n'est disponible. Souhaitez-vous recharger ? Vous pouvez également recharger plus tard dans Paramètres → Compte.",
   quotaTopUp: 'Recharger',
-  bonusNoticeTitle: 'Bonus crédité',
-} satisfies Record<keyof typeof en, string>
+  bonusNoticeTitle: 'Bonus crédité' } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
 export const de = {
@@ -215,7 +210,7 @@ export const de = {
   failureTitle: 'Konnte mich nicht anmelden',
   platformFailed: 'Der Vorgang konnte nicht abgeschlossen werden. Versuchen Sie es erneut.', platformRetry: 'Erneut versuchen',
   loading: 'Laden…', backToHarness: 'Zurück zu DeepSeek Harness',
-  settings: 'Einstellungen', contactUs: 'Rückmeldung', menu: 'Kontomenü',
+  settings: 'Einstellungen',feedback: 'Feedback',menu: 'Kontomenü',
   nav: 'Konto', signedIn: 'Angemeldet bei DeepSeek', signedOut: 'Nicht angemeldet',
   signIn: 'Melden Sie sich an', signOut: 'Abmelden',
   signOutUnknownDescription: 'Laufende Aufgaben konnten nicht überprüft werden. Durch das Abmelden werden möglicherweise Aufgaben mit diesem Konto unterbrochen. Jetzt abmelden?',
@@ -234,8 +229,7 @@ export const de = {
   quotaTitle: 'Kein Guthaben verfügbar',
   quotaDescription: 'DeepSeek Harness kann mit diesem Konto keine neue Aufgabe starten, wenn kein Guthaben verfügbar ist. Möchten Sie aufladen? Sie können das Guthaben auch später unter Einstellungen → Konto aufladen.',
   quotaTopUp: 'Auffüllen',
-  bonusNoticeTitle: 'Bonus gutgeschrieben',
-} satisfies Record<keyof typeof en, string>
+  bonusNoticeTitle: 'Bonus gutgeschrieben' } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
@@ -250,7 +244,7 @@ export const ru = {
   failureTitle: 'Не удалось войти в систему',
   platformFailed: 'Не удалось завершить операцию. Попробуйте еще раз.', platformRetry: 'Повторить',
   loading: 'Загрузка…', backToHarness: 'Вернуться к DeepSeek Harness',
-  settings: 'Настройки', contactUs: 'Обратная связь', menu: 'Меню аккаунта',
+  settings: 'Настройки',feedback: 'Обратная связь',menu: 'Меню аккаунта',
   nav: 'Аккаунт', signedIn: 'Вошёл в DeepSeek', signedOut: 'Не авторизован',
   signIn: 'Войти', signOut: 'Выйти',
   signOutUnknownDescription: 'Не удалось проверить запущенные задачи. Выход из системы может прервать выполнение задач с использованием этой учетной записи. Выйти сейчас?',
@@ -269,8 +263,7 @@ export const ru = {
   quotaTitle: 'Нет доступного баланса',
   quotaDescription: 'DeepSeek Harness не может запустить новую задачу с этой учетной записью, если на ней нет баланса. Хотите пополнить счет? Вы также можете пополнить счет позже в «Настройки» → «Аккаунт».',
   quotaTopUp: 'Пополнить',
-  bonusNoticeTitle: 'Бонус начислен',
-} satisfies Record<keyof typeof en, string>
+  bonusNoticeTitle: 'Бонус начислен' } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
@@ -285,7 +278,7 @@ export const pt = {
   failureTitle: 'Não foi possível fazer login',
   platformFailed: 'Não foi possível concluir a operação. Tente novamente.', platformRetry: 'Tentar novamente',
   loading: 'Carregando…', backToHarness: 'Voltar para DeepSeek Harness',
-  settings: 'Configurações', contactUs: 'Comentários', menu: 'Menu da conta',
+  settings: 'Configurações',feedback: 'Comentários',menu: 'Menu da conta',
   nav: 'Conta', signedIn: 'Conectado em DeepSeek', signedOut: 'Não conectado',
   signIn: 'Faça login', signOut: 'Sair',
   signOutUnknownDescription: 'Não foi possível verificar as tarefas em execução. Sair pode interromper tarefas usando esta conta. Sair agora?',
@@ -304,5 +297,4 @@ export const pt = {
   quotaTitle: 'Nenhum saldo disponível',
   quotaDescription: 'DeepSeek Harness não pode iniciar uma nova tarefa com esta conta quando não houver saldo disponível. Você gostaria de recarregar? Você também pode recarregar mais tarde em Configurações → Conta.',
   quotaTopUp: 'Recarregar',
-  bonusNoticeTitle: 'Bônus creditado',
-} satisfies Record<keyof typeof en, string>
+  bonusNoticeTitle: 'Bônus creditado' } satisfies Record<keyof typeof en, string>

@@ -8235,6 +8235,9 @@ importers:
       '@deepseek-ai/dsh-tool-goal':
         specifier: workspace:*
         version: link:../../goal/tool-goal
+      '@deepseek-ai/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -11479,6 +11482,9 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
@@ -14279,6 +14285,9 @@ importers:
       '@deepseek-ai/dsh-storage-domain':
         specifier: workspace:*
         version: link:../../storage/storage-domain
+      '@deepseek-ai/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools

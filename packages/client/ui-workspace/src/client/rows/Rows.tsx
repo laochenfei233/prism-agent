@@ -21,6 +21,9 @@ import {
   IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular, IconLikeFillRegular,
   IconNewChatOutlineRegular, IconPinFillRegular, IconQueueOutlineRegular, IconTrashOutlineRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, relativeTime, StateDot, Tooltip,
+  // The injected `useContextMenu` prop shadows the primitives name; the alias
+  // reaches the local press-point hook the row menus render through.
+  useContextMenu as usePressPointMenu,
   useRowDragPreview,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -303,7 +306,7 @@ function ProjectRow({
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
-  const contextMenu = useContextMenu()
+  const contextMenu = usePressPointMenu()
   // Plugin rows dismiss the same press-point menu the shipped rows live in.
   const projectMenuState = useMemo((): ProjectMenuOpenState => [
     contextMenu.point !== null,
@@ -349,8 +352,15 @@ function ProjectRow({
       tabIndex={-1}
       aria-expanded={row.expanded}
       onClick={onToggle}
-      onContextMenu={actions === undefined ? undefined : contextMenu.open}
-      {...getTriggerProps(workspaceMenuTarget === undefined ? undefined : { kind: 'workspace', value: { ...workspaceMenuTarget, displayTitle: label } })}
+      // A fork project menu owns the secondary press; the shared Workspace menu
+      // keeps the rows without one. The local open's preventDefault keeps both
+      // from opening at once.
+      {...getTriggerProps(
+        actions === undefined
+          ? workspaceMenuTarget === undefined ? undefined : { kind: 'workspace', value: { ...workspaceMenuTarget, displayTitle: label } }
+          : undefined,
+        actions === undefined ? undefined : { onContextMenu: contextMenu.open },
+      )}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -722,6 +732,7 @@ export function SessionNodeItem({
   selection?: SessionSelection | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useSessionAccess'> & PropsRenderSlots<
+  | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
   | 'sidebar.workspaces.session.pending'
   | 'sidebar.session.row.trailing'
@@ -750,7 +761,7 @@ export function SessionNodeItem({
   // The secondary-press surface shares the row entries: its open state is the
   // press point, exposed through the same hook shape so entries dismiss either
   // surface without knowing which one they sit in.
-  const contextMenu = useContextMenu()
+  const contextMenu = usePressPointMenu()
   const contextMenuState = useMemo((): MenuOpenState => [
     contextMenu.point !== null,
     (open: boolean) => { if (!open) contextMenu.close() },
@@ -787,13 +798,17 @@ export function SessionNodeItem({
       tabIndex={0}
 
       onClick={() => { onOpen(node.id) }}
-      onContextMenu={row.blank ? undefined : contextMenu.open}
-      {...getTriggerProps(row.blank ? undefined : { kind: 'session', value: { sessionId: node.id, displayTitle: row.title } }, { onKeyDown: (event) => {
-        if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
-        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-        event.preventDefault()
-        onOpen(node.id)
-      } })}
+      // The press-point menu owns the secondary press; its preventDefault keeps
+      // the shared session menu to the keyboard gesture and the "..." button.
+      {...getTriggerProps(row.blank ? undefined : { kind: 'session', value: { sessionId: node.id, displayTitle: row.title } }, {
+        onContextMenu: row.blank ? undefined : contextMenu.open,
+        onKeyDown: (event) => {
+          if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+          if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+          event.preventDefault()
+          onOpen(node.id)
+        },
+      })}
       onPointerEnter={marquee.enter}
       onPointerLeave={() => { if (!menuOpen) marquee.leave() }}
       draggable={draggable}

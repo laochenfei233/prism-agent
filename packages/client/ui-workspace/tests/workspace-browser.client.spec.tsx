@@ -115,6 +115,10 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
   const props: WorkspaceBrowserProps = {
     openWorkspaceMenu: vi.fn(),
     useWorkspaceActionRequest: bindSnapshotSelector(request),
+    requestWorkspaceAction: (workspaceId, displayTitle, action) => {
+      const storedTitle = props.useWorkspaces(state => state.items.find(row => row.workspaceId === workspaceId)?.title ?? displayTitle)
+      request.set({ action, workspaceId, displayTitle, storedTitle })
+    },
     settleWorkspaceAction: () => { request.set(null) },
     openSessionMenu: vi.fn(),
     useContextMenuTarget: selector => selector(null),

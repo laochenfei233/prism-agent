@@ -408,6 +408,7 @@ export function apply(ctx: Context): void {
       if (mode === 'toggle' && target?.kind === 'workspace' && target.value.workspaceId === workspaceId) ctx.contextMenus.close()
       else ctx.contextMenus.open({ kind: 'workspace', value: { workspaceId, path, displayTitle } }, point)
     },
+    requestWorkspaceAction,
     settleWorkspaceAction: () => { workspaceActionRequest.set(null) },
     openSessionMenu: (sessionId, displayTitle, point, mode) => {
       const target = ctx.contextMenus.active.getSnapshot()
@@ -460,6 +461,9 @@ export function apply(ctx: Context): void {
         'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
         'sidebar.workspaces.project.menu.item': {
           kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: projectMenuOpenStateFactory } },
+        },
+        'sidebar.workspaces.session.menu.item': {
+          kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: menuOpenStateFactory, shortcuts: ctx.shortcuts.catalog } },
         },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
         'sidebar.workspaces.session.pending': { kind: 'list', scope: 'root' },
