@@ -47,6 +47,7 @@ const USAGE = [
   '  verify [limit]             Re-check cited sources: intact, drifted, missing, or unavailable',
   '  compare <idA> <idB>        Set two claims side by side; a mechanical verdict, never a merge',
   '  import [apply] [sources]   Read other tools\' memory files; dry run unless "apply" is given',
+  '  bootstrap [apply] [limit]  Distill past sessions of this directory; dry run unless "apply" is given',
   '  export [dir]               Write the mirror and its JSON index; "check" audits an existing mirror',
 ].join('\n')
 
@@ -330,6 +331,40 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
         `known sources: ${IMPORT_SOURCE_IDS.join(', ')}`,
       ]
       return { kind: 'success', text: [heading, ...details].join('\n') }
+    }
+
+    case 'bootstrap': {
+      const tokens = rest.split(/\s+/).filter(token => token !== '')
+      const apply = tokens[0] === 'apply'
+      const limitToken = apply ? tokens[1] : tokens[0]
+      const parsed = limitToken === undefined ? NaN : Number.parseInt(limitToken, 10)
+      const report = await memory.bootstrap({
+        apply,
+        ...Number.isFinite(parsed) && parsed > 0 ? { limit: parsed } : {},
+        agent: invocation.agent,
+      })
+      const heading = report.applied
+        ? 'Bootstrap applied.'
+        : 'Bootstrap dry run: nothing was written. Re-run as "/memory bootstrap apply" to commit.'
+      const lines = [
+        heading,
+        `route: ${report.target.provider}/${report.target.model}`,
+        `sessions processed by an earlier pass: ${report.processedCount}`,
+        `selected: ${report.sessions.length === 0 ? 'none' : `${report.sessions.length} session(s), newest first`}`,
+      ]
+      for (const session of report.sessions) {
+        lines.push(`  ${session.sessionId} — ${session.processed
+          ? 'already processed'
+          : `${session.messageCount === null ? 'unreadable' : `${session.messageCount} message(s)`} on the surface`}`)
+      }
+      if (report.applied) {
+        lines.push(
+          `stored: ${report.created.length === 0 ? 'none' : report.created.join(', ')} — pending, into review`,
+          `already known: ${report.skipped}`,
+          `failed sessions: ${report.failed}`,
+        )
+      }
+      return { kind: 'success', text: lines.join('\n') }
     }
 
     case 'export': {

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，一个 Web 记忆页，自动沉淀与整理，引用来源核验与主张比较，从其他工具的记忆文件导入，以及一份带审计核对、确定性的 Markdown 镜像。
+Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，一个 Web 记忆页，自动沉淀与整理，一个可自选开启的模型辅助沉淀窗口与一次既往会话 bootstrap，引用来源核验与主张比较，从其他工具的记忆文件导入，以及一份带审计核对、确定性的 Markdown 镜像。
 
 ## 概述
 
@@ -13,7 +13,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 1. **缓存前缀永不被改写。** 见下文。
 2. **主张按三条彼此独立的轴归档** —— 主张讲的是谁的事（`layer`）、它是什么类型的陈述（`kind`）、谁能看见它（`scope`）—— 而层决定一条主张是先被声明还是被提及后才引用。
 3. **治理是人的界面。** 批准、拒绝、恢复、退役、过期、整理、导入与导出都是 `/memory` 子命令，其中前两项也是 Web 记忆页上的按钮 —— 都不是工具，因此模型无法自行提升自己的主张，而确实位于前缀中的 5 个工具 schema 保持固定。
-4. **记忆同时来自三类写入方**：模型调用工具、一个轮次在收尾时被读取（无需额外模型调用），以及另一个工具已经为此用户写下的记忆文件。
+4. **记忆同时来自三类写入方**：模型调用工具、一个轮次在收尾时被读取（无需额外模型调用），以及另一个工具已经为此用户写下的记忆文件。第四类写入方 —— 一个在窗口上读最近轮次的模型 —— 存在于 `assistedDistill` 之后，默认关闭。
 
 ## 设计约束：缓存前缀保持字节稳定
 
@@ -77,6 +77,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `/memory verify [limit]` | 重读每一条被引用的来源：`intact`、`drifted`、`missing` 或 `unavailable` |
 | `/memory compare <idA> <idB>` | 把两条主张并排对照，给出由部署自身阈值决定的机械判定；绝不是合并 |
 | `/memory import [apply] [sources]` | 读取其他工具的记忆文件；除非给出 `apply`，否则为空跑 |
+| `/memory bootstrap [apply] [limit]` | 用模型沉淀本工作目录的既往会话；除非给出 `apply`，否则为空跑 |
 | `/memory export [dir]` | 写出 Markdown 镜像及其 JSON 索引；`export check [dir]` 对照当前存储审计一份既有镜像 |
 
 ### 记忆页
@@ -120,7 +121,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 ## 自动记忆
 
-有三类写入方无需工具调用即可写入。它们都不能把未复核的主张送到模型面前：沉淀与导入默认落 `pending`，而 pending 从不注入，只能由 `/memory approve` 或 `/memory reject` 复核。
+有三类写入方无需工具调用即可写入。它们都不能把未复核的主张送到模型面前：沉淀与导入默认落 `pending`，而 pending 从不注入，只能由 `/memory approve` 或 `/memory reject` 复核。下面的第四类写入方通过模型读取，且只存在于一次显式的自选开启之后。
 
 ### 沉淀：在轮次自己的路径上
 
@@ -129,6 +130,22 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 这条路径里没有模型调用。它每轮零成本，且对相同文本完全确定，这正是它能每轮都跑、而不必挂在调度器后面的原因。它也不动复用计数：语料已经持有的主张直接丢弃，因为 `hits` 被当作人或模型真的去拿过这条记录的证据。
 
 代价说得很直白：一个识别句式的读取器既有漏检（换种说法表述的主张会被漏掉），也有误报（一句话读起来像约束但其实不是）。误报正是出厂状态为 `pending` 的原因。
+
+### 模型辅助沉淀：按窗口
+
+`assistedDistill` 开启后，第二个 `agent/turn-stopping` 监听器维护最近 `assistedDistillBufferTurns` 个轮次的滚动缓冲，并且每满 `assistedDistillEveryTurns` 个轮次，就把这段对话交给部署自己的模型，附一条指令：提出句式读取器看不见的持久主张。路由在 `assistedDistillProvider`/`assistedDistillModel` 都设置时用配置，否则用调用轮次已路由的模型。每个候选指明它依据的消息，写入时以 `/memory verify` 之后会重读的同款指纹引用该消息。
+
+每个候选都以 `pending` 状态、`assistedDistillConfidence` 置信度写入，无论模型怎么宣称 —— 模型只负责提出，提升永远由人完成。语料已经持有的主张被丢弃，与句式读取器丢弃一条的方式相同。
+
+模型调用是外部依赖，因此它的失败不属于该轮次：不可达的路由、一次拒绝，或解析不出任何东西的输出，都只留一行日志跳过该窗口，下一个窗口再试。存储写入失败仍然传播 —— 坏掉的存储保持吵闹。
+
+缓冲与窗口计数只存在内存里。重启会丢掉它们并从头计数，代价是下个窗口之前的那些轮次，除此之外没有别的。
+
+### Bootstrap：按需
+
+新装的插件从它存在之前就结束了的会话里学不到任何东西。`/memory bootstrap` 补上这个缺口：它列出调用工作目录的既往会话 —— 与会话工具相同的 exact-cwd 权限，调用会话自身除外 —— 而 `/memory bootstrap apply` 对每个会话跑一次模型调用做沉淀，写入引用了来源消息的 `pending` project 作用域主张。已完成的巡检处理过的会话会被跳过，记录在一条可通过 `/memory journal` 读取的自持 `bootstrap-log` 条目里。
+
+无法立足时该命令会吵闹地失败：没有 session-query 引擎、没有 llm 服务、没有已路由的模型，或没有工作目录，每一样都会让命令带着缺失项停下来。空跑只选会话并解析路由，不调用模型；apply 是同步的，受 `bootstrapMaxSessions` 约束。
 
 ### 整理：按窗口
 
@@ -259,6 +276,16 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `importSources` | `[]` | `/memory import` 可读取的外部布局；不指名则不读 |
 | `importStatus` | `pending` | 导入的主张写入时所用的状态 |
 | `importConfidence` | `0.6` | 导入的主张写入时所用的置信度 |
+| `assistedDistill` | `false` | 让模型读最近轮次并提出持久主张，按窗口 |
+| `assistedDistillEveryTurns` | `40` | 下一个辅助窗口触发前要结束的轮次数 |
+| `assistedDistillBufferTurns` | `12` | 滚动缓冲为下一个窗口保留的轮次数 |
+| `assistedDistillLimit` | `3` | 一个辅助窗口可写入的候选上限 |
+| `assistedDistillConfidence` | `0.5` | 辅助主张写入时所用的置信度 |
+| `assistedDistillProvider` | 空 | 辅助调用走的 provider 路由；须与 `assistedDistillModel` 同时设置 |
+| `assistedDistillModel` | 空 | 辅助调用用的模型 id；须与 `assistedDistillProvider` 同时设置 |
+| `bootstrapMaxSessions` | `10` | 一次 `/memory bootstrap apply` 可读取的会话上限 |
+| `bootstrapClaimsPerSession` | `3` | 每个被 bootstrap 的会话可贡献的候选上限 |
+| `bootstrapMaxChars` | `24000` | 每个被 bootstrap 的会话贡献给提示词的对话字符上限 |
 
 `dedupeReplaceJaccard` 低于 `dedupeJaccard`、`identityLayers` 中出现未知或重复的名字、`dreamClusterFloor` 低于 `2`，以及 `importSources` 中出现未知的名字，都会让插件加载失败。每个字段都是易变的，因此可以从运行中的配置面编辑。
 
@@ -330,7 +357,7 @@ memory_open when the exact record matters.
 
 ### 轮次末的巡检
 
-沉淀与整理写入记录且不追加任何消息，因此在触发它们的那个轮次里对模型不可见。它们写下的内容之后会通过召回或通过工具变得可见，与任何其他记录一样。对触发轮次的 token 影响：无。
+沉淀与整理写入记录且不追加任何消息，因此在触发它们的那个轮次里对模型不可见。辅助窗口与一次 bootstrap apply 同样不追加任何东西 —— 它们的代价是模型调用本身，在任何请求之外。它们写下的内容之后会通过召回或通过工具变得可见，与任何其他记录一样。对触发轮次的 token 影响：无。
 
 ### 记忆页
 
@@ -345,7 +372,7 @@ token 影响：无。页面通过自己的路由读写，而它所结算的东�
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 198 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 207 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -356,6 +383,8 @@ node scripts/smoke.mjs                                                        # 
 
 `tests/automatic.spec.ts` 是自动那一半的测试套件：一个轮次自身的文本在无模型调用的情况下被沉淀并拦下待审，重复的主张不会被存两次、也不抬高它的复用计数，整理窗口按语料而不是按计数器开启，矛盾被上报且两条主张都存活，常驻记忆无需关键词命中即到达，到期日会浮现，以及一次导入把一个工作区文件读成 project 作用域的主张而不重复它已经读过的东西。
 
+`tests/assisted.spec.ts` 是模型辅助那一半的测试套件，跑在一段脚本化的 llm 上：写入方在被开启前保持沉默，一个窗口恰好触发一次调用并把候选拦进复核，同一主张跨窗口不会被存两次，一次被拒的调用或无法解析的回复软失败，被引用的候选项核验为 intact，以及 bootstrap 在空跑中选出本目录的会话、对每个会话只应用一次、并在缺依赖时吵闹地失败。
+
 `tests/commands.spec.ts` 是运维命令面的测试套件：每个用例把一行 `/memory` 打进真实的命令运行时并读取结算后的结果，因此一次什么都没存下的 `remember`、一次渲染错行的 `search`，或一个不再被解析的子命令都会在那里失败。
 
 `tests/web.spec.ts` 与 `tests/web-composition.host.spec.ts` 是浏览器路由的测试套件：前者通过路由注册时的那个对象驱动每条路由，断言信封、请求体校验与它背后的运维面；后者用真实 Loader 在真实 web 服务器与 Connection 之上启动该行，并断言在没有两者的 profile 里它保持 pending —— 而不是失败。`tests/client/api.spec.ts` 覆盖浏览器请求客户端自己的解码，包括宿主答了它读不懂的东西这一情形。
@@ -364,7 +393,9 @@ node scripts/smoke.mjs                                                        # 
 
 - **没有 embedding。** 排序是在字面 token 上做的 BM25（ASCII 词加 CJK 字符与二元组）。改写式召回能力弱；没有重排序器，也没有向量索引。harness 不自带 embedding 提供方，因此向量路径需要先有它。
 - **记忆语料没有 FTS 索引。** 记录存放在存储域中并在内存里排序，这让检索在模型路径上保持同步且无 I/O。在 `maxRecords` 上限之下这是正确的取舍；超过它之后，或者一旦改写式召回比延迟更重要，下一步就是在同样的记录上建立 `node:sqlite` FTS5 索引。
-- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。两者都是出厂状态为 `pending` 的原因；把 `autoDistillStatus` 提到 `active` 的部署是在把误报接进注入。
+- **沉淀识别的是句式，不是含义。** 它是一张正则表。换种说法表述的持久主张会被漏掉，而一句读起来像约束其实不是的话会被捕获。两者都是出厂状态为 `pending` 的原因；把 `autoDistillStatus` 提到 `active` 的部署是在把误报接进注入。辅助窗口是语义上的补充，而它在开启期间每个窗口要花一次模型调用。
+- **辅助窗口的缓冲与计数只存在内存里。** 重启会丢掉被缓冲的轮次，窗口计数从头再来；想要跨重启连续性的部署，需要从会话日志回放它们。
+- **一次 bootstrap apply 会等待。** 该命令在一次同步结算里沉淀至多 `bootstrapMaxSessions` 个会话；既往会话非常多的目录受这个上限约束，若真实使用超出它，下一步是后台作业。
 - **矛盾检测是启发式的。** 它要求共用一个召回标签且落在某个相似度区间内，因此会漏掉用不同措辞表述的矛盾，也可能把关于同一主题的两条细致主张标出来。它只上报；没有任何东西被自动裁决。
 - **每日反思报告的是已经过完的一天，因此它在那天之后才出现。** 一个连跑数周、没有跨过本地午夜的会话永远不会产出它。
 - **整理跑在轮次的路径上。** 该巡检受 `dreamWindowRecords` 限制，但它在轮次关闭之前被等待，因此非常大的语料会让跨过窗口的那个轮次变慢。

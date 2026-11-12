@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-memory/README.md
 /prism-prism-memory:
-  en: a8cf0b6581e77747
-  zh: 147fce9521f29e09
+  en: b4450702c017dbde
+  zh: 119ddf31cf9305d4
 /prism-prism-memory/summary:
-  en: 079db35c0cee84ff
-  zh: e64d02c29027e129
+  en: 8997536446506dea
+  zh: e5841c40e14eb26f
 /prism-prism-memory/design-constraint-the-cached-prefix-stays-byte-stable:
   en: bae113ec8558ed3e
   zh: 9ddeb3cb43c2cb6b
@@ -18,8 +18,8 @@
   en: ab357ea99798b43b
   zh: 15fb3215ef5ab026
 /prism-prism-memory/use-this-package/the-operator-command:
-  en: 2f067b2b779ef7d2
-  zh: 53e0c308a10ae06a
+  en: c877a1937d2fc52e
+  zh: 14afe16685e5c430
 /prism-prism-memory/use-this-package/the-memory-page:
   en: 314d337450fb1ebd
   zh: 944ee8820ea45ee5
@@ -30,11 +30,17 @@
   en: cd1e6047c70c60c0
   zh: b0a04eda488c22b8
 /prism-prism-memory/automatic-memory:
-  en: 355b38fd5c9e9756
-  zh: 6b4f19fdce4767b6
+  en: bcdc51d6fade0587
+  zh: 6a2f50071a53df5f
 /prism-prism-memory/automatic-memory/distillation-on-the-turn-s-own-path:
   en: 8af69de2e02e28f7
   zh: 695e87d18cb42aae
+/prism-prism-memory/automatic-memory/model-assisted-distillation-on-a-window:
+  en: d66fd25aaa628348
+  zh: ea452ebcf2221f7c
+/prism-prism-memory/automatic-memory/bootstrap-on-demand:
+  en: 2288db3718d61364
+  zh: 99bcc80efc64a1e9
 /prism-prism-memory/automatic-memory/consolidation-on-a-window:
   en: 51f4bda1e661a19d
   zh: 179e97430a77d74a
@@ -60,8 +66,8 @@
   en: 09cf4a23971fae0b
   zh: 534fcae1c1ea76ca
 /prism-prism-memory/the-second-layer-a-durable-session-history-index/configuration:
-  en: 754ab26209b8168b
-  zh: 438d14e11c5eb2b5
+  en: 86470494db657f0f
+  zh: ca05cb4a6f31601f
 /prism-prism-memory/record-model:
   en: d74d16db6d06da2c
   zh: 94db8672e973193d
@@ -78,8 +84,8 @@
   en: 4956633a2d535e89
   zh: bd2022ec569288a9
 /prism-prism-memory/model-experience/turn-end-passes:
-  en: 0823f4dc95cfd218
-  zh: dbabe32c451f481c
+  en: c95b110b087069df
+  zh: f68f4a6c3d2e7e61
 /prism-prism-memory/model-experience/the-memory-page:
   en: d4afe6f236b55c6c
   zh: 0e999a6c0d22d4a9
@@ -87,11 +93,11 @@
   en: f15a9ae5ebacab3f
   zh: 5332098695d8c6e7
 /prism-prism-memory/verification:
-  en: c291171f2907e0c2
-  zh: 8703ca2f9355331f
+  en: 0da2971187a1bfd3
+  zh: 11e4b6df6e2a1150
 /prism-prism-memory/known-limitations-and-deferred-work:
-  en: abfe16e1434699f8
-  zh: bc02d9d31a4aee5f
+  en: 41678962084baee5
+  zh: 3d14b124aed76774
 /prism-prism-memory/installation:
   en: 69521c4de892670f
   zh: c2565d8a06956085

@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, a Web memory page, automatic distillation and consolidation, cited-source verification and claim comparison, import from other tools' memory files, and a deterministic Markdown mirror with an audit check.
+Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, a Web memory page, automatic distillation and consolidation, an opt-in model-assisted distillation window with a past-session bootstrap pass, cited-source verification and claim comparison, import from other tools' memory files, and a deterministic Markdown mirror with an audit check.
 
 ## Summary
 
@@ -13,7 +13,7 @@ Four things distinguish it from the usual "inject memory into the system prompt"
 1. **The cached prefix is never rewritten.** See below.
 2. **Claims are filed on three independent axes** — what the claim is about (`layer`), what sort of statement it is (`kind`), and who may see it (`scope`) — and the layer decides whether a claim is stated before it is mentioned.
 3. **Governance is a human surface.** Approving, rejecting, restoring, retiring, expiring, consolidating, importing, and exporting are `/memory` subcommands and, for the first two, buttons on the Web memory page — never tools, so the model cannot promote its own claim and the five tool schemas that do sit in the prefix stay fixed.
-4. **Memory arrives from three producers at once**: the model calling a tool, a turn being read as it closes (no extra model call), and the memory files another tool already wrote for this user.
+4. **Memory arrives from three producers at once**: the model calling a tool, a turn being read as it closes (no extra model call), and the memory files another tool already wrote for this user. A fourth producer — a model reading recent turns on a window — exists behind `assistedDistill`, off by default.
 
 ## Design constraint: the cached prefix stays byte-stable
 
@@ -77,6 +77,7 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory verify [limit]` | Re-read every cited source: `intact`, `drifted`, `missing`, or `unavailable` |
 | `/memory compare <idA> <idB>` | Two claims side by side with a mechanical verdict from the deployment's own thresholds; never a merge |
 | `/memory import [apply] [sources]` | Read other tools' memory files; a dry run unless `apply` is given |
+| `/memory bootstrap [apply] [limit]` | Distill past sessions of this working directory through the model; a dry run unless `apply` is given |
 | `/memory export [dir]` | Write the Markdown mirror and its JSON index; `export check [dir]` audits an existing mirror against the current store |
 
 ### The memory page
@@ -120,7 +121,7 @@ The score is normalized by the square root of the query's own term weight. The s
 
 ## Automatic memory
 
-Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is reviewed only by `/memory approve` or `/memory reject`.
+Three producers write without a tool call. None of them can put an unreviewed claim in front of a model: distillation and import default to `pending`, which never injects and is reviewed only by `/memory approve` or `/memory reject`. The fourth producer below reads through a model, and it exists only behind an explicit opt-in.
 
 ### Distillation, on the turn's own path
 
@@ -129,6 +130,22 @@ An `agent/turn-stopping` listener reads the turn that just closed — the person
 There is no model call in this path. It costs nothing per turn and is deterministic for identical text, which is why it can run on every turn rather than behind a scheduler. It also never inflates the reuse counter: a claim the corpus already holds is dropped instead, because `hits` is read as evidence that a human or a model actually reached for a record.
 
 The trade is stated plainly: a form-recognizing reader has false negatives (a claim phrased some other way is missed) and false positives (a sentence that reads like a constraint but is not). The false positives are why the shipped status is `pending`.
+
+### Model-assisted distillation, on a window
+
+With `assistedDistill` on, a second `agent/turn-stopping` listener keeps a rolling buffer of the last `assistedDistillBufferTurns` turns and, every `assistedDistillEveryTurns` turns, hands that dialogue to the deployment's own model with one instruction: propose the durable claims the form-recognizing reader cannot see. The route is `assistedDistillProvider`/`assistedDistillModel` when both are set, otherwise the calling turn's routed model. Each candidate names the message it is grounded in, and the write cites that message with the same fingerprint `/memory verify` re-reads.
+
+Every candidate is written `pending` with `assistedDistillConfidence`, whatever the model said about it — the model proposes, and only a person promotes. A claim the corpus already holds is dropped, the way the form reader drops one.
+
+The model call is an external dependency, so its failure is not the turn's: an unreachable route, a refusal, or output that parses to nothing skips that window with a log line, and the next window tries again. A storage write failure still propagates — a broken store stays loud.
+
+The buffer and the window count are memory-only. A restart drops them and the recount starts over, which costs the turns before the next window and nothing else.
+
+### Bootstrap, on demand
+
+A fresh install learns nothing from the sessions that closed before it existed. `/memory bootstrap` closes that gap: it lists the calling working directory's past sessions — the same exact-cwd authority the session tools use, the calling session itself excluded — and `/memory bootstrap apply` distills each one through a single model call, writing `pending` project-scope claims that cite the messages they came from. Sessions a completed pass already processed are skipped, recorded in a self-kept `bootstrap-log` entry readable through `/memory journal`.
+
+The command fails loud when it cannot stand: no session-query engine, no llm service, no routed model, or no working directory each stop the command with what is missing. The dry run selects sessions and resolves the route without calling the model; the apply is synchronous and bounded by `bootstrapMaxSessions`.
 
 ### Consolidation, on a window
 
@@ -259,6 +276,16 @@ A record outside the caller's scope is not merely ranked lower; it is filtered o
 | `importSources` | `[]` | External layouts `/memory import` may read; none is read unless named |
 | `importStatus` | `pending` | Status an imported claim is written with |
 | `importConfidence` | `0.6` | Confidence an imported claim is written with |
+| `assistedDistill` | `false` | Let a model read recent turns and propose durable claims, on a window |
+| `assistedDistillEveryTurns` | `40` | Turns that close before another assisted window fires |
+| `assistedDistillBufferTurns` | `12` | Turns the rolling buffer keeps for the next window |
+| `assistedDistillLimit` | `3` | Candidates one assisted window may write |
+| `assistedDistillConfidence` | `0.5` | Confidence an assisted claim is written with |
+| `assistedDistillProvider` | empty | Provider route an assisted call takes; must be set with `assistedDistillModel` |
+| `assistedDistillModel` | empty | Model id an assisted call takes; must be set with `assistedDistillProvider` |
+| `bootstrapMaxSessions` | `10` | Sessions one `/memory bootstrap apply` may read |
+| `bootstrapClaimsPerSession` | `3` | Candidates one bootstrapped session may contribute |
+| `bootstrapMaxChars` | `24000` | Dialogue characters one bootstrapped session contributes to its prompt |
 
 `dedupeReplaceJaccard` below `dedupeJaccard`, an unknown or repeated name in `identityLayers`, `dreamClusterFloor` below `2`, and an unknown name in `importSources` all fail plugin load. Every field is volatile, so it is editable from the running configuration surface.
 
@@ -330,7 +357,7 @@ Sections that have nothing to contribute are omitted, so a turn carrying only a 
 
 ### Turn-end passes
 
-Distillation and consolidation write records and append no message, so they are invisible to the model in the turn that triggers them. What they wrote becomes visible later, through recall or through the tools, exactly as any other record would. Token effect on the triggering turn: none.
+Distillation and consolidation write records and append no message, so they are invisible to the model in the turn that triggers them. The assisted window and a bootstrap apply also append nothing — their cost is the model call itself, outside any request. What they wrote becomes visible later, through recall or through the tools, exactly as any other record would. Token effect on the triggering turn: none.
 
 ### The memory page
 
@@ -345,7 +372,7 @@ Token effect: none. The page reads and writes through its own routes, and what i
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 198 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 207 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -356,6 +383,8 @@ The specs drive production services — the storage hub with its SQLite backend,
 
 `tests/automatic.spec.ts` is the suite for the automatic half: a turn's own text is distilled without a model call and parked for review, a repeated claim is not stored twice and does not inflate its reuse count, the consolidation window opens on the corpus rather than on a counter, a contradiction is reported and both claims survive, standing memory arrives without a keyword match, a due date surfaces, and an import reads a workspace file into project-scoped claims without duplicating what it already read.
 
+`tests/assisted.spec.ts` is the suite for the model-assisted half, over a scripted llm: the producer is silent until turned on, one window fires one call and parks its candidates in review, the same claim is not stored twice across windows, a refused call or an unparsable reply fails soft, a cited candidate verifies intact, and bootstrap selects this directory's sessions in a dry run, applies once per session, and fails loud when a dependency is missing.
+
 `tests/commands.spec.ts` is the suite for the operator command surface: every case types a `/memory` line into the real command runtime and reads the settled result, so a `remember` that stored nothing, a `search` that rendered the wrong line, or a subcommand that stopped resolving fails there.
 
 `tests/web.spec.ts` and `tests/web-composition.host.spec.ts` are the suites for the browser routes: one drives every route through the objects it registers and asserts the envelopes, the body validation, and the operator surface behind them; the other boots the row through the real Loader over a real web server and Connection, and asserts it stays pending — never failed — in a profile that composes neither. `tests/client/api.spec.ts` covers the browser request client's own decoding, including the case where the host answers something it cannot read.
@@ -364,7 +393,9 @@ The specs drive production services — the storage hub with its SQLite backend,
 
 - **No embeddings.** Ranking is BM25 over literal tokens (ASCII words plus CJK characters and bigrams). Paraphrase recall is weak; there is no reranker and no vector index. The harness ships no embedding provider, so a vector path would need one first.
 - **The memory corpus is not FTS-indexed.** Records live in a storage domain and are ranked in memory, which keeps retrieval synchronous and I/O-free on the model path. That is the right trade below the `maxRecords` cap; above it, or once paraphrase recall matters more than latency, a `node:sqlite` FTS5 index over the same records is the next step.
-- **Distillation recognizes sentence forms, not meanings.** It is a regex table. A durable claim phrased some other way is missed, and a sentence that reads like a constraint without being one is captured. Both are why the shipped status is `pending`; a deployment that raises `autoDistillStatus` to `active` is accepting the false positives into injection.
+- **Distillation recognizes sentence forms, not meanings.** It is a regex table. A durable claim phrased some other way is missed, and a sentence that reads like a constraint without being one is captured. Both are why the shipped status is `pending`; a deployment that raises `autoDistillStatus` to `active` is accepting the false positives into injection. The assisted window is the semantic complement, and it costs one model call per window while it is on.
+- **The assisted window's buffer and count are memory-only.** A restart drops the buffered turns and the window recount starts over; a deployment that wants continuity across restarts would need to replay them from the session log.
+- **A bootstrap apply waits.** The command distills up to `bootstrapMaxSessions` sessions in one synchronous settle; a directory with very many past sessions is bounded by that cap, and a background job would be the next step if real use outgrows it.
 - **Contradiction detection is a heuristic.** It requires a shared recall tag and a similarity band, so it misses contradictions phrased with different words and can flag two nuanced claims about one subject. It only ever reports; nothing is resolved automatically.
 - **The daily reflection reports a completed day, so it appears the day after.** A session that runs for weeks without a local midnight rollover never produces one.
 - **Consolidation runs on the turn's path.** The pass is bounded by `dreamWindowRecords`, but it is awaited before the turn closes, so a very large corpus makes the turn that crosses the window slower.
