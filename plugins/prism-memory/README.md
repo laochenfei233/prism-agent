@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, a Web memory page, automatic distillation and consolidation, import from other tools' memory files, and a deterministic Markdown mirror.
+Prism long-term memory: durable, scope- and layer-filtered, supersede-tracked records, a cache-safe tail recall block, five model-facing tools, an operator governance command, a Web memory page, automatic distillation and consolidation, cited-source verification and claim comparison, import from other tools' memory files, and a deterministic Markdown mirror with an audit check.
 
 ## Summary
 
@@ -74,8 +74,10 @@ Five tools is a deliberate bound: tool schemas sit in the cached prefix and are 
 | `/memory maintain [apply]` | Hygiene pass; a dry run unless `apply` is given |
 | `/memory dream [apply]` | Consolidation pass; a dry run unless `apply` is given |
 | `/memory journal [limit]` | The consolidation journal and the daily reflections |
+| `/memory verify [limit]` | Re-read every cited source: `intact`, `drifted`, `missing`, or `unavailable` |
+| `/memory compare <idA> <idB>` | Two claims side by side with a mechanical verdict from the deployment's own thresholds; never a merge |
 | `/memory import [apply] [sources]` | Read other tools' memory files; a dry run unless `apply` is given |
-| `/memory export [dir]` | Write the Markdown mirror and its JSON index |
+| `/memory export [dir]` | Write the Markdown mirror and its JSON index; `export check [dir]` audits an existing mirror against the current store |
 
 ### The memory page
 
@@ -135,7 +137,7 @@ An `agent/turn-stopping` listener also runs a consolidation pass once the corpus
 The pass concludes three things and refuses a fourth:
 
 - **Corroboration.** A claim written from more than one conversation has survived more than one chance to be wrong. The write path records this when an identical claim arrives from a different session; the pass confirms those claims by stamping `corroboratedAt`. It does not touch `confidence`: the certainty a claim carries is its author's statement, and a background pass raising it would be inventing evidence.
-- **Topic digests.** Claims that keep returning under one recall tag become a single `topic` record listing them, so later recall has one entry point instead of N. A digest is written `pending`: it is machine-written prose about other records, and a wrong index entry would misdirect every recall through it.
+- **Topic digests.** Claims that keep returning under one recall tag become a single `topic` record listing them, so later recall has one entry point instead of N. The digest carries its member claims as structured `parents`, so the derivation is auditable, and a member later evicted from the store is reported by `/memory maintain`. A digest is written `pending`: it is machine-written prose about other records, and a wrong index entry would misdirect every recall through it.
 - **A journal.** Each pass writes one archived entry naming what it found, and each completed local day with activity writes one reflection. Both are deterministic, so the journal reads as a diff.
 - **Contradictions are reported, never resolved.** Two live claims that share a recall tag and overlap in wording without saying the same thing are surfaced for a person. Choosing between two claims is a judgement, and a wrong automatic choice is worse than an open question.
 
@@ -158,8 +160,18 @@ A claim the corpus already holds is counted as skipped rather than stored again 
 - **Review inbox.** With `requireApproval`, or for any write below `pendingBelowConfidence`, a claim is stored as `pending`. Injection and search visibility are separate decisions: a pending record never injects and is never counted as live, but `memory_search` returns it — under **every** configuration, `requireApproval` included — so the model can always find a claim it wrote, whatever confidence it carried. Settling the review is only `/memory approve` or `/memory reject`, neither of which the model can call; `/memory forget <id>` archives any claim it is given, a pending one included, without recording a review decision.
 - **Two-time records.** Every record carries `validAt` and `invalidAt`. Superseding, expiring, merging, and forgetting all invalidate rather than delete, so an old answer stays auditable while only the current claim injects.
 - **Rollback.** `/memory restore` re-activates a record and archives a live successor, recording the rollback in the successor's evidence.
-- **Maintenance.** `/memory maintain` reports what it would do and writes nothing until `apply`: live records past their deadline are archived, near-duplicates at or above `dedupeJaccard` are merged into the record a reader would keep (higher confidence, then newer), archived records are evicted when the store is at capacity, and supersede links that no longer resolve are reported.
+- **Maintenance.** `/memory maintain` reports what it would do and writes nothing until `apply`: live records past their deadline are archived, near-duplicates at or above `dedupeJaccard` are merged into the record a reader would keep (higher confidence, then newer), archived records are evicted when the store is at capacity, and supersede links and digest parents that no longer resolve are reported.
 - **Deterministic mirror.** `/memory export` writes `memory.md` and `memory.index.json` with a full write to a sibling temporary path and a rename. Identical corpora produce identical bytes, so the mirror is commit-able and a `git diff` shows only real memory changes.
+
+### Verifying cited evidence
+
+A claim the model recorded cites its source: `memory_remember` anchors the user message it was recorded while answering, and a distilled claim cites the message its sentence came from. The citation carries `evidence.textHash`, the SHA-256 of that message's model-visible text at write time. A write with no cited message — an operator, Web, imported, or consolidation write — carries no citation; nothing is invented.
+
+`/memory verify` re-reads each cited message through the session-query engine, which prefers the live session and falls back to the persisted log, and recomputes the fingerprint over the current model-visible surface. Each cited record reads `intact`, `drifted` (the cited text changed), `missing` (the session or message no longer resolves), or `unavailable` (no reader could open the session). The engine is optional: a composition that mounts none keeps every other memory path, and verification reports its cited sources as unavailable instead of failing.
+
+### Comparing two claims
+
+`/memory compare <idA> <idB>` sets two claims side by side with the mechanical facts — Jaccard similarity over the ranker's tokenization, shared recall tags, and any supersede, merge, or derivation link between them — and a mechanical verdict from the deployment's own thresholds: `equivalent` at or above `dedupeJaccard`, `conflicting` when the pair shares a tag inside the contradiction band, `complementary` when it shares a tag below that band, and `unrelated` otherwise. The verdict is vocabulary, not a decision: equivalent claims keep both identities and sources, complementary claims leave any ordering to the reader, and conflicting claims are preserved with their conditions. The comparison merges, retires, and rewrites nothing.
 
 ## The second layer: a durable session-history index
 
@@ -277,7 +289,8 @@ mergedInto    memory id this record was folded into, or null
 restoredAt    epoch ms, or null
 corroborations  times an identical claim arrived from another conversation
 corroboratedAt  epoch ms a consolidation pass confirmed it, or null
-evidence      { sessionId, messageId, note }
+parents       ids this record was derived from (a digest's member claims), or absent
+evidence      { sessionId, messageId, textHash, note }
 hits          reuse count, incremented by memory_open
 ```
 
@@ -323,12 +336,16 @@ Distillation and consolidation write records and append no message, so they are 
 
 Token effect: none. The page reads and writes through its own routes, and what it settles — an approved claim, a stored one — reaches the model only through the injection and search paths that were already there. KV-cache effect: none, because nothing on this path is part of a request.
 
+### Operator audits
+
+`/memory verify`, `/memory compare`, and `/memory export check` are operator reads: they write nothing, inject nothing, and reach the model through no tool schema. Token effect: none. KV-cache effect: none.
+
 ## Verification
 
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 198 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -360,6 +377,9 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **The four operator methods are un-narrowed public service methods.** No model-facing caller can reach them, and `maintain`, `dream`, `importMemories`, and `exportMarkdown` were already whole-store, so this adds no new authority class — but any plugin that injects `prismMemory` can read the whole corpus, and the type does not say so beyond the name.
 - **The page has no component spec.** The bundle declares no React runtime of its own and the plugin's Vitest config sets no jsdom environment, so the page is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.
 - **The model-facing session tools are not in this bundle.** `session-search.patch.yml` turns on the durable `sessionQuery` index, but mounting `@deepseek-ai/dsh-tool-session-query` is the deployment's decision, because that package is not part of every Harness installation. Without that row the model can still reach a claim's originating session through `memory_search`'s attribution, but it has no tool that reads session history directly.
+- **Evidence verification needs a reader and a cite.** `/memory verify` resolves a cited message only where a session-query engine is mounted — the durable index layer ships one — and only records written after this field existed cite a message with a fingerprint; older records, and operator or imported claims, count as uncited. The re-read costs one session read per cited session, and a message compacted off the model-visible surface reads as `missing`.
+- **The comparison verdict is mechanical.** `/memory compare` classifies with the shipped thresholds and states the preservation rule; what two claims mean for each other is the reader's judgement.
+- **The mirror check is byte-exact.** `/memory export check` compares the current render against the mirror byte for byte, so any store change — a due date arriving, a claim expiring — reads as stale even when no claim text moved.
 - **Import layouts are hardcoded by id.** Adding a tool means adding an entry to `IMPORT_SOURCES`; there is no configuration format for a custom layout.
 
 ## Installation

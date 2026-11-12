@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-memory/README.md
 /prism-prism-memory:
-  en: a25e7c50091049d3
-  zh: bb184595a41eabb1
+  en: a8cf0b6581e77747
+  zh: 147fce9521f29e09
 /prism-prism-memory/summary:
   en: 079db35c0cee84ff
   zh: e64d02c29027e129
@@ -18,8 +18,8 @@
   en: ab357ea99798b43b
   zh: 15fb3215ef5ab026
 /prism-prism-memory/use-this-package/the-operator-command:
-  en: 646ea9498129cdf1
-  zh: 4064e66d10af4790
+  en: 2f067b2b779ef7d2
+  zh: 53e0c308a10ae06a
 /prism-prism-memory/use-this-package/the-memory-page:
   en: 314d337450fb1ebd
   zh: 944ee8820ea45ee5
@@ -36,8 +36,8 @@
   en: 8af69de2e02e28f7
   zh: 695e87d18cb42aae
 /prism-prism-memory/automatic-memory/consolidation-on-a-window:
-  en: 2f0d90f312bcb2b3
-  zh: 1bdbd4cc05ebf446
+  en: 51f4bda1e661a19d
+  zh: 179e97430a77d74a
 /prism-prism-memory/automatic-memory/dates:
   en: 5abe3062fc3a5dff
   zh: 70e4c5c4112c6d3f
@@ -45,8 +45,14 @@
   en: 7371962a8e964227
   zh: ae0e83a62c0ea266
 /prism-prism-memory/governance-and-library-hygiene:
-  en: ad15086b6a2a14ba
-  zh: 5cff87f139ee0790
+  en: 8bf91996bd4a88e3
+  zh: 831eb80f4c7f244f
+/prism-prism-memory/governance-and-library-hygiene/verifying-cited-evidence:
+  en: d12fb497edb54f15
+  zh: b16516a4b101dbee
+/prism-prism-memory/governance-and-library-hygiene/comparing-two-claims:
+  en: 845ca7c9f487a6ee
+  zh: ef6babfb5c9cdc99
 /prism-prism-memory/the-second-layer-a-durable-session-history-index:
   en: 59e50235fc51fea8
   zh: eb398facca3abdba
@@ -77,12 +83,15 @@
 /prism-prism-memory/model-experience/the-memory-page:
   en: d4afe6f236b55c6c
   zh: 0e999a6c0d22d4a9
+/prism-prism-memory/model-experience/operator-audits:
+  en: f15a9ae5ebacab3f
+  zh: 5332098695d8c6e7
 /prism-prism-memory/verification:
   en: c291171f2907e0c2
   zh: 8703ca2f9355331f
 /prism-prism-memory/known-limitations-and-deferred-work:
-  en: 79a4bbf7557376df
-  zh: 828e580a6304bf57
+  en: abfe16e1434699f8
+  zh: bc02d9d31a4aee5f
 /prism-prism-memory/installation:
   en: 69521c4de892670f
   zh: c2565d8a06956085

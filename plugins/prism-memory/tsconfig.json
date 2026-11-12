@@ -44,6 +44,7 @@
       "@deepseek-ai/dsh-llm": ["../../packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session-projection": ["../../packages/session/session-projection/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session-query": ["../../packages/session-query/session-query/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-storage": ["../../packages/storage/storage/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-storage-domain": ["../../packages/storage/storage-domain/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-storage-sqlite": ["../../packages/storage/storage-sqlite/lib/types/index.d.ts"],

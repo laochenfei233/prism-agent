@@ -15,12 +15,33 @@ import CommandRuntime from '@deepseek-ai/dsh-commands'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageSqlite from '@deepseek-ai/dsh-storage-sqlite'
+import { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
+import type {
+  SessionEventSearchPage,
+  SessionSearchHit,
+  SessionSearchPage,
+} from '@deepseek-ai/dsh-session-query'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import PrismMemory from '../../src/index.ts'
 import * as MemoryCommands from '../../src/commands.ts'
 import * as MemoryTools from '../../src/tools.ts'
+
+/**
+ * A session-query engine for the verify path. The exact reads are concrete on
+ * the base class, so the stub only declines the ranked searches the verify path
+ * never calls.
+ */
+class StubSessionQuery extends SessionQueryEngine {
+  async searchSessions(): Promise<SessionSearchPage<SessionSearchHit>> {
+    throw new Error('the stub answers exact reads only')
+  }
+
+  async searchEvents(): Promise<SessionEventSearchPage> {
+    throw new Error('the stub answers exact reads only')
+  }
+}
 
 /** Configuration a spec overrides; every other field keeps its shipped default. */
 export interface HarnessOptions {
@@ -30,6 +51,8 @@ export interface HarnessOptions {
   readonly tools?: boolean
   /** Mount the operator command registrant. */
   readonly commands?: boolean
+  /** Mount the stub session-query engine, so `/memory verify` has a reader. */
+  readonly sessionQuery?: boolean
 }
 
 /**
@@ -44,6 +67,7 @@ export async function mountMemory(options: HarnessOptions = {}): Promise<Context
   await ctx.plugin(StorageDomain, { backend: 'sqlite' })
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  if (options.sessionQuery === true) await ctx.plugin(StubSessionQuery)
   if (options.commands === true) await ctx.plugin(CommandRuntime)
   await ctx.plugin(PrismMemory, options.config ?? {})
   if (options.tools === true) await ctx.plugin(MemoryTools)

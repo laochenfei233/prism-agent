@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，一个 Web 记忆页，自动沉淀与整理，从其他工具的记忆文件导入，以及一份确定性的 Markdown 镜像。
+Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的记录，一个缓存安全的尾部召回块，5 个面向模型的工具，一个运维治理命令，一个 Web 记忆页，自动沉淀与整理，引用来源核验与主张比较，从其他工具的记忆文件导入，以及一份带审计核对、确定性的 Markdown 镜像。
 
 ## 概述
 
@@ -74,8 +74,10 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 | `/memory maintain [apply]` | 卫生巡检；除非给出 `apply`，否则为空跑 |
 | `/memory dream [apply]` | 整理巡检；除非给出 `apply`，否则为空跑 |
 | `/memory journal [limit]` | 整理日志与每日反思 |
+| `/memory verify [limit]` | 重读每一条被引用的来源：`intact`、`drifted`、`missing` 或 `unavailable` |
+| `/memory compare <idA> <idB>` | 把两条主张并排对照，给出由部署自身阈值决定的机械判定；绝不是合并 |
 | `/memory import [apply] [sources]` | 读取其他工具的记忆文件；除非给出 `apply`，否则为空跑 |
-| `/memory export [dir]` | 写出 Markdown 镜像及其 JSON 索引 |
+| `/memory export [dir]` | 写出 Markdown 镜像及其 JSON 索引；`export check [dir]` 对照当前存储审计一份既有镜像 |
 
 ### 记忆页
 
@@ -135,7 +137,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 这次巡检得出三件事，并拒绝第四件：
 
 - **印证。** 由不止一个会话写出的主张，经历过不止一次出错的机会。写入路径在一条相同的主张来自不同会话时记下这一点；巡检通过盖上 `corroboratedAt` 确认这些主张。它不碰 `confidence`：一条主张携带的确定性是其作者的陈述，后台巡检抬高它等于在编造证据。
-- **主题摘要。** 持续在同一个召回标签下返回的主张，会变成一条列出它们的 `topic` 记录，于是后续召回只有一个入口而不是 N 个。摘要以 `pending` 写入：它是机器写的、关于其他记录的散文，一个错误的索引条目会经它误导每一次召回。
+- **主题摘要。** 持续在同一个召回标签下返回的主张，会变成一条列出它们的 `topic` 记录，于是后续召回只有一个入口而不是 N 个。摘要把它的成员主张作为结构化的 `parents` 带上，因此这条派生关系可审计，而一个后来被逐出存储的成员会由 `/memory maintain` 上报。摘要以 `pending` 写入：它是机器写的、关于其他记录的散文，一个错误的索引条目会经它误导每一次召回。
 - **日志。** 每次巡检写一条归档条目，记下它发现了什么；每完成一个有活动的本地日写一条反思。两者都是确定性的，因此日志读起来像一份 diff。
 - **矛盾只上报，绝不裁决。** 两条共用召回标签、措辞重叠但说的不是同一件事的在库主张，会被人看到。在两条主张之间做选择是一个判断，而一个错误的自动选择比一个悬而未决的问题更糟。
 
@@ -158,8 +160,18 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 - **待审收件箱。** 在 `requireApproval` 下，或对任何低于 `pendingBelowConfidence` 的写入，主张都以 `pending` 存储。注入与搜索可见性是两个独立的决定：一条 pending 记录从不注入、也从不计为在库，但 `memory_search` 会返回它 —— 在**每一种**配置下，包括 `requireApproval` —— 因此模型总能找到它自己写过的主张，无论它当时带什么置信度。定夺审阅的只有 `/memory approve` 或 `/memory reject`，两者模型都无法调用；`/memory forget <id>` 会把交给它的任意一条主张归档，包括 pending 的，但不记录审阅决定。
 - **双时间记录。** 每条记录带 `validAt` 与 `invalidAt`。supersede、过期、合并与遗忘都走失效而不是删除，因此旧答案保持可审计，而只有当前主张会注入。
 - **回滚。** `/memory restore` 重新激活一条记录并归档一个在库的后继者，把回滚记录在后继者的证据里。
-- **维护。** `/memory maintain` 报告它将要做什么，在 `apply` 之前不写任何东西：超过期限的在库记录被归档，达到或高于 `dedupeJaccard` 的近似重复被合并进读者会保留的那条记录（更高置信度，其次更新），存储达到容量时已归档记录被淘汰，以及无法再解析的 supersede 链被上报。
+- **维护。** `/memory maintain` 报告它将要做什么，在 `apply` 之前不写任何东西：超过期限的在库记录被归档，达到或高于 `dedupeJaccard` 的近似重复被合并进读者会保留的那条记录（更高置信度，其次更新），存储达到容量时已归档记录被淘汰，以及无法再解析的 supersede 链与摘要父本被上报。
 - **确定性镜像。** `/memory export` 写出 `memory.md` 与 `memory.index.json`，方式是完整写入同目录的临时路径再改名。相同的语料产出相同的字节，因此镜像可以提交，`git diff` 只显示真实的记忆变化。
+
+### 引用来源核验
+
+模型记下的主张会引用它的来源：`memory_remember` 锚定它记录该主张时正在回答的那条用户消息，而一条沉淀出的主张引用它的句子所来自的那条消息。该引用带 `evidence.textHash`，即那条消息在写入时刻模型可见文本的 SHA-256。没有可引用消息的写入 —— 运维、Web、导入或整理写入 —— 不带引用；不编造任何东西。
+
+`/memory verify` 经 session-query 引擎重读每一条被引用的消息 —— 它优先取活会话，回退到持久日志 —— 并在当前模型可见面上重新计算指纹。每条被引用的记录读出 `intact`、`drifted`（被引用的文本变了）、`missing`（会话或消息不再能解析）或 `unavailable`（没有读取方能打开该会话）。引擎是可选的：没有挂载它的编排保留其余全部记忆路径，核验把它引用的来源报为 unavailable 而不是失败。
+
+### 比较两条主张
+
+`/memory compare <idA> <idB>` 把两条主张并排对照，附上机械事实 —— 排序器分词上的 Jaccard 相似度、共享的召回标签、以及两者之间任何 supersede、合并或派生关系 —— 并给出一个由部署自身阈值决定的机械判定：达到或高于 `dedupeJaccard` 为 `equivalent`；两条主张共用一个标签且落在矛盾区间内为 `conflicting`；共用一个标签但低于该区间为 `complementary`；其余为 `unrelated`。判定是词汇，不是决定：等价的主张保留双方的身份与来源，互补的主张把任何先后次序留给读者，冲突的主张连同各自的条件一起保留。这次比较不合并、不退役、不改写任何东西。
 
 ## 第二层：持久的会话历史索引
 
@@ -277,7 +289,8 @@ mergedInto    memory id this record was folded into, or null
 restoredAt    epoch ms, or null
 corroborations  times an identical claim arrived from another conversation
 corroboratedAt  epoch ms a consolidation pass confirmed it, or null
-evidence      { sessionId, messageId, note }
+parents       ids this record was derived from (a digest's member claims), or absent
+evidence      { sessionId, messageId, textHash, note }
 hits          reuse count, incremented by memory_open
 ```
 
@@ -323,12 +336,16 @@ memory_open when the exact record matters.
 
 token 影响：无。页面通过自己的路由读写，而它所结算的东西 —— 一条被批准或存下的主张 —— 只会经由本就存在的注入与检索路径到达模型。KV 缓存影响：无，因为这条路径上没有任何东西属于一次请求。
 
+### 运维审计
+
+`/memory verify`、`/memory compare` 与 `/memory export check` 是运维读取：它们不写、不注入，也不经由任何工具 schema 到达模型。token 影响：无。KV 缓存影响：无。
+
 ## 验证
 
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 178 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 198 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -360,6 +377,9 @@ node scripts/smoke.mjs                                                        # 
 - **四个运维方法是公开且不收窄的服务方法。** 没有任何面向模型的调用方能到达它们，而 `maintain`、`dream`、`importMemories`、`exportMarkdown` 本来就是整库操作，因此这不引入新的权限类别 —— 但任何注入 `prismMemory` 的插件都能读到整库，而类型除了名字之外没有表达这一点。
 - **页面没有组件规格。** 该包不自带 React 运行时，插件的 Vitest 配置也没有设置 jsdom 环境，因此页面只由路由规格、请求客户端规格，以及加载该包并执行其 `apply` 的 smoke 覆盖。
 - **面向模型的会话工具不在本 bundle 中。** `session-search.patch.yml` 打开持久的 `sessionQuery` 索引，但挂载 `@deepseek-ai/dsh-tool-session-query` 是部署的决定，因为该包并非每套 Harness 安装的一部分。没有那一行，模型仍能通过 `memory_search` 的溯源到达一条主张的来源会话，但它没有直接读取会话历史的工具。
+- **证据核验需要读取方与引用。** `/memory verify` 只有在挂载了 session-query 引擎时才能解析被引用的消息 —— 持久索引层自带一个 —— 且只有在本字段存在之后写入的记录才带带指纹的消息引用；更早的记录，以及运维或导入的主张，计为未引用。重读的成本是每个被引用会话一次会话读取，而一条被压缩出模型可见面的消息读出 `missing`。
+- **比较判定是机械的。** `/memory compare` 用出厂阈值分类并陈述保留规则；两条主张彼此意味着什么，是读者的判断。
+- **镜像核对按字节精确。** `/memory export check` 将当前渲染与镜像逐字节比较，因此存储的任何变化 —— 一个到期日到来、一条主张过期 —— 即使没有任何主张文本移动也读出 `stale`。
 - **导入布局按 id 硬编码。** 新增一个工具意味着往 `IMPORT_SOURCES` 加一条；自定义布局没有配置格式。
 
 ## 安装

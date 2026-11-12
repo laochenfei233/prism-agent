@@ -234,6 +234,9 @@ function createMemoryTools(memory: PrismMemoryService): ToolDefinition[] {
       },
     },
     execute: async (args, exec) => {
+      // The model's claim is anchored to the message it was recorded while
+      // answering; the fingerprint lets `/memory verify` re-read it later.
+      const anchor = memory.evidenceAnchor(exec.agent)
       const result = await memory.remember({
         text: args.text,
         ...args.kind === undefined ? {} : { kind: args.kind },
@@ -244,6 +247,7 @@ function createMemoryTools(memory: PrismMemoryService): ToolDefinition[] {
         ...args.supersedes === undefined ? {} : { supersedes: args.supersedes },
         ...args.ttl_days === undefined ? {} : { ttlDays: args.ttl_days },
         ...args.due_after_days === undefined ? {} : { dueAt: Date.now() + args.due_after_days * 86_400_000 },
+        ...anchor === null ? {} : { evidenceMessage: anchor },
       }, exec.agent)
       return {
         ...entryOf(result.record),

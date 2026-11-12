@@ -21,6 +21,7 @@ import {
   renderIndex,
   renderRecall,
   suggestTags,
+  textFingerprint,
   tokenize,
 } from '../src/memory.ts'
 
@@ -261,5 +262,24 @@ describe('renderExport', () => {
     const exported = renderExport([record()], { now: EPOCH })
     expect(exported.markdown).not.toContain('2026-01-01T')
     expect(exported.markdown).not.toContain('generated')
+  })
+
+  it('renders derivation parents into both mirrors, and nothing for claims without them', () => {
+    const digest = record({ tags: ['dream-topic'], parents: ['mem_aaa', 'mem_bbb'] })
+    const exported = renderExport([digest, record()], { now: EPOCH })
+    expect(exported.markdown).toContain('parents: `mem_aaa`, `mem_bbb`')
+    const index = JSON.parse(exported.index) as {
+      records: readonly { parents: readonly string[] | null }[]
+    }
+    expect(index.records.map(entry => entry.parents)).toEqual([['mem_aaa', 'mem_bbb'], null])
+  })
+})
+
+describe('textFingerprint', () => {
+  it('is deterministic hex output that distinguishes texts', () => {
+    const first = textFingerprint('the deploy window is tuesday')
+    expect(textFingerprint('the deploy window is tuesday')).toBe(first)
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(textFingerprint('the deploy window is wednesday')).not.toBe(first)
   })
 })
