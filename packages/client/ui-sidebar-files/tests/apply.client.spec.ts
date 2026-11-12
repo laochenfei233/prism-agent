@@ -42,7 +42,8 @@ const PANE = 'pane-1' as PaneId
 
 async function boot() {
   const ctx = new Context()
-  ctx.provide('contextMenus', { open: vi.fn() } as never)
+  ctx.provide('contextMenus', { open: vi.fn(), register: vi.fn(() => () => {}), notify: vi.fn() } as never)
+  ctx.provide('sessions', { list: { getSnapshot: () => ({ byId: {} }) } } as never)
   const tabs = new SidebarRightTabRegistry(ctx)
   const registered: Recorded[] = []
   const slots = {

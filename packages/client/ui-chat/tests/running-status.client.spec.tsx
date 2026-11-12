@@ -70,13 +70,13 @@ describe('RunningStatus', () => {
 
   it('freezes the duration while paused and resumes from the Turn start', () => {
     const view = statusHarness(1_000)
-    expect(view.content()?.textContent).toBe('深度求索中，用时 4秒 ···')
+    expect(view.content()?.textContent).toBe('逐层显影中，用时 4秒 ···')
     view.set(1_000, true)
     expect(vi.getTimerCount()).toBe(0)
     act(() => { vi.advanceTimersByTime(5_000) })
-    expect(view.content()?.textContent).toBe('深度求索中，用时 4秒 ···')
+    expect(view.content()?.textContent).toBe('逐层显影中，用时 4秒 ···')
     view.set(1_000)
-    expect(view.content()?.textContent).toBe('深度求索中，用时 9秒 ···')
+    expect(view.content()?.textContent).toBe('逐层显影中，用时 9秒 ···')
     expect(vi.getTimerCount()).toBe(1)
   })
 })

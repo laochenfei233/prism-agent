@@ -8232,6 +8232,9 @@ importers:
       '@deepseek-ai/dsh-storage-json':
         specifier: workspace:*
         version: link:../../storage/storage-json
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
       '@deepseek-ai/dsh-tool-goal':
         specifier: workspace:*
         version: link:../../goal/tool-goal

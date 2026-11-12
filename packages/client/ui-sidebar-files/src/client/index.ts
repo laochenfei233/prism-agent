@@ -14,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { BoundActions } from '@deepseek-ai/dsh-client-store'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { fileAddressFor, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import { FILES_ID, FILES_KIND, filesDefinition } from './definition.tsx'
 import { canOpenOf, createList, createWatch, filesFace, type FilesInjected } from './face.ts'
 import { FileTree } from './FileTree.tsx'
@@ -54,7 +55,7 @@ const NS = 'sidebarFiles'
  * Required browser services: the tab registry, the keyed seat, the Remote
  * carrier and its namespace, and copy.
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles']
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles', 'contextMenus', 'sessions']
 
 /**
  * Client plugin body: register the type, its shortcut, its dictionaries, the
@@ -64,6 +65,47 @@ export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'r
  */
 export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (A12). The fork's file-row
+  // actions ride the global context menu as one contributor: preview in the viewer pane, the explicit
+  // open-with application list, and the two path spellings, on top of upstream's open-in-app rows.
+  ctx.effect(() => ctx.contextMenus.register({
+    id: 'prism-files.file', target: 'file', order: 150,
+    resolve: async ({ sessionId, path }, signal) => {
+      const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+      const applications = await ctx.remote.session.workspacePathApplications({ path })
+        .then((result) => result.ok ? result.value : null)
+        .catch(() => null)
+      signal.throwIfAborted()
+      const absolutePath = resolveWorkspacePath(cwd, path)
+      const open = (application?: string) => {
+        void ctx.remote.session.openWorkspacePath(application === undefined ? { path } : { path, application })
+          .then((opened) => { if (!opened.ok) ctx.contextMenus.notify(t('error.openFailed')) })
+          .catch(() => { ctx.contextMenus.notify(t('error.openFailed')) })
+      }
+      const copy = (text: string) => {
+        void navigator.clipboard.writeText(text)
+          .then(() => { ctx.contextMenus.notify(t('menu.copied'), true) })
+          .catch(() => { ctx.contextMenus.notify(t('menu.copyFailed')) })
+      }
+      return [
+        { id: 'prism-files.preview', label: t('menu.preview'), run: () => {
+          ctx.sidebarRight.openResourceIn(sessionId, fileAddressFor(sessionId, cwd, path), { destination: 'sidebar' })
+        } },
+        { id: 'prism-files.open', label: t('menu.open'), run: () => { open() } },
+        ...(applications !== null && applications.length > 0 ? [{
+          id: 'prism-files.open-with',
+          label: t('menu.openWith'),
+          children: applications.map(application => ({
+            id: `prism-files.application:${application.id}`,
+            label: application.name,
+            run: () => { open(application.id) },
+          })),
+        }] : []),
+        { id: 'prism-files.copy-relative', label: t('menu.copyRelative'), run: () => { copy(path) } },
+        { id: 'prism-files.copy-absolute', label: t('menu.copyAbsolute'), run: () => { copy(absolutePath) } },
+      ]
+    },
+  }), 'prism-files: file context menu')
   const handle = createFilesStore()
   const face = filesFace(createList(ctx.remote), createWatch(ctx.remote), canOpenOf(ctx.sidebarRightTabs), (sessionId, tabId) => {
     const source = ctx.sidebarRight.tabDomain.occurrence(sessionId, { id: tabId }).navigation

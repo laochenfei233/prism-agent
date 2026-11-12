@@ -3918,15 +3918,15 @@ describe('ChatView', () => {
     )
     const view = render(<h.ChatView {...h.props} />)
     const content = runningContent(view.container)!
-    expect(content.textContent).toBe('深度求索中，用时 9秒 ···')
+    expect(content.textContent).toBe('逐层显影中，用时 9秒 ···')
     act(() => { h.setConnection('connecting') })
     act(() => { vi.advanceTimersByTime(5_000) })
-    expect(content.textContent).toBe('深度求索中，用时 9秒 ···')
+    expect(content.textContent).toBe('逐层显影中，用时 9秒 ···')
     act(() => { h.setConnection('disconnected') })
     act(() => { vi.advanceTimersByTime(5_000) })
-    expect(content.textContent).toBe('深度求索中，用时 9秒 ···')
+    expect(content.textContent).toBe('逐层显影中，用时 9秒 ···')
     act(() => { h.setConnection('connected') })
-    expect(content.textContent).toBe('深度求索中，用时 19秒 ···')
+    expect(content.textContent).toBe('逐层显影中，用时 19秒 ···')
   }))
 
   it('the running clock reads hours once the turn passes an hour', withClock(3_600_000, () => {

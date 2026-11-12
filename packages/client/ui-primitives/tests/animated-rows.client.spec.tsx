@@ -177,7 +177,7 @@ describe('AnimatedRows', () => {
 
   it('walks rows with the arrow keys, reaches the ends, and presses the focused row on Enter', () => {
     render(<div style={{ position: 'relative' }}>
-      <AnimatedRows className="rows" label="Sessions" rowKeys={['a', 'b', 'c']} ready resetKey="manual">
+      <AnimatedRows className="rows" role="tree" label="Sessions" rowKeys={['a', 'b', 'c']} ready resetKey="manual">
         {['a', 'b', 'c'].map(key => <div key={key} data-row-key={key} role="treeitem" tabIndex={-1}>
           <span>{key}</span><button type="button" aria-label={`menu ${key}`}>…</button>
         </div>)}
@@ -209,7 +209,7 @@ describe('AnimatedRows', () => {
 
   it('ignores navigation on a tree without rows', () => {
     render(<div style={{ position: 'relative' }}>
-      <AnimatedRows className="rows" label="Sessions" rowKeys={[]} ready resetKey="manual">{null}</AnimatedRows>
+      <AnimatedRows className="rows" role="tree" label="Sessions" rowKeys={[]} ready resetKey="manual">{null}</AnimatedRows>
     </div>)
     const tree = screen.getByRole('tree')
     tree.focus()
@@ -219,7 +219,7 @@ describe('AnimatedRows', () => {
 
   it('leaves keys pressed on a row control to that control', () => {
     render(<div style={{ position: 'relative' }}>
-      <AnimatedRows className="rows" label="Sessions" rowKeys={['a', 'b']} ready resetKey="manual">
+      <AnimatedRows className="rows" role="tree" label="Sessions" rowKeys={['a', 'b']} ready resetKey="manual">
         {['a', 'b'].map(key => <div key={key} data-row-key={key} role="treeitem" tabIndex={-1}>
           <button type="button">menu {key}</button>
         </div>)}

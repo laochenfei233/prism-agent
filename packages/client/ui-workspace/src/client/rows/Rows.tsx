@@ -758,14 +758,6 @@ export function SessionNodeItem({
   const draggable = drag !== undefined && reorderable && !row.blank && !row.archived
   const menuOpen = useContextMenuTarget(target => target?.kind === 'session' && target.value.sessionId === node.id)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
-  // The secondary-press surface shares the row entries: its open state is the
-  // press point, exposed through the same hook shape so entries dismiss either
-  // surface without knowing which one they sit in.
-  const contextMenu = usePressPointMenu()
-  const contextMenuState = useMemo((): MenuOpenState => [
-    contextMenu.point !== null,
-    (open: boolean) => { if (!open) contextMenu.close() },
-  ], [contextMenu.point, contextMenu.close])
   const rowRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   // On macOS the click that activates the window is not delivered, but the
@@ -798,10 +790,13 @@ export function SessionNodeItem({
       tabIndex={0}
 
       onClick={() => { onOpen(node.id) }}
-      // The press-point menu owns the secondary press; its preventDefault keeps
-      // the shared session menu to the keyboard gesture and the "..." button.
+      // The global context menu owns the secondary press: it opens at the
+      // pointer with the same entries the "..." button shows.
       {...getTriggerProps(row.blank ? undefined : { kind: 'session', value: { sessionId: node.id, displayTitle: row.title } }, {
-        onContextMenu: row.blank ? undefined : contextMenu.open,
+        onContextMenu: row.blank ? undefined : (event) => {
+          event.preventDefault()
+          openSessionMenu(node.id, row.title, { x: event.clientX, y: event.clientY })
+        },
         onKeyDown: (event) => {
           if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
           if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
@@ -923,17 +918,9 @@ export function SessionNodeItem({
           {renderSlot('sidebar.workspaces.session.pending', { sessionId: node.id, displayTitle: row.title })}
         </div>
       )}
-      {!row.blank && (
-        <ContextMenu state={contextMenu}>
-          {renderSlot(
-            'sidebar.workspaces.session.menu.item',
-            { sessionId: node.id, displayTitle: row.title },
-            { hookContext: contextMenuState },
-          )}
-        </ContextMenu>
-      )}
     </div>
   )
+
   return (
     <HoverCard
       anchor={ownRow}
@@ -946,7 +933,7 @@ export function SessionNodeItem({
       />}
       openDelayMs={800}
       grouped
-      disabled={menuOpen || contextMenu.point !== null || drag?.active === true}
+      disabled={menuOpen || drag?.active === true}
       copyText={row.blank || row.title === '' ? undefined : row.title}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}

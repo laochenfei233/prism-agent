@@ -1551,22 +1551,6 @@ function SlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState
   return <button type="button" role="menuitem" onClick={() => { setOpen(false) }}>entry</button>
 }
 
-it('opens the same row entries on a secondary press and dismisses through the hook', () => {
-  const node: SessionNode = { id: sid('ctx'), title: 'Context', blank: false, running: false,
-    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false }
-  const renderSlot = ((
-    name: 'sidebar.workspaces.session.menu.item',
-    _props: SessionRowOwnerProps,
-    opts?: { hookContext?: unknown },
-  ) => (name === 'sidebar.workspaces.session.menu.item'
-    ? <SlotEntry useMenuOpenState={menuOpenStateFactory(undefined as never, opts?.hookContext as MenuOpenState)} />
-    : null)) as RowRenderSlot
-  render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()} renderSlot={renderSlot} t={t} />)
-  fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 12, clientY: 20 })
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['entry'])
-  fireEvent.click(screen.getByRole('menuitem', { name: 'entry' }))
-  expect(screen.queryByRole('menu')).toBeNull()
-})
 
 it('keeps the browser menu on a blank provisional row', () => {
   const node: SessionNode = { id: sid('blank'), title: '', blank: true, running: false,
@@ -1632,22 +1616,6 @@ it('runs every project context row and lets plugins add rows', () => {
   expect(onDelete).toHaveBeenCalledOnce()
 })
 
-
-it('leaves the menu open when an entry asks the hook to stay open', () => {
-  const node: SessionNode = { id: sid('ctx-keep'), title: 'Context', blank: false, running: false,
-    runningSubagentCount: 0, completed: false, updatedAt: 0, pinned: false, archived: false }
-  const renderSlot = ((
-    name: 'sidebar.workspaces.session.menu.item',
-    _props: SessionRowOwnerProps,
-    opts?: { hookContext?: unknown },
-  ) => (name === 'sidebar.workspaces.session.menu.item'
-    ? <KeepingSlotEntry useMenuOpenState={menuOpenStateFactory(undefined as never, opts?.hookContext as MenuOpenState)} />
-    : null)) as RowRenderSlot
-  render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()} renderSlot={renderSlot} t={t} />)
-  fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 12, clientY: 20 })
-  fireEvent.click(screen.getByRole('menuitem', { name: 'keep' }))
-  expect(screen.getByRole('menu')).toBeTruthy()
-})
 
 describe('annotation marks', () => {
   const base: SessionNode = {
