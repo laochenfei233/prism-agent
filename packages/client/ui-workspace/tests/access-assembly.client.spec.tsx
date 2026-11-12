@@ -53,6 +53,11 @@ async function bench(access: ClientAccessState, options: { ungroupedSession?: Se
   }).await()
   runtime.ctx.provide('shortcuts', { register: () => () => {}, catalog: createSnapshotStore([]) })
   runtime.ctx.provide('uiConversation', {})
+  // The merged browser requires the remote.session service at mount; navigation never picks a path here.
+  runtime.ctx.provide('remote.session', {
+    openWorkspacePath: vi.fn(async () => ({ ok: true as const, value: { opened: true } })),
+    workspacePathApplications: vi.fn(async () => ({ ok: true as const, value: [] })),
+  } as never)
   runtime.ctx.provide('layout', { selectPanel: vi.fn(), beginNavigation: () => new AbortController().signal })
   runtime.releaseWorkspaceSource()
   runtime.remote.provideNamespaces({ directoryPicker: {} })

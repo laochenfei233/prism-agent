@@ -10,6 +10,8 @@ import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { unsupportedInbox, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
@@ -115,9 +117,11 @@ async function boot(configLines: readonly string[] = []): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-meeting-minutes-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
+    "- name: '@deepseek-ai/dsh-session-projection'",
     "- name: '@deepseek-ai/dsh-agent'",
     "- name: '@deepseek-ai/dsh-system-prompt'",
     "- name: '@deepseek-ai/dsh-tools'",
+    "- name: '@deepseek-ai/dsh-tool-executor-native'",
     "- name: '@deepseek-ai/dsh-fs-local'",
     "- name: '@deepseek-ai/dsh-experimental-speech-to-text'",
     '  config:',
@@ -135,9 +139,11 @@ async function boot(configLines: readonly string[] = []): Promise<Context> {
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-fs-local', FileSystemLocal],
     ['@deepseek-ai/dsh-experimental-speech-to-text', SpeechToTextDefinition],
     ['stub-speech-provider', StubSpeechProvider],

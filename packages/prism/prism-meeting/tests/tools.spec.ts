@@ -4,6 +4,7 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@prism-ai/prism-meeting'
 import MeetingMinutesService from '@prism-ai/prism-meeting'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
@@ -87,6 +88,7 @@ async function setup(calls: string[] = []): Promise<Context> {
   contexts.push(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   ctx.provide('meetingMinutes', makeService(calls))
   await ctx.plugin(ToolMeetingMinutes)
   return ctx

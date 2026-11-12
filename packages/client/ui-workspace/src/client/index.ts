@@ -462,9 +462,6 @@ export function apply(ctx: Context): void {
         'sidebar.workspaces.project.menu.item': {
           kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: projectMenuOpenStateFactory } },
         },
-        'sidebar.workspaces.session.menu.item': {
-          kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: menuOpenStateFactory, shortcuts: ctx.shortcuts.catalog } },
-        },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
         'sidebar.workspaces.session.pending': { kind: 'list', scope: 'root' },
         'sidebar.session.row.leading': { kind: 'list', scope: 'root', inline: true },

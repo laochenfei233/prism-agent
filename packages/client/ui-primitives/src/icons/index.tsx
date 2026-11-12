@@ -615,19 +615,11 @@ export const IconSaveOutlineRegular = productIcon('save-outline', 'regular')
 /** Medium floppy-disk save action. */
 export const IconSaveOutlineMedium = productIcon('save-outline', 'medium')
 
-const IconThemeOutlineArtwork = ({ size = 16, className, strokeWidth }: { size?: number | undefined; className?: string | undefined; strokeWidth: number }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" strokeWidth={strokeWidth}>
-    <rect x="4.5" y="4.5" width="10" height="10" rx="2" stroke="currentColor" />
-    <path d="M11.5 4.5V3.5C11.5 2.39543 10.6046 1.5 9.5 1.5H3.5C2.39543 1.5 1.5 2.39543 1.5 3.5V9.5C1.5 10.6046 2.39543 11.5 3.5 11.5H4.5" stroke="currentColor" />
-  </svg>
-)
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (A2). The fork adds the
+// theme-outline glyph to the sprite catalog and exports it through the shared factory like every other glyph.
 
-/** Regular one-pixel IconThemeOutline artwork. */
-export const IconThemeOutlineRegular = (props: IconProps) => (
-  <IconThemeOutlineArtwork {...props} strokeWidth={ICON_REGULAR_STROKE} />
-)
+/** Regular theme-swatch action. */
+export const IconThemeOutlineRegular = productIcon('theme-outline', 'regular')
 
-/** Medium IconThemeOutline artwork with a 1.3px stroke. */
-export const IconThemeOutlineMedium = (props: IconProps) => (
-  <IconThemeOutlineArtwork {...props} strokeWidth={ICON_MEDIUM_STROKE} />
-)
+/** Medium theme-swatch action with 1.3px strokes. */
+export const IconThemeOutlineMedium = productIcon('theme-outline', 'medium')

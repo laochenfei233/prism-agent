@@ -63,7 +63,8 @@ describe('icon sprite', () => {
     expect(reject({ [SEARCH]: svg('<style>path{fill:red}</style>') })).toThrow(/<style> or <script>/)
     expect(reject({ [SEARCH]: svg('<mask id="root"/>') })).toThrow(/element id "root" must start with "dsw-icon-search-outline-regular-"/)
     expect(reject({ [SEARCH]: svg(`<g id="${SEARCH}"/>`) })).toThrow(/must start with/)
-    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark'])
+    // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (A2). The fork's gallery registers its builtin themes, so the environment carries more than upstream's two.
+    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark', 'graph-glass', 'mono-accent', 'strata-dark', 'paper', 'blueprint', 'phosphor', 'sumi', 'sage', 'custom'])
     await fiber.dispose()
   })
 

@@ -677,9 +677,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .batchAction:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .batchAction:disabled {
