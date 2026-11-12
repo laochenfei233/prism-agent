@@ -81,4 +81,4 @@ The user's explicit acceptance for this delivery: every `plugins/<name>` must st
 - [x] A3: `pnpm run typecheck` (5/5) and `pnpm run build` (9/9) pass with only re-checked pre-existing failures.
 - [x] A4: all 387 workspace `package.json` version fields read `0.2.2-rc.1` and none read `0.2.1-*`.
 - [x] A5: every bundle plugin builds via tsdown (8 of 9; `plugins/prism-meeting` is a manifest mirror whose source lives in `packages/prism/prism-meeting` and `aegis` is an asset plugin), installs past the exact-version gate after the pin bump, and registers into a fresh profile (`--dump-config` composes all ten with zero skips).
-- [x] A6: keyless `test:snapshot` shows 183 failures against the 162 recorded on master (A6 scope: 21 new, listed as open in the Report); the focused suites show 87 new failures of which 78 are fixed and 9 remain open.
+- [x] A6: keyless `test:snapshot` shows 183 failures against the 162 recorded on master (21 new, two diagnosed signatures listed as open in the Report); the focused suites reach master parity — the only failures left are the six that also fail on master (bridge timeouts ×2, theme CSS gates ×3, cookie-heal).

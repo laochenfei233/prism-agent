@@ -81,4 +81,4 @@ commits: 28f0c8776f (master anchor)..delivery
 - [x] A3: `pnpm run typecheck`（5/5）与 `pnpm run build`（9/9）通过，仅余重新核验过的既有失败。
 - [x] A4: 387 个工作区 `package.json` 版本字段均为 `0.2.2-rc.1`，无 `0.2.1-*` 残留。
 - [x] A5: 每个 bundle 插件经 tsdown 构建（9 个中 8 个；`plugins/prism-meeting` 是清单镜像，源码在 `packages/prism/prism-meeting`；`aegis` 为资产插件），钉版升级后全部通过精确版本门禁，并注册进全新 profile（`--dump-config` 零跳过组装全部十个）。
-- [x] A6: 无键 `test:snapshot` 183 失败对比 master 记录的 162（A6 范围：21 个新失败，列入 Report 开放清单）；聚焦套件 87 个新失败中 78 个已修，9 个开放。
+- [x] A6: 无键 `test:snapshot` 183 失败对比 master 记录的 162（21 个新增，两个已定性签名列入 Report 开放项）；聚焦套件达到 master 平价——仅剩的 6 个失败与 master 上完全相同（桥超时 ×2、主题 CSS 门 ×3、cookie-heal）。
