@@ -306,7 +306,6 @@ type SessionTreeProps = Pick<
   | 'insertWorkspaceBefore' | 'revealWorkspace' | 't' | 'usePanelInfo'
   | 'useRemoteAccess' | 'useSessionAccess' | 'useWorkspaceAccess'
 > & PropsRenderSlots<
-  | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.project.menu.item'
   | 'sidebar.workspaces.session.row.action'
   | 'sidebar.workspaces.session.pending'

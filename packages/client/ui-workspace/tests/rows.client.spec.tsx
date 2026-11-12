@@ -10,8 +10,7 @@ import { allowAllAccess, makeTranslate } from '@deepseek-ai/dsh-client-test-runt
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { HoverCardGroup, MenuItemButton, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { menuOpenStateFactory } from '../src/client/contract/slots.ts'
-import type { MenuOpenState, ProjectMenuOpenState, ProjectRowOwnerProps, SessionRowOwnerProps } from '../src/client/contract/slots.ts'
+import type { ProjectMenuOpenState, ProjectRowOwnerProps } from '../src/client/contract/slots.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { RowDragProps } from '../src/client/rows/Rows.tsx'
 import {
@@ -1539,17 +1538,6 @@ it.each([['未命名', t], ['Untitled', tEn]])('labels unnamed search results as
   expect(onOpen).toHaveBeenCalledWith(result.id)
 })
 
-/** A slot entry that keeps the menu open through the hook's true branch. */
-function KeepingSlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState }): React.JSX.Element {
-  const [, setOpen] = useMenuOpenState()
-  return <button type="button" role="menuitem" onClick={() => { setOpen(true) }}>keep</button>
-}
-
-/** A slot entry that dismisses through the hook the row occurrence supplies. */
-function SlotEntry({ useMenuOpenState }: { useMenuOpenState: () => MenuOpenState }): React.JSX.Element {
-  const [, setOpen] = useMenuOpenState()
-  return <button type="button" role="menuitem" onClick={() => { setOpen(false) }}>entry</button>
-}
 
 
 it('keeps the browser menu on a blank provisional row', () => {

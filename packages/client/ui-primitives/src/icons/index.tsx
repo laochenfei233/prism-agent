@@ -5,7 +5,7 @@
  * sprite that ui-theme maintains, so a theme can replace the artwork without
  * touching callers and the artwork inherits `currentColor` and CSS variables.
  */
-import { ICON_ARTWORK, ICON_MEDIUM_STROKE, ICON_REGULAR_STROKE, iconSymbolId, type IconGlyph, type IconWeight } from './artwork.ts'
+import { ICON_ARTWORK, iconSymbolId, type IconGlyph, type IconWeight } from './artwork.ts'
 import type { IconProps } from './props.ts'
 
 export type { IconProps } from './props.ts'

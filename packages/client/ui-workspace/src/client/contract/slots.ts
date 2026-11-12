@@ -661,7 +661,6 @@ export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
   & PropsRenderSlots<
     | 'sidebar.workspaces.directoryFlow'
-    | 'sidebar.workspaces.session.menu.item'
     | 'sidebar.workspaces.project.menu.item'
     | 'sidebar.workspaces.session.row.action'
     | 'sidebar.workspaces.session.pending'
