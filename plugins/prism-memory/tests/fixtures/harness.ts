@@ -15,12 +15,71 @@ import CommandRuntime from '@deepseek-ai/dsh-commands'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageSqlite from '@deepseek-ai/dsh-storage-sqlite'
+import { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
+import type {
+  SessionEventSearchPage,
+  SessionSearchHit,
+  SessionSearchPage,
+} from '@deepseek-ai/dsh-session-query'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import PrismMemory from '../../src/index.ts'
 import * as MemoryCommands from '../../src/commands.ts'
 import * as MemoryTools from '../../src/tools.ts'
+
+/**
+ * A session-query engine for the verify path. The exact reads are concrete on
+ * the base class, so the stub only declines the ranked searches the verify path
+ * never calls.
+ */
+class StubSessionQuery extends SessionQueryEngine {
+  async searchSessions(): Promise<SessionSearchPage<SessionSearchHit>> {
+    throw new Error('the stub answers exact reads only')
+  }
+
+  async searchEvents(): Promise<SessionEventSearchPage> {
+    throw new Error('the stub answers exact reads only')
+  }
+}
+
+/**
+ * Scripted llm behavior, installed over the real runtime the test spine
+ * mounts: the runtime stays the one `ctx.llm`, and only its stream is
+ * replaced, so the assisted paths bind to the same instance a deployment's
+ * composition would give them.
+ */
+export interface LlmStub {
+  /** Every request the stub received, in order. */
+  readonly calls: GenerateOptions[]
+  /** The text the next calls answer with; a test mutates it between windows. */
+  reply: string
+  /** The error the next call throws, when set; cleared by no one but the test. */
+  failure: Error | undefined
+}
+
+const llmStubs = new WeakSet<Context>()
+const llmScripts = new WeakMap<Context, LlmStub>()
+
+/**
+ * Replace the real runtime's stream with the scripted one. One stub per
+ * context; installing twice would reset the call log.
+ * @param ctx - the mounting context, whose `llm` the test spine already registered.
+ */
+function installLlmStub(ctx: Context): void {
+  if (llmStubs.has(ctx)) return
+  llmStubs.add(ctx)
+  const stub: LlmStub = { calls: [], reply: '[]', failure: undefined }
+  llmScripts.set(ctx, stub)
+  ctx.llm.stream = async function* (options: GenerateOptions): AsyncIterable<StreamChunk> {
+    stub.calls.push(options)
+    const failure = stub.failure
+    if (failure !== undefined) throw failure
+    yield { type: 'text-delta', index: 0, text: stub.reply }
+    yield { type: 'finish', reason: { kind: 'stop' } }
+  }
+}
 
 /** Configuration a spec overrides; every other field keeps its shipped default. */
 export interface HarnessOptions {
@@ -30,6 +89,10 @@ export interface HarnessOptions {
   readonly tools?: boolean
   /** Mount the operator command registrant. */
   readonly commands?: boolean
+  /** Mount the stub session-query engine, so `/memory verify` has a reader. */
+  readonly sessionQuery?: boolean
+  /** Mount the stub llm runtime, so the assisted distillation paths have a seam. */
+  readonly llm?: boolean
 }
 
 /**
@@ -44,6 +107,8 @@ export async function mountMemory(options: HarnessOptions = {}): Promise<Context
   await ctx.plugin(StorageDomain, { backend: 'sqlite' })
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  if (options.sessionQuery === true) await ctx.plugin(StubSessionQuery)
+  if (options.llm === true) installLlmStub(ctx)
   if (options.commands === true) await ctx.plugin(CommandRuntime)
   await ctx.plugin(PrismMemory, options.config ?? {})
   if (options.tools === true) await ctx.plugin(MemoryTools)
@@ -65,6 +130,18 @@ export function createAgent(ctx: Context, id: string, cwd?: string): Promise<Age
     { provider: 'mock', model: 'mock' },
     cwd === undefined ? {} : { cwd },
   )
+}
+
+/**
+ * The llm stub a mount with `llm: true` installed, for scripting replies and
+ * reading back the calls the producer made.
+ * @param ctx - a context mounted by {@link mountMemory}.
+ * @returns the live script.
+ */
+export function llmOf(ctx: Context): LlmStub {
+  const stub = llmScripts.get(ctx)
+  if (stub === undefined) throw new Error('this mount installed no llm script (pass llm: true)')
+  return stub
 }
 
 /** One admitted step's messages, for driving the pre-step waterfall. */

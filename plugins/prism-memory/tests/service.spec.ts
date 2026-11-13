@@ -13,8 +13,17 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Message } from '@deepseek-ai/dsh-llm'
+import { textFingerprint } from '../src/memory.ts'
 import { PrismMemoryError } from '../src/service.ts'
-import { createAgent, mountMemory, stepMessages } from './fixtures/harness.ts'
+import {
+  appendAssistant,
+  appendUser,
+  createAgent,
+  driveTurnStopping,
+  mountMemory,
+  stepMessages,
+} from './fixtures/harness.ts'
 
 const owned = new Set<Context>()
 const directories = new Set<string>()
@@ -472,5 +481,234 @@ describe('the operator surface', () => {
     // Rejection is a status, not a deletion: the record stays in the operator
     // read so a person can see what was turned down.
     expect(ctx.prismMemory.operatorRecords().map(record => record.id)).toEqual([stored.record.id])
+  })
+})
+
+describe('evidence fingerprints', () => {
+  it('anchors a model write to the user message it answers, with its write-time fingerprint', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'anchor')
+    appendUser(agent, 'the deploy window is tuesday')
+
+    // The anchor is the caller-side fact (the tool computes it); the write
+    // stores exactly what it is given.
+    const anchor = ctx.prismMemory.evidenceAnchor(agent)
+    expect(anchor?.id).toBe(agent.session.deriveMessages().at(-1)?.id)
+    expect(anchor?.textHash).toBe(textFingerprint('the deploy window is tuesday'))
+    const stored = await ctx.prismMemory.remember({
+      text: 'the deploy window is tuesday',
+      ...(anchor === null ? {} : { evidenceMessage: anchor }),
+    }, agent)
+    expect(stored.record.evidence.messageId).toBe(anchor?.id)
+    expect(stored.record.evidence.textHash).toBe(anchor?.textHash)
+    expect(stored.record.evidence.sessionId).toBe(agent.session.id)
+  })
+
+  it('cites the exact message each distilled claim came from', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'distill-cite')
+    appendUser(agent, 'I prefer concise answers from now on')
+    appendAssistant(agent, 'Noted. The root cause was the stale build cache.')
+    await driveTurnStopping(ctx, agent)
+
+    const records = ctx.prismMemory.operatorRecords()
+    expect(records.length).toBeGreaterThan(0)
+    const messages = agent.session.deriveMessages()
+    const textOf = (message: Message): string =>
+      message.content.filter(block => block.type === 'text').map(block => block.text).join('\n')
+    for (const record of records) {
+      const source = messages.find(message => message.id === record.evidence.messageId)
+      if (source === undefined) throw new Error(`the cited message is missing: ${String(record.evidence.messageId)}`)
+      expect(record.evidence.textHash).toBe(textFingerprint(textOf(source)))
+    }
+    // Both sides of the turn contributed, each through its own message.
+    const cited = new Set(records.map(record => record.evidence.messageId))
+    expect(cited.size).toBeGreaterThan(1)
+  })
+
+  it('leaves a write with no cited message unanchored instead of inventing one', async () => {
+    const ctx = await boot()
+    const stored = await ctx.prismMemory.remember({ text: 'an operator wrote this claim' }, undefined)
+    expect(stored.record.evidence.messageId).toBeNull()
+    expect(stored.record.evidence.textHash ?? null).toBeNull()
+  })
+
+  it('re-reads cited sources and reports intact, drifted, and missing', async () => {
+    const ctx = await mountMemory({ sessionQuery: true })
+    owned.add(ctx)
+    const agent = await createAgent(ctx, 'verify')
+    appendUser(agent, 'the deploy window is tuesday')
+    const anchor = agent.session.deriveMessages().at(-1)
+    if (anchor === undefined) throw new Error('no user message to cite')
+    const intact = await ctx.prismMemory.remember({
+      text: 'the deploy window is tuesday',
+      evidenceMessage: { id: anchor.id, textHash: textFingerprint('the deploy window is tuesday') },
+    }, agent)
+    const drifted = await ctx.prismMemory.remember({
+      text: 'a drift probe with distinct words',
+      evidenceMessage: { id: anchor.id, textHash: 'ff'.repeat(32) },
+    }, agent)
+    const missing = await ctx.prismMemory.remember({
+      text: 'a claim whose cited message never existed',
+      evidenceMessage: { id: 'msg-bogus', textHash: 'ee'.repeat(32) },
+    }, agent)
+
+    const report = await ctx.prismMemory.verifyEvidence()
+    expect(report.readerUnavailable).toBe(false)
+    const outcomes = new Map(report.verdicts.map(verdict => [verdict.id, verdict.outcome]))
+    expect(outcomes.get(intact.record.id)).toBe('intact')
+    expect(outcomes.get(drifted.record.id)).toBe('drifted')
+    expect(outcomes.get(missing.record.id)).toBe('missing')
+    expect(report.uncited).toBe(0)
+  })
+
+  it('reports unavailable when no session-query engine is mounted', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'no-reader')
+    appendUser(agent, 'the deploy window is tuesday')
+    const anchor = ctx.prismMemory.evidenceAnchor(agent)
+    await ctx.prismMemory.remember({
+      text: 'the deploy window is tuesday',
+      ...(anchor === null ? {} : { evidenceMessage: anchor }),
+    }, agent)
+    await ctx.prismMemory.remember({ text: 'an operator claim without a source' }, undefined)
+
+    const report = await ctx.prismMemory.verifyEvidence()
+    expect(report.readerUnavailable).toBe(true)
+    expect(report.verdicts.map(verdict => verdict.outcome)).toEqual(['unavailable'])
+    expect(report.uncited).toBe(1)
+  })
+})
+
+describe('derivation parents', () => {
+  it('carries the member claims as parents on a digest', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dreamClusterFloor: 2, dreamMaxTopics: 1 })
+    const first = await ctx.prismMemory.remember({ text: 'the gateway rate limit is 100 requests', tags: ['gateway'] }, undefined)
+    const second = await ctx.prismMemory.remember({ text: 'the gateway timeout is 5 seconds', tags: ['gateway'] }, undefined)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    expect(report.topics.map(topic => topic.tag)).toEqual(['gateway'])
+    const digest = ctx.prismMemory.all().find(record => record.tags.includes('dream-topic'))
+    expect(digest?.status).toBe('pending')
+    expect(digest?.parents).toEqual(report.topics[0]?.memberIds)
+    expect(digest?.parents).toContain(first.record.id)
+    expect(digest?.parents).toContain(second.record.id)
+  })
+
+  it('reports a digest whose parent no longer resolves, such as after an eviction', async () => {
+    const ctx = await boot({ maxRecords: 4, dreamEveryWrites: 1, dreamClusterFloor: 2, dreamMaxTopics: 1 })
+    const first = await ctx.prismMemory.remember({ text: 'the gateway rate limit is 100 requests', tags: ['gateway'] }, undefined)
+    await ctx.prismMemory.remember({ text: 'the gateway timeout is 5 seconds', tags: ['gateway'] }, undefined)
+    await ctx.prismMemory.dream({ apply: true })
+    const digest = ctx.prismMemory.all().find(record => record.tags.includes('dream-topic'))
+    if (digest === undefined) throw new Error('the digest was not written')
+
+    // A write at the cap evicts the oldest archived record: the journal first,
+    // then the forgotten claim — the one parent the digest carries.
+    await ctx.prismMemory.forget(first.record.id, 'no longer true', undefined)
+    await ctx.prismMemory.remember({ text: 'a filler claim that forces one eviction' }, undefined)
+    await ctx.prismMemory.remember({ text: 'a second filler claim that forces another eviction' }, undefined)
+
+    const plan = await ctx.prismMemory.maintain({})
+    expect(plan.orphanedParents).toEqual([digest.id])
+  })
+
+  it('renders derivation parents into the mirror and its index', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dreamClusterFloor: 2, dreamMaxTopics: 1 })
+    await ctx.prismMemory.remember({ text: 'the gateway rate limit is 100 requests', tags: ['gateway'] }, undefined)
+    await ctx.prismMemory.remember({ text: 'the gateway timeout is 5 seconds', tags: ['gateway'] }, undefined)
+    await ctx.prismMemory.dream({ apply: true })
+
+    const dir = await scratch()
+    await ctx.prismMemory.exportMarkdown({ dir })
+    const markdown = await readFile(join(dir, 'memory.md'), 'utf8')
+    expect(markdown).toContain('parents: `mem_')
+    const index = JSON.parse(await readFile(join(dir, 'memory.index.json'), 'utf8')) as {
+      records: readonly { tags: readonly string[], parents: readonly string[] | null }[] }
+    const digest = index.records.find(record => record.tags.includes('dream-topic'))
+    expect(digest?.parents?.length).toBe(2)
+    expect(index.records.filter(record => !record.tags.includes('dream-topic')).every(record => record.parents === null))
+      .toBe(true)
+  })
+})
+
+describe('compare', () => {
+  it('classifies two claims with the deployment thresholds and touches nothing', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'compare')
+    const first = await ctx.prismMemory.remember({
+      text: 'the default storage backend is sqlite, storing one document per record',
+    }, agent)
+    const second = await ctx.prismMemory.remember({
+      text: 'the default storage backend is sqlite, storing one document per memory record',
+    }, agent)
+    const retryA = await ctx.prismMemory.remember({ text: 'the retry budget is three attempts per endpoint', tags: ['retry'] }, agent)
+    const retryB = await ctx.prismMemory.remember({ text: 'the retry budget is five attempts per endpoint', tags: ['retry'] }, agent)
+    const backoff = await ctx.prismMemory.remember({ text: 'retry storms are prevented by exponential backoff', tags: ['retry'] }, agent)
+    const invoice = await ctx.prismMemory.remember({ text: 'the invoice batches on the first monday', tags: ['invoice'] }, agent)
+
+    expect(ctx.prismMemory.operatorCompare(first.record.id, second.record.id).verdict).toBe('equivalent')
+    const conflicting = ctx.prismMemory.operatorCompare(retryA.record.id, retryB.record.id)
+    expect(conflicting.verdict).toBe('conflicting')
+    expect(conflicting.sharedTags).toEqual(['retry'])
+    expect(ctx.prismMemory.operatorCompare(retryA.record.id, backoff.record.id).verdict).toBe('complementary')
+    expect(ctx.prismMemory.operatorCompare(first.record.id, invoice.record.id).verdict).toBe('unrelated')
+
+    // Compare is a read: no record moved.
+    expect(ctx.prismMemory.all().every(record => record.updatedAt === record.createdAt)).toBe(true)
+  })
+
+  it('names the supersede relation between the two claims', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'compare-relation')
+    const old = await ctx.prismMemory.remember({ text: 'the retry budget is three attempts', tags: ['retry'] }, agent)
+    const updated = await ctx.prismMemory.remember({
+      text: 'the retry budget is five attempts',
+      tags: ['retry'],
+      supersedes: old.record.id,
+    }, agent)
+
+    const report = ctx.prismMemory.operatorCompare(old.record.id, updated.record.id)
+    expect(report.relation).toBe('right supersedes left')
+  })
+
+  it('refuses to compare a record with itself and names an unknown id', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'compare-guard')
+    const stored = await ctx.prismMemory.remember({ text: 'the deploy window is tuesday' }, agent)
+
+    const same = await errorOf((async () => ctx.prismMemory.operatorCompare(stored.record.id, stored.record.id))())
+    expect(same.code).toBe('PRISM_MEMORY_COMPARE_SAME')
+    const unknown = await errorOf((async () => ctx.prismMemory.operatorCompare(stored.record.id, 'mem_missing'))())
+    expect(unknown.code).toBe('PRISM_MEMORY_NOT_FOUND')
+  })
+})
+
+describe('the mirror check', () => {
+  it('reads missing, match, then stale against the current store', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'mirror-check')
+    await ctx.prismMemory.remember({ text: 'the domain stays at version 1' }, agent)
+
+    const dir = await scratch()
+    const missing = await ctx.prismMemory.checkExport({ dir })
+    expect(missing.markdown).toBe('missing')
+    expect(missing.index).toBe('missing')
+
+    await ctx.prismMemory.exportMarkdown({ dir })
+    const match = await ctx.prismMemory.checkExport({ dir })
+    expect(match.markdown).toBe('match')
+    expect(match.index).toBe('match')
+
+    await ctx.prismMemory.remember({ text: 'a claim written after the mirror was taken' }, agent)
+    const stale = await ctx.prismMemory.checkExport({ dir })
+    expect(stale.markdown).toBe('stale')
+    expect(stale.index).toBe('stale')
+  })
+
+  it('fails loud without a directory, like the export itself', async () => {
+    const ctx = await boot()
+    const error = await errorOf(ctx.prismMemory.checkExport({}))
+    expect(error.code).toBe('PRISM_MEMORY_NO_EXPORT_DIR')
   })
 })

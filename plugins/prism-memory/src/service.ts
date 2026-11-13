@@ -17,24 +17,32 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
-import type { Context, Volatile } from '@deepseek-ai/cordis'
+import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import type { SessionQueryEngine, SessionSurfaceSnapshot } from '@deepseek-ai/dsh-session-query'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContextFormed, Message } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed, LlmRuntime, Message } from '@deepseek-ai/dsh-llm'
+import {
+  parseAssistedOutput,
+  renderAssistedPrompt,
+  runAssistedCall,
+} from './assisted.ts'
+import type { AssistedMessage, AssistedTarget } from './assisted.ts'
 import {
   extractInjectedIds,
   findNearDuplicates,
   groupConversations,
   isExpired,
   isLive,
+  jaccard,
   MEMORY_KINDS,
   MEMORY_SCOPES,
   MEMORY_STATUSES,
@@ -44,6 +52,8 @@ import {
   renderExport,
   renderIndex,
   suggestTags,
+  textFingerprint,
+  tokenize,
 } from './memory.ts'
 import type { ConversationBucket, MemoryHit, MemoryKind, MemoryOrigin, MemoryScope, MemoryStatus } from './memory.ts'
 import {
@@ -100,8 +110,8 @@ const MAX_TRACKED_INJECTIONS = 200
 const MAX_CHAIN_LENGTH = 64
 
 /** Mirrored file names under the configured export directory. */
-const EXPORT_MARKDOWN_FILE = 'memory.md'
-const EXPORT_INDEX_FILE = 'memory.index.json'
+export const EXPORT_MARKDOWN_FILE = 'memory.md'
+export const EXPORT_INDEX_FILE = 'memory.index.json'
 
 /**
  * The fixed, short memory protocol placed in the stable prompt prefix.
@@ -169,6 +179,9 @@ const CORROBORATION_FLOOR = 2
 const IMPORT_MAX_FILES = 50
 const IMPORT_MAX_FILE_BYTES = 131_072
 
+/** The tag a bootstrap pass's self-record carries; it never injects and never searches. */
+const BOOTSTRAP_TAG = 'bootstrap-log'
+
 /** A memory operation failed for a reason the caller can act on. */
 export class PrismMemoryError extends Error {
   /** Stable failure code, so a model tool or a command can branch on it. */
@@ -211,6 +224,12 @@ export interface RememberInput {
   readonly origin?: MemoryOrigin
   /** Where the write came from, overriding the calling session; used by the importer. */
   readonly evidenceNote?: string
+  /**
+   * The message this claim is grounded in, with the fingerprint of its
+   * model-visible text at write time. A caller with no cited message omits it;
+   * no source is invented. `/memory verify` re-reads it.
+   */
+  readonly evidenceMessage?: EvidenceMessage
   /** Status an automatic write takes; a model write overrides this with the review rules. */
   readonly status?: AdmissionStatus
 }
@@ -237,6 +256,8 @@ export interface MaintenanceReport {
   readonly evicted: readonly string[]
   /** Records whose supersede links no longer resolve in the store. */
   readonly orphaned: readonly string[]
+  /** Records whose derivation parents no longer resolve, such as after an eviction. */
+  readonly orphanedParents: readonly string[]
   /** Store size before the pass. */
   readonly totalBefore: number
   /** Store size after the pass. */
@@ -251,6 +272,64 @@ export interface ExportResult {
   readonly files: readonly string[]
   /** Records mirrored. */
   readonly total: number
+}
+
+/** One mirrored file's state against what the current store renders. */
+export type ExportFileState = 'match' | 'stale' | 'missing' | 'unreadable'
+
+/** What one mirror check found. */
+export interface ExportCheckResult {
+  /** Directory checked. */
+  readonly dir: string
+  /** The Markdown mirror's state. */
+  readonly markdown: ExportFileState
+  /** The JSON index's state. */
+  readonly index: ExportFileState
+}
+
+/** The message one claim is grounded in, as its identity and write-time fingerprint. */
+export interface EvidenceMessage {
+  /** The cited message's stable id. */
+  readonly id: string
+  /** SHA-256 of the message's model-visible text at write time. */
+  readonly textHash: string
+}
+
+/** What re-reading one cited source found. */
+export type EvidenceOutcome = 'intact' | 'drifted' | 'missing' | 'unavailable'
+
+/** One cited record's verification verdict. */
+export interface EvidenceVerdict {
+  /** The record checked. */
+  readonly id: string
+  /** What the re-read found. */
+  readonly outcome: EvidenceOutcome
+}
+
+/** What one evidence verification read. */
+export interface VerificationReport {
+  /** Every record citing a message, newest first, with its verdict. */
+  readonly verdicts: readonly EvidenceVerdict[]
+  /** Records citing no message; they carry nothing to verify and are counted, not listed. */
+  readonly uncited: number
+  /** Whether no session-query engine was mounted, so nothing could be re-read. */
+  readonly readerUnavailable: boolean
+}
+
+/** Two claims set side by side, with the mechanical facts and verdict. */
+export interface ComparisonReport {
+  /** One record. */
+  readonly left: MemoryRecord
+  /** The other record. */
+  readonly right: MemoryRecord
+  /** Jaccard similarity of the two claims' text, as the ranker's tokenizer sees it. */
+  readonly similarity: number
+  /** Recall tags both records carry. */
+  readonly sharedTags: readonly string[]
+  /** Direct supersede, merge, or derivation link between the two, named from the left side, or `null`. */
+  readonly relation: string | null
+  /** Mechanical verdict over the deployment's own thresholds; a reader decides what it means. */
+  readonly verdict: 'equivalent' | 'conflicting' | 'complementary' | 'unrelated'
 }
 
 /** What one consolidation pass found and, when committed, what it changed. */
@@ -285,6 +364,32 @@ export interface ImportReport {
   readonly created: readonly string[]
   /** Claims dropped as already known, or as unreadable. */
   readonly skipped: number
+}
+
+/** One session a bootstrap pass selected. */
+export interface BootstrapSessionPlan {
+  /** The session id. */
+  readonly sessionId: string
+  /** Model-visible messages on the session's current surface, or `null` when not read. */
+  readonly messageCount: number | null
+}
+
+/** What one bootstrap invocation selected and, when applied, wrote. */
+export interface BootstrapReport {
+  /** Whether the pass called the model and wrote. A dry run reports the same plan and writes nothing. */
+  readonly applied: boolean
+  /** The sessions this working directory contributed, newest first. */
+  readonly sessions: readonly BootstrapSessionPlan[]
+  /** Sessions a completed pass already processed, which apply skips. */
+  readonly processedCount: number
+  /** The provider route the assisted calls take. */
+  readonly target: AssistedTarget
+  /** Claims this pass stored. */
+  readonly created: readonly string[]
+  /** Candidate claims dropped because the corpus already held them. */
+  readonly skipped: number
+  /** Sessions that could not be read or distilled. */
+  readonly failed: number
 }
 
 /** The caller's admission context, derived from the immutable agent and session. */
@@ -411,6 +516,31 @@ export interface PrismMemoryConfig {
   importStatus: Volatile<AdmissionStatus>
   /** Confidence an imported claim is written with. */
   importConfidence: Volatile<number>
+
+  // --- Model-assisted distillation -----------------------------------------
+
+  /** Let a model read recent turns and propose durable claims, on a window. */
+  assistedDistill: Volatile<boolean>
+  /** Turns that close before another assisted window fires. */
+  assistedDistillEveryTurns: Volatile<number>
+  /** Turns the rolling buffer keeps for the next assisted window. */
+  assistedDistillBufferTurns: Volatile<number>
+  /** Candidates one assisted window may write. */
+  assistedDistillLimit: Volatile<number>
+  /** Confidence an assisted claim is written with. */
+  assistedDistillConfidence: Volatile<number>
+  /** Provider route an assisted call takes; must be set with `assistedDistillModel`. */
+  assistedDistillProvider: Volatile<string>
+  /** Model id an assisted call takes; must be set with `assistedDistillProvider`. */
+  assistedDistillModel: Volatile<string>
+  /** Sessions one `/memory bootstrap apply` may read. */
+  bootstrapMaxSessions: Volatile<number>
+  /** Candidates one bootstrapped session may contribute. */
+  bootstrapClaimsPerSession: Volatile<number>
+  /** Dialogue characters one bootstrapped session contributes to its prompt. */
+  bootstrapMaxChars: Volatile<number>
+  /** Token cap one assisted model call may spend. */
+  assistedDistillMaxTokens: Volatile<number>
 }
 
 /** Convert a day count to an absolute deadline, or `null` for "never". */
@@ -462,6 +592,126 @@ async function writeAtomically(path: string, content: string): Promise<void> {
   await rename(temporary, path)
 }
 
+/**
+ * The direct derivation or replacement link between two records, named from the
+ * compare report's left side, or `null` when none exists.
+ * @param left - one record of the comparison.
+ * @param right - the other record.
+ * @returns the link, or `null`.
+ */
+function relationBetween(left: MemoryRecord, right: MemoryRecord): string | null {
+  if (left.supersedes === right.id) return 'left supersedes right'
+  if (right.supersedes === left.id) return 'right supersedes left'
+  if (left.mergedInto === right.id) return 'left was merged into right'
+  if (right.mergedInto === left.id) return 'right was merged into left'
+  if ((left.parents ?? []).includes(right.id)) return 'left derives from right'
+  if ((right.parents ?? []).includes(left.id)) return 'right derives from left'
+  return null
+}
+
+/**
+ * The model-visible text of every message on one session's current surface, by
+ * message id. A read failure resolves to `undefined`, which the verifier
+ * reports as `unavailable` rather than guessing at the cause.
+ * @param reader - the session-query engine.
+ * @param sessionId - the stored session id, which names a session by construction.
+ * @returns message id → its text blocks joined, or `undefined` when the session could not be read.
+ */
+async function readSurfaceTexts(
+  reader: SessionQueryEngine,
+  sessionId: string,
+): Promise<Map<string, string> | undefined> {
+  let snapshot: SessionSurfaceSnapshot
+  try {
+    // Stored as plain text; the id space is the session id space by construction.
+    snapshot = await reader.readSurface(sessionId as SessionId)
+  } catch {
+    // Unknown session, unparsable log, or backend failure: the cited records
+    // are unverifiable, and no outcome in between is knowable here.
+    return undefined
+  }
+  const texts = new Map<string, string>()
+  for (const event of snapshot.events) {
+    const message = 'message' in event.data ? event.data.message : event.data
+    texts.set(message.id, messageText(message))
+  }
+  return texts
+}
+
+/**
+ * The model-visible user and assistant messages of one session's current
+ * surface, oldest first. A read failure resolves to `undefined`, the same
+ * `unavailable` stance the verifier takes.
+ * @param reader - the session-query engine.
+ * @param sessionId - the session id to read, which names a session by construction.
+ * @returns one entry per non-empty dialogue message, or `undefined` when the session could not be read.
+ */
+async function readSurfaceDialogue(
+  reader: SessionQueryEngine,
+  sessionId: string,
+): Promise<AssistedMessage[] | undefined> {
+  let snapshot: SessionSurfaceSnapshot
+  try {
+    snapshot = await reader.readSurface(sessionId as SessionId)
+  } catch {
+    // Unknown session, unparsable log, or backend failure: the session
+    // contributes nothing, and no outcome in between is knowable here.
+    return undefined
+  }
+  const dialogue: AssistedMessage[] = []
+  for (const event of snapshot.events) {
+    const message = 'message' in event.data ? event.data.message : event.data
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+    const text = messageText(message)
+    if (text.trim() === '') continue
+    dialogue.push({ role: message.role, text, id: message.id })
+  }
+  return dialogue
+}
+
+/**
+ * Bound one dialogue to its character budget, keeping the newest messages: the
+ * end of a session is where its conclusions live.
+ * @param dialogue - the dialogue, oldest first.
+ * @param maxChars - the total text budget.
+ * @returns the longest newest-first suffix that fits the budget.
+ */
+function boundDialogue(dialogue: readonly AssistedMessage[], maxChars: number): AssistedMessage[] {
+  const bounded: AssistedMessage[] = []
+  let total = 0
+  for (let index = dialogue.length - 1; index >= 0; index -= 1) {
+    const message = dialogue[index]
+    if (message === undefined) continue
+    total += message.text.length
+    if (total > maxChars) break
+    bounded.unshift(message)
+  }
+  return bounded
+}
+
+/**
+ * Classify one mirrored file against the bytes the current store renders.
+ * @param path - the file to read.
+ * @param expected - the expected bytes.
+ * @returns the file's state.
+ */
+async function mirroredFileState(path: string, expected: string): Promise<ExportFileState> {
+  try {
+    await stat(path)
+  } catch {
+    // No mirror written yet — the ordinary pre-export state.
+    return 'missing'
+  }
+  let actual: string
+  try {
+    actual = await readFile(path, 'utf8')
+  } catch {
+    // The file exists but cannot be read; report that rather than guess.
+    return 'unreadable'
+  }
+  return actual === expected ? 'match' : 'stale'
+}
+
 /** Order records newest first, ties broken by id so the order stays total. */
 function newestFirst(left: MemoryRecord, right: MemoryRecord): number {
   return right.createdAt - left.createdAt || (left.id < right.id ? -1 : 1)
@@ -475,31 +725,30 @@ function messageText(message: Message): string {
 }
 
 /**
- * The text of the turn that is closing: the person's message and everything the
- * assistant said after it.
+ * The messages of the turn that is closing, oldest first: the person's message
+ * and everything the assistant said after it.
  *
  * The walk runs backwards and stops at that message, so an earlier turn's words
  * cannot be distilled a second time, and a tool result between them is ignored —
  * a command's output is not a claim the turn made.
  * @param messages - the session's derived model-visible history.
- * @returns the turn's user text and its assistant text.
+ * @returns the turn's user message followed by its assistant messages.
  */
-function turnText(messages: readonly Message[]): { readonly user: string, readonly assistant: string } {
-  const assistant: string[] = []
-  let user = ''
+function turnMessages(messages: readonly Message[]): Message[] {
+  const turn: Message[] = []
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
     if (message === undefined) continue
     if (message.role === 'assistant') {
-      assistant.unshift(messageText(message))
+      turn.unshift(message)
       continue
     }
     if (message.role === 'user') {
-      user = messageText(message)
+      turn.unshift(message)
       break
     }
   }
-  return { user, assistant: assistant.join('\n') }
+  return turn
 }
 
 /** One record this plugin writes for itself: a journal entry, a reflection, or a digest. */
@@ -516,6 +765,8 @@ interface AutomaticRecordInput {
   readonly kind: MemoryKind
   /** Why this record exists, recorded on its evidence. */
   readonly note: string
+  /** Records this digest was derived from; absent on records that are not syntheses. */
+  readonly parents?: readonly string[]
 }
 
 /**
@@ -571,10 +822,49 @@ export class PrismMemoryService extends Service {
     importSources: z.array(z.string()).default([]).volatile(),
     importStatus: z.union([z.const('pending'), z.const('active')]).default('pending').volatile(),
     importConfidence: z.number().min(0).max(1).default(0.6).volatile(),
+    assistedDistill: z.boolean().default(false).volatile(),
+    assistedDistillEveryTurns: z.number().step(1).min(1).default(40).volatile(),
+    assistedDistillBufferTurns: z.number().step(1).min(1).default(12).volatile(),
+    assistedDistillLimit: z.number().step(1).min(1).default(3).volatile(),
+    assistedDistillConfidence: z.number().min(0).max(1).default(0.5).volatile(),
+    assistedDistillProvider: z.string().default('').volatile(),
+    assistedDistillModel: z.string().default('').volatile(),
+    bootstrapMaxSessions: z.number().step(1).min(1).default(10).volatile(),
+    bootstrapClaimsPerSession: z.number().step(1).min(1).default(3).volatile(),
+    bootstrapMaxChars: z.number().step(1).min(1).default(24_000).volatile(),
+    assistedDistillMaxTokens: z.number().step(1).min(1).default(1024).volatile(),
   })
 
   /** The durable record table; assigned by {@link PrismMemoryService.init}. */
   private records!: KvTable<string, MemoryRecord>
+
+  /**
+   * The session-query engine, bound for `/memory verify` while the composition
+   * mounts one. It is optional on purpose: a composition without it keeps every
+   * other memory path, and verification reports its cited sources as
+   * `unavailable` instead of failing the row.
+   */
+  private sessionReader: SessionQueryEngine | undefined
+
+  /** The binding fiber for {@link PrismMemoryService.sessionReader}, disposed with the service. */
+  private sessionReaderFiber: Fiber | undefined
+
+  /**
+   * The LLM runtime, bound for the assisted distillation paths while the
+   * composition mounts one. Optional for the same reason the session reader
+   * is: a composition without it keeps every other memory path, and the
+   * assisted producer simply never fires.
+   */
+  private llmRuntime: LlmRuntime | undefined
+
+  /** The binding fiber for {@link PrismMemoryService.llmRuntime}, disposed with the service. */
+  private llmFiber: Fiber | undefined
+
+  /** Turns closed since the last assisted window fired; memory-only, by design. */
+  private assistedTurnCount = 0
+
+  /** The closing turns the next assisted window reads, oldest first; memory-only, by design. */
+  private readonly assistedBuffer: AssistedMessage[][] = []
 
   /** Validated deployment configuration, read through each field's `get()`. */
   private readonly config: PrismMemoryConfig
@@ -617,6 +907,27 @@ export class PrismMemoryService extends Service {
         return { injected: [...merged].slice(-MAX_TRACKED_INJECTIONS) }
       },
     })
+
+    // The optional read path behind `/memory verify`, bound the way an optional
+    // service is bound anywhere else: a fiber that re-resolves when the service
+    // appears and clears the field when it goes.
+    this.sessionReaderFiber = this.ctx.inject(['sessionQuery'], childCtx => {
+      const reader = childCtx.sessionQuery
+      this.sessionReader = reader
+      childCtx.effect(() => () => {
+        if (this.sessionReader === reader) this.sessionReader = undefined
+      }, 'prismMemory.sessionReaderRelease')
+    })
+    this.ctx.effect(() => () => this.sessionReaderFiber?.dispose(), 'prismMemory.sessionReaderBinding')
+
+    this.llmFiber = this.ctx.inject(['llm'], childCtx => {
+      const llm = childCtx.llm
+      this.llmRuntime = llm
+      childCtx.effect(() => () => {
+        if (this.llmRuntime === llm) this.llmRuntime = undefined
+      }, 'prismMemory.llmRelease')
+    })
+    this.ctx.effect(() => () => this.llmFiber?.dispose(), 'prismMemory.llmBinding')
 
     this.ctx.on('agent/turn-stopping', async ({ agent, signal }): Promise<void> => {
       if (signal.aborted) return
@@ -954,7 +1265,8 @@ export class PrismMemoryService extends Service {
       supersededBy: null,
       evidence: {
         sessionId: agent?.session.id ?? null,
-        messageId: null,
+        messageId: input.evidenceMessage?.id ?? null,
+        textHash: input.evidenceMessage?.textHash ?? null,
         note: input.evidenceNote ?? null,
       },
       hits: 0,
@@ -1290,9 +1602,13 @@ export class PrismMemoryService extends Service {
 
     const corpus = this.all()
     const byId = new Map(corpus.map(record => [record.id, record]))
+    const orphanedParents: string[] = []
     for (const record of corpus) {
       const successor = record.supersededBy === null ? undefined : byId.get(record.supersededBy)
       if (record.supersededBy !== null && successor === undefined) orphaned.push(record.id)
+      // Only a digest carries parents, so the link points digest → claim; an
+      // evicted claim is the one way it stops resolving.
+      if ((record.parents ?? []).some(parent => !byId.has(parent))) orphanedParents.push(record.id)
     }
 
     // Expiry first: an expired record should not be paired as a merge survivor.
@@ -1360,6 +1676,7 @@ export class PrismMemoryService extends Service {
       duplicates,
       evicted,
       orphaned,
+      orphanedParents,
       totalBefore,
       totalAfter: applied ? this.records.size : projected,
     }
@@ -1378,6 +1695,7 @@ export class PrismMemoryService extends Service {
    * @param agent - the agent whose turn is closing.
    */
   private async afterTurn(agent: Agent): Promise<void> {
+    if (this.config.assistedDistill.get()) await this.assistedDistillTurn(agent)
     if (this.config.autoDistill.get()) await this.distillTurn(agent)
     if (this.config.dreamEnabled.get() && this.dreamWindow(Date.now()) !== null) {
       await this.dream({ apply: true })
@@ -1389,19 +1707,23 @@ export class PrismMemoryService extends Service {
    *
    * Both sides are read: the person's message carries the constraints and
    * preferences they stated, and the assistant's own account carries the causes
-   * it established. A candidate an identical claim already covers is dropped
+   * it established. Each claim cites the message its sentence came from, with
+   * that message's write-time fingerprint, so a later `/memory verify` can
+   * re-read it. A candidate an identical claim already covers is dropped
    * rather than written, because the write path would only raise that record's
    * reuse count, and an automatic pass must not inflate a signal that ranking
    * reads as evidence of use.
    * @param agent - the agent whose turn is closing.
    */
   private async distillTurn(agent: Agent): Promise<void> {
-    const { user, assistant } = turnText(agent.session.deriveMessages())
     const limit = this.config.autoDistillLimit.get()
-    const candidates = [
-      ...distillCandidates(user, { limit }),
-      ...distillCandidates(assistant, { limit }),
-    ]
+    const candidates = turnMessages(agent.session.deriveMessages()).flatMap(message => {
+      const text = messageText(message)
+      return distillCandidates(text, { limit }).map(candidate => ({
+        ...candidate,
+        evidence: { id: message.id, textHash: textFingerprint(text) },
+      }))
+    })
     if (candidates.length === 0) return
     const admission = this.admission(agent)
     const now = Date.now()
@@ -1422,9 +1744,240 @@ export class PrismMemoryService extends Service {
         confidence: this.config.autoDistillConfidence.get(),
         origin: 'session',
         status: this.config.autoDistillStatus.get(),
+        evidenceMessage: candidate.evidence,
       }, agent)
       stored.push(candidate.text)
     }
+  }
+
+  /**
+   * Buffer the closing turn and fire the assisted window when it fills.
+   *
+   * The buffer and the window count are deliberately memory-only: a restart
+   * drops them and the recount starts over, which costs the turns before the
+   * next window and nothing else. The model call is an external dependency, so
+   * a failure to reach it, route it, or parse it skips this window with a log
+   * line rather than failing the turn; only a storage write failure
+   * propagates, the way every other turn-end pass fails loud on a broken store.
+   * @param agent - the agent whose turn is closing.
+   */
+  private async assistedDistillTurn(agent: Agent): Promise<void> {
+    const messages: AssistedMessage[] = turnMessages(agent.session.deriveMessages())
+      .filter((message): message is Message & { role: 'user' | 'assistant' } =>
+        message.role === 'user' || message.role === 'assistant')
+      .map(message => ({ role: message.role, text: messageText(message), id: message.id }))
+    if (messages.length > 0) this.assistedBuffer.push(messages)
+    const bufferTurns = this.config.assistedDistillBufferTurns.get()
+    if (this.assistedBuffer.length > bufferTurns) {
+      this.assistedBuffer.splice(0, this.assistedBuffer.length - bufferTurns)
+    }
+    this.assistedTurnCount += 1
+    if (this.assistedTurnCount < this.config.assistedDistillEveryTurns.get()) return
+    this.assistedTurnCount = 0
+    const llm = this.llmRuntime
+    const dialogue = this.assistedBuffer.flat()
+    if (llm === undefined || dialogue.length === 0) return
+    const target = this.assistedTarget(agent)
+    if (target === undefined) {
+      this.ctx.logger.warn('prism-memory: assisted distillation skipped this window, no provider/model to route through')
+      return
+    }
+    const limit = this.config.assistedDistillLimit.get()
+    let raw: string
+    try {
+      raw = await runAssistedCall(llm, target, renderAssistedPrompt(dialogue, limit), this.config.assistedDistillMaxTokens.get())
+    } catch (error) {
+      this.ctx.logger.warn('prism-memory: assisted distillation call failed; skipping this window')
+      this.ctx.logger.warn(error)
+      return
+    }
+    const candidates = parseAssistedOutput(raw, limit)
+    if (candidates.length === 0) {
+      // An unusable reply is the model's failure, not the store's; the window
+      // still happened and the next one pays for it, so it leaves a trace.
+      this.ctx.logger.warn('prism-memory: assisted distillation window produced no readable candidate')
+      return
+    }
+    const admission = this.admission(agent)
+    const now = Date.now()
+    for (const candidate of candidates) {
+      const scope: MemoryScope = candidate.layer === 'project' && admission.cwd !== null ? 'project' : 'global'
+      if (this.hasIdenticalClaim(candidate.kind, scope, candidate.text, now, MEMORY_STATUSES)) continue
+      const cited = candidate.sourceMessage !== undefined ? dialogue[candidate.sourceMessage - 1] : undefined
+      await this.remember({
+        text: candidate.text,
+        kind: candidate.kind,
+        ...candidate.layer !== undefined ? { layer: candidate.layer } : {},
+        scope,
+        confidence: this.config.assistedDistillConfidence.get(),
+        origin: 'session',
+        status: 'pending',
+        evidenceNote: 'assisted',
+        ...cited !== undefined
+          ? { evidenceMessage: { id: cited.id, textHash: textFingerprint(cited.text) } }
+          : {},
+      }, agent)
+    }
+  }
+
+  /**
+   * Resolve the provider route one assisted call takes.
+   * @param agent - the calling agent, whose routed model is the fallback.
+   * @returns the route, or `undefined` when configuration and routing both name none.
+   */
+  private assistedTarget(agent: Agent | undefined): AssistedTarget | undefined {
+    const provider = this.config.assistedDistillProvider.get()
+    const model = this.config.assistedDistillModel.get()
+    if (provider !== '' && model !== '') return { provider, model }
+    const routed = agent?.session.requestHeader()?.config
+    if (routed?.provider !== undefined && routed.provider !== ''
+      && routed.model !== undefined && routed.model !== '') {
+      return { provider: routed.provider, model: routed.model }
+    }
+    if (agent?.options.provider !== undefined && agent.options.provider !== ''
+      && agent.options.model !== undefined && agent.options.model !== '') {
+      return { provider: agent.options.provider, model: agent.options.model }
+    }
+    return undefined
+  }
+
+  /**
+   * Distill durable claims out of past sessions of this working directory.
+   *
+   * A dry run selects sessions and resolves the route without calling the
+   * model; `apply` distills each selected session through one assisted call
+   * and writes the candidates `pending` into project scope. Both fail loud
+   * when a dependency is missing: this is an operator-invoked path, so the
+   * earliest resolvable point is here.
+   * @param options - whether to apply, an optional session-count cap, and the invoking agent.
+   * @returns the plan, and the write counts when applied.
+   */
+  async bootstrap(options: {
+    readonly apply?: boolean
+    readonly limit?: number
+    readonly agent: Agent | undefined
+  }): Promise<BootstrapReport> {
+    const reader = this.sessionReader
+    const llm = this.llmRuntime
+    if (reader === undefined || llm === undefined) {
+      throw new PrismMemoryError(
+        'bootstrap needs a session-query engine and an llm service;'
+        + ' mount @deepseek-ai/dsh-session-query and an llm adapter to use it',
+        'PRISM_MEMORY_BOOTSTRAP_UNAVAILABLE',
+      )
+    }
+    const agent = options.agent
+    const cwd = agent?.session.header.cwd ?? null
+    if (agent === undefined || cwd === null) {
+      throw new PrismMemoryError(
+        'bootstrap needs a calling session with a working directory to fix the project scope',
+        'PRISM_MEMORY_BOOTSTRAP_UNAVAILABLE',
+      )
+    }
+    const target = this.assistedTarget(agent)
+    if (target === undefined) {
+      throw new PrismMemoryError(
+        'bootstrap has no provider/model: set assistedDistillProvider and assistedDistillModel, or route one request',
+        'PRISM_MEMORY_BOOTSTRAP_UNAVAILABLE',
+      )
+    }
+    const processed = new Set(this.bootstrappedSessions())
+    const cap = Math.min(options.limit ?? this.config.bootstrapMaxSessions.get(), this.config.bootstrapMaxSessions.get())
+    const sessionId = agent.session.id
+    const sessions: BootstrapSessionPlan[] = []
+    let processedCount = 0
+    for (const record of (await reader.listSessions()).sort((left, right) => right.header.createdAt - left.header.createdAt)) {
+      const isProcessed = processed.has(record.header.id)
+      if (isProcessed) {
+        processedCount += 1
+        continue
+      }
+      // The calling session distills itself turn by turn; bootstrap is for the
+      // sessions that closed before this one opened.
+      if (record.header.id === sessionId) continue
+      if (record.header.cwd !== cwd) continue
+      if (sessions.length >= cap) break
+      let messageCount: number | null = null
+      try {
+        messageCount = (await reader.readSurface(record.header.id)).events.length
+      } catch {
+        // An unreadable surface still belongs in the plan; apply reports it as failed.
+      }
+      sessions.push({ sessionId: record.header.id, messageCount })
+    }
+    const applied = options.apply ?? false
+    if (!applied) {
+      return { applied, sessions, processedCount, target, created: [], skipped: 0, failed: 0 }
+    }
+
+    const claimsPerSession = this.config.bootstrapClaimsPerSession.get()
+    const maxChars = this.config.bootstrapMaxChars.get()
+    const now = Date.now()
+    const created: string[] = []
+    const handled: string[] = []
+    let skipped = 0
+    let failed = 0
+    for (const session of sessions) {
+      const dialogue = await readSurfaceDialogue(reader, session.sessionId)
+      if (dialogue === undefined || dialogue.length === 0) {
+        failed += 1
+        continue
+      }
+      const bounded = boundDialogue(dialogue, maxChars)
+      let raw: string
+      try {
+        raw = await runAssistedCall(llm, target, renderAssistedPrompt(bounded, claimsPerSession), this.config.assistedDistillMaxTokens.get())
+      } catch (error) {
+        this.ctx.logger.warn(`prism-memory: bootstrap call failed for ${session.sessionId}; skipping it`)
+        this.ctx.logger.warn(error)
+        failed += 1
+        continue
+      }
+      for (const candidate of parseAssistedOutput(raw, claimsPerSession)) {
+        if (this.hasIdenticalClaim(candidate.kind, 'project', candidate.text, Date.now(), MEMORY_STATUSES)) {
+          skipped += 1
+          continue
+        }
+        const cited = candidate.sourceMessage !== undefined ? bounded[candidate.sourceMessage - 1] : undefined
+        const result = await this.remember({
+          text: candidate.text,
+          kind: candidate.kind,
+          ...candidate.layer !== undefined ? { layer: candidate.layer } : {},
+          scope: 'project',
+          confidence: this.config.assistedDistillConfidence.get(),
+          origin: 'session',
+          status: 'pending',
+          evidenceNote: 'bootstrap',
+          ...cited !== undefined
+            ? { evidenceMessage: { id: cited.id, textHash: textFingerprint(cited.text) } }
+            : {},
+        }, agent)
+        created.push(result.record.id)
+      }
+      handled.push(session.sessionId)
+    }
+    if (handled.length > 0) {
+      await this.putAutomatic({
+        text: `bootstrap pass processed ${handled.length} session(s): ${handled.join(', ')}`,
+        tags: [BOOTSTRAP_TAG],
+        status: 'archived',
+        layer: 'topic',
+        kind: 'fact',
+        note: 'bootstrap pass',
+      }, now)
+    }
+    return { applied, sessions, processedCount, target, created, skipped, failed }
+  }
+
+  /** Every session id a completed bootstrap apply recorded, read back from its self-records. */
+  private bootstrappedSessions(): string[] {
+    const ids: string[] = []
+    for (const record of this.all()) {
+      if (!record.tags.includes(BOOTSTRAP_TAG)) continue
+      const listed = record.text.slice(record.text.indexOf(': ') + 2)
+      for (const id of listed.split(', ')) if (id !== '') ids.push(id)
+    }
+    return ids
   }
 
   /**
@@ -1561,6 +2114,7 @@ export class PrismMemoryService extends Service {
         layer: 'topic',
         kind: 'fact',
         note: `topic digest over ${topic.memberIds.join(', ')}`,
+        parents: topic.memberIds,
       }, now)
     }
     const journal = window?.triggered === true || plan.corroborated.length > 0
@@ -1623,6 +2177,7 @@ export class PrismMemoryService extends Service {
       expiresAt: null,
       dueAt: null,
       origin: 'operator',
+      ...(input.parents === undefined ? {} : { parents: [...input.parents] }),
     }
     await this.records.put(record.id, record)
     return record
@@ -1630,13 +2185,17 @@ export class PrismMemoryService extends Service {
 
   /**
    * The consolidation journal: what each pass concluded, and the daily accounts.
+   * A bootstrap pass's self-record reads here too, so an operator can see which
+   * sessions a completed apply already processed.
    * @param agent - The calling agent, when the caller is model-facing.
    * @param limit - Maximum entries, newest first.
    * @returns the journal entries.
    */
   journal(agent: Agent | undefined, limit = 20): MemoryRecord[] {
     return this.visible(agent)
-      .filter(record => record.tags.includes(DREAM_TAG) || record.tags.includes(REFLECTION_TAG))
+      .filter(record => record.tags.includes(DREAM_TAG)
+        || record.tags.includes(REFLECTION_TAG)
+        || record.tags.includes(BOOTSTRAP_TAG))
       .sort((left, right) => right.createdAt - left.createdAt || (left.id < right.id ? -1 : 1))
       .slice(0, limit)
   }
@@ -1736,6 +2295,134 @@ export class PrismMemoryService extends Service {
     return renderConversations(this.conversations(agent, { limit }))
   }
 
+  /**
+   * The evidence anchor for a write made from this agent: the user message the
+   * claim is being recorded while answering, with its write-time fingerprint.
+   * @param agent - The calling agent, when the caller is model-facing.
+   * @returns the anchor, or `null` when there is no user message to cite.
+   */
+  evidenceAnchor(agent: Agent | undefined): EvidenceMessage | null {
+    if (agent === undefined) return null
+    const messages = agent.session.deriveMessages()
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message === undefined || message.role !== 'user') continue
+      const text = messageText(message)
+      return { id: message.id, textHash: textFingerprint(text) }
+    }
+    return null
+  }
+
+  // --- Operator audits ------------------------------------------------------
+
+  /**
+   * Re-read the cited message of every record that carries one, and report
+   * whether its model-visible text still matches the write-time fingerprint.
+   *
+   * The surface is read through the session-query engine, which prefers a live
+   * session and falls back to the persisted log, so the comparison sees the same
+   * projection surface the write did. A record citing no message carries
+   * nothing to verify and is counted, not listed.
+   * @returns one verdict per citing record and the uncited count.
+   */
+  async verifyEvidence(): Promise<VerificationReport> {
+    const corpus = this.all()
+    const cited = corpus.filter(record => record.evidence.messageId !== null).sort(newestFirst)
+    const uncited = corpus.length - cited.length
+    const reader = this.sessionReader
+    if (reader === undefined) {
+      return {
+        verdicts: cited.map(record => ({ id: record.id, outcome: 'unavailable' as const })),
+        uncited,
+        readerUnavailable: true,
+      }
+    }
+    // One read per cited session: the surface map answers every record citing
+    // it. A session that could not be read is left unset, which the verdict
+    // step reports as `unavailable` rather than as a missing source.
+    const sessionIds = new Set(cited.map(record => record.evidence.sessionId)
+      .filter((sessionId): sessionId is string => sessionId !== null))
+    const surfaces = new Map<string, Map<string, string>>()
+    for (const sessionId of sessionIds) {
+      const texts = await readSurfaceTexts(reader, sessionId)
+      if (texts !== undefined) surfaces.set(sessionId, texts)
+    }
+    const verdicts = cited.map(record => {
+      const sessionId = record.evidence.sessionId
+      const messageId = record.evidence.messageId
+      const textHash = record.evidence.textHash ?? null
+      if (sessionId === null || messageId === null || textHash === null) {
+        // A cite without its session, message id, or fingerprint cannot resolve.
+        return { id: record.id, outcome: 'missing' as const }
+      }
+      const surface = surfaces.get(sessionId)
+      if (surface === undefined) return { id: record.id, outcome: 'unavailable' as const }
+      const text = surface.get(messageId)
+      if (text === undefined) return { id: record.id, outcome: 'missing' as const }
+      return {
+        id: record.id,
+        outcome: textFingerprint(text) === textHash ? ('intact' as const) : ('drifted' as const),
+      }
+    })
+    return { verdicts, uncited, readerUnavailable: false }
+  }
+
+  /**
+   * Set two claims side by side for a person, with the mechanical facts and a
+   * mechanical verdict over the deployment's own thresholds. The verdict is
+   * vocabulary, not a decision: equivalent claims keep both identities and
+   * sources, complementary claims leave any ordering to the reader, and
+   * conflicting claims are preserved with their conditions — nothing here
+   * merges, retires, or rewrites either record.
+   * @param idA - One record's id.
+   * @param idB - The other record's id.
+   * @returns both records, their similarity, and the verdict.
+   */
+  operatorCompare(idA: string, idB: string): ComparisonReport {
+    if (idA === idB) {
+      throw new PrismMemoryError('comparing a record with itself says nothing', 'PRISM_MEMORY_COMPARE_SAME')
+    }
+    const left = this.records.get(idA)
+    if (left === undefined) throw new PrismMemoryError(`unknown memory id: ${idA}`, 'PRISM_MEMORY_NOT_FOUND')
+    const right = this.records.get(idB)
+    if (right === undefined) throw new PrismMemoryError(`unknown memory id: ${idB}`, 'PRISM_MEMORY_NOT_FOUND')
+    const similarity = jaccard(tokenize(left.text), tokenize(right.text))
+    const sharedTags = left.tags.filter(tag => right.tags.includes(tag))
+    const equivalentFloor = this.config.dedupeJaccard.get()
+    const conflictFloor = this.config.dreamConflictFloor.get()
+    const verdict = similarity >= equivalentFloor
+      ? 'equivalent'
+      : sharedTags.length > 0 && similarity >= conflictFloor
+        ? 'conflicting'
+        : sharedTags.length > 0 ? 'complementary' : 'unrelated'
+    return { left, right, similarity, sharedTags, verdict, relation: relationBetween(left, right) }
+  }
+
+  /**
+   * Compare an existing mirror against what the current store would render,
+   * without writing. Both files are compared byte for byte, which is exact: any
+   * store change since the last export reads as stale.
+   * @param options - Target directory; defaults to the configured export directory.
+   * @returns each mirrored file's state.
+   */
+  async checkExport(options: { readonly dir?: string } = {}): Promise<ExportCheckResult> {
+    const dir = options.dir ?? this.config.exportDir.get()
+    if (dir === undefined || dir.trim() === '') {
+      throw new PrismMemoryError(
+        'no export directory: pass one to /memory export check, or set exportDir on the prism-memory row',
+        'PRISM_MEMORY_NO_EXPORT_DIR',
+      )
+    }
+    const rendered = renderExport(this.all(), {})
+    const markdownPath = join(dir, EXPORT_MARKDOWN_FILE)
+    const indexPath = join(dir, EXPORT_INDEX_FILE)
+    const [markdown, index] = await Promise.all([
+      mirroredFileState(markdownPath, rendered.markdown),
+      mirroredFileState(indexPath, rendered.index),
+    ])
+    return { dir, markdown, index }
+  }
+
   /** Resolve one id the caller may act on, returning the record or failing with the reason it cannot. */
   private require(id: string, agent: Agent | undefined): MemoryRecord {
     return this.requireIn(id, this.admission(agent))
@@ -1780,6 +2467,13 @@ function assertBounds(config: PrismMemoryConfig): void {
         `prism-memory importSources names an unknown source: ${id} (known: ${IMPORT_SOURCE_IDS.join(', ')})`,
       )
     }
+  }
+  const assistedProvider = config.assistedDistillProvider.get()
+  const assistedModel = config.assistedDistillModel.get()
+  if ((assistedProvider === '') !== (assistedModel === '')) {
+    throw new Error(
+      'prism-memory assistedDistillProvider and assistedDistillModel must be set together, or both left empty',
+    )
   }
 }
 
