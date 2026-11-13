@@ -57,9 +57,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .tool:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .body {
@@ -97,8 +99,10 @@
   border-radius: var(--dsw-radius-sm);
 }
 
+@media (hover: hover) {
 .row:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .rowHead {

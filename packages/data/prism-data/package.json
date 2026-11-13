@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-data",
   "description": "Data settings page: the harness home, relocating it to another directory, and the tabs that host backup and import/export",
-  "version": "0.2.1-rc.4",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },

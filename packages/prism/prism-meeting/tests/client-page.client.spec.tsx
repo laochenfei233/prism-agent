@@ -131,6 +131,7 @@ function standardSeats() {
     useRemoteAccess: unused,
     useSessionAccess: unused,
     useWorkspaceAccess: unused,
+    useContextMenu: unused,
   }
 }
 

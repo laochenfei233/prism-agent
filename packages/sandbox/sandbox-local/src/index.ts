@@ -40,7 +40,7 @@ import {
 } from '@deepseek-ai/node-addon-system/landlock-run'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { SandboxProvider, SandboxUnavailableError, canonicalPath } from '@deepseek-ai/dsh-sandbox'
+import { SandboxProvider, SandboxUnavailableError, SandboxUnsupportedPolicyError, canonicalPath } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, ConfinedSandboxMode, RunnerFailureRule, SandboxEnforcement, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { assertTempRootOutsideWorkspace, registerAclDiagnosisSkill, tempWriteSid, workspaceWriteSid } from '@deepseek-ai/dsh-sandbox-windows-acl'
@@ -434,6 +434,9 @@ export class LocalSandboxProvider extends SandboxProvider {
    * @returns the runner invocation.
    */
   private async windowsAclRunnerArgv(policy: SandboxPolicy, signal?: AbortSignal): Promise<string[]> {
+    if (policy.mode === 'workspace-write' && (policy.additionalWritableRoots?.length ?? 0) > 0) {
+      throw new SandboxUnsupportedPolicyError('Windows ACL confinement does not support additional writable directories; remove the extra grants or use a supported host')
+    }
     const sessionId = policy.sessionId
     if (sessionId === undefined || policy.mode === 'read-only') {
       // The standalone runner manages its own DACLs, so the home denial travels

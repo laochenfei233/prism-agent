@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { allowAllAccess, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { allowAllAccess, bindSnapshotSelector, contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
 import type { CustomThemeInputs, CustomThemePreset } from '../src/theme-settings.ts'
 import { AppearanceSection } from '../src/client/AppearanceSection.tsx'
 import type { AppearanceSectionComponentProps } from '../src/client/AppearanceSection.tsx'
@@ -86,6 +86,7 @@ function mount(preference: ThemePreference = 'system', custom: CustomThemeInputs
     useSessionStatus,
     usePanelInfo, useResource, useSessionRetainInfo: () => undefined,
     useWorkspaces: emptyWorkspaces(),
+    useContextMenu: contextMenuHook(),
     ...allowAllAccess,
     useStore: bindSnapshotSelector(store),
     actions: store.actions,

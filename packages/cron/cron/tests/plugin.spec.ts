@@ -6,6 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import TimerService from '@deepseek-ai/cordis-plugin-timer'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import Storage from '@deepseek-ai/dsh-storage'
 import {
   apply as storageJsonApply, Config as storageJsonConfig, inject as storageJsonInject, name as storageJsonName,
@@ -47,6 +48,7 @@ async function backend(root: string): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(TimerService)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(Storage)
   await ctx.plugin({ name: storageJsonName, inject: storageJsonInject, apply: storageJsonApply, Config: storageJsonConfig }, { root })

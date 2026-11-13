@@ -30,6 +30,11 @@ function anyStore(): CronStore {
     size: 0,
     put: async (key, value) => { rows.set(key, value) },
     delete: async key => rows.delete(key),
+    deleteMany: async keys => {
+      let removed = 0
+      for (const key of keys) if (rows.delete(key)) removed += 1
+      return removed
+    },
     update: async (key, change) => {
       const current = rows.get(key)
       if (current === undefined) throw new Error('missing row')

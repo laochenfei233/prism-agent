@@ -24,8 +24,10 @@ import type { AppearanceSectionInjected } from './AppearanceSection.tsx'
 import { AppearanceSection } from './AppearanceSection.tsx'
 import { projectThemeGallery } from './gallery.ts'
 import { createAppearanceSectionStore } from './settings-store.ts'
+import { ICON_SYMBOLS, type IconSymbolId } from '@deepseek-ai/dsh-client-ui-primitives'
+import { installIconSprite, type IconReplacements } from './icon-sprite.ts'
 import { installThemeStyles } from './styles.ts'
-import { en, zh, type ThemeKey } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh, type ThemeKey } from './locales.ts'
 import { BUILTIN_THEMES } from '../builtin-themes.ts'
 import {
   CUSTOM_ACCENT_FIELD, CUSTOM_CANVAS_FIELD, CUSTOM_PRESETS_FIELD, CUSTOM_PRESET_NAME_MAX, CUSTOM_PRESETS_MAX,
@@ -34,8 +36,8 @@ import {
   DEFAULT_FONT_SIZES, DEFAULT_PREFERENCE, FONT_FAMILY_FIELDS, FONT_ROLES, FONT_SIZE_SPECS,
   fontFamilyVariable, isFontSize, isHexColor, isThemePreference, normalizeFontFamily, normalizeHexColor,
   sectionFontSizes, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type CustomThemeInputs, type CustomThemePreset, type FontFamilies, type FontRole, type FontSizes, type ThemeDefinition,
-  type ThemePreference, type ThemeSettings, type ThemeTokenModes, type ThemeTokenOverrides, type ThemeTokens,
+  type CustomThemeInputs, type CustomThemePreset, type FontFamilies, type FontRole, type FontSizes,
+  type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 import { synthesizeCustomTheme } from '../custom-theme.ts'
 
@@ -47,8 +49,8 @@ export type { AppearanceSectionState } from './settings-store.ts'
 export type { ThemeGalleryEntry } from './gallery.ts'
 export type { ThemeKey } from './locales.ts'
 export type {
-  BuiltinThemeId, CustomThemeInputs, CustomThemePreset, ThemeColorScheme, ThemeDefinition, FontFamilies, FontRole, FontSizes,
-  ThemePreference, ThemeSettings, ThemeTokenModes, ThemeTokenOverrides, ThemeTokens,
+  BuiltinThemeId, CustomThemeInputs, CustomThemePreset, ThemeColorScheme, FontFamilies, FontRole, FontSizes,
+  ThemePreference, ThemeSettings,
 } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
@@ -59,6 +61,51 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** The Appearance settings row's copy. */
     'settings.theme': ThemeKey
   }
+}
+
+/** Theme token dictionary: --dsw-alias-* overrides keyed by variable name. */
+export type ThemeTokens = Record<string, string>
+
+/**
+ * One override-layer token value: both palette modes are mandatory (repeat
+ * the same value when the token is scheme-invariant) so an override never
+ * goes illegible when the user switches to the other scheme.
+ */
+export interface ThemeTokenModes {
+  /** Value applied while the light base palette is active. */
+  light: string
+  /** Value applied while the dark base palette is active. */
+  dark: string
+}
+
+/** Override-layer dictionary: token names to per-mode value pairs. */
+export type ThemeTokenOverrides = Record<string, ThemeTokenModes>
+
+/** One selectable theme: id, dark/light semantics, and alias-token overrides. */
+export interface ThemeDefinition {
+  /** Theme id (the setTheme argument for concrete themes). */
+  id: string
+  /**
+   * Which base palette this theme builds on. The presenter switches
+   * `body[data-ds-dark-theme]` from this field — never from the id.
+   */
+  colorScheme: 'light' | 'dark'
+  /** Alias-layer overrides applied as inline CSS variables over the base palette. */
+  tokens: ThemeTokens
+  /**
+   * Product icon replacements: ui-primitives `ICON_SYMBOLS` ids to complete
+   * SVG documents, trusted like the registering plugin's code. The icon
+   * sprite renders each replacement as that id's `<symbol>`: the root's
+   * `viewBox` and presentation attributes carry over, its `width`, `height`,
+   * `class`, and `aria-hidden` are ignored because the use site sizes the
+   * icon, and painted elements inherit `currentColor` and CSS variables from
+   * the use site. Gradients and other paint servers resolve their stops in
+   * the sprite, which sits in `body`, so they follow palette tokens but not
+   * use-site overrides. Each document needs an SVG-namespace root with a
+   * `viewBox`, no `<style>` or `<script>` (they would apply to the whole
+   * document), and element ids prefixed with `<symbol id>-`.
+   */
+  icons?: IconReplacements | undefined
 }
 
 /** Immutable theme state published on every change. */
@@ -399,7 +446,9 @@ export class ThemeRuntime {
   /**
    * Register a theme. Duplicate id throws (single occupant per id; the
    * built-in pair counts; `system` is a preference, not a registrable id).
-   * @param definition - theme id, colorScheme, and alias-token overrides.
+   * @param definition - theme id, colorScheme, alias-token overrides, and
+   * optional icon replacements; the runtime keeps a frozen copy of `icons`.
+   * Invalid icon replacements throw a `TypeError` naming the theme and icon.
    * @returns disposer. Disposing the theme backing the active preference
    * resets the preference to the default so the UI never keeps tokens of an
    * unregistered theme.
@@ -409,7 +458,8 @@ export class ThemeRuntime {
     if (this.themes.some(t => t.id === definition.id)) {
       throw new Error(`theme "${definition.id}" is already registered`)
     }
-    this.themes = [...this.themes, definition]
+    const icons = validateIcons(definition)
+    this.themes = [...this.themes, Object.freeze({ ...definition, icons })]
     this.publish()
     return () => {
       if (!this.themes.some(t => t.id === definition.id)) return
@@ -607,6 +657,38 @@ function presetEqual(left: CustomThemePreset, right: CustomThemePreset): boolean
   return validated
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+/**
+ * Reject icon replacements a sprite cannot render (untyped dynamic-package
+ * callers reach this boundary, as with {@link validateOverrides}): unknown
+ * symbol ids, documents without an SVG-namespace `<svg viewBox>` root,
+ * document-wide `<style>` or `<script>`, and element ids outside the
+ * symbol's own `<symbol id>-` namespace.
+ * @returns a frozen copy of the replacements, or undefined when there are none.
+ */
+function validateIcons({ id, icons }: ThemeDefinition): IconReplacements | undefined {
+  // Untyped callers may pass null; treat it like an absent field.
+  if (icons == null) return undefined
+  const copy: Partial<Record<IconSymbolId, string>> = {}
+  for (const [name, markup] of Object.entries<unknown>(icons)) {
+    const fail = (problem: string): never => { throw new TypeError(`theme "${id}" icon "${name}" ${problem}`) }
+    if (!Object.hasOwn(ICON_SYMBOLS, name)) fail('is not an ICON_SYMBOLS id')
+    if (typeof markup !== 'string') fail('must be an SVG document string')
+    copy[name as IconSymbolId] = markup as string
+    /* v8 ignore next -- needs a documentless run (node e2e booting the client tree), where no sprite renders either */
+    if (typeof DOMParser === 'undefined') continue
+    const root = new DOMParser().parseFromString(markup as string, 'image/svg+xml').documentElement
+    if (root.namespaceURI !== SVG_NS || root.localName !== 'svg' || root.querySelector('parsererror') !== null) fail('is not a well-formed SVG-namespace <svg> document')
+    if (!root.hasAttribute('viewBox')) fail('needs a viewBox')
+    if (root.querySelector('style, script') !== null) fail('must not contain <style> or <script>')
+    for (const element of root.querySelectorAll('[id]')) {
+      if (!element.id.startsWith(`${name}-`)) fail(`element id "${element.id}" must start with "${name}-"`)
+    }
+  }
+  return Object.freeze(copy)
+}
+
 function dynamicToken(name: string): ThemeTokenInspection {
   return {
     name,
@@ -666,10 +748,11 @@ export const inject = ['slots', 'locale', 'remote', 'configForms']
  */
 export function apply(ctx: ClientContext): void {
   installThemeStyles(ctx)
-  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings dictionaries')
+  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-theme: settings dictionaries')
   const host = ctx.configForms.get<ThemeSettings>(THEME_SETTINGS_NAMESPACE)
   const theme = new ThemeRuntime(ctx, host)
   ctx.provide('theme', theme)
+  installIconSprite(ctx, theme.getTheme().active.icons)
   const t = ctx.locale.bind(SETTINGS_NS)
 
   const store = createAppearanceSectionStore()

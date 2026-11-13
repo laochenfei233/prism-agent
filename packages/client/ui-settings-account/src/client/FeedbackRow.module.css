@@ -14,8 +14,10 @@
   text-decoration: none;
 }
 
+@media (hover: hover) {
 .link:hover {
-  text-decoration: underline;
+    text-decoration: underline;
+  }
 }
 
 .link:focus-visible {

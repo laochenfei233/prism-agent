@@ -62,8 +62,10 @@
   transition: border-color .16s, background .16s, opacity .16s;
 }
 
+@media (hover: hover) {
 .source:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .source:focus-visible {

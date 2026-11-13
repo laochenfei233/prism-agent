@@ -4,7 +4,9 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@prism/prism-meeting'
 import MeetingMinutesService from '@prism/prism-meeting'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import ToolMeetingMinutes from '../src/tools.ts'
 
@@ -86,6 +88,7 @@ async function setup(calls: string[] = []): Promise<Context> {
   contexts.push(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   ctx.provide('meetingMinutes', makeService(calls))
   await ctx.plugin(ToolMeetingMinutes)
   return ctx
@@ -93,7 +96,7 @@ async function setup(calls: string[] = []): Promise<Context> {
 
 
 function call(ctx: Context, name: string, args: unknown = {}) {
-  return ctx.tools.execute({
+  return executeModelToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId(`meeting-tool-${name}`),
     name,

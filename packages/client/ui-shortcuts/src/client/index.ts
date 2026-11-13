@@ -10,7 +10,7 @@ import { createShortcutsStore } from './store.ts'
 import { createCommandPaletteStore } from './palette-store.ts'
 import { ShortcutReference, ShortcutsRow } from './Reference.tsx'
 import { CommandPalette } from './CommandPalette.tsx'
-import { en, zh } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 import { fixedCommands } from './fixed.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -28,7 +28,7 @@ export const inject = ['shortcuts', 'locale', 'slots']
  * @param ctx - plugin-owned client context.
  */
 export function apply(ctx: Context): void {
-  ctx.effect(() => ctx.locale.register('shortcuts', { zh, en }), 'shortcuts: dictionaries')
+  ctx.effect(() => ctx.locale.register('shortcuts', { zh, en, ja, es, fr, de, ru, pt }), 'shortcuts: dictionaries')
   const t = ctx.locale.bind('shortcuts')
   const handle = createShortcutsStore()
   const instance = handle.create()
