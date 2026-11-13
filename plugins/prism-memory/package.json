@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-memory",
   "description": "Prism memory plugin: durable, scope-filtered, supersede-tracked long-term memory with a cache-safe tail recall block, five model-facing tools, an operator governance command with cited-source verification and claim comparison, a Web memory page, and a Markdown mirror export with an audit check",
-  "version": "0.2.2",
+  "version": "0.2.2-rc2-alpha1",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
