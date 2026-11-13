@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones.
+An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds one rail of its own that reminds instead of enforcing.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
+Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -24,6 +24,7 @@ Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the
 | Turn completion (Compose Next) | The workflow tells the model to finish its tasks and produce delivery evidence; the loop still ends the turn whenever the model stops calling tools | A turn whose own todo list still holds open items is steered to continue before it can stop |
 | Destructive commands | Nothing parses a shell command's text, and `bash` and `pwsh` are deliberately absent from the plan-mode rail for that reason; the sandbox covers file effects, not a force-push | A command matching a configured pattern goes to approval |
 | Credential reads | `read` and `grep` are read-only tools to every other rail, and a read lands in the session log permanently | A read of a configured credential path is refused |
+| Spinning on failures | Nothing watches for a turn that repeats one failing call; the model's own judgment is the only brake | A judge model confirms the run is a loop and the next result carries a reminder to change approach — the call itself is never refused |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
 
@@ -60,7 +61,7 @@ The prompt text and the workflows are maintained here rather than vendored from 
 
 ## Configuration
 
-Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission.
+Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. The one exception is the stuck nudge, which ships on because it refuses nothing and its judge is called only while failures repeat; `stuckNudgeAfterFailures: 0` turns it off.
 
 | Key | Type | Meaning | Default |
 |---|---|---|---|
@@ -80,12 +81,18 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `sensitivePaths` | non-empty array of distinct, non-blank path segments | Path segments treated as credential material | rail off |
 | `commandGuard.tools` | non-empty array of `{ tool, commandArgument }` | The tools whose call carries a command line | required by that rail |
 | `commandGuard.deny` | non-empty array of `{ pattern, reason }` | Regular expressions a command is matched against, and why an approver should care | required by that rail |
+| `stuckNudgeAfterFailures` | integer `0` or `>= 2` | Consecutive failed calls tolerated before the judge is asked whether the agent is spinning; `0` disables | `3` |
+| `stuckNudgeConfidence` | number in `(0, 1]` | Judge confidence at or above which the reminder is sent | `0.7` |
+| `stuckNudgeMaxTokens` | integer `>= 1` | Token cap one judge call may spend | `512` |
+| `stuckNudgePerTurn` | integer `>= 0` | Reminders one turn may receive; `0` disables | `1` |
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
 `readTools` works the same way: `{ tool: read, pathArgument: file_path }`, `{ tool: read_image, pathArgument: file_path }`, and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's three tools that read by path.
 
 `mode` is the only key that applies to every rail at once, and it is the only way to see a rail before arming it: under `observe` each rail decides exactly as it would under `enforce`, records the decision, and lets the call through. `/guardrails` lists what it would have stopped. A `deny` and an `ask` are both observations; a `steer` is not, because sending a turn back for evidence is a request to finish work rather than a refusal, and observing must not switch it off.
+
+The stuck nudge is the one rail that refuses nothing, so it has no `deny` to observe either: it behaves identically in both modes, and records its reminder as a `steer`. Within one turn it counts an agent's consecutive failed calls — any success clears the run, a claimed user message starts a new turn's run — and when the run reaches `stuckNudgeAfterFailures`, one one-shot call through the agent's own provider route judges whether the failures are one loop. Only a confident yes (`stuckNudgeConfidence`) attaches a reminder to the failing call's accepted result; the reminder names the run, says that retrying alone will not change it, and says plainly that stopping is the person's call. `stuckNudgePerTurn` bounds the reminders, so a model that ignores the first costs no more than one extra failure each time. The judge is an external dependency: no llm service, no routed model, or an unusable verdict means the window sends nothing, a log line records why, and the next qualifying window tries again.
 
 Load-time rejections, each with the message asserted by the test suite:
 
@@ -124,6 +131,11 @@ Load-time rejections, each with the message asserted by the test suite:
 | a command tool naming no argument | `commandGuard.tools entry "bash" must name its commandArgument` |
 | a pattern naming no reason | `commandGuard.deny entry "…" must name a reason` |
 | a pattern that does not compile | `commandGuard.deny pattern "(" is not a regular expression: …` |
+| `stuckNudgeAfterFailures` not an integer, or `< 0` | `stuckNudgeAfterFailures must be an integer >= 0` |
+| `stuckNudgeAfterFailures: 1` | `stuckNudgeAfterFailures must be 0 (off) or >= 2 — one failure is not stuck` |
+| `stuckNudgeConfidence` not a number in `(0, 1]` | `stuckNudgeConfidence must be a number in (0, 1]` |
+| `stuckNudgeMaxTokens` not an integer, or `< 1` | `stuckNudgeMaxTokens must be an integer >= 1` |
+| `stuckNudgePerTurn` not an integer, or `< 0` | `stuckNudgePerTurn must be an integer >= 0` |
 | any other top-level key | `unknown config key(s) …` |
 
 The `writeTools` and `readTools` rows are the bundle's cross-field rule: a rail that reads a file owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.

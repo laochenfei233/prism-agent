@@ -158,6 +158,19 @@ export interface Config {
   readonly sensitivePaths?: readonly string[]
   /** Whether a shell command matching a guarded pattern goes to approval; omit to disable this rail. */
   readonly commandGuard?: CommandGuardConfig
+  /**
+   * Consecutive failed calls tolerated before the judge decides whether the
+   * agent is spinning. Unlike the other rails this one ships on: the nudge is
+   * a reminder that refuses nothing, and the judge is called only while the
+   * failures repeat. `0` turns the rail off.
+   */
+  readonly stuckNudgeAfterFailures?: number
+  /** Judge confidence at or above which the nudge is sent. */
+  readonly stuckNudgeConfidence?: number
+  /** Token cap one judge call may spend. */
+  readonly stuckNudgeMaxTokens?: number
+  /** Nudges one turn may receive. */
+  readonly stuckNudgePerTurn?: number
 }
 
 /** One writing tool after load-time validation. */
@@ -183,6 +196,10 @@ export interface ResolvedConfig {
   readonly readTools: ReadonlyMap<string, string> | undefined
   readonly sensitivePaths: readonly string[] | undefined
   readonly commandGuard: ResolvedCommandGuard | undefined
+  readonly stuckNudgeAfterFailures: number | undefined
+  readonly stuckNudgeConfidence: number
+  readonly stuckNudgeMaxTokens: number
+  readonly stuckNudgePerTurn: number | undefined
 }
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
@@ -202,6 +219,10 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'readTools',
   'sensitivePaths',
   'commandGuard',
+  'stuckNudgeAfterFailures',
+  'stuckNudgeConfidence',
+  'stuckNudgeMaxTokens',
+  'stuckNudgePerTurn',
 ])
 
 /** Keys one `writeTools` entry reads. */
@@ -286,6 +307,10 @@ export function resolveConfig(config: Config): ResolvedConfig {
     readTools,
     sensitivePaths,
     commandGuard,
+    stuckNudgeAfterFailures: resolveStuckNudgeAfterFailures(config.stuckNudgeAfterFailures),
+    stuckNudgeConfidence: resolveStuckNudgeConfidence(config.stuckNudgeConfidence),
+    stuckNudgeMaxTokens: resolveStuckNudgeMaxTokens(config.stuckNudgeMaxTokens),
+    stuckNudgePerTurn: resolveStuckNudgePerTurn(config.stuckNudgePerTurn),
   }
 }
 
@@ -388,6 +413,60 @@ function resolveMaxStepsPerTurn(value: number | undefined): number | undefined {
     throw new Error(`prism-guardrails: maxStepsPerTurn must be an integer >= 1, received ${String(value)}`)
   }
   return value
+}
+
+/** Failed calls one chain may hold before the judge is asked whether the agent is spinning. */
+const DEFAULT_STUCK_NUDGE_AFTER_FAILURES = 3
+
+/** Judge confidence at or above which the nudge is sent. */
+const DEFAULT_STUCK_NUDGE_CONFIDENCE = 0.7
+
+/** Token cap one judge call may spend. */
+const DEFAULT_STUCK_NUDGE_MAX_TOKENS = 512
+
+/** Nudges one turn may receive. */
+const DEFAULT_STUCK_NUDGE_PER_TURN = 1
+
+/**
+ * Check the stuck-nudge threshold. The rail ships on, so an omitted field
+ * takes the default; `0` is the off switch, and one failure is not stuck.
+ */
+function resolveStuckNudgeAfterFailures(value: number | undefined): number | undefined {
+  if (value === undefined) return DEFAULT_STUCK_NUDGE_AFTER_FAILURES
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`prism-guardrails: stuckNudgeAfterFailures must be an integer >= 0, received ${String(value)}`)
+  }
+  if (value === 1) {
+    throw new Error('prism-guardrails: stuckNudgeAfterFailures must be 0 (off) or >= 2 — one failure is not stuck')
+  }
+  return value === 0 ? undefined : value
+}
+
+/** Check the judge confidence threshold. */
+function resolveStuckNudgeConfidence(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_STUCK_NUDGE_CONFIDENCE
+  if (!Number.isFinite(value) || value <= 0 || value > 1) {
+    throw new Error(`prism-guardrails: stuckNudgeConfidence must be a number in (0, 1], received ${String(value)}`)
+  }
+  return value
+}
+
+/** Check the judge token cap. */
+function resolveStuckNudgeMaxTokens(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_STUCK_NUDGE_MAX_TOKENS
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`prism-guardrails: stuckNudgeMaxTokens must be an integer >= 1, received ${String(value)}`)
+  }
+  return value
+}
+
+/** Check the per-turn nudge quota; `0` is the same off switch as the threshold's. */
+function resolveStuckNudgePerTurn(value: number | undefined): number | undefined {
+  if (value === undefined) return DEFAULT_STUCK_NUDGE_PER_TURN
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`prism-guardrails: stuckNudgePerTurn must be an integer >= 0, received ${String(value)}`)
+  }
+  return value === 0 ? undefined : value
 }
 
 /**

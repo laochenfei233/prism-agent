@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
 /prism-guardrails:
-  en: 321a89671c6168e3
-  zh: 26b36c2653420caa
+  en: 572182f4055f0c71
+  zh: 511db76383c23061
 /prism-guardrails/why-this-exists:
-  en: 25864098178c82e1
-  zh: db107679b65c453c
+  en: 40b0909f2e3fba77
+  zh: 2f80f75d98d31251
 /prism-guardrails/ponytail-mode:
   en: a3a015188eef2d2b
   zh: 24954e3d6f274975
 /prism-guardrails/configuration:
-  en: b6571b0430be3372
-  zh: 462b9ab79e7769c3
+  en: 9a1610b029e17bc4
+  zh: ed2719b85ffc260a
 /prism-guardrails/rails:
   en: 72f7891b97c27a02
   zh: ebcc7fab8b465344

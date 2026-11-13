@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入一条自己的、只提醒而不强制的 rail。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
+十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -24,6 +24,7 @@
 | 轮次完成（Compose Next） | 工作流要求模型做完自己的任务并给出交付证据；但只要模型不再调用工具，循环照样结束该轮 | 模型自己写的 todo 清单里还有未完成项时，在它能停下之前被 steer 继续 |
 | 破坏性命令 | 没有任何东西解析 shell 命令文本，`bash` 与 `pwsh` 正因此被排除在计划模式 rail 之外；沙箱管的是文件效果，管不了强推 | 命中配置模式的命令送交审批 |
 | 凭据读取 | 在其他所有 rail 眼里 `read` 与 `grep` 都是只读工具，而一次读取会永久留在会话日志里 | 读取配置的凭据路径被拒绝 |
+| 在失败上原地打转 | 没有任何东西盯着同一轮里反复同一种失败调用的轮次；模型自己的判断是唯一的刹车 | 裁判模型确认这串失败是个循环之后，下一个结果携带一句换思路的提醒 —— 调用本身永不被告决 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
 
@@ -60,7 +61,7 @@
 
 ## 配置
 
-每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。
+每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。唯一的例外是卡住提醒：它什么都不拒绝、裁判只在失败重复时才被调用，因此随插件出厂开启；`stuckNudgeAfterFailures: 0` 关闭它。
 
 | 键 | 类型 | 含义 | 默认 |
 |---|---|---|---|
@@ -80,12 +81,18 @@
 | `sensitivePaths` | 非空、互不相同、非空白的路径段数组 | 被视为凭据材料的路径段 | rail 关闭 |
 | `commandGuard.tools` | 非空的 `{ tool, commandArgument }` 数组 | 调用中携带命令行文本的工具 | 由该 rail 要求 |
 | `commandGuard.deny` | 非空的 `{ pattern, reason }` 数组 | 命令文本要匹配的正则，以及审批人需要知道的理由 | 由该 rail 要求 |
+| `stuckNudgeAfterFailures` | 整数 `0` 或 `>= 2` | 连续失败调用达到多少次后，请裁判判断 agent 是否在原地打转；`0` 关闭 | `3` |
+| `stuckNudgeConfidence` | `(0, 1]` 区间内的数 | 裁判置信度达到多少才发送提醒 | `0.7` |
+| `stuckNudgeMaxTokens` | 整数 `>= 1` | 一次裁判调用可花费的 token 上限 | `512` |
+| `stuckNudgePerTurn` | 整数 `>= 0` | 一轮最多可收到的提醒数；`0` 关闭 | `1` |
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
 
 `readTools` 同理：`{ tool: read, pathArgument: file_path }`、`{ tool: read_image, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取的三个工具。
 
 `mode` 是唯一同时作用于全部 rail 的键，也是唯一能在武装之前看见某条 rail 的办法：`observe` 下每条 rail 的判定与 `enforce` 完全一致，只是记下这次判定并放行。`/guardrails` 会列出它本来会挡住什么。`deny` 与 `ask` 都算观察结果；`steer` 不算——把一轮送回补证据是要求把活干完，不是拒绝，观察模式不该把它一起关掉。
+
+卡住提醒是唯一什么都不拒绝的 rail，因此它也没有可供观察的 `deny`：它在两种模式下行为完全一致，并把提醒记为一条 `steer`。在同一轮内它统计 agent 连续失败的调用——任何一次成功都清空这串失败，一条被领取的用户消息开启新一轮的计数——当连续失败达到 `stuckNudgeAfterFailures`，一次走 agent 自己 provider 路由的一次性调用会裁判这些失败是否同一个循环。只有置信度足够的肯定（`stuckNudgeConfidence`）才会把一句提醒附在失败调用的已接受结果上；提醒点名这串失败，说明单靠重试不会改变它，并明说停不停由人决定。`stuckNudgePerTurn` 限定提醒次数，忽略第一次的模型每次只多付一次失败。裁判是外部依赖：没有 llm 服务、没有已路由的模型，或一份无法读取的裁判结果，都意味着这个窗口什么也不发，留一行日志说明原因，下一个达标的窗口再试。
 
 加载期拒绝项（每条文案都由测试套件断言）：
 
@@ -124,6 +131,11 @@
 | 命令工具条目没有给出参数名 | `commandGuard.tools entry "bash" must name its commandArgument` |
 | 模式条目没有给出理由 | `commandGuard.deny entry "…" must name a reason` |
 | 模式无法编译 | `commandGuard.deny pattern "(" is not a regular expression: …` |
+| `stuckNudgeAfterFailures` 不是整数，或 `< 0` | `stuckNudgeAfterFailures must be an integer >= 0` |
+| `stuckNudgeAfterFailures: 1` | `stuckNudgeAfterFailures must be 0 (off) or >= 2 — one failure is not stuck` |
+| `stuckNudgeConfidence` 不在 `(0, 1]` 区间 | `stuckNudgeConfidence must be a number in (0, 1]` |
+| `stuckNudgeMaxTokens` 不是整数，或 `< 1` | `stuckNudgeMaxTokens must be an integer >= 1` |
+| `stuckNudgePerTurn` 不是整数，或 `< 0` | `stuckNudgePerTurn must be an integer >= 0` |
 | 其他任意键 | `unknown config key(s) …` |
 
 `writeTools` 与 `readTools` 两行是本 bundle 的跨字段规则：读写文件的 rail 自身不掌握任何工具知识，因此只开启 rail 而不声明工具的部署没有可执行的对象。这种情况在加载期就失败，而不是加载一条永不触发的 rail。

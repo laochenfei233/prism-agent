@@ -51,11 +51,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ContextFormed } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ContextFormed, GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
-import type { PostToolDecision, PreToolDecision } from '@deepseek-ai/dsh-tools'
+import type { PostToolDecision, PreToolDecision, ToolExecutionFailure } from '@deepseek-ai/dsh-tools'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import { configVersion, resolveConfig } from './config.ts'
 import { createLedger } from './decision.ts'
@@ -101,6 +101,9 @@ const MAX_REPORTED_DECISIONS = 10
 
 /** How much of one decision's subject the status report shows. */
 const MAX_REPORTED_SUBJECT = 60
+
+/** How much of one failure's text the judge's prompt carries per entry. */
+const STUCK_FAILURE_TEXT_MAX = 160
 
 /** One agent's consecutive-repeat chain: the last tracked call's identity and its run length. */
 interface RepeatChain {
@@ -156,6 +159,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   installUnfinishedTodoGate(ctx, resolved, ledger)
   installSensitiveReadDenial(ctx, resolved, ledger)
   installCommandGuard(ctx, resolved, ledger)
+  installStuckNudge(ctx, resolved, ledger)
   installStatusCommand(ctx, resolved, ledger, version)
 }
 
@@ -622,6 +626,219 @@ function unfinishedTodos(agent: Agent): readonly TodoItem[] {
   return []
 }
 
+/** One failed call in a stuck chain: the tool and what it said went wrong. */
+interface StuckFailure {
+  readonly tool: string
+  readonly message: string
+}
+
+/** One agent's stuck chain and its per-turn quota spend. */
+interface StuckRecord {
+  readonly failures: StuckFailure[]
+  nudged: number
+}
+
+/** The judge's verdict on one failure chain. */
+interface StuckVerdict {
+  readonly spinning: boolean
+  readonly confidence: number
+}
+
+/** The bound judge, or `undefined` while no llm service is mounted. */
+type StuckJudge = (agent: Agent, failures: readonly StuckFailure[]) => Promise<StuckVerdict | undefined>
+
+/**
+ * Nudge an agent that keeps repeating the same failing call.
+ *
+ * The failure chain is per turn — a claimed user message resets it, the way
+ * the repeat rail's chain resets — and any successful call clears it, so the
+ * judge only ever sees a run of consecutive failures inside one turn. When the
+ * run reaches the threshold, one one-shot model call decides whether the run
+ * really is a loop, and only a confident yes sends a reminder. The reminder
+ * rides the accepted result's additional contexts: the call itself is never
+ * refused, this rail has no deny to make, and the text says plainly that
+ * stopping is the person's call.
+ *
+ * The judge is an external dependency. No llm service, no routed model, an
+ * unusable reply, or a failed call all mean this window sends nothing, and
+ * only a log line records why; the chain keeps accumulating, and the next
+ * qualifying window tries the judge again.
+ */
+function installStuckNudge(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const threshold = resolved.stuckNudgeAfterFailures
+  const quota = resolved.stuckNudgePerTurn
+  if (threshold === undefined || quota === undefined) return
+  const records = new WeakMap<Agent, StuckRecord>()
+  let judge: StuckJudge | undefined
+
+  ctx.inject(['llm'], childCtx => {
+    const llm = childCtx.llm
+    judge = (agent, failures) => judgeStuck(llm, agent, failures, resolved.stuckNudgeMaxTokens)
+    childCtx.effect(() => () => {
+      judge = undefined
+    }, 'prism-guardrails.stuckJudgeRelease')
+  })
+
+  ctx.on('agent/pre-step', ({ agent, messages }, next): Promise<PreStepDecision> => {
+    if (messages.some(message => message.source.kind === 'user')) records.delete(agent)
+    return next()
+  })
+
+  ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
+    const decided = await next()
+    const agent = exec.agent
+    if (agent === undefined) return decided
+    const record = records.get(agent) ?? { failures: [], nudged: 0 }
+    records.set(agent, record)
+    if (result.isError) {
+      record.failures.push({ tool: exec.name, message: failureText(result) })
+    } else {
+      record.failures.length = 0
+    }
+    if (record.failures.length < threshold || record.nudged >= quota) return decided
+    const bound = judge
+    if (bound === undefined) {
+      ctx.logger.warn('prism-guardrails: stuck chain reached the threshold but no llm service is mounted; no nudge sent')
+      return decided
+    }
+    const verdict = await bound(agent, record.failures).catch((error: unknown) => {
+      ctx.logger.warn('prism-guardrails: the stuck judge call failed; no nudge sent')
+      ctx.logger.warn(error)
+      return undefined
+    })
+    if (verdict === undefined || !verdict.spinning || verdict.confidence < resolved.stuckNudgeConfidence) {
+      return decided
+    }
+    if (decided.kind !== 'accept') return decided
+    record.nudged += 1
+    note(ledger, agent, 'stuck nudge', `${exec.name} failed ${String(record.failures.length)} time(s)`, 'steer')
+    return {
+      ...decided,
+      additionalContexts: [
+        createUserMessage({
+          content: [{
+            type: 'text',
+            text: `You have now seen ${String(record.failures.length)} consecutive failures of \`${exec.name}\` with the same `
+              + 'outcome. Retrying the same call is unlikely to change it. Read the error and change the approach: '
+              + 'try a different method, fix the underlying cause first, or ask the person. If you are genuinely '
+              + 'stuck, say so plainly and stop — the person can interrupt at any time.',
+          }],
+          source: { kind: 'prism-guardrails', form: 'instructions' },
+        }),
+      ],
+    }
+  })
+}
+
+/** The error text one failed call contributes to the chain, bounded for the judge's prompt. */
+function failureText(result: ToolExecutionFailure): string {
+  const raw = result.error.message
+  const collapsed = raw.replace(/\s+/g, ' ').trim()
+  return collapsed.length <= STUCK_FAILURE_TEXT_MAX ? collapsed : `${collapsed.slice(0, STUCK_FAILURE_TEXT_MAX - 1)}…`
+}
+
+/**
+ * The identity-free instruction for every judge call.
+ */
+const STUCK_JUDGE_SYSTEM = [
+  'You decide whether an agent is stuck in a loop.',
+  'The input is a run of consecutive tool failures inside one turn, oldest first.',
+  'Answer with JSON only: {"spinning": <true|false>, "confidence": <0..1>}.',
+  '"spinning" is true only when the same failure keeps repeating and retrying alone will not fix it.',
+  'An empty answer or prose means no verdict.',
+].join(' ')
+
+/**
+ * The provider route one agent's calls take, or `undefined` when none is recorded.
+ * @param agent - the agent whose route is read.
+ * @returns the route, or `undefined`.
+ */
+function routeOf(agent: Agent): { readonly provider: string, readonly model: string } | undefined {
+  const routed = agent.session.requestHeader()?.config
+  if (routed?.provider !== undefined && routed.provider !== ''
+    && routed.model !== undefined && routed.model !== '') {
+    return { provider: routed.provider, model: routed.model }
+  }
+  if (agent.options.provider !== undefined && agent.options.provider !== ''
+    && agent.options.model !== undefined && agent.options.model !== '') {
+    return { provider: agent.options.provider, model: agent.options.model }
+  }
+  return undefined
+}
+
+/**
+ * Ask one model whether a run of consecutive failures is a loop.
+ *
+ * The request is a one-shot call whose content is the chain summary, routed
+ * through the agent's own provider route; the caller owns its inputs until the
+ * stream settles. An unusable reply is `undefined` — the same stance as a
+ * failed call — so the window sends nothing rather than guessing.
+ * @param llm - the llm runtime to dispatch through.
+ * @param agent - the agent whose routed model judges the chain.
+ * @param failures - the consecutive failures, oldest first.
+ * @param maxTokens - the token cap the deployment allows one judge call.
+ * @returns the verdict, or `undefined` when no route or no readable verdict exists.
+ */
+async function judgeStuck(
+  llm: LlmRuntime,
+  agent: Agent,
+  failures: readonly StuckFailure[],
+  maxTokens: number,
+): Promise<StuckVerdict | undefined> {
+  const route = routeOf(agent)
+  if (route === undefined) {
+    return undefined
+  }
+  const summary = failures
+    .map((failure, index) => `${index + 1}. [${failure.tool}] ${failure.message}`)
+    .join('\n')
+  const assembler = new BlockAssembler()
+  const options: GenerateOptions = {
+    provider: route.provider,
+    model: route.model,
+    system: STUCK_JUDGE_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [{ type: 'text', text: `Consecutive tool failures:\n${summary}\n\nIs the agent spinning? Answer as the JSON object.` }],
+    }],
+    maxTokens,
+  }
+  for await (const chunk of llm.stream(options)) assembler.push(chunk)
+  const finish = assembler.finish
+  if (finish.kind !== 'stop' && finish.kind !== 'tool-calls') return undefined
+  return parseStuckVerdict(assembler.blocks()
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join(''))
+}
+
+/**
+ * Read one judge reply into a verdict.
+ *
+ * The first balanced brace region is the answer; anything the model wrapped
+ * around it is ignored, and an unreadable region is no verdict.
+ * @param raw - the judge's full text output.
+ * @returns the verdict, or `undefined`.
+ */
+function parseStuckVerdict(raw: string): StuckVerdict | undefined {
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start < 0 || end <= start) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1))
+  } catch {
+    return undefined
+  }
+  if (typeof parsed !== 'object' || parsed === null) return undefined
+  const record = parsed as Record<string, unknown>
+  if (typeof record.spinning !== 'boolean') return undefined
+  if (!Number.isFinite(record.confidence) || (record.confidence as number) < 0 || (record.confidence as number) > 1) {
+    return undefined
+  }
+  return { spinning: record.spinning, confidence: record.confidence as number }
+}
+
 /**
  * Track each agent's current turn, the files it wrote, and whether it verified.
  *
@@ -939,6 +1156,9 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     ['command guard', resolved.commandGuard === undefined
       ? undefined
       : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
+    ['stuck nudge', resolved.stuckNudgeAfterFailures === undefined
+      ? undefined
+      : `after ${String(resolved.stuckNudgeAfterFailures)} consecutive failures`],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
   // An observing deployment is not protected, so its first line says so before

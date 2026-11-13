@@ -111,7 +111,7 @@ async function userTurn(ctx: Context, agent: Agent, text: string): Promise<void>
 }
 
 describe('configuration validation', () => {
-  it('resolves an empty configuration with every rail off and guidance on', () => {
+  it('resolves an empty configuration with the opt-in rails off and guidance on', () => {
     expect(resolveConfig({})).toEqual({
       mode: 'enforce',
       planDeniedTools: undefined,
@@ -128,6 +128,10 @@ describe('configuration validation', () => {
       readTools: undefined,
       sensitivePaths: undefined,
       commandGuard: undefined,
+      stuckNudgeAfterFailures: 3,
+      stuckNudgeConfidence: 0.7,
+      stuckNudgeMaxTokens: 512,
+      stuckNudgePerTurn: 1,
     })
   })
 
@@ -170,6 +174,16 @@ describe('configuration validation', () => {
 
   it('treats repeatAskAfter 0 as the off switch rather than a threshold', () => {
     expect(resolveConfig({ repeatAskAfter: 0 }).repeatAskAfter).toBeUndefined()
+  })
+
+  it('rejects an invalid stuck-nudge configuration at load', () => {
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: 1 })).toThrow(/one failure is not stuck/)
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: -2 })).toThrow(/stuckNudgeAfterFailures/)
+    expect(() => resolveConfig({ stuckNudgeConfidence: 1.5 })).toThrow(/stuckNudgeConfidence/)
+    expect(() => resolveConfig({ stuckNudgeMaxTokens: 0 })).toThrow(/stuckNudgeMaxTokens/)
+    expect(() => resolveConfig({ stuckNudgePerTurn: -1 })).toThrow(/stuckNudgePerTurn/)
+    expect(resolveConfig({ stuckNudgeAfterFailures: 0 }).stuckNudgeAfterFailures).toBeUndefined()
+    expect(resolveConfig({ stuckNudgePerTurn: 0 }).stuckNudgePerTurn).toBeUndefined()
   })
 
   it('defaults the mode to enforce and accepts observe', () => {
@@ -1643,8 +1657,8 @@ describe('/guardrails status', () => {
     const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
     const text = execution?.result.text ?? ''
 
-    expect(text).toContain('Guardrails: 3 of 12 rails armed (mode: enforce, config ')
-    expect(text.split('\n').slice(1, 13)).toEqual([
+    expect(text).toContain('Guardrails: 4 of 13 rails armed (mode: enforce, config ')
+    expect(text.split('\n').slice(1, 14)).toEqual([
       'plan-mode denial: off',
       'repeat approval: off',
       'turn budget: 20 steps',
@@ -1657,6 +1671,7 @@ describe('/guardrails status', () => {
       'verification gate: off',
       'sensitive reads: .env',
       'command guard: off',
+      'stuck nudge: after 3 consecutive failures',
     ])
     // Nothing was observed and nothing was refused, so the ledger has no rows
     // beyond the count an observing deployment would need.
@@ -1671,7 +1686,7 @@ describe('/guardrails status', () => {
     const second = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
 
     expect(first?.result.text.split('\n')[0])
-      .toMatch(/^Guardrails: \d+ of 12 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
+      .toMatch(/^Guardrails: \d+ of 13 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
     expect(second?.result.text).toEqual(first?.result.text)
   })
 
@@ -1733,5 +1748,139 @@ describe('/guardrails status', () => {
 
     expect((await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text)
       .not.toContain('decisions this session')
+  })
+})
+
+/** A tool fixture whose every execution fails with one fixed message. */
+function failingFixture(name: string, message: string) {
+  return defineContentToolFixture({
+    name,
+    description: `${name} fixture`,
+    parameters: {},
+    execute() {
+      return Promise.reject(new Error(message))
+    },
+  })
+}
+
+/** The full model-visible text of every request the adapter received, in order. */
+function requestTexts(adapter: MockAdapter): string[] {
+  return adapter.requests.map(options => options.messages
+    .map(message => JSON.stringify(message.content))
+    .join(' '))
+}
+
+describe('stuck nudge', () => {
+  it('nudges once when the judge confirms a confident loop, and refuses nothing', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 3 })
+    const runs: string[] = []
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const results = recordToolResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('stuck-confident'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Every call ran — the nudge rides alongside the result, it never refuses.
+    expect(runs).toEqual([])
+    expect(results).toHaveLength(3)
+    expect(results.every(text => text.includes('the cache is stale'))).toBe(true)
+    const judged = requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))
+    expect(judged).toHaveLength(1)
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('sends nothing when the judge says not spinning, is unsure, or is unreadable', async () => {
+    for (const reply of ['{"spinning":false,"confidence":0.95}', '{"spinning":true,"confidence":0.4}', 'no verdict in this prose']) {
+      const ctx = await harness({ stuckNudgeAfterFailures: 2 })
+      ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+      const agent = await ctx.agentLoop.create(SessionId('stuck-doubt'), { provider: 'mock', model: 'mock' })
+
+      const adapter = new MockAdapter([
+        toolCallResponse('c0', 'broken', { q: 'x' }),
+        toolCallResponse('c1', 'broken', { q: 'x' }),
+        textResponse(reply),
+        textResponse('done'),
+      ])
+      ctx.llm.registerAdapter(['mock'], adapter)
+      await userTurn(ctx, agent, 'go')
+
+      expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(1)
+      expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(false)
+    }
+  })
+
+  it('clears the chain on a success and resets it on a new turn', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 3 })
+    const runs: string[] = []
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-clears'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'probe', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Two failures around one success never reach the threshold, so the judge
+    // is never asked: five requests, no judge among them.
+    expect(runs).toEqual(['probe'])
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(0)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('spends its per-turn quota after one nudge', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 2, stuckNudgePerTurn: 1 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-quota'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // The third failure qualifies again, but the quota is spent, so the judge
+    // is not asked a second time. The nudge, once delivered, is durable session
+    // text: every later request carries it.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(1)
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('nudges in observe mode too, because a steer is not a refusal', async () => {
+    const ctx = await commandHarness({ mode: 'observe', stuckNudgeAfterFailures: 2 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-observe'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('stuck nudge: after 2 consecutive failures')
   })
 })
