@@ -180,6 +180,8 @@ describe('configuration validation', () => {
     expect(() => resolveConfig({ stuckNudgeAfterFailures: 1 })).toThrow(/one failure is not stuck/)
     expect(() => resolveConfig({ stuckNudgeAfterFailures: -2 })).toThrow(/stuckNudgeAfterFailures/)
     expect(() => resolveConfig({ stuckNudgeConfidence: 1.5 })).toThrow(/stuckNudgeConfidence/)
+    expect(() => resolveConfig({ stuckNudgeConfidence: 0 })).toThrow(/stuckNudgeConfidence/)
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: 2.5 })).toThrow(/stuckNudgeAfterFailures/)
     expect(() => resolveConfig({ stuckNudgeMaxTokens: 0 })).toThrow(/stuckNudgeMaxTokens/)
     expect(() => resolveConfig({ stuckNudgePerTurn: -1 })).toThrow(/stuckNudgePerTurn/)
     expect(resolveConfig({ stuckNudgeAfterFailures: 0 }).stuckNudgeAfterFailures).toBeUndefined()
@@ -1773,7 +1775,6 @@ function requestTexts(adapter: MockAdapter): string[] {
 describe('stuck nudge', () => {
   it('nudges once when the judge confirms a confident loop, and refuses nothing', async () => {
     const ctx = await harness({ stuckNudgeAfterFailures: 3 })
-    const runs: string[] = []
     ctx.tools.register(failingFixture('broken', 'the cache is stale'))
     const results = recordToolResults(ctx)
     const agent = await ctx.agentLoop.create(SessionId('stuck-confident'), { provider: 'mock', model: 'mock' })
@@ -1788,8 +1789,7 @@ describe('stuck nudge', () => {
     ctx.llm.registerAdapter(['mock'], adapter)
     await userTurn(ctx, agent, 'go')
 
-    // Every call ran — the nudge rides alongside the result, it never refuses.
-    expect(runs).toEqual([])
+    // Every result reached the model unchanged — the nudge rides alongside, it never refuses.
     expect(results).toHaveLength(3)
     expect(results.every(text => text.includes('the cache is stale'))).toBe(true)
     const judged = requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))
@@ -1882,5 +1882,53 @@ describe('stuck nudge', () => {
     expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
     const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
     expect(status).toContain('stuck nudge: after 2 consecutive failures')
+    // The reminder is a steer, so it counts toward the ledger without being an
+    // observable refusal — exactly the asymmetry the mode's contract states.
+    expect(status).toContain('decisions this session: 1 (0 observed)')
+  })
+
+  it('stays out of the loop entirely when stuckNudgeAfterFailures is 0', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 0 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-off'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Four failures in one turn and no judge request anywhere: the rail never
+    // registered a listener.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(0)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('spends a fresh quota in the next turn', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 2, stuckNudgePerTurn: 1 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-next-turn'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('interim'),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.85}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+    await userTurn(ctx, agent, 'continue')
+
+    // One judge call per turn: the quota resets when the loop opens a turn,
+    // whatever message claimed it.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(2)
   })
 })

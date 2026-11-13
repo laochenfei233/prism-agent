@@ -644,15 +644,22 @@ interface StuckVerdict {
   readonly confidence: number
 }
 
+/**
+ * The bound judge's outcome: a verdict, or why there is none. The caller logs
+ * the reason, so an operator can tell a missing route from an unusable reply.
+ */
+type StuckJudgement = StuckVerdict | 'no-route' | 'unusable'
+
 /** The bound judge, or `undefined` while no llm service is mounted. */
-type StuckJudge = (agent: Agent, failures: readonly StuckFailure[]) => Promise<StuckVerdict | undefined>
+type StuckJudge = (agent: Agent, failures: readonly StuckFailure[], signal: AbortSignal) => Promise<StuckJudgement>
 
 /**
  * Nudge an agent that keeps repeating the same failing call.
  *
- * The failure chain is per turn — a claimed user message resets it, the way
- * the repeat rail's chain resets — and any successful call clears it, so the
- * judge only ever sees a run of consecutive failures inside one turn. When the
+ * The failure chain is per turn — the loop opening a turn the record has not
+ * seen resets it, whatever enqueued the turn — and any successful call clears
+ * it, so the judge only ever sees a run of consecutive failures inside one
+ * turn. When the
  * run reaches the threshold, one one-shot model call decides whether the run
  * really is a loop, and only a confident yes sends a reminder. The reminder
  * rides the accepted result's additional contexts: the call itself is never
@@ -673,14 +680,22 @@ function installStuckNudge(ctx: Context, resolved: ResolvedConfig, ledger: Decis
 
   ctx.inject(['llm'], childCtx => {
     const llm = childCtx.llm
-    judge = (agent, failures) => judgeStuck(llm, agent, failures, resolved.stuckNudgeMaxTokens)
+    judge = (agent, failures, signal) => judgeStuck(llm, agent, failures, resolved.stuckNudgeMaxTokens, signal)
     childCtx.effect(() => () => {
       judge = undefined
     }, 'prism-guardrails.stuckJudgeRelease')
   })
 
-  ctx.on('agent/pre-step', ({ agent, messages }, next): Promise<PreStepDecision> => {
-    if (messages.some(message => message.source.kind === 'user')) records.delete(agent)
+  const turnSeen = new WeakMap<Agent, number>()
+
+  ctx.on('agent/pre-step', ({ agent, turn }, next): Promise<PreStepDecision> => {
+    // The loop opens every turn, whatever enqueued it — a claimed user message
+    // or a scheduled follow-up — so the run and its quota reset per turn rather
+    // than per message source.
+    if (turnSeen.get(agent) !== turn) {
+      turnSeen.set(agent, turn)
+      records.delete(agent)
+    }
     return next()
   })
 
@@ -688,6 +703,10 @@ function installStuckNudge(ctx: Context, resolved: ResolvedConfig, ledger: Decis
     const decided = await next()
     const agent = exec.agent
     if (agent === undefined) return decided
+    // Child calls of a composite tool run the same pipeline with the same
+    // agent, and this rail counts them like any other call — the same blind
+    // spot the repeat rail has: one child failure each, one child success
+    // clearing the run, while the model only sees the parent's outcome.
     const record = records.get(agent) ?? { failures: [], nudged: 0 }
     records.set(agent, record)
     if (result.isError) {
@@ -701,11 +720,20 @@ function installStuckNudge(ctx: Context, resolved: ResolvedConfig, ledger: Decis
       ctx.logger.warn('prism-guardrails: stuck chain reached the threshold but no llm service is mounted; no nudge sent')
       return decided
     }
-    const verdict = await bound(agent, record.failures).catch((error: unknown) => {
+    const judgement = await bound(agent, record.failures, exec.signal).catch((error: unknown) => {
       ctx.logger.warn('prism-guardrails: the stuck judge call failed; no nudge sent')
       ctx.logger.warn(error)
       return undefined
     })
+    if (judgement === 'no-route') {
+      ctx.logger.warn('prism-guardrails: the stuck judge has no routed model to call; no nudge sent')
+      return decided
+    }
+    if (judgement === 'unusable') {
+      ctx.logger.warn('prism-guardrails: the stuck judge reply was not a readable verdict; no nudge sent')
+      return decided
+    }
+    const verdict = judgement
     if (verdict === undefined || !verdict.spinning || verdict.confidence < resolved.stuckNudgeConfidence) {
       return decided
     }
@@ -770,25 +798,24 @@ function routeOf(agent: Agent): { readonly provider: string, readonly model: str
  * Ask one model whether a run of consecutive failures is a loop.
  *
  * The request is a one-shot call whose content is the chain summary, routed
- * through the agent's own provider route; the caller owns its inputs until the
- * stream settles. An unusable reply is `undefined` — the same stance as a
- * failed call — so the window sends nothing rather than guessing.
+ * through the agent's own provider route and bound to the failing call's
+ * cancellation signal; the caller owns its inputs until the stream settles.
  * @param llm - the llm runtime to dispatch through.
  * @param agent - the agent whose routed model judges the chain.
  * @param failures - the consecutive failures, oldest first.
  * @param maxTokens - the token cap the deployment allows one judge call.
- * @returns the verdict, or `undefined` when no route or no readable verdict exists.
+ * @param signal - the failing call's cancellation signal, honored by the judge.
+ * @returns the verdict, or why there is none.
  */
 async function judgeStuck(
   llm: LlmRuntime,
   agent: Agent,
   failures: readonly StuckFailure[],
   maxTokens: number,
-): Promise<StuckVerdict | undefined> {
+  signal: AbortSignal,
+): Promise<StuckJudgement> {
   const route = routeOf(agent)
-  if (route === undefined) {
-    return undefined
-  }
+  if (route === undefined) return 'no-route'
   const summary = failures
     .map((failure, index) => `${index + 1}. [${failure.tool}] ${failure.message}`)
     .join('\n')
@@ -802,14 +829,15 @@ async function judgeStuck(
       content: [{ type: 'text', text: `Consecutive tool failures:\n${summary}\n\nIs the agent spinning? Answer as the JSON object.` }],
     }],
     maxTokens,
+    signal,
   }
   for await (const chunk of llm.stream(options)) assembler.push(chunk)
   const finish = assembler.finish
-  if (finish.kind !== 'stop' && finish.kind !== 'tool-calls') return undefined
+  if (finish.kind !== 'stop' && finish.kind !== 'tool-calls') return 'unusable'
   return parseStuckVerdict(assembler.blocks()
     .filter(block => block.type === 'text')
     .map(block => block.text)
-    .join(''))
+    .join('')) ?? 'unusable'
 }
 
 /**
@@ -1156,7 +1184,7 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     ['command guard', resolved.commandGuard === undefined
       ? undefined
       : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
-    ['stuck nudge', resolved.stuckNudgeAfterFailures === undefined
+    ['stuck nudge', resolved.stuckNudgeAfterFailures === undefined || resolved.stuckNudgePerTurn === undefined
       ? undefined
       : `after ${String(resolved.stuckNudgeAfterFailures)} consecutive failures`],
   ]

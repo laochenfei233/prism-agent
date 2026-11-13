@@ -2,7 +2,7 @@
 type: added
 breaking: false
 audience: user
-commits: d7306fb147
+commits: 1dbe6af27d
 ---
 Give prism-guardrails a stuck-nudge rail that reminds instead of enforcing
 
