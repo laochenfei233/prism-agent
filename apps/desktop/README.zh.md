@@ -14,7 +14,7 @@ src-tauri/            Rust shell
   src/proxy.rs        loopback proxy the window loads: attaches the signed browser session to every request and WebSocket handshake
   src/tray.rs         tray residency: closing the window hides it; only tray Quit ends the process tree
   src/quit.rs         installer-requested exit: --quit signals the running shell, which removes its tray icon
-  src/setup.rs        profile seeding: preinstall the bundled default plugins into the web profile (patch + bundle layers), and refresh each copy whenever the running installation ships a different build
+  src/setup.rs        profile seeding: preinstall the bundled default plugins into the web profile (patch + bundle layers), scaffold a home that has never booted dsh through the CLI's initProfile, and refresh each copy whenever the running installation ships a different build
   src/update.rs       in-app updater state: GitHub-Releases-only checks, progress events, and the install handoff to the NSIS installer
   installer-template.nsi  vendored NSIS template (tauri-cli-v2.11.4) with the upgrade default flipped to an in-place overwrite; re-sync when the pinned CLI version changes
 ui/dist/              shell frontend (pure static, no build): index.html full-window iframe + error banner
