@@ -7,6 +7,7 @@
 //! keeps the app resident when the window closes.
 
 mod dsh_runner;
+mod proxy;
 mod quit;
 mod setup;
 mod tray;
@@ -20,9 +21,12 @@ use dsh_runner::DshHandle;
 
 /// Default loopback port for the bundled `dsh web` process. When occupied, the
 /// shell scans upward for a free port and delivers the authenticated launch
-/// URL through `dsh://ready`. CLI users who run their own `dsh web` keep the
-/// default 3080.
-pub const INTERNAL_PORT: u16 = 3081;
+/// URL through `dsh://ready`. Sibling dsh-fork desktop shells share the
+/// upstream 3081 default, and the port is part of the browser session's
+/// authority, so losing that race moves every launch to a fallback port and
+/// 401s every existing session cookie; this private default leaves 3081 to
+/// them. CLI users who run their own `dsh web` keep the default 3080.
+pub const INTERNAL_PORT: u16 = 38081;
 
 /// The main window is declared in `tauri.conf.json` with `"create": false`
 /// and built here instead: the `on_new_window` handler that routes popup
