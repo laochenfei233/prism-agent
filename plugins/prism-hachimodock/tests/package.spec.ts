@@ -109,7 +109,7 @@ describe('apply wiring', () => {
       sessions: { get: () => undefined, list: () => [] },
       agents: {},
       sessionController: {},
-      get: () => undefined,
+      get: (name: string) => (name === 'connection' ? connection : undefined),
       on: (name: string, listener: unknown) => {
         listeners.push([name, listener])
         return () => {}
@@ -128,7 +128,6 @@ describe('apply wiring', () => {
       },
       logger: { info() {}, warn() {}, error() {} },
     }
-    Reflect.set(ctx, 'connection', connection)
     plugin.apply(ctx as never, { descriptorPath: 'unused' })
     const labels = effects.map(e => e.label)
     expect(labels).toContain('hachimodock: http bridge')

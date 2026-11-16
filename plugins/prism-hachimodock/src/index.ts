@@ -89,7 +89,9 @@ export function apply(ctx: Context, config: Config = {}): void {
   bridge.server.capabilities = () => capabilities(bridge.ctx)
 
   // The same-origin activation stream; the webserver authenticates /api.
-  const connection = Reflect.get(ctx, 'connection') as ConnectionRoute | undefined
+  // `ctx.get` reads without the inject requirement; the context proxy rejects
+  // undeclared `Reflect.get` access since the cordis resync.
+  const connection = ctx.get('connection') as ConnectionRoute | undefined
   if (connection !== undefined && typeof connection.fetch?.register === 'function') {
     ctx.effect(() => connection.fetch.register({
       path: ACTIVATION_PATH,
