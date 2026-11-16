@@ -296,7 +296,7 @@ export class BotConversations {
 /** Read the host services the conversations module needs off the context. */
 export function readBotHostServices(ctx: Context): { sessionController: PocketSessionControllerLike; sessions: PocketSessionsLike; agents: PocketAgentsLike } {
   const read = (name: string): unknown => {
-    const value: unknown = Reflect.get(ctx, name)
+    const value: unknown = ctx.get(name)
     if (value === undefined || typeof value !== 'object') {
       throw new Error(`pocket: the ${name} service is required for bot delivery`)
     }

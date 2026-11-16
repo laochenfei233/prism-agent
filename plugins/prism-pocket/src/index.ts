@@ -104,9 +104,11 @@ interface PocketRuntime {
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = Config(config) as Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
-  const connection = Reflect.get(ctx, 'connection') as ConnectionRoute
-  const webserver = Reflect.get(ctx, 'webServer') as WebServerLike
-  const webStartup = Reflect.get(ctx, 'webStartup') as WebStartupLike
+  // `ctx.get` reads without the inject requirement; the context proxy rejects
+  // undeclared `Reflect.get` access since the cordis resync.
+  const connection = ctx.get('connection') as ConnectionRoute
+  const webserver = ctx.get('webServer') as WebServerLike
+  const webStartup = ctx.get('webStartup') as WebStartupLike
   const runtime: PocketRuntime = {
     surface: {
       host: webStartup.host ?? '127.0.0.1',
@@ -447,7 +449,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 /** Read the harness home from the boot-provided path helper. */
 function homeOf(ctx: Context): string {
-  const provider: unknown = Reflect.get(ctx, 'dshHomePath')
+  const provider: unknown = ctx.get('dshHomePath')
   if (typeof provider !== 'function') {
     throw new Error('pocket: the dshHomePath service is required to locate pocket storage')
   }
