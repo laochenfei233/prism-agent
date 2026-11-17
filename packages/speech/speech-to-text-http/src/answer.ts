@@ -44,11 +44,12 @@ export async function readAnswerJson(response: Response, name: string): Promise<
  * @param name - the service display name for the failure message.
  * @returns the parsed answer.
  */
-export function parseAnswerText(body: string, name: string): unknown {
+export function parseAnswerText(body: string, name = ''): unknown {
   try {
     return JSON.parse(body)
   } catch (error) {
-    throw new Error(`Speech service ${name} answered malformed JSON: ${reasonOf(error)}`)
+    const origin = name.length > 0 ? `Speech service ${name}` : 'Speech service'
+    throw new Error(`${origin} answered malformed JSON: ${reasonOf(error)}`)
   }
 }
 
@@ -81,7 +82,7 @@ export function reasonOf(error: unknown): string {
 export async function readJsonObject(response: Response): Promise<Record<string, unknown>> {
   const body = await readBody(response)
   if (!response.ok) throw new Error(`Speech service answered ${response.status}: ${body}`)
-  const parsed = parseAnswerText(body, 'answer')
+  const parsed = parseAnswerText(body)
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error('Speech service did not answer a JSON object')
   }

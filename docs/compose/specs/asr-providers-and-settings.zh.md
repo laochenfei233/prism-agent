@@ -1,7 +1,7 @@
 ---
 feature: asr-providers-and-settings
 status: delivered
-updated: 2026-11-17
+updated: 2026-11-18
 branch: feat/asr-providers-and-settings
 commits: f5baf8f73f..760b99e11c
 ---
@@ -11,6 +11,12 @@ commits: f5baf8f73f..760b99e11c
 [English](asr-providers-and-settings.md) | 中文
 
 ## Report
+
+**做了什么** —— 语音注册表把超出提供者声明请求上限的录音在安静 20 ms 窗口(最短 1 秒切片)处切片,按序识别并合并文本、平移分段时刻与时长总和;每个识别器都声明自己的上限。HTTP ASR 提供者覆盖九种请求形态——可选 model 的 OpenAI multipart、chat-completions、raw-body、腾讯 SentenceRecognition(TC3-HMAC-SHA256,黄金向量钉住)、讯飞 lfasr(四步任务流)、豆包极速版、Google Speech v1、Azure 快速转写、Amazon Transcribe(SigV4 走 S3)——配合可配置凭据头与点路径响应映射,DeepSeek、DashScope qwen3-asr、Deepgram、ElevenLabs、Groq、Mistral 均可纯配置接入。语音输入 Bundle 内置 deepseek-asr 与 dashscope-qwen3,新的语音设置分区(order 11,紧跟模型设置)渲染服务卡片、凭据管理与默认识别器切换。
+
+**验证** —— 七个触及包 343/343 聚焦测试(seam 分段 35、HTTP 提供者 43、DashScope/OpenAI/SenseVoice/voice-input/settings-speech 全套);触及包逐包与聚合 `tsc -b` 干净,client/host 聚合对触及文件零错误;触及面的文档门禁全绿(doc-standard 22/22、package-README limitations 390 文件、doc budgets、doc references 5024 文件、每个编辑过的配对都重录通过,config/cordis/tool/client 目录重新生成)。聚合残余红项均为基线(2026-11-05 基线 + 后续 resync 漂移):早期 fork spec 的陈旧双语记录、tool-catalog zh 漂移、webserver README 摘要、以及已知 Windows TMP/esbuild 文档构建问题;duplication 27 个克隆、新文件零克隆(2026-10-31 记录的 13 基线,余为后续会话漂移)。全部 adapter 流程与签名均为假服务/golden 向量测试;本环境未对接任何真实服务。
+
+**历程** —— 安静边界切点最初在窗口等能量时选中第一个扫描窗口,把均匀音调碎成 20 ms 小片;以目标窗口自身能量为比较基线并强制 1 秒最小切片后修复。第一版 TC3 黄金向量与实现共享同一处规范头构造错误(每头换行重复);按腾讯文档拼接式重算后实现与向量一起修正。火山标准版 submit/query 只收音频 URL,特性改落在收 base64 字节的极速版。注册表预读时长曾让非规范音频变成 seam 层错误、遮住提供者自己的 Prepare 报错;不可解析音频现在整段透传。
 
 ## [S1] 问题
 

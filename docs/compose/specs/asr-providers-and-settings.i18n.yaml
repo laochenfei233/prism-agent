@@ -4,13 +4,13 @@
 #   pnpm run verify-translation-pairing --write docs/compose/specs/asr-providers-and-settings.md
 /:
   en: afa0a05858129677
-  zh: a0da7dd44c76d65f
+  zh: afa0a05858129677
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section:
   en: e60a924db9fb00c1
   zh: 570633db7aa0cdad
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/report:
   en: 6dfef6e110e80210
-  zh: 355a41a8b4106d9f
+  zh: ff4fca89e3261c89
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s1-problem:
   en: 66702238fe666946
   zh: 1cf6059ee6f029c1
@@ -21,7 +21,7 @@
   en: 56a1acdd95e27a14
   zh: 686af2b82f7057c6
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-2-speech-to-text-http-flavor-expansion:
-  en: 9a656b9247a43eef
+  en: f68a6afbcb128d94
   zh: f4c72d22ca5d726b
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-2-1-aws-transcribe-s3-prerequisite:
   en: 752389d42954638e

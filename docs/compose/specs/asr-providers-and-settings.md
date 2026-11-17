@@ -39,7 +39,7 @@ Under-cap input is a single provider call exactly as today; the per-provider int
 Service entries gain new `mode` values alongside `transcriptions` and `chat-completions`:
 
 - `tencent-sentence` — `POST https://asr.tencentcloudapi.com`, `SentenceRecognition` / `2019-06-14`, TC3-HMAC-SHA256 signing from SecretId + SecretKey, `SourceType: 1` (base64 WAV in `Audio`), `EngSerViceType` from `engineModel` (default `16k_zh`), text read from `Response.Result`. Cap 60 s.
-- `xfyun-filetrans` — `POST https://raas.xfyun.cn/v2/upload` then poll `/v2/getTaskResult`; `X-Appid` / `X-CurTime` / `X-Param` (base64 JSON) / `X-CheckSum` = base64(HMAC-SHA1(secretKey, `X-Param` + `X-CurTime`)); parse the completed order into text. Cap 5 h; polling bounded by `timeoutMs`.
+- `xfyun-filetrans` — iFlytek lfasr over `https://raasr.xfyun.cn/api`: prepare, ordered 10 MiB slice upload, merge, progress polling (`signa` = base64(HMAC-SHA1(secretKey, MD5(appId+ts)))), and sentence result read. Cap 5 h; polling bounded by `timeoutMs`.
 - `volcano-flash` — Doubao recording-file recognition, *flash* edition: one `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` carrying `audio.data` (base64), `X-Api-Key`, status in the `X-Api-Status-Code` response header, text and utterance segments in the body. Cap 2 h. The standard submit/query edition is URL-only and stays out of scope.
 
 `model` becomes optional for every mode: absent `model`/`language` form fields are simply omitted (`transcriptions` keeps working for OpenAI/Groq/Qwen/DashScope compatible endpoints). DeepSeek ASR is therefore pure config: `endpoint: https://api.deepseek.com/v1/tools/asr`, no `model`, cap 120 s, `maxAudioBytes` 8 MiB.
