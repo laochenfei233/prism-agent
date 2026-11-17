@@ -74,16 +74,16 @@ export class XfyunFiletrans {
     const prepared = await this.post('prepare', { file_len: String(audio.byteLength), file_name: 'audio.wav',
       slice_num: String(this.sliceIds(audio.byteLength).length),
       ...(language === 'zh' ? { language: 'cn' } : language === 'en' ? { language: 'en' } : {}) },
-    appId, secretKey)
+    appId, secretKey, undefined, signal)
     const taskId = prepared.data
     if (typeof taskId !== 'string' || taskId.length === 0) throw new Error(`Speech service answered without a task id: ${JSON.stringify(prepared)}`)
     const slices = this.sliceIds(audio.byteLength)
     for (const [index, [offset, length]] of this.sliceRanges(audio.byteLength).entries()) {
       await this.uploadSlice(taskId, slices[index]!, audio.subarray(offset, offset + length), appId, secretKey, signal)
     }
-    await this.post('merge', {}, appId, secretKey, taskId)
+    await this.post('merge', {}, appId, secretKey, taskId, signal)
     await this.awaitCompletion(taskId, appId, secretKey, signal)
-    const result = await this.post('getResult', {}, appId, secretKey, taskId)
+    const result = await this.post('getResult', {}, appId, secretKey, taskId, signal)
     const sentences = readSentences(result)
     return {
       text: sentences.map(sentence => sentence.onebest).join(''),
@@ -120,8 +120,8 @@ export class XfyunFiletrans {
   }
 
   /** @returns one form-urlencoded response envelope, rejecting service failures. */
-  private async post(action: string, fields: Record<string, string>, appId: string, secretKey: string, taskId?: string):
-  Promise<Record<string, unknown>> {
+  private async post(action: string, fields: Record<string, string>, appId: string, secretKey: string, taskId?: string,
+    signal?: AbortSignal): Promise<Record<string, unknown>> {
     const ts = Math.floor(Date.now() / 1000)
     const body = new URLSearchParams({
       app_id: appId,
@@ -134,6 +134,7 @@ export class XfyunFiletrans {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
       body,
+      ...(signal === undefined ? {} : { signal }),
     }))
     if (envelope.ok !== 0) {
       throw new Error(`Speech service ${action} failed: ${String(envelope.err_no)} ${String(envelope.failed)}`)
@@ -160,7 +161,7 @@ export class XfyunFiletrans {
   private async awaitCompletion(taskId: string, appId: string, secretKey: string, signal: AbortSignal): Promise<void> {
     for (;;) {
       signal.throwIfAborted()
-      const progress = await this.post('getProgress', {}, appId, secretKey, taskId)
+      const progress = await this.post('getProgress', {}, appId, secretKey, taskId, signal)
       const status = readProgressStatus(progress.data)
       if (status === STATUS_COMPLETED) return
       // Statuses 0–5 describe work in flight; the remaining statuses report

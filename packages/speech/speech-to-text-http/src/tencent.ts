@@ -60,8 +60,9 @@ export function tencentSentenceRequest(
     'POST',
     '/',
     '',
+    // The header block keeps its trailing newline; the join supplies exactly
+    // the one separator line the Tencent canonical form prescribes.
     `content-type:${CONTENT_TYPE}\nhost:${host}\nx-tc-action:sentencerecognition\n`,
-    '',
     SIGNED_HEADERS,
     sha256Hex(body),
   ].join('\n')

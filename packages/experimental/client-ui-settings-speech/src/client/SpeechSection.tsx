@@ -6,7 +6,7 @@
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { SpeechSettingsStore, type SpeechServiceConfig } from './store.ts'
+import { SpeechSettingsStore, type SpeechServiceConfig, type SpeechServiceEdits } from './store.ts'
 import css from './SpeechSection.module.css'
 
 /** Registration-side business face for the section. */
@@ -29,6 +29,7 @@ export type SpeechSectionProps =
 export function SpeechSection(props: SpeechSectionProps): ReactNode {
   const { t, store } = props
   const state = useSyncExternalStore(store.subscribe.bind(store), store.getSnapshot.bind(store))
+  const [selectNotice, setSelectNotice] = useState<string | undefined>(undefined)
   return (
     <div className={css.page}>
       <h2>{t('title')}</h2>
@@ -42,13 +43,14 @@ export function SpeechSection(props: SpeechSectionProps): ReactNode {
                 id='speech-default-recognizer'
                 className={css.select}
                 value={state.roster.selected}
-                onChange={event => { void store.selectProvider(event.target.value) }}
+                onChange={event => { void store.selectProvider(event.target.value).then(refusal => { setSelectNotice(refusal) }) }}
               >
                 {state.roster.providers.map(provider =>
                   <option key={provider.id} value={provider.id}>{provider.name}</option>)}
               </select>
             </div>
           )}
+      {selectNotice !== undefined && <p className={css.error}>{selectNotice}</p>}
       <h3>{t('services')}</h3>
       {state.services.map((service, index) => (
         <ServiceCard
@@ -147,9 +149,9 @@ function ServiceCard(props: {
             void store.saveService(index, {
               name: name.current?.value ?? '',
               endpoint: endpoint.current?.value ?? '',
-              ...(modelValue === undefined || modelValue === '' ? {} : { model: modelValue }),
+              model: modelValue === undefined ? null : modelValue,
               apiKeyEnv: apiKeyEnv.current?.value ?? '',
-            })
+            } satisfies SpeechServiceEdits)
           }}
         >{t('save')}</button>
         <button

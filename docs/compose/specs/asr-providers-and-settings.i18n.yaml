@@ -4,10 +4,10 @@
 #   pnpm run verify-translation-pairing --write docs/compose/specs/asr-providers-and-settings.md
 /:
   en: afa0a05858129677
-  zh: 8adb79d0a5732efe
+  zh: a0da7dd44c76d65f
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section:
-  en: 551861422003ddb5
-  zh: 7593ca5426606002
+  en: e60a924db9fb00c1
+  zh: 570633db7aa0cdad
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/report:
   en: 6dfef6e110e80210
   zh: 355a41a8b4106d9f
@@ -18,11 +18,11 @@
   en: ecbb0dbfa14686f0
   zh: 3c4e147edaa36f87
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-1-seam-level-chunked-transcription:
-  en: 85d749d0edd83c97
-  zh: 63888d55fb20d7b6
+  en: 56a1acdd95e27a14
+  zh: 686af2b82f7057c6
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-2-speech-to-text-http-flavor-expansion:
-  en: 1882a296d7dc765b
-  zh: 7902faa7c25c8e8e
+  en: 9a656b9247a43eef
+  zh: f4c72d22ca5d726b
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-2-1-aws-transcribe-s3-prerequisite:
   en: 752389d42954638e
   zh: 6c2a6b6f882134e6
@@ -30,11 +30,11 @@
   en: b16ee588f1ba5838
   zh: 11aea9d7d380a2e6
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-4-settings-section:
-  en: 6635eb2d0bcc5edc
-  zh: f481bb1d33b9f27d
+  en: addcb87168e59119
+  zh: d90c9d82b37bb97c
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s2-design/s2-5-documentation-and-gates:
-  en: be600f61bf741192
-  zh: a4e37b9a49c40a05
+  en: 42d50af7fb098e04
+  zh: cae6829f2d21e9f4
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s3-scope:
   en: 64431add76a6ee30
   zh: 459e7f24ce765463
@@ -42,5 +42,5 @@
   en: 826291e3a71fef0f
   zh: a48744e70c3b337e
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s4-acceptance:
-  en: 354349ad4abffe87
-  zh: cf909cf0588dafd0
+  en: 825c8508d25c5290
+  zh: 7b10b424aea4c0a4

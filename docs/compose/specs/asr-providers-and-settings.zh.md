@@ -1,12 +1,14 @@
 ---
 feature: asr-providers-and-settings
-status: in-progress
+status: delivered
 updated: 2026-11-17
 branch: feat/asr-providers-and-settings
-commits: f5baf8f73f.. # filled at delivery
+commits: f5baf8f73f..760b99e11c
 ---
 
 # ASR 提供者扩展：六家服务、时长分段、语音设置分区
+
+[English](asr-providers-and-settings.md) | 中文
 
 ## Report
 
@@ -22,7 +24,7 @@ commits: f5baf8f73f.. # filled at delivery
 
 `packages/experimental/speech-to-text/src/wave.ts` 增加 `readWaveSeconds(audio)`（从 `validateWave` 抽出）与 `sliceWave(audio, startSample, endSample)`，产出规范 16 kHz 单声道 PCM16 WAV。
 
-`SpeechToText.transcribe()`（seam，`src/index.ts`）在解析到的提供者声明了上限且输入超限时切片：切点优先选目标切点 ±3 秒窗口内能量最低（安静）的采样处，否则硬切；切片按现有 abort/pending 跟踪顺序转写。结果合并：文本以 `\n` 拼接，提供者分段的时间按切片起点平移（无分段的切片合成一条覆盖分段），`audioSeconds` 与 `inferenceSeconds` 求和。
+`SpeechToText.transcribe()`（seam，`src/index.ts`）在解析到的提供者声明了上限且输入超限时切片：切点在时长上限前最多 3 秒的范围内搜索能量最低（安静）的 20 ms 窗口，否则硬切；切片按现有 abort/pending 跟踪顺序转写。结果合并：文本以 `\n` 拼接，提供者分段的时间按切片起点平移（无分段的切片合成一条覆盖分段），`audioSeconds` 与 `inferenceSeconds` 求和。
 
 未超限的输入与今天完全一致（单次提供者调用）；各提供者自身的内部校验继续作为兜底。会议页在线路径（8 秒切片）不会触发分段；文件导入路径是主要受益者。
 
@@ -30,9 +32,9 @@ commits: f5baf8f73f.. # filled at delivery
 
 服务条目的 `mode` 在 `transcriptions` 与 `chat-completions` 之外新增：
 
-- `tencent-sentence` — `POST https://asr.tencentcloudapi.com`，`SentenceRecognition` / `2019-06-14`，以 SecretId + SecretKey 做 TC3-HMAC-SHA256 签名，`SourceType: 1`（base64 WAV 放 `Audio`），`EngSerViceType` 来自 `engineModel`（默认 `16k_zh`），文本读自 `Response.Text`。上限 60 秒。
-- `xfyun-filetrans` — `POST https://raasr.xfyun.cn/v2/upload` 后轮询 `/v2/getTaskResult`；`X-Appid` / `X-CurTime` / `X-Param`（base64 JSON）/ `X-CheckSum` = base64(HMAC-SHA1(secretKey, `X-Param` + `X-CurTime`))；解析完成订单为文本。上限 5 小时；轮询受 `timeoutMs` 约束。
-- `volcano-flash` — 豆包录音文件识别*极速版*：一次 `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` 携带 `audio.data`（base64），`X-Api-Key`（新版控制台）或 app-id/访问令牌对（旧版控制台），状态在 `X-Api-Status-Code` 响应头，文本与分句分段在响应体。上限 2 小时。标准的 submit/query 版只收音频 URL，不在范围内。
+- `tencent-sentence` — `POST https://asr.tencentcloudapi.com`，`SentenceRecognition` / `2019-06-14`，以 SecretId + SecretKey 做 TC3-HMAC-SHA256 签名，`SourceType: 1`（base64 WAV 放 `Audio`），`EngSerViceType` 来自 `engineModel`（默认 `16k_zh`），文本读自 `Response.Result`。上限 60 秒。
+- `xfyun-filetrans` — 讯飞 lfasr，走 `https://raasr.xfyun.cn/api`：prepare、有序 10 MiB 分片上传、merge、进度轮询（`signa` = base64(HMAC-SHA1(secretKey, MD5(appid+ts)))）与分句结果读取。上限 5 小时；轮询受 `timeoutMs` 约束。
+- `volcano-flash` — 豆包录音文件识别*极速版*：一次 `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` 携带 `audio.data`（base64），`X-Api-Key`，状态在 `X-Api-Status-Code` 响应头，文本与分句分段在响应体。上限 2 小时。标准的 submit/query 版只收音频 URL，不在范围内。
 
 `model` 对所有形态变为可选：缺省的 `model`/`language` 表单字段直接省略（`transcriptions` 对 OpenAI/Groq/Qwen/DashScope 兼容端点继续可用）。因此 DeepSeek ASR 是纯配置：`endpoint: https://api.deepseek.com/v1/tools/asr`、无 `model`、上限 120 秒、`maxAudioBytes` 8 MiB。
 
@@ -40,7 +42,7 @@ commits: f5baf8f73f.. # filled at delivery
 
 - `authHeader?: string` + `authStyle?: 'bearer' | 'token' | 'raw'` — 非 Authorization 键（ElevenLabs `xi-api-key`，raw）与带前缀的 Authorization 形态（Deepgram 的 `Token <key>`）复用既有密钥解析，不需要专门 adapter。
 - `textField` 支持点路径访问（`results.channels.0.alternatives.0.transcript`）。
-- 新增 `raw-body` 请求形态：音频字节作为整个请求体，内容类型可配置，查询参数模板（model/language 在 URL 里）——这就是 Deepgram `/v1/listen` 的全部故事。
+- 新增 `raw-body` 请求形态：WAV 字节作为整个请求体、`audio/wav`，固定的 model 或语言参数写在端点 URL 里——这就是 Deepgram `/v1/listen` 的全部故事。
 
 在此之上提供专门形态：
 
@@ -70,13 +72,13 @@ AWS 批量识别没有内联音频 API：`StartTranscriptionJob` 接收 S3 URI�
 内容仿模型设置区的卡片布局：
 
 - 默认识别器切换器，绑定语音 seam 的持久化选择（花名册 `id`/`name`/`phase`/`languages` 来自远端语音面）。
-- 每个配置的 `speech-to-text-http` 服务一张卡：名称、端点、形态、model/引擎字段、语言、上限，以及经 `credentials/set` 与派生引用写入的 API key（模型设置区 `storeCredential` 的模式）。服务列表编辑以设置变更落在 `speech-to-text-http` 配置命名空间；卡片展示密钥状态（是否已配置）。
+- 每个配置的 `speech-to-text-http` 服务一张卡：名称、端点、模型、凭据引用，以及经 `credentials/set` 与派生引用写入的 API key（模型设置区 `storeCredential` 的模式）。服务列表编辑以设置变更落在 `speech-to-text-http` 配置命名空间；卡片展示密钥状态（是否已配置）。形态专属字段仍走配置文件。
 
 Host 接线：http 包的 `Config` 注册为设置描述符命名空间（Host `SettingsForms` 投影），既有实验性 api speech-to-text 远端面按需补齐分区所需的 list/configure 操作（先核实其现有面；扩展而非复制）。
 
 ### S2.5 文档与门禁
 
-重新生成配置目录（双语并校验配对），更新 http 包 README 对，为新配置面与分段行为写升级指南条目，添加变更记录，若花名册或设置面出现在既有期望输出中则刷新录制快照。
+重新生成配置目录（双语并校验配对），更新 http 包 README 对，在包 README 对里说明新配置面与分段行为，添加变更记录，若花名册或设置面出现在既有期望输出中则刷新录制快照。
 
 ## [S3] 范围
 
@@ -98,7 +100,7 @@ Host 接线：http 包的 `Config` 注册为设置描述符命名空间（Host `
 - [ ] 带 `DEEPSEEK_API_KEY` 的新 profile 在会议花名册显示 `deepseek-asr`，并通过 `/v1/tools/asr` 转写 8 秒片段（不发送 `model` 字段）。
 - [ ] 带 `DASHSCOPE_API_KEY` 的 profile 显示 `dashscope-qwen3`，经兼容端点转写。
 - [ ] 向上限低于 40 分钟的服务导入 40 分钟 WAV 产出合并转写（文本拼接、分段时间平移、总时求和），无 "Audio exceeds" 错误；单元测试覆盖切片边界、合并与安静边界兜底。
-- [ ] `tencent-sentence` 对固定时钟产出确定性 TC3 签名（单元测试）并解析 `Response.Text`。
+- [ ] `tencent-sentence` 对固定时钟产出确定性 TC3 签名（单元测试）并解析 `Response.Result`。
 - [ ] `xfyun-filetrans` 上传、轮询至完成并返回文本（假服务单元测试）。
 - [ ] `volcano-flash` 按文档头发送 base64 音频并读取文本与分句分段（假服务单元测试）。
 - [ ] `deepgram-listen`、`google-speech-v1`、`azure-fasttranscribe` 各自构造文档化的请求形态并解析文档化的应答（假服务单元测试）。

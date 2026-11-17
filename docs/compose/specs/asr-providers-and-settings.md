@@ -8,6 +8,8 @@ commits: f5baf8f73f..760b99e11c
 
 # ASR provider expansion: six services, duration chunking, speech settings section
 
+English | [中文](asr-providers-and-settings.zh.md)
+
 ## Report
 
 **What was built** — The speech registry splits any recording beyond a provider's declared request cap at quiet 20 ms windows (1 s minimum pieces) before the cap boundary, recognizes the pieces in order, and merges text, offset segment times, and duration totals; every recognizer now declares its cap. The HTTP ASR provider speaks nine request forms — OpenAI multipart with an optional model, chat-completions, raw-body, Tencent SentenceRecognition (TC3-HMAC-SHA256, golden-pinned), iFlytek lfasr (four-step job flow), Doubao flash edition, Google Speech v1, Azure fast transcription, and Amazon Transcribe (SigV4 over S3) — with a configurable credential header and dot-path response mapping, so DeepSeek, DashScope qwen3-asr, Deepgram, ElevenLabs, Groq, and Mistral join by configuration. The voice-input bundle ships deepseek-asr and dashscope-qwen3 built-ins, and a new speech settings section (order 11, after models) renders service cards with credential management plus the default-recognizer switcher.
@@ -28,7 +30,7 @@ The meeting page and voice input currently expose a narrow recognizer roster: `d
 
 `packages/experimental/speech-to-text/src/wave.ts` gains `readWaveSeconds(audio)` (extracted from `validateWave`) and `sliceWave(audio, startSample, endSample)` emitting a canonical 16 kHz mono PCM16 WAV.
 
-`SpeechToText.transcribe()` (seam, `src/index.ts`) chunks when the resolved provider declares a cap and the input exceeds it: cut points prefer the lowest-energy (quiet) sample within a ±3 s window around the target cut, falling back to a hard cut; chunks are transcribed sequentially under the existing abort/pending tracking. Results merge: text joins with `\n`, provider segments keep their times shifted by the chunk start (a synthesized segment covers a chunk that returned none), `audioSeconds` and `inferenceSeconds` sum.
+`SpeechToText.transcribe()` (seam, `src/index.ts`) chunks when the resolved provider declares a cap and the input exceeds it: cut points search up to 3 s before the cap boundary for the lowest-energy (quiet) 20 ms window, falling back to a hard cut; chunks are transcribed sequentially under the existing abort/pending tracking. Results merge: text joins with `\n`, provider segments keep their times shifted by the chunk start (a synthesized segment covers a chunk that returned none), `audioSeconds` and `inferenceSeconds` sum.
 
 Under-cap input is a single provider call exactly as today; the per-provider internal validations remain as backstops. The live meeting path (8 s slices) never triggers chunking; the file-import path is the primary beneficiary.
 
@@ -36,9 +38,9 @@ Under-cap input is a single provider call exactly as today; the per-provider int
 
 Service entries gain new `mode` values alongside `transcriptions` and `chat-completions`:
 
-- `tencent-sentence` — `POST https://asr.tencentcloudapi.com`, `SentenceRecognition` / `2019-06-14`, TC3-HMAC-SHA256 signing from SecretId + SecretKey, `SourceType: 1` (base64 WAV in `Audio`), `EngSerViceType` from `engineModel` (default `16k_zh`), text read from `Response.Text`. Cap 60 s.
+- `tencent-sentence` — `POST https://asr.tencentcloudapi.com`, `SentenceRecognition` / `2019-06-14`, TC3-HMAC-SHA256 signing from SecretId + SecretKey, `SourceType: 1` (base64 WAV in `Audio`), `EngSerViceType` from `engineModel` (default `16k_zh`), text read from `Response.Result`. Cap 60 s.
 - `xfyun-filetrans` — `POST https://raas.xfyun.cn/v2/upload` then poll `/v2/getTaskResult`; `X-Appid` / `X-CurTime` / `X-Param` (base64 JSON) / `X-CheckSum` = base64(HMAC-SHA1(secretKey, `X-Param` + `X-CurTime`)); parse the completed order into text. Cap 5 h; polling bounded by `timeoutMs`.
-- `volcano-flash` — Doubao recording-file recognition, *flash* edition: one `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` carrying `audio.data` (base64), `X-Api-Key` (new console) or the app-id/access-token pair (old console), status in the `X-Api-Status-Code` response header, text and utterance segments in the body. Cap 2 h. The standard submit/query edition is URL-only and stays out of scope.
+- `volcano-flash` — Doubao recording-file recognition, *flash* edition: one `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` carrying `audio.data` (base64), `X-Api-Key`, status in the `X-Api-Status-Code` response header, text and utterance segments in the body. Cap 2 h. The standard submit/query edition is URL-only and stays out of scope.
 
 `model` becomes optional for every mode: absent `model`/`language` form fields are simply omitted (`transcriptions` keeps working for OpenAI/Groq/Qwen/DashScope compatible endpoints). DeepSeek ASR is therefore pure config: `endpoint: https://api.deepseek.com/v1/tools/asr`, no `model`, cap 120 s, `maxAudioBytes` 8 MiB.
 
@@ -46,7 +48,7 @@ Generic auth and response ergonomics, added to the shared request layer so sever
 
 - `authHeader?: string` + `authStyle?: 'bearer' | 'token' | 'raw'` — non-Authorization keys (ElevenLabs `xi-api-key`, raw) and prefixed Authorization forms (`Token <key>` for Deepgram) ride the existing key resolution instead of bespoke adapters.
 - `textField` gains dot-path access (`results.channels.0.alternatives.0.transcript`).
-- A `raw-body` request form: audio bytes as the request body with a configurable content type and query parameter template (model/language in the URL) — this is the whole Deepgram `/v1/listen` story.
+- A `raw-body` request form: the WAV bytes as the whole request body with `audio/wav` and any fixed model or language parameters living in the endpoint URL — this is the whole Deepgram `/v1/listen` story.
 
 Provider-specific modes on top of that:
 
@@ -76,13 +78,13 @@ New package `packages/client/ui-settings-speech` injecting `settings.section` wi
 Content, modeled on the models section's card layout:
 
 - A default-recognizer switcher bound to the speech-to-text seam's persisted selection (roster `id`/`name`/`phase`/`languages` from the remote speech face).
-- One card per configured `speech-to-text-http` service: name, endpoint, mode, model/engine fields, languages, caps, and the API key written through `credentials/set` with a derived ref (the models-section `storeCredential` pattern). Service list edits land as settings mutations against the `speech-to-text-http` config namespace; key state (configured or not) is shown on the card.
+- One card per configured `speech-to-text-http` service: name, endpoint, model, credential reference, and the API key written through `credentials/set` with a derived ref (the models-section `storeCredential` pattern). Service list edits land as settings mutations against the `speech-to-text-http` config namespace; key state (configured or not) is shown on the card. Per-form extras stay configuration-file territory.
 
 Host wiring: the http package's `Config` registers as a settings descriptor namespace (the host `SettingsForms` projection), and the existing experimental api speech-to-text remote face grows whatever list/configure operations the section needs (verify its current surface first; extend rather than duplicate).
 
 ### S2.5 Documentation and gates
 
-Regenerate the config catalog (both languages, pairing verified), update the http package README pair, write an upgrade-guide entry for the new config surface and the chunking behavior, add changelog entries, and refresh recorded-session snapshots if the roster or settings surface appears in expected outputs.
+Regenerate the config catalog (both languages, pairing verified), update the http package README pair, document the new config surface and the chunking behavior in the package README pair, add changelog entries, and refresh recorded-session snapshots if the roster or settings surface appears in expected outputs.
 
 ## [S3] Scope
 
@@ -104,7 +106,7 @@ Regenerate the config catalog (both languages, pairing verified), update the htt
 - [ ] A fresh profile with `DEEPSEEK_API_KEY` shows `deepseek-asr` in the meeting roster and transcribes an 8 s clip through `/v1/tools/asr` (no `model` field sent).
 - [ ] A profile with `DASHSCOPE_API_KEY` shows `dashscope-qwen3` and transcribes through the compatible-mode endpoint.
 - [ ] Importing a 40-minute WAV into a service capped below 40 minutes produces a merged transcript (text joined, segment times offset, totals summed) with no "Audio exceeds" error; unit tests cover the chunk boundary, merge, and quiet-boundary fallback.
-- [ ] `tencent-sentence` produces a deterministic TC3 signature against a fixed clock (unit test) and parses `Response.Text`.
+- [ ] `tencent-sentence` produces a deterministic TC3 signature against a fixed clock (unit test) and parses `Response.Result`.
 - [ ] `xfyun-filetrans` uploads, polls to completion, and returns text (fake-server unit test).
 - [ ] `volcano-flash` sends base64 audio with the documented headers and reads text plus utterance segments (fake-server unit test).
 - [ ] `deepgram-listen`, `google-speech-v1`, and `azure-fasttranscribe` each build their documented request form and parse the documented response (fake-server unit tests).

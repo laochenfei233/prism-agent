@@ -25,7 +25,6 @@ export const zh = {
   /** Label of the registration-id field. */
   providerId: '识别器 ID',
   /** Label of the request-form field. */
-  mode: '请求形态',
   /** Label of the endpoint field. */
   endpoint: '端点',
   /** Label of the model field. */
@@ -44,14 +43,10 @@ export const zh = {
   keyRemove: '移除密钥',
   /** Hint under the credential row. */
   keyHint: '密钥按引用名存入凭据库；识别器在每次请求时解析它。',
-  /** Toast for one saved card. */
-  saved: '已保存',
   /** Toast for one refused write. */
   writeFailed: '保存失败',
   /** Hint when the speech remote is not served by this deployment. */
   rosterUnavailable: '此部署未启用语音注册表，默认识别器跟随会议页选择。',
-  /** Toast for one changed default recognizer. */
-  selected: '已切换默认识别器',
 }
 
 /** en dictionary, keyed exactly as zh. */
@@ -67,7 +62,6 @@ export const en: typeof zh = {
   removeConfirm: 'Delete this transcription service?',
   name: 'Name',
   providerId: 'Recognizer ID',
-  mode: 'Request form',
   endpoint: 'Endpoint',
   model: 'Model',
   apiKeyEnv: 'Credential reference',
@@ -77,10 +71,8 @@ export const en: typeof zh = {
   keySet: 'Set key',
   keyRemove: 'Remove key',
   keyHint: 'Keys are stored under the reference name in the credential store; the recognizer resolves it per request.',
-  saved: 'Saved',
   writeFailed: 'Save failed',
   rosterUnavailable: 'This deployment serves no speech registry; the default recognizer follows the meeting page selection.',
-  selected: 'Default recognizer switched',
 }
 
 /** Keys of the speech settings dictionary. */

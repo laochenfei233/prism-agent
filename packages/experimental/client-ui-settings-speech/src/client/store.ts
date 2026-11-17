@@ -23,6 +23,14 @@ export interface SpeechServiceConfig {
   readonly maxDurationSeconds?: number
 }
 
+/** Field edits one service card submits; a `null` model clears the field. */
+export interface SpeechServiceEdits {
+  readonly name?: string
+  readonly endpoint?: string
+  readonly model?: string | null
+  readonly apiKeyEnv?: string
+}
+
 /** Client-sync state of the page. */
 export interface SpeechSettingsState {
   /** Configured services in document order. */
@@ -92,13 +100,16 @@ export class SpeechSettingsStore {
   /**
    * Save one service card's edited fields back into the document.
    * @param index - service position in the document list.
-   * @param patch - field edits; an absent optional field clears it.
+   * @param edits - field edits; a `null` model clears the field from the entry.
    */
-  async saveService(index: number, patch: SpeechServiceConfig): Promise<void> {
+  async saveService(index: number, edits: SpeechServiceEdits): Promise<void> {
     const services = [...this.state.services]
     const current = services[index]
     if (current === undefined) return
-    services[index] = { ...current, ...patch }
+    const { model, ...rest } = edits
+    const merged: Record<string, unknown> = { ...current, ...rest }
+    if (model === null || model === '') delete merged.model
+    services[index] = merged as SpeechServiceConfig
     await this.write(services)
   }
 
@@ -118,7 +129,8 @@ export class SpeechSettingsStore {
   }
 
   /**
-   * Remove one service and any key state it carried.
+   * Remove one service from the document; its stored key stays in the
+   * credential store until removed explicitly.
    * @param index - service position in the document list.
    */
   async removeService(index: number): Promise<void> {

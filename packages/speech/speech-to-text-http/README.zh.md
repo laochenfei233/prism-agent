@@ -17,10 +17,12 @@ kind: "package-reference"
 
 -----
 
+<a id="summary"></a>
 ## 概述
 
 这个插件为每个配置的服务在 `ctx.speechToText` 上注册一个识别器，第三方 ASR 服务只靠配置就能接入语音输入和会议页。每个识别器把规范 WAV 按配置的请求形态上传到配置的端点，并从 JSON 应答读取文本；注册表会把超出请求形态时长上限的录音在安静边界切片并合并各片。提供者不拥有准备，注册即就绪。语音识别设置分区编辑这个插件的服务列表与密钥；语音输入 Bundle 内置 DeepSeek ASR 与 DashScope qwen3-asr。
 
+<a id="configuration"></a>
 ## 配置
 
 插件接收 `services` 列表；每个条目注册一个识别器，重复 id 在加载时失败。每个条目命名 `providerId`、可选显示 `name`、`endpoint` 和接受的 `languages`；`mode` 选择请求形态。`apiKeyEnv` 命名一个凭据引用，受控部署也支持字面量 `apiKey`，但不应写进普通配置文件；`authHeader` 与 `authStyle`（默认 `bearer`，或 `token`、`raw`）把凭据放进服务期望的头。`textField` 以点路径（对象键与数组下标）命名应答的响应字段（默认 `text`），`maxAudioBytes`、`maxDurationSeconds` 与 `timeoutMs` 约束每次识别；缺省 `model` 时不发送 model 字段。
@@ -67,6 +69,7 @@ plugins:
           languages: [auto]
 ```
 
+<a id="model-experience"></a>
 ## 模型体验
 
 无；识别结果在被消费者显式持久化或提交之前不会进入模型请求。
@@ -75,6 +78,7 @@ plugins:
 
 无直接影响；把识别文本放进模型请求的消费者自行承担前缀效应。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - chat-completions 形态只读取 `choices[0].message.content`；其他 chat 应答布局不在范围内。
