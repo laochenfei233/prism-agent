@@ -1,8 +1,9 @@
 /**
  * Register config-driven HTTP transcription providers with `ctx.speechToText`:
  * every configured service becomes one immediately-ready recognizer speaking
- * the OpenAI `/audio/transcriptions` request shape. Third-party ASR services
- * join voice-input and the meeting page by configuration alone.
+ * the OpenAI `/audio/transcriptions` multipart form or an audio-bearing
+ * chat-completions request. Third-party ASR services join voice-input and the
+ * meeting page by configuration alone.
  * @module @deepseek-ai/dsh-experimental-speech-to-text-http
  */
 
@@ -17,7 +18,7 @@ import z from '@deepseek-ai/schemastery'
 import { HttpSpeechProvider } from './provider.ts'
 
 export { HTTP_ASR_TIMEOUT_CODE, HttpSpeechProvider } from './provider.ts'
-export type { HttpAsrServiceOptions } from './provider.ts'
+export type { HttpAsrServiceOptions, SpeechHttpMode } from './provider.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'speech-to-text-http'
@@ -33,6 +34,8 @@ export interface HttpServiceConfig {
   name?: string
   /** Complete POST URL of the transcription endpoint. */
   endpoint: string
+  /** Request form the service speaks; defaults to the OpenAI multipart form. */
+  mode: 'transcriptions' | 'chat-completions'
   /** Literal API key; prefer {@link HttpServiceConfig.apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
   /** Credential reference holding the bearer key. */
@@ -63,6 +66,7 @@ export const Config = z.object({
     providerId: z.string().min(1).required(),
     name: z.string().min(1),
     endpoint: z.string().min(1).required(),
+    mode: z.union([z.const('transcriptions'), z.const('chat-completions')]).default('transcriptions'),
     apiKey: z.string().role('secret'),
     apiKeyEnv: z.string().role('credential-ref').required(),
     model: z.string().min(1).required(),
@@ -111,6 +115,7 @@ export function apply(ctx: Context, config: Config): void {
       id: service.providerId,
       ...(service.name === undefined ? {} : { name: service.name }),
       endpoint: service.endpoint,
+      ...(service.mode === 'transcriptions' ? {} : { mode: service.mode }),
       model: service.model,
       languages: service.languages,
       textField: service.textField,

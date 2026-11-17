@@ -1,8 +1,9 @@
 /**
  * One config-driven HTTP transcription provider: it uploads the canonical WAV
- * to a third-party endpoint using the OpenAI `/audio/transcriptions` request
- * shape and reads the recognized text from one JSON response field. The
- * provider owns no preparation, so the registry reports it ready on arrival.
+ * to a third-party endpoint speaking either the OpenAI `/audio/transcriptions`
+ * multipart form or an audio-bearing chat-completions request, and reads the
+ * recognized text from the JSON answer. The provider owns no preparation, so
+ * the registry reports it ready on arrival.
  * @module @deepseek-ai/dsh-experimental-speech-to-text-http/provider
  */
 
@@ -16,6 +17,9 @@ import { deadline } from '@deepseek-ai/dsh-timeout'
 /** Deadline code the provider reports when the service exceeds its budget. */
 export const HTTP_ASR_TIMEOUT_CODE = 'HTTP_ASR_TIMEOUT'
 
+/** Request form one configured service speaks. */
+export type SpeechHttpMode = 'transcriptions' | 'chat-completions'
+
 /** Longest JSON answer this provider reads before giving up on the body. */
 const MAX_RESPONSE_BYTES = 1024 * 1024
 
@@ -27,7 +31,9 @@ export interface HttpAsrServiceOptions {
   readonly name?: string
   /** Complete POST URL of the transcription endpoint. */
   readonly endpoint: string
-  /** Transcription model named in the form. */
+  /** Request form the service speaks; defaults to the OpenAI multipart form. */
+  readonly mode?: SpeechHttpMode
+  /** Transcription model named in the request. */
   readonly model: string
   /** Language hints this recognizer accepts, including `auto`. */
   readonly languages: readonly string[]
@@ -51,6 +57,7 @@ export class HttpSpeechProvider implements SpeechProvider {
   readonly info: SpeechProviderInfo
 
   private readonly endpoint: string
+  private readonly mode: SpeechHttpMode
   private readonly model: string
   private readonly textField: string
   private readonly maxAudioBytes: number
@@ -70,6 +77,7 @@ export class HttpSpeechProvider implements SpeechProvider {
       languages: [...options.languages],
     }
     this.endpoint = options.endpoint
+    this.mode = options.mode ?? 'transcriptions'
     this.model = options.model
     this.textField = options.textField
     this.maxAudioBytes = options.maxAudioBytes
@@ -80,8 +88,8 @@ export class HttpSpeechProvider implements SpeechProvider {
   }
 
   /**
-   * Upload one canonical recording as `multipart/form-data` and read the mapped
-   * text field of the JSON answer.
+   * Upload one canonical recording in the configured request form and read the
+   * recognized text of the JSON answer.
    * @param input - complete WAV bytes and the resolved language hint.
    * @param signal - caller or registration cancellation.
    * @returns the recognized text and measured durations.
@@ -98,26 +106,66 @@ export class HttpSpeechProvider implements SpeechProvider {
     }
     using callDeadline = deadline(signal, this.timeoutMs, HTTP_ASR_TIMEOUT_CODE)
     const startedAt = performance.now()
-    const form = new FormData()
-    form.append('file', new Blob([new Uint8Array(input.audio)], { type: 'audio/wav' }), 'audio.wav')
-    form.append('model', this.model)
-    if (input.language !== 'auto') form.append('language', input.language)
-    const response = await this.doFetch(this.endpoint, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: callDeadline.signal,
-    })
+    const response = await this.doFetch(this.endpoint, this.mode === 'chat-completions'
+      ? this.chatCompletionsRequest(apiKey, input, callDeadline.signal)
+      : this.transcriptionsRequest(apiKey, input, callDeadline.signal))
     const body = await readBody(response)
     if (!response.ok) {
       throw new Error(`Speech service ${this.info.name} answered ${response.status}: ${body}`)
     }
-    const text = readTextField(body, this.textField, this.info.name)
+    const text = this.mode === 'chat-completions'
+      ? readChatCompletionsText(body, this.info.name)
+      : readTextField(body, this.textField, this.info.name)
     callDeadline.signal.throwIfAborted()
     return {
       text,
       audioSeconds,
       inferenceSeconds: (performance.now() - startedAt) / 1000,
+    }
+  }
+
+  /**
+   * Build the OpenAI `/audio/transcriptions` multipart request.
+   * @param apiKey - resolved bearer credential.
+   * @param input - complete WAV bytes and the resolved language hint.
+   * @param signal - deadline signal covering the request.
+   * @returns the fetch request descriptor.
+   */
+  private transcriptionsRequest(apiKey: string, input: SpeechInput, signal: AbortSignal): RequestInit {
+    const form = new FormData()
+    form.append('file', new Blob([new Uint8Array(input.audio)], { type: 'audio/wav' }), 'audio.wav')
+    form.append('model', this.model)
+    if (input.language !== 'auto') form.append('language', input.language)
+    return {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal,
+    }
+  }
+
+  /**
+   * Build the audio-bearing chat-completions request: the canonical WAV travels
+   * as one base64 data URL inside an `input_audio` content part, the form
+   * chat-completions ASR services such as MiMo-V2.5-ASR document. `asr_options`
+   * is those services' language knob; the auto hint uses the endpoint's own
+   * detection default.
+   * @param apiKey - resolved bearer credential.
+   * @param input - complete WAV bytes and the resolved language hint.
+   * @param signal - deadline signal covering the request.
+   * @returns the fetch request descriptor.
+   */
+  private chatCompletionsRequest(apiKey: string, input: SpeechInput, signal: AbortSignal): RequestInit {
+    const audio = `data:audio/wav;base64,${Buffer.from(input.audio).toString('base64')}`
+    return {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [{ role: 'user', content: [{ type: 'input_audio', input_audio: { data: audio } }] }],
+        ...(input.language === 'auto' ? {} : { asr_options: { language: input.language } }),
+      }),
+      signal,
     }
   }
 }
@@ -170,6 +218,30 @@ function readTextField(body: string, field: string, name: string): string {
     throw new Error(`Speech service ${name} answered without the "${field}" field`)
   }
   return text
+}
+
+/**
+ * Read the recognized text of one chat-completions answer.
+ * @param body - the response body text.
+ * @param name - the service display name for the failure message.
+ * @returns the recognized text; empty when the service recognized no speech.
+ */
+function readChatCompletionsText(body: string, name: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch (error) {
+    throw new Error(`Speech service ${name} answered malformed JSON: ${reasonOf(error)}`)
+  }
+  const message = typeof parsed === 'object' && parsed !== null
+    && Array.isArray((parsed as Record<string, unknown>).choices)
+    ? (parsed as { choices: ReadonlyArray<{ message?: { content?: unknown } }> }).choices[0]?.message
+    : undefined
+  // An empty string is the legitimate "no speech was recognized" transcript.
+  if (typeof message?.content !== 'string') {
+    throw new Error(`Speech service ${name} answered without a "choices[0].message.content" text`)
+  }
+  return message.content
 }
 
 /** Operator-readable text for one thrown value. */

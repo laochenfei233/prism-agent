@@ -1465,7 +1465,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-speech-to-text-http`
 
 - `inject`: `speechToText`
-- `source`: [`packages/speech/speech-to-text-http/src/index.ts:55`](../packages/speech/speech-to-text-http/src/index.ts)
+- `source`: [`packages/speech/speech-to-text-http/src/index.ts:58`](../packages/speech/speech-to-text-http/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration; every entry becomes one registered recognizer. */
@@ -1482,6 +1482,8 @@ export interface HttpServiceConfig {
   name?: string
   /** Complete POST URL of the transcription endpoint. */
   endpoint: string
+  /** Request form the service speaks; defaults to the OpenAI multipart form. */
+  mode: 'transcriptions' | 'chat-completions'
   /** Literal API key; prefer {@link HttpServiceConfig.apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
   /** Credential reference holding the bearer key. */

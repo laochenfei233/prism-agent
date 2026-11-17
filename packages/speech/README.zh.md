@@ -24,9 +24,8 @@ speech 组定义具名转写 Provider seam，维护 DashScope 云 Provider，并
 | Package | Role | ctx key |
 |---|---|---|
 | [`speech-to-text/`](speech-to-text/README.zh.md) | 路由具名 Provider，拥有取消操作和易变默认值，并校验 WAV 输入 | `ctx.speechToText` |
-| [`speech-to-text-http/`](speech-to-text-http/README.zh.md) | 注册配置驱动的第三方 HTTP 识别器，使用 OpenAI 转写形态 | 贡献配置的提供者 id |
+| [`speech-to-text-http/`](speech-to-text-http/README.zh.md) | 注册配置驱动的第三方 HTTP 识别器，使用 OpenAI multipart 或 chat-completions 请求形态 | 贡献配置的提供者 id |
 | [`speech-to-text-dashscope/`](speech-to-text-dashscope/README.zh.md) | 注册面向完整 WAV 录音的 DashScope 实时识别器 | 贡献 `dashscope-funasr` |
-| [`speech-to-text-http/`](speech-to-text-http/README.zh.md) | 注册配置驱动的第三方 HTTP 识别器，使用 OpenAI 转写形态 | 贡献配置的提供者 id |
 
 -----
 

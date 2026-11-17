@@ -153,6 +153,75 @@ describe('HTTP provider recognition', () => {
   })
 })
 
+describe('chat-completions mode recognition', () => {
+  /** One provider speaking the audio-bearing chat-completions request form. */
+  function chatProvider(doFetch: typeof fetch): HttpSpeechProvider {
+    return provider(doFetch, async () => 'secret', {
+      endpoint: 'https://asr.example/v1/chat/completions',
+      mode: 'chat-completions',
+      model: 'mimo-v2.5-asr',
+      languages: ['auto', 'zh', 'en'],
+    })
+  }
+
+  it('sends the WAV as a base64 data URL inside an input_audio message', async () => {
+    const stub = fetchOf(200, JSON.stringify({ choices: [{ message: { role: 'assistant', content: '会议开始了' } }] }))
+    const audio = canonicalWav(1)
+    const result = await chatProvider(stub.doFetch).transcribe({ audio, language: 'zh' }, new AbortController().signal)
+    expect(result).toMatchObject({ text: '会议开始了', audioSeconds: 1 })
+    expect(stub.calls).toHaveLength(1)
+    expect(stub.calls[0]?.url).toBe('https://asr.example/v1/chat/completions')
+    const headers = new Headers(stub.calls[0]?.init.headers)
+    expect(headers.get('authorization')).toBe('Bearer secret')
+    expect(headers.get('content-type')).toBe('application/json')
+    const body = JSON.parse(stub.calls[0]?.init.body as string) as {
+      model: string
+      asr_options: { language: string }
+      messages: { role: string; content: { type: string; input_audio: { data: string } }[] }[]
+    }
+    expect(body.model).toBe('mimo-v2.5-asr')
+    expect(body.asr_options).toEqual({ language: 'zh' })
+    expect(body.messages[0]?.role).toBe('user')
+    expect(body.messages[0]?.content[0]?.type).toBe('input_audio')
+    expect(body.messages[0]?.content[0]?.input_audio.data).toBe(`data:audio/wav;base64,${Buffer.from(audio).toString('base64')}`)
+  })
+
+  it('omits the language knob for the auto hint and answers empty as no speech', async () => {
+    const stub = fetchOf(200, JSON.stringify({ choices: [{ message: { role: 'assistant', content: '' } }] }))
+    const result = await chatProvider(stub.doFetch).transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal)
+    expect(result).toMatchObject({ text: '' })
+    const body = JSON.parse(stub.calls[0]?.init.body as string) as { asr_options?: { language: string } }
+    expect(body.asr_options).toBeUndefined()
+  })
+
+  it('rejects an answer without a choices message text', async () => {
+    const stub = fetchOf(200, JSON.stringify({ choices: [] }))
+    await expect(chatProvider(stub.doFetch).transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal))
+      .rejects.toThrow('answered without a "choices[0].message.content" text')
+  })
+
+  it('registers a chat-completions service and answers through the registry', async () => {
+    const stub = fetchOf(200, JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'chat mode from the registry' } }] }))
+    vi.stubGlobal('fetch', stub.doFetch)
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SpeechToText, { defaultProvider: 'http-chat', language: 'auto' })
+      const fiber = await ctx.plugin(Plugin, {
+        services: [
+          { providerId: 'http-chat', endpoint: 'https://a.example/v1/chat/completions', apiKey: 'literal-chat', apiKeyEnv: 'A_KEY', model: 'mimo-v2.5-asr', mode: 'chat-completions', languages: ['auto', 'zh', 'en'] },
+        ],
+      })
+      expect(ctx.speechToText.listProviders()).toEqual([
+        { id: 'http-chat', name: 'mimo-v2.5-asr', location: 'cloud', languages: ['auto', 'zh', 'en'] },
+      ])
+      const spec = ctx.speechToText.resolve({ audio: canonicalWav(1) })
+      await expect(ctx.speechToText.transcribe(spec, new AbortController().signal))
+        .resolves.toMatchObject({ text: 'chat mode from the registry' })
+      await fiber.dispose()
+    } finally { await ctx.fiber.dispose() }
+  })
+})
+
 describe('HTTP provider registration', () => {
   it('registers one recognizer per service, answers through the registry, and withdraws on disposal', async () => {
     const stub = fetchOf(200, JSON.stringify({ text: 'from the registry' }))
