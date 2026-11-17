@@ -62,6 +62,7 @@ describe('voice-input bundle composition', () => {
       'speech-to-text-http',
       'api-speech-to-text',
       'ui-voice-input',
+      'client-ui-settings-speech',
     ])
     expect(rows.find(row => row.id === 'speech-to-text-dashscope')?.name)
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-dashscope')
@@ -69,6 +70,8 @@ describe('voice-input bundle composition', () => {
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-sensevoice')
     expect(rows.find(row => row.id === 'speech-to-text-http')?.name)
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-http')
+    expect(rows.find(row => row.id === 'client-ui-settings-speech')?.name)
+      .toBe('@deepseek-ai/dsh-experimental-client-ui-settings-speech')
     expect(rows.find(row => row.id === 'speech-to-text-http')?.config).toEqual({
       services: [
         { providerId: 'deepseek-asr', name: 'DeepSeek ASR', endpoint: 'https://api.deepseek.com/v1/tools/asr',

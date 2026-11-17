@@ -40,3 +40,7 @@
       name: '@deepseek-ai/dsh-experimental-api-speech-to-text'
     - id: ui-voice-input
       name: '@deepseek-ai/dsh-experimental-client-ui-voice-input'
+    # Settings section for the HTTP services above: service cards, keys, and
+    # the default-recognizer switcher share this bundle's lifetime.
+    - id: client-ui-settings-speech
+      name: '@deepseek-ai/dsh-experimental-client-ui-settings-speech'

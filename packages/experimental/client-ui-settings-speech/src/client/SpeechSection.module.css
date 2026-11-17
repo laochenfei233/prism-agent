@@ -1,0 +1,102 @@
+/* Speech settings page: cards and rows, aligned with the data section's layout. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.intro {
+  margin: 0;
+  color: var(--dsh-text-secondary, #666);
+  font-size: 13px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--dsh-border, #ddd);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rowLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.select,
+.input {
+  border: 1px solid var(--dsh-border, #ccc);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.code {
+  font-size: 12px;
+}
+
+.tag,
+.okTag,
+.missingTag {
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--dsh-border, #ddd);
+}
+
+.okTag {
+  color: #1a7f37;
+}
+
+.missingTag {
+  color: #9a6700;
+}
+
+.button,
+.dangerButton,
+.addButton {
+  border: 1px solid var(--dsh-border, #ccc);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.dangerButton {
+  color: #c62828;
+}
+
+.addButton {
+  align-self: flex-start;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsh-text-secondary, #888);
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  color: #c62828;
+  font-size: 13px;
+}
