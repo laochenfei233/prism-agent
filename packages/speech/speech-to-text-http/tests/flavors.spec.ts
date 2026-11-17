@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Plugin from '../src/index.ts'
 import { HttpSpeechProvider } from '../src/provider.ts'
 import { readTencentResult, tencentSentenceRequest } from '../src/tencent.ts'
-import { readVolcanoResult } from '../src/volcano.ts'
 
 /** Golden TC3 signature of the deterministic recording below, computed independently of the adapter. */
 const GOLDEN_TC3 = '4c7f431477d005aa2950feee61b73580fa2536953afcc3fc62a21e5636eb0fbf'

@@ -23,9 +23,9 @@ function fakeForm(initial: SpeechServiceConfig[]): {
       return () => { listeners.delete(listener) }
     },
     mutate: async mutations => {
-      for (const mutation of mutations) ops.push({ path: mutation.path, value: mutation.value })
+      for (const mutation of mutations) ops.push({ path: mutation.path, ...(mutation.op === 'set' ? { value: mutation.value } : {}) })
       const mutation = mutations[0]
-      if (mutation !== undefined && mutation.path[0] === 'services') {
+      if (mutation !== undefined && mutation.op === 'set' && mutation.path[0] === 'services') {
         services = mutation.value as SpeechServiceConfig[]
         revision++
         for (const listener of listeners) listener()
@@ -99,8 +99,9 @@ describe('speech settings store', () => {
     const { store, ops } = mounted()
     await store.saveService(0, { name: 'Renamed' })
     expect(ops).toEqual([{ path: ['services'], value: expect.anything() }])
-    expect(ops[0]?.value[0]).toMatchObject({ providerId: 'deepseek-asr', name: 'Renamed', endpoint: 'https://api.deepseek.com/v1/tools/asr' })
-    expect(ops[0]?.value[1]).toMatchObject({ providerId: 'dashscope-qwen3' })
+    const written = (ops[0] as { value: SpeechServiceConfig[] }).value
+    expect(written[0]).toMatchObject({ providerId: 'deepseek-asr', name: 'Renamed', endpoint: 'https://api.deepseek.com/v1/tools/asr' })
+    expect(written[1]).toMatchObject({ providerId: 'dashscope-qwen3' })
   })
 
   it('removes one service and clears the notice on accepted writes', async () => {

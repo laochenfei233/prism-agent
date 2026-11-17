@@ -42,12 +42,12 @@ class StubCredentials extends CredentialProvider {
 function provider(
   doFetch: typeof fetch,
   resolveApiKey: () => Promise<string | undefined> = async () => 'secret',
-  overrides: Partial<ConstructorParameters<typeof HttpSpeechProvider>[0]> = {},
+  overrides: Partial<Omit<ConstructorParameters<typeof HttpSpeechProvider>[0], 'model'>> = {},
+  model: string | null = 'whisper-large-v3',
 ): HttpSpeechProvider {
   return new HttpSpeechProvider({
     id: 'http-test',
     endpoint: 'https://asr.example/v1/audio/transcriptions',
-    model: 'whisper-large-v3',
     languages: ['auto', 'zh'],
     textField: 'text',
     maxAudioBytes: 25 * 1024 * 1024,
@@ -55,6 +55,7 @@ function provider(
     timeoutMs: 1_000,
     resolveApiKey,
     doFetch,
+    ...(model === null ? {} : { model }),
     ...overrides,
   })
 }
@@ -156,7 +157,7 @@ describe('HTTP provider recognition', () => {
 describe('generic request layer', () => {
   it('omits the model field and keeps the credential when the service names no model', async () => {
     const stub = fetchOf(200, JSON.stringify({ text: 'ok' }))
-    await provider(stub.doFetch, async () => 'secret', { model: undefined, name: 'DeepSeek ASR' }).transcribe(
+    await provider(stub.doFetch, async () => 'secret', { name: 'DeepSeek ASR' }, null).transcribe(
       { audio: canonicalWav(1), language: 'auto' }, new AbortController().signal)
     const form = stub.calls[0]?.init.body as FormData
     expect(form.get('model')).toBeNull()
@@ -202,9 +203,8 @@ describe('chat-completions mode recognition', () => {
     return provider(doFetch, async () => 'secret', {
       endpoint: 'https://asr.example/v1/chat/completions',
       mode: 'chat-completions',
-      model: 'mimo-v2.5-asr',
       languages: ['auto', 'zh', 'en'],
-    })
+    }, 'mimo-v2.5-asr')
   }
 
   it('sends the WAV as a base64 data URL inside an input_audio message', async () => {

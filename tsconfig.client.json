@@ -53,6 +53,7 @@
     { "path": "./packages/client/ui-file-drag" },
     { "path": "./packages/session/message-quotes" },
     { "path": "./packages/experimental/client-ui-voice-input" },
+    { "path": "./packages/experimental/client-ui-settings-speech" },
     { "path": "./packages/experimental/client-ui-claude-code-mods" },
 
     { "path": "./packages/client/ui-sidebar-terminal" },
