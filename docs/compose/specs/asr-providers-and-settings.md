@@ -32,7 +32,7 @@ Service entries gain new `mode` values alongside `transcriptions` and `chat-comp
 
 - `tencent-sentence` — `POST https://asr.tencentcloudapi.com`, `SentenceRecognition` / `2019-06-14`, TC3-HMAC-SHA256 signing from SecretId + SecretKey, `SourceType: 1` (base64 WAV in `Audio`), `EngSerViceType` from `engineModel` (default `16k_zh`), text read from `Response.Text`. Cap 60 s.
 - `xfyun-filetrans` — `POST https://raas.xfyun.cn/v2/upload` then poll `/v2/getTaskResult`; `X-Appid` / `X-CurTime` / `X-Param` (base64 JSON) / `X-CheckSum` = base64(HMAC-SHA1(secretKey, `X-Param` + `X-CurTime`)); parse the completed order into text. Cap 5 h; polling bounded by `timeoutMs`.
-- `volcano-filetrans` — Doubao recording-file recognition per the published HTTP doc: submit then query with the documented `Authorization` header form (`appid` + access token). Decision point at implementation start: the standard edition takes an audio *URL*; if the lite edition does not accept base64 bytes either, stop and re-grill (WebSocket streaming adapter or deferral) instead of forcing an upload target.
+- `volcano-flash` — Doubao recording-file recognition, *flash* edition: one `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash` carrying `audio.data` (base64), `X-Api-Key` (new console) or the app-id/access-token pair (old console), status in the `X-Api-Status-Code` response header, text and utterance segments in the body. Cap 2 h. The standard submit/query edition is URL-only and stays out of scope.
 
 `model` becomes optional for every mode: absent `model`/`language` form fields are simply omitted (`transcriptions` keeps working for OpenAI/Groq/Qwen/DashScope compatible endpoints). DeepSeek ASR is therefore pure config: `endpoint: https://api.deepseek.com/v1/tools/asr`, no `model`, cap 120 s, `maxAudioBytes` 8 MiB.
 
@@ -80,14 +80,14 @@ Regenerate the config catalog (both languages, pairing verified), update the htt
 
 ## [S3] Scope
 
-- In scope: seam chunked transcription; optional-`model` plus the generic auth-header/dot-path/raw-body mechanisms; domestic flavors (tencent-sentence, xfyun-filetrans, volcano-filetrans) and international flavors (deepgram-listen, google-speech-v1, azure-fasttranscribe, aws-transcribe); built-in `deepseek-asr` + `dashscope-qwen3`; the speech settings section; docs/catalog/snapshot/changelog updates. OpenAI-compatible international services (OpenAI, Groq, Mistral) need no code — documented as config recipes.
-- Out of scope: WebSocket streaming adapters (real-time providers) except as the documented fallback if S2.2's volcano decision point fails; speaker diarization for new providers; recognizer-selector changes on the meeting page beyond what the roster already shows; localization beyond the zh/en pair; Azure batch transcription and any provider whose audio input is a URL only.
+- In scope: seam chunked transcription; optional-`model` plus the generic auth-header/dot-path/raw-body mechanisms; domestic flavors (tencent-sentence, xfyun-filetrans, volcano-flash) and international flavors (deepgram-listen, google-speech-v1, azure-fasttranscribe, aws-transcribe); built-in `deepseek-asr` + `dashscope-qwen3`; the speech settings section; docs/catalog/snapshot/changelog updates. OpenAI-compatible international services (OpenAI, Groq, Mistral) need no code — documented as config recipes.
+- Out of scope: WebSocket streaming adapters (real-time providers); speaker diarization for new providers; recognizer-selector changes on the meeting page beyond what the roster already shows; localization beyond the zh/en pair; Azure batch transcription and any provider whose audio input is a URL only (Doubao standard submit/query edition).
 
 ## Tasks
 
 - [ ] T1: seam chunked transcription — info cap field, wave read/slice helpers, quiet-boundary chunk loop, merge semantics, unit tests (depends: none)
 - [ ] T2: generic request layer — optional model, authHeader/authStyle, dot-path textField, raw-body form (depends: none)
-- [ ] T3: domestic flavors — tencent-sentence, xfyun-filetrans, volcano-filetrans (decision point), per-flavor key fields, unit tests (depends: T2)
+- [ ] T3: domestic flavors — tencent-sentence, xfyun-filetrans, volcano-flash, per-flavor key fields, unit tests (depends: T2)
 - [ ] T4: international flavors — deepgram-listen, google-speech-v1, azure-fasttranscribe, aws-transcribe (last; re-grill point), unit tests (depends: T2)
 - [ ] T5: built-in deepseek-asr + dashscope-qwen3 in the base voice profile (depends: T3)
 - [ ] T6: speech settings section package + host face wiring (depends: T3, T4)
@@ -100,7 +100,7 @@ Regenerate the config catalog (both languages, pairing verified), update the htt
 - [ ] Importing a 40-minute WAV into a service capped below 40 minutes produces a merged transcript (text joined, segment times offset, totals summed) with no "Audio exceeds" error; unit tests cover the chunk boundary, merge, and quiet-boundary fallback.
 - [ ] `tencent-sentence` produces a deterministic TC3 signature against a fixed clock (unit test) and parses `Response.Text`.
 - [ ] `xfyun-filetrans` uploads, polls to completion, and returns text (fake-server unit test).
-- [ ] `volcano-filetrans` resolves its decision point with a documented outcome (implemented, or re-grilled with evidence).
+- [ ] `volcano-flash` sends base64 audio with the documented headers and reads text plus utterance segments (fake-server unit test).
 - [ ] `deepgram-listen`, `google-speech-v1`, and `azure-fasttranscribe` each build their documented request form and parse the documented response (fake-server unit tests).
 - [ ] `aws-transcribe` either passes a fake-server round trip (upload → start → poll → read) or the feature returns to the user with the re-grill outcome and rationale.
 - [ ] The settings section lists built-in and user services, edits a service field through a settings mutation, sets and removes a key through credentials, and switches the default recognizer; all persisted to the profile.

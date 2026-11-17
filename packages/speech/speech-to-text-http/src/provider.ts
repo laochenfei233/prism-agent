@@ -9,16 +9,31 @@
 
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type {
-  SpeechProvider, SpeechProviderId, SpeechProviderInfo, SpeechInput, Transcript,
+  SpeechProvider, SpeechProviderId, SpeechProviderInfo, SpeechInput, SpeechSegment, Transcript,
 } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import { validateWave } from '@deepseek-ai/dsh-experimental-speech-to-text/wave'
 import { deadline } from '@deepseek-ai/dsh-timeout'
+import { readTencentResult, tencentSentenceRequest } from './tencent.ts'
+import { XfyunFiletrans } from './xfyun.ts'
+import { readVolcanoResult, volcanoFlashRequest } from './volcano.ts'
 
 /** Deadline code the provider reports when the service exceeds its budget. */
 export const HTTP_ASR_TIMEOUT_CODE = 'HTTP_ASR_TIMEOUT'
 
 /** Request form one configured service speaks. */
-export type SpeechHttpMode = 'transcriptions' | 'chat-completions' | 'raw-body'
+export type SpeechHttpMode =
+  | 'transcriptions'
+  | 'chat-completions'
+  | 'raw-body'
+  | 'tencent-sentence'
+  | 'xfyun-filetrans'
+  | 'volcano-flash'
+
+/** Per-request audio duration cap each provider-specific form imposes, in seconds. */
+const MODE_CAP_SECONDS: Partial<Record<SpeechHttpMode, number>> = {
+  'tencent-sentence': 60,
+  'volcano-flash': 2 * 3600,
+}
 
 /** Credential placement one configured service expects. */
 export type SpeechHttpAuthStyle = 'bearer' | 'token' | 'raw'
@@ -49,6 +64,14 @@ export interface HttpAsrServiceOptions {
   readonly authHeader?: string
   /** Credential value prefix; defaults to the `Bearer` scheme. */
   readonly authStyle?: SpeechHttpAuthStyle
+  /** Engine model the `tencent-sentence` form names in its body. */
+  readonly engineModel?: string
+  /** Resolves the Tencent SecretId signing identity; required for `tencent-sentence`. */
+  readonly resolveSecretId?: () => Promise<string | undefined>
+  /** Resolves the iFlytek AppId; required for `xfyun-filetrans`. */
+  readonly resolveAppId?: () => Promise<string | undefined>
+  /** Delay between iFlytek progress polls, in milliseconds. */
+  readonly pollIntervalMs?: number
   /** Rejected recording size in bytes. */
   readonly maxAudioBytes: number
   /** Rejected recording duration in seconds. */
@@ -68,6 +91,8 @@ export class HttpSpeechProvider implements SpeechProvider {
 
   private readonly endpoint: string
   private readonly mode: SpeechHttpMode
+  private readonly engineModel: string | undefined
+  private readonly resolveSecretId: (() => Promise<string | undefined>) | undefined
   private readonly model: string | undefined
   private readonly textField: string
   private readonly authHeader: string
@@ -77,22 +102,32 @@ export class HttpSpeechProvider implements SpeechProvider {
   private readonly timeoutMs: number
   private readonly resolveApiKey: () => Promise<string | undefined>
   private readonly doFetch: typeof fetch
+  private readonly xfyun: XfyunFiletrans | undefined
 
   /**
    * @param options - identity, endpoint, bounds, credential resolution, and the HTTP entry.
    */
   constructor(options: HttpAsrServiceOptions) {
+    this.mode = options.mode ?? 'transcriptions'
+    this.endpoint = options.endpoint
+    this.engineModel = options.engineModel
+    this.resolveSecretId = options.resolveSecretId
+    if (this.mode === 'tencent-sentence' && (this.engineModel === undefined || this.resolveSecretId === undefined)) {
+      throw new Error(`Service ${options.id} speaks tencent-sentence and must configure an engineModel and a SecretId`)
+    }
     this.info = {
       id: brandString<SpeechProviderId>(options.id),
       name: options.name ?? options.model ?? options.id,
       location: 'cloud',
       languages: [...options.languages],
-      // The registry splits recordings beyond this cap, so the per-service duration
-      // and byte limits both stay satisfied by whatever pieces arrive.
-      maxAudioSeconds: Math.min(options.maxDurationSeconds, Math.floor((options.maxAudioBytes - 44) / 32000)),
+      // The registry splits recordings beyond this cap, so the per-service duration,
+      // byte, and form limits all stay satisfied by whatever pieces arrive.
+      maxAudioSeconds: Math.min(
+        options.maxDurationSeconds,
+        Math.floor((options.maxAudioBytes - 44) / 32000),
+        MODE_CAP_SECONDS[this.mode] ?? Number.POSITIVE_INFINITY,
+      ),
     }
-    this.endpoint = options.endpoint
-    this.mode = options.mode ?? 'transcriptions'
     this.model = options.model
     this.textField = options.textField
     this.authHeader = options.authHeader?.toLowerCase() ?? 'authorization'
@@ -102,6 +137,21 @@ export class HttpSpeechProvider implements SpeechProvider {
     this.timeoutMs = options.timeoutMs
     this.resolveApiKey = options.resolveApiKey
     this.doFetch = options.doFetch ?? ((input, init) => globalThis.fetch(input, init))
+    if (this.mode === 'xfyun-filetrans') {
+      const resolveAppId = options.resolveAppId
+      if (resolveAppId === undefined) {
+        throw new Error(`Service ${options.id} speaks xfyun-filetrans and must configure an AppId`)
+      }
+      this.xfyun = new XfyunFiletrans({
+        endpoint: options.endpoint,
+        pollIntervalMs: options.pollIntervalMs ?? 5000,
+        resolveAppId,
+        resolveApiKey: options.resolveApiKey,
+        doFetch: this.doFetch,
+      })
+    } else {
+      this.xfyun = undefined
+    }
   }
 
   /**
@@ -123,24 +173,51 @@ export class HttpSpeechProvider implements SpeechProvider {
     }
     using callDeadline = deadline(signal, this.timeoutMs, HTTP_ASR_TIMEOUT_CODE)
     const startedAt = performance.now()
+    const outcome = await this.recognize(apiKey, input, callDeadline.signal)
+    callDeadline.signal.throwIfAborted()
+    return {
+      text: outcome.text,
+      audioSeconds,
+      inferenceSeconds: (performance.now() - startedAt) / 1000,
+      ...outcome.segments === undefined ? {} : { segments: outcome.segments },
+    }
+  }
+
+  /**
+   * Recognize one canonical recording in the configured request form.
+   * @param apiKey - resolved credential.
+   * @param input - complete WAV bytes and the resolved language hint.
+   * @param signal - deadline signal covering the request or the whole job.
+   * @returns the recognized text with any sentence segments.
+   */
+  private async recognize(apiKey: string, input: SpeechInput, signal: AbortSignal):
+  Promise<{ text: string; segments?: readonly SpeechSegment[] }> {
+    if (this.mode === 'xfyun-filetrans') return await this.xfyun!.transcribe(input.audio, input.language, signal)
+    if (this.mode === 'tencent-sentence') {
+      const secretId = await this.resolveSecretId?.()
+      if (secretId === undefined || secretId.length === 0) {
+        throw new Error(`Speech provider ${this.info.name} has no SecretId; configure the credential its deployment names`)
+      }
+      const response = await this.doFetch(this.endpoint,
+        tencentSentenceRequest(secretId, apiKey, { engineModel: this.engineModel!, endpoint: this.endpoint }, input, signal))
+      return { text: readTencentResult(await readBody(response), this.info.name) }
+    }
+    if (this.mode === 'volcano-flash') {
+      const response = await this.doFetch(this.endpoint, volcanoFlashRequest(apiKey, input, signal))
+      return readVolcanoResult(response, await readBody(response), this.info.name)
+    }
     const response = await this.doFetch(this.endpoint, this.mode === 'chat-completions'
-      ? this.chatCompletionsRequest(apiKey, input, callDeadline.signal)
+      ? this.chatCompletionsRequest(apiKey, input, signal)
       : this.mode === 'raw-body'
-        ? this.rawBodyRequest(apiKey, input, callDeadline.signal)
-        : this.transcriptionsRequest(apiKey, input, callDeadline.signal))
+        ? this.rawBodyRequest(apiKey, input, signal)
+        : this.transcriptionsRequest(apiKey, input, signal))
     const body = await readBody(response)
     if (!response.ok) {
       throw new Error(`Speech service ${this.info.name} answered ${response.status}: ${body}`)
     }
-    const text = this.mode === 'chat-completions'
+    return { text: this.mode === 'chat-completions'
       ? readChatCompletionsText(body, this.info.name)
-      : readTextPath(body, this.textField, this.info.name)
-    callDeadline.signal.throwIfAborted()
-    return {
-      text,
-      audioSeconds,
-      inferenceSeconds: (performance.now() - startedAt) / 1000,
-    }
+      : readTextPath(body, this.textField, this.info.name) }
   }
 
   /**
