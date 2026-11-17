@@ -46,6 +46,7 @@ describe('DashScopeSpeechProvider', () => {
       location: 'cloud',
       languages: ['zh'],
       model: 'fun-asr-realtime',
+      maxAudioSeconds: 60,
     })
     expect(provider.preparation).toBeUndefined()
   })

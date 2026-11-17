@@ -87,6 +87,7 @@ describe('the DashScope recognizer plugin', () => {
       languages: ['zh', 'en'],
       model: 'my-model',
       models: ['my-model', 'other'],
+      maxAudioSeconds: 14400,
     }])
     await ctx.fiber.dispose()
     expect(speech.listProviders()).toEqual([])
@@ -99,6 +100,7 @@ describe('the DashScope recognizer plugin', () => {
       id: 'dashscope-funasr',
       name: 'DashScope fun-asr-realtime',
       location: 'cloud',
+      maxAudioSeconds: 14400,
       languages: ['zh'],
       model: 'fun-asr-realtime',
     }])

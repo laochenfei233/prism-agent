@@ -58,7 +58,15 @@ export function* chunkWave(audio: Uint8Array, maxSeconds: number): Generator<Wav
  */
 export async function transcribeCapped(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript> {
   const cap = spec.provider.info.maxAudioSeconds
-  if (cap === undefined || parseWave(spec.audio) <= cap) return callProvider(spec, spec.audio, signal)
+  let seconds: number
+  try {
+    seconds = parseWave(spec.audio)
+  } catch {
+    // Non-canonical audio is the provider's to reject in its own words; the
+    // registry only splits what it can measure.
+    return callProvider(spec, spec.audio, signal)
+  }
+  if (cap === undefined || seconds <= cap) return callProvider(spec, spec.audio, signal)
   const text: string[] = []
   const segments: SpeechSegment[] = []
   let audioSeconds = 0
