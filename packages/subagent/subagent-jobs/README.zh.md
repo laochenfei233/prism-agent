@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 `@prism/prism-subagent-jobs` 把子 Agent 委派镜像进后台任务注册表：每个面向父会话投递的激活周期都会注册一个 `subagent` 类型的 job，归属委派发起会话，于是 `job_list`、`job_kill` 和作业名册可以像管理 shell、workflow 后台工作一样管理委派。job 不携带子 Agent 的回答 —— 子 Agent 结算通知已经把它报告给父会话 —— 而且 `dsh-tool-jobs` 对这一类型不发送完成通知。停止 job 的效果与 `interrupt_agent` 完全一致。
 
-## Table of Contents
+## 目录
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
@@ -107,7 +107,7 @@ Append-only；新可见内容跟随可复用的请求前缀。
 - **label 标识 provider 与子 id，而不是任务** —— 生命周期 payload 不携带委派任务文本；label 用于标识周期，子 Agent 的上下文仍由 `list_agents` 提供。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

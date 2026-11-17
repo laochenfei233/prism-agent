@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/speech/speech-to-text-http/README.md
-README.md: 4662d85187855782a91dc6af70ce7642d5b1ed46
-README.zh.md: cc1d2a20348aec9c7c3ca23844f35dc9e41fbc1b
+/:
+  en: 620118890049fd95
+  zh: 48c6f88673c8ad90
+/deepseek-ai-dsh-experimental-speech-to-text-http:
+  en: c787be28bb20c72b
+  zh: 7862c8bfdf6e6c1b
+/deepseek-ai-dsh-experimental-speech-to-text-http/table-of-contents:
+  en: cd84700320dab62c
+  zh: c393de808bb0b647
+/deepseek-ai-dsh-experimental-speech-to-text-http/summary:
+  en: 6e74ceb51cff31b5
+  zh: 4c7a4305adac5856
+/deepseek-ai-dsh-experimental-speech-to-text-http/configuration:
+  en: c32933c88bc7d61a
+  zh: 0e3968ed7b2c9ee3
+/deepseek-ai-dsh-experimental-speech-to-text-http/model-experience:
+  en: 760ea63b81ad48fc
+  zh: fda7bcff0625e41a
+/deepseek-ai-dsh-experimental-speech-to-text-http/model-experience/kv-cache-effect:
+  en: bc8f386cc7079a03
+  zh: 318aa85f9f04da20
+/deepseek-ai-dsh-experimental-speech-to-text-http/known-limitations-and-deferred-work:
+  en: 1574d69427b8e527
+  zh: e5fcd1aa3847acd7
+/deepseek-ai-dsh-experimental-speech-to-text-http/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6

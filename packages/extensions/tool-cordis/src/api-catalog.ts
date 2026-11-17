@@ -3742,7 +3742,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>',
-        description: 'Execute exactly the resolved provider; no fallback sends audio elsewhere.',
+        description: 'Execute exactly the resolved provider; no fallback sends audio elsewhere. Recordings beyond the provider\'s declared request cap are split at quiet boundaries and merged, so the cap never rejects an admitted recording.',
         parameters: [{ name: 'spec', description: 'resolved input; a withdrawn or replaced registration is rejected.' }, { name: 'signal', description: 'caller cancellation.' }],
         returns: 'final transcript after provider settlement.',
       },
@@ -9391,7 +9391,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpeechProviderInfo',
-    declaration: 'export interface SpeechProviderInfo {\n    readonly id: SpeechProviderId;\n    readonly name: string;\n    readonly location: \'host-local\' | \'cloud\';\n    readonly languages: readonly string[];\n    readonly model?: string;\n    readonly models?: readonly string[];\n    readonly setupEstimate?: SpeechSetupEstimate;\n    readonly downloadSources?: readonly string[];\n}',
+    declaration: 'export interface SpeechProviderInfo {\n    readonly id: SpeechProviderId;\n    readonly name: string;\n    readonly location: \'host-local\' | \'cloud\';\n    readonly languages: readonly string[];\n    readonly model?: string;\n    readonly models?: readonly string[];\n    readonly maxAudioSeconds?: number;\n    readonly setupEstimate?: SpeechSetupEstimate;\n    readonly downloadSources?: readonly string[];\n}',
   },
   {
     name: 'SpeechProviderView',

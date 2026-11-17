@@ -9578,6 +9578,9 @@ importers:
       '@deepseek-ai/dsh-experimental-speech-to-text-http':
         specifier: workspace:*
         version: link:../../speech/speech-to-text-http
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -11896,6 +11899,9 @@ importers:
       '@deepseek-ai/dsh-experimental-api-speech-to-text':
         specifier: workspace:*
         version: link:../api-speech-to-text
+      '@deepseek-ai/dsh-experimental-client-ui-settings-speech':
+        specifier: workspace:*
+        version: link:../client-ui-settings-speech
       '@deepseek-ai/dsh-experimental-client-ui-voice-input':
         specifier: workspace:*
         version: link:../client-ui-voice-input

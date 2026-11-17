@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Every package is scoped `@deepseek-ai/dsh-*` and lives in exactly one group; each group README is the authoritative package map for its family.
+The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Every package is scoped `@deepseek-ai/dsh-*` and lives in exactly one group; each group README is that family's authoritative package map.
 
 ## Table of Contents
 
@@ -90,7 +90,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 <a id="release-expectations"></a>
 ## Release expectations
 
-Product groups have maintained product roles, while their public APIs remain pre-stable. [Experimental status](experimental/README.md#status) is independent of publication, installation, and optional delivery. Nonexperimental runtime packages must have product use or an explicit [package classification](../scripts/product-package-policy.ts); SDK, build, test, and declaration infrastructure have separate classifications.
+Product groups have maintained product roles, while their public APIs remain pre-stable. [Experimental status](experimental/README.md#status) is independent of publication, installation, and optional delivery. Nonexperimental runtime packages need product use or an explicit [package classification](../scripts/product-package-policy.ts); SDK, build, test, and declaration infrastructure have separate classifications.
 
 -----
 

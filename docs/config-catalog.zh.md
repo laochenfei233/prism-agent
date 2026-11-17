@@ -1409,7 +1409,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-speech-to-text`
 
 - `refs`: `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/experimental/speech-to-text/src/index.ts:20`](../packages/experimental/speech-to-text/src/index.ts)
+- `source`: [`packages/experimental/speech-to-text/src/index.ts:21`](../packages/experimental/speech-to-text/src/index.ts)
 
 ```ts config-catalog
 /** Live selection read before a transcription starts; `configure()` writes it through the profile. */
@@ -1467,7 +1467,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-speech-to-text-http`
 
 - `inject`: `speechToText`
-- `source`: [`packages/speech/speech-to-text-http/src/index.ts:58`](../packages/speech/speech-to-text-http/src/index.ts)
+- `source`: [`packages/speech/speech-to-text-http/src/index.ts:80`](../packages/speech/speech-to-text-http/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration; every entry becomes one registered recognizer. */
@@ -1480,22 +1480,43 @@ export interface Config {
 export interface HttpServiceConfig {
   /** Registration identity this recognizer occupies. */
   providerId: string
-  /** Operator-facing display name; omitted names show the model. */
+  /** Operator-facing display name; omitted names show the model, then the id. */
   name?: string
-  /** Complete POST URL of the transcription endpoint. */
+  /** Complete POST URL of the transcription endpoint; `raw-body` services carry fixed query parameters here. */
   endpoint: string
   /** Request form the service speaks; defaults to the OpenAI multipart form. */
-  mode: 'transcriptions' | 'chat-completions'
+  mode: 'transcriptions' | 'chat-completions' | 'raw-body' | 'tencent-sentence' | 'xfyun-filetrans'
+    | 'volcano-flash' | 'google-speech' | 'azure-fasttranscribe' | 'aws-transcribe'
   /** Literal API key; prefer {@link HttpServiceConfig.apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
-  /** Credential reference holding the bearer key. */
+  /** Credential reference holding the key. */
   apiKeyEnv: string
-  /** Transcription model named in the form. */
-  model: string
+  /** Transcription model named in the request; omitted models send no model field. */
+  model?: string
   /** Language hints this recognizer accepts, including `auto`. */
   languages: string[]
-  /** Top-level JSON response field carrying the recognized text. */
+  /** Response field carrying the recognized text, as a dot path. */
   textField: string
+  /** Credential header; defaults to `authorization`. */
+  authHeader?: string
+  /** Credential value prefix; defaults to the `Bearer` scheme. */
+  authStyle: 'bearer' | 'token' | 'raw'
+  /** Engine model the `tencent-sentence` form names in its body. */
+  engineModel: string
+  /** Literal Tencent SecretId; {@link HttpServiceConfig.secretIdEnv} keeps it out of configuration files. */
+  secretId?: string
+  /** Credential reference holding the Tencent SecretId. */
+  secretIdEnv?: string
+  /** Literal iFlytek AppId; {@link HttpServiceConfig.appIdEnv} keeps it out of configuration files. */
+  appId?: string
+  /** Credential reference holding the iFlytek AppId. */
+  appIdEnv?: string
+  /** AWS region hosting the transcription job and S3 bucket; required for `aws-transcribe`. */
+  awsRegion?: string
+  /** S3 bucket receiving the upload and the transcript; required for `aws-transcribe`. */
+  awsBucket?: string
+  /** Delay between job progress polls, in milliseconds. */
+  pollIntervalMs: number
   /** Rejected recording size in bytes. */
   maxAudioBytes: number
   /** Rejected recording duration in seconds. */
@@ -5279,6 +5300,7 @@ export type ImportSourceId =
 | `@deepseek-ai/dsh-experimental-auto-review` | `approval` · `llm` · `permissionPresets` · `sessions` · `tools` · `workingDirectory` | [`packages/experimental/auto-review/src/index.ts`](../packages/experimental/auto-review/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-agent-team` | — | [`packages/experimental/client-ui-agent-team/src/index.ts`](../packages/experimental/client-ui-agent-team/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-claude-code-mods` | — | [`packages/experimental/client-ui-claude-code-mods/src/index.ts`](../packages/experimental/client-ui-claude-code-mods/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-client-ui-settings-speech` | — | [`packages/experimental/client-ui-settings-speech/src/index.ts`](../packages/experimental/client-ui-settings-speech/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-stats` | — | [`packages/experimental/client-ui-stats/src/index.ts`](../packages/experimental/client-ui-stats/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-client-ui-voice-input` | — | [`packages/experimental/client-ui-voice-input/src/index.ts`](../packages/experimental/client-ui-voice-input/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | `computerUse` · `tools` · `systemPrompt` | [`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts) |

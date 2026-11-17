@@ -65,7 +65,10 @@ export class SpeechSettingsStore {
     this.listeners.clear()
   }
 
-  /** @returns the current page state, stable between writes. */
+  /**
+   * Read the current page state.
+   * @returns the page state, stable between writes.
+   */
   getSnapshot(): SpeechSettingsState {
     return this.state
   }
@@ -127,6 +130,8 @@ export class SpeechSettingsStore {
 
   /**
    * Store one API key under the reference its service names.
+   * @param ref - the credential reference the service names.
+   * @param value - the API key value.
    * @returns the refusal message, or undefined on success.
    */
   async storeKey(ref: string, value: string): Promise<string | undefined> {
@@ -137,6 +142,7 @@ export class SpeechSettingsStore {
 
   /**
    * Remove one stored API key.
+   * @param ref - the credential reference to clear.
    * @returns the refusal message, or undefined on success.
    */
   async removeKey(ref: string): Promise<string | undefined> {
@@ -147,6 +153,7 @@ export class SpeechSettingsStore {
 
   /**
    * Switch the default recognizer to one roster entry.
+   * @param providerId - the roster id to select.
    * @returns the refusal message, or undefined on success.
    */
   async selectProvider(providerId: string): Promise<string | undefined> {

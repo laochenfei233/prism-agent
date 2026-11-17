@@ -28,6 +28,7 @@ export interface WaveChunk {
  * @param audio - canonical 16 kHz mono PCM16 WAV.
  * @param maxSeconds - per-piece duration cap.
  * @yields pieces in submission order, each within the cap.
+ * @returns the generator over the pieces.
  */
 export function* chunkWave(audio: Uint8Array, maxSeconds: number): Generator<WaveChunk> {
   const seconds = parseWave(audio)

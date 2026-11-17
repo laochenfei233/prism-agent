@@ -23,9 +23,7 @@ The speech group defines the named transcription-provider seam, maintains the Da
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`speech-to-text/`](speech-to-text/README.md) | Routes named providers, owns cancellation and volatile defaults, and validates WAV input | `ctx.speechToText` |
-| [`speech-to-text-http/`](speech-to-text-http/README.md) | Registers config-driven third-party HTTP recognizers speaking the OpenAI multipart or chat-completions forms | contributes configured provider ids |
-| [`speech-to-text-dashscope/`](speech-to-text-dashscope/README.md) | Registers the DashScope realtime recognizer for complete WAV recordings | contributes `dashscope-funasr` |
+| [`speech-to-text-http/`](speech-to-text-http/README.md) | Registers config-driven third-party HTTP recognizers across nine request forms | contributes configured provider ids |
 
 -----
 
