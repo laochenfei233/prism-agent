@@ -27,6 +27,9 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => {
     const unregister = ctx.speechToText.register({
       info: { id: config.providerId as SpeechProviderId, name: `SenseVoiceSmall (${config.precision.toUpperCase()})`, location: 'host-local', languages, downloadSources: worker.downloadSources,
+        // The worker validates duration through its byte limit; the declared cap
+        // lets the registry split long recordings before that limit rejects them.
+        maxAudioSeconds: Math.floor((config.maxAudioBytes - 44) / 32000),
         setupEstimate: { recommendedDiskBytes: estimatedBytes, expectedMemoryBytes: estimatedBytes,
           minimumMinutes: 1, maximumMinutes: 10 } },
       preparation: worker,

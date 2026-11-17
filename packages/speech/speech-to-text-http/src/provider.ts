@@ -75,6 +75,9 @@ export class HttpSpeechProvider implements SpeechProvider {
       name: options.name ?? options.model,
       location: 'cloud',
       languages: [...options.languages],
+      // The registry splits recordings beyond this cap, so the per-service duration
+      // and byte limits both stay satisfied by whatever pieces arrive.
+      maxAudioSeconds: Math.min(options.maxDurationSeconds, Math.floor((options.maxAudioBytes - 44) / 32000)),
     }
     this.endpoint = options.endpoint
     this.mode = options.mode ?? 'transcriptions'
