@@ -131,10 +131,10 @@ describe('HTTP provider recognition', () => {
       .rejects.toThrow('malformed JSON')
   })
 
-  it('rejects a JSON answer that is not an object', async () => {
+  it('rejects a JSON answer whose mapped path is absent', async () => {
     const stub = fetchOf(200, '"recognized"')
     await expect(provider(stub.doFetch).transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal))
-      .rejects.toThrow('did not answer a JSON object carrying the "text" field')
+      .rejects.toThrow('answered without the "text" field')
   })
 
   it('rejects malformed JSON and an answer without the mapped field', async () => {
@@ -150,6 +150,49 @@ describe('HTTP provider recognition', () => {
     const stub = fetchOf(200, JSON.stringify({ text: '' }))
     await expect(provider(stub.doFetch).transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal))
       .resolves.toMatchObject({ text: '' })
+  })
+})
+
+describe('generic request layer', () => {
+  it('omits the model field and keeps the credential when the service names no model', async () => {
+    const stub = fetchOf(200, JSON.stringify({ text: 'ok' }))
+    await provider(stub.doFetch, async () => 'secret', { model: undefined, name: 'DeepSeek ASR' }).transcribe(
+      { audio: canonicalWav(1), language: 'auto' }, new AbortController().signal)
+    const form = stub.calls[0]?.init.body as FormData
+    expect(form.get('model')).toBeNull()
+    expect(new Headers(stub.calls[0]?.init.headers).get('authorization')).toBe('Bearer secret')
+  })
+
+  it('maps the recognized text through a dot path into nested answers', async () => {
+    const stub = fetchOf(200, JSON.stringify({ results: { channels: [{ alternatives: [{ transcript: 'hello there' }] }] } }))
+    const nested = provider(stub.doFetch, async () => 'secret',
+      { textField: 'results.channels.0.alternatives.0.transcript' })
+    await expect(nested.transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal))
+      .resolves.toMatchObject({ text: 'hello there' })
+  })
+
+  it('uploads raw bytes with the fixed endpoint URL and the configured credential prefix', async () => {
+    const stub = fetchOf(200, JSON.stringify({ text: 'raw' }))
+    const raw = provider(stub.doFetch, async () => 'secret', {
+      mode: 'raw-body',
+      endpoint: 'https://api.example/v1/listen?model=nova-3',
+      authStyle: 'token',
+    })
+    const audio = canonicalWav(1)
+    await raw.transcribe({ audio, language: 'auto' }, new AbortController().signal)
+    expect(stub.calls[0]?.url).toBe('https://api.example/v1/listen?model=nova-3')
+    const headers = new Headers(stub.calls[0]?.init.headers)
+    expect(headers.get('authorization')).toBe('Token secret')
+    expect(headers.get('content-type')).toBe('audio/wav')
+    expect(stub.calls[0]?.init.body).toBeInstanceOf(Uint8Array)
+    expect((stub.calls[0]?.init.body as Uint8Array).byteLength).toBe(audio.byteLength)
+  })
+
+  it('carries the credential as a raw value under a custom header', async () => {
+    const stub = fetchOf(200, JSON.stringify({ text: 'keyed' }))
+    const keyed = provider(stub.doFetch, async () => 'secret', { authHeader: 'xi-api-key', authStyle: 'raw' })
+    await keyed.transcribe({ audio: canonicalWav(1), language: 'auto' }, new AbortController().signal)
+    expect(new Headers(stub.calls[0]?.init.headers).get('xi-api-key')).toBe('secret')
   })
 })
 
@@ -212,7 +255,7 @@ describe('chat-completions mode recognition', () => {
         ],
       })
       expect(ctx.speechToText.listProviders()).toEqual([
-        { id: 'http-chat', name: 'mimo-v2.5-asr', location: 'cloud', languages: ['auto', 'zh', 'en'] },
+        { id: 'http-chat', name: 'mimo-v2.5-asr', location: 'cloud', languages: ['auto', 'zh', 'en'], maxAudioSeconds: 819 },
       ])
       const spec = ctx.speechToText.resolve({ audio: canonicalWav(1) })
       await expect(ctx.speechToText.transcribe(spec, new AbortController().signal))
@@ -237,8 +280,8 @@ describe('HTTP provider registration', () => {
       })
       await fiber
       expect(ctx.speechToText.listProviders()).toEqual([
-        { id: 'http-a', name: 'whisper-a', location: 'cloud', languages: ['auto'] },
-        { id: 'http-b', name: 'Second service', location: 'cloud', languages: ['auto'] },
+        { id: 'http-a', name: 'whisper-a', location: 'cloud', languages: ['auto'], maxAudioSeconds: 819 },
+        { id: 'http-b', name: 'Second service', location: 'cloud', languages: ['auto'], maxAudioSeconds: 819 },
       ])
       const spec = ctx.speechToText.resolve({ audio: canonicalWav(1), providerId: brandString<SpeechProviderId>('http-b') })
       const result = await ctx.speechToText.transcribe(spec, new AbortController().signal)

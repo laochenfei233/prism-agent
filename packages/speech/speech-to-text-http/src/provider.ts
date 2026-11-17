@@ -1,9 +1,9 @@
 /**
  * One config-driven HTTP transcription provider: it uploads the canonical WAV
- * to a third-party endpoint speaking either the OpenAI `/audio/transcriptions`
- * multipart form or an audio-bearing chat-completions request, and reads the
- * recognized text from the JSON answer. The provider owns no preparation, so
- * the registry reports it ready on arrival.
+ * to a third-party endpoint speaking the OpenAI `/audio/transcriptions` multipart
+ * form, an audio-bearing chat-completions request, or a raw-bytes upload, and
+ * reads the recognized text from the JSON answer under the configured dot path.
+ * The provider owns no preparation, so the registry reports it ready on arrival.
  * @module @deepseek-ai/dsh-experimental-speech-to-text-http/provider
  */
 
@@ -18,7 +18,10 @@ import { deadline } from '@deepseek-ai/dsh-timeout'
 export const HTTP_ASR_TIMEOUT_CODE = 'HTTP_ASR_TIMEOUT'
 
 /** Request form one configured service speaks. */
-export type SpeechHttpMode = 'transcriptions' | 'chat-completions'
+export type SpeechHttpMode = 'transcriptions' | 'chat-completions' | 'raw-body'
+
+/** Credential placement one configured service expects. */
+export type SpeechHttpAuthStyle = 'bearer' | 'token' | 'raw'
 
 /** Longest JSON answer this provider reads before giving up on the body. */
 const MAX_RESPONSE_BYTES = 1024 * 1024
@@ -27,18 +30,25 @@ const MAX_RESPONSE_BYTES = 1024 * 1024
 export interface HttpAsrServiceOptions {
   /** Registration identity this recognizer occupies. */
   readonly id: string
-  /** Operator-facing display name; defaults to the model. */
+  /** Operator-facing display name; defaults to the model, then the id. */
   readonly name?: string
-  /** Complete POST URL of the transcription endpoint. */
+  /** Complete POST URL of the transcription endpoint; `raw-body` services carry any fixed query parameters here. */
   readonly endpoint: string
   /** Request form the service speaks; defaults to the OpenAI multipart form. */
   readonly mode?: SpeechHttpMode
-  /** Transcription model named in the request. */
-  readonly model: string
+  /** Transcription model named in the request; omitted models send no model field or parameter. */
+  readonly model?: string
   /** Language hints this recognizer accepts, including `auto`. */
   readonly languages: readonly string[]
-  /** Top-level JSON response field carrying the recognized text. */
+  /**
+   * Response field carrying the recognized text, as a dot path: object keys and
+   * numeric array indices (`results.channels.0.alternatives.0.transcript`).
+   */
   readonly textField: string
+  /** Credential header; defaults to `authorization`. */
+  readonly authHeader?: string
+  /** Credential value prefix; defaults to the `Bearer` scheme. */
+  readonly authStyle?: SpeechHttpAuthStyle
   /** Rejected recording size in bytes. */
   readonly maxAudioBytes: number
   /** Rejected recording duration in seconds. */
@@ -58,8 +68,10 @@ export class HttpSpeechProvider implements SpeechProvider {
 
   private readonly endpoint: string
   private readonly mode: SpeechHttpMode
-  private readonly model: string
+  private readonly model: string | undefined
   private readonly textField: string
+  private readonly authHeader: string
+  private readonly authStyle: SpeechHttpAuthStyle
   private readonly maxAudioBytes: number
   private readonly maxDurationSeconds: number
   private readonly timeoutMs: number
@@ -72,7 +84,7 @@ export class HttpSpeechProvider implements SpeechProvider {
   constructor(options: HttpAsrServiceOptions) {
     this.info = {
       id: brandString<SpeechProviderId>(options.id),
-      name: options.name ?? options.model,
+      name: options.name ?? options.model ?? options.id,
       location: 'cloud',
       languages: [...options.languages],
       // The registry splits recordings beyond this cap, so the per-service duration
@@ -83,6 +95,8 @@ export class HttpSpeechProvider implements SpeechProvider {
     this.mode = options.mode ?? 'transcriptions'
     this.model = options.model
     this.textField = options.textField
+    this.authHeader = options.authHeader?.toLowerCase() ?? 'authorization'
+    this.authStyle = options.authStyle ?? 'bearer'
     this.maxAudioBytes = options.maxAudioBytes
     this.maxDurationSeconds = options.maxDurationSeconds
     this.timeoutMs = options.timeoutMs
@@ -111,14 +125,16 @@ export class HttpSpeechProvider implements SpeechProvider {
     const startedAt = performance.now()
     const response = await this.doFetch(this.endpoint, this.mode === 'chat-completions'
       ? this.chatCompletionsRequest(apiKey, input, callDeadline.signal)
-      : this.transcriptionsRequest(apiKey, input, callDeadline.signal))
+      : this.mode === 'raw-body'
+        ? this.rawBodyRequest(apiKey, input, callDeadline.signal)
+        : this.transcriptionsRequest(apiKey, input, callDeadline.signal))
     const body = await readBody(response)
     if (!response.ok) {
       throw new Error(`Speech service ${this.info.name} answered ${response.status}: ${body}`)
     }
     const text = this.mode === 'chat-completions'
       ? readChatCompletionsText(body, this.info.name)
-      : readTextField(body, this.textField, this.info.name)
+      : readTextPath(body, this.textField, this.info.name)
     callDeadline.signal.throwIfAborted()
     return {
       text,
@@ -129,7 +145,7 @@ export class HttpSpeechProvider implements SpeechProvider {
 
   /**
    * Build the OpenAI `/audio/transcriptions` multipart request.
-   * @param apiKey - resolved bearer credential.
+   * @param apiKey - resolved credential.
    * @param input - complete WAV bytes and the resolved language hint.
    * @param signal - deadline signal covering the request.
    * @returns the fetch request descriptor.
@@ -137,14 +153,41 @@ export class HttpSpeechProvider implements SpeechProvider {
   private transcriptionsRequest(apiKey: string, input: SpeechInput, signal: AbortSignal): RequestInit {
     const form = new FormData()
     form.append('file', new Blob([new Uint8Array(input.audio)], { type: 'audio/wav' }), 'audio.wav')
-    form.append('model', this.model)
+    if (this.model !== undefined) form.append('model', this.model)
     if (input.language !== 'auto') form.append('language', input.language)
     return {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}` },
+      headers: this.credentialHeaders(apiKey),
       body: form,
       signal,
     }
+  }
+
+  /**
+   * Build the raw-bytes request: the canonical WAV travels as the whole body and
+   * any fixed model or language parameters live in the configured endpoint URL.
+   * @param apiKey - resolved credential.
+   * @param input - complete WAV bytes; the language hint is not transmitted.
+   * @param signal - deadline signal covering the request.
+   * @returns the fetch request descriptor.
+   */
+  private rawBodyRequest(apiKey: string, input: SpeechInput, signal: AbortSignal): RequestInit {
+    return {
+      method: 'POST',
+      headers: { ...this.credentialHeaders(apiKey), 'content-type': 'audio/wav' },
+      body: new Uint8Array(input.audio),
+      signal,
+    }
+  }
+
+  /**
+   * Headers carrying the resolved credential under the configured header and scheme.
+   * @param apiKey - resolved credential value.
+   * @returns one header record for the request builders.
+   */
+  private credentialHeaders(apiKey: string): Record<string, string> {
+    const prefix = this.authStyle === 'bearer' ? 'Bearer ' : this.authStyle === 'token' ? 'Token ' : ''
+    return { [this.authHeader]: `${prefix}${apiKey}` }
   }
 
   /**
@@ -153,7 +196,7 @@ export class HttpSpeechProvider implements SpeechProvider {
    * chat-completions ASR services such as MiMo-V2.5-ASR document. `asr_options`
    * is those services' language knob; the auto hint uses the endpoint's own
    * detection default.
-   * @param apiKey - resolved bearer credential.
+   * @param apiKey - resolved credential.
    * @param input - complete WAV bytes and the resolved language hint.
    * @param signal - deadline signal covering the request.
    * @returns the fetch request descriptor.
@@ -162,9 +205,9 @@ export class HttpSpeechProvider implements SpeechProvider {
     const audio = `data:audio/wav;base64,${Buffer.from(input.audio).toString('base64')}`
     return {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      headers: { ...this.credentialHeaders(apiKey), 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: this.model,
+        ...(this.model === undefined ? {} : { model: this.model }),
         messages: [{ role: 'user', content: [{ type: 'input_audio', input_audio: { data: audio } }] }],
         ...(input.language === 'auto' ? {} : { asr_options: { language: input.language } }),
       }),
@@ -199,28 +242,36 @@ async function readBody(response: Response): Promise<string> {
 }
 
 /**
- * Read the mapped top-level field of one JSON answer.
+ * Read the mapped response field of one JSON answer, following the configured dot
+ * path through object keys and numeric array indices.
  * @param body - the response body text.
- * @param field - the configured field name.
+ * @param path - the configured field path (`text`, `results.channels.0.alternatives.0.transcript`).
  * @param name - the service display name for the failure message.
  * @returns the recognized text; empty when the service recognized no speech.
  */
-function readTextField(body: string, field: string, name: string): string {
-  let parsed: unknown
+function readTextPath(body: string, path: string, name: string): string {
+  let walked: unknown
   try {
-    parsed = JSON.parse(body)
+    walked = JSON.parse(body)
   } catch (error) {
     throw new Error(`Speech service ${name} answered malformed JSON: ${reasonOf(error)}`)
   }
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error(`Speech service ${name} did not answer a JSON object carrying the "${field}" field`)
+  for (const segment of path.split('.')) {
+    const container = walked
+    const index = /^\d+$/.test(segment) ? Number(segment) : segment
+    const value = typeof container === 'object' && container !== null
+      ? (container as Record<string | number, unknown>)[index]
+      : undefined
+    if (value === undefined) {
+      throw new Error(`Speech service ${name} answered without the "${path}" field`)
+    }
+    walked = value
   }
-  const text = (parsed as Record<string, unknown>)[field]
   // An empty string is the legitimate "no speech was recognized" transcript.
-  if (typeof text !== 'string') {
-    throw new Error(`Speech service ${name} answered without the "${field}" field`)
+  if (typeof walked !== 'string') {
+    throw new Error(`Speech service ${name} answered without a "${path}" text`)
   }
-  return text
+  return walked
 }
 
 /**
