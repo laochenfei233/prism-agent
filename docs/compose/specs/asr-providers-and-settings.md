@@ -1,14 +1,20 @@
 ---
 feature: asr-providers-and-settings
-status: in-progress
-updated: 2026-11-17
+status: delivered
+updated: 2026-11-18
 branch: feat/asr-providers-and-settings
-commits: f5baf8f73f.. # filled at delivery
+commits: f5baf8f73f..760b99e11c
 ---
 
 # ASR provider expansion: six services, duration chunking, speech settings section
 
 ## Report
+
+**What was built** — The speech registry splits any recording beyond a provider's declared request cap at quiet 20 ms windows (1 s minimum pieces) before the cap boundary, recognizes the pieces in order, and merges text, offset segment times, and duration totals; every recognizer now declares its cap. The HTTP ASR provider speaks nine request forms — OpenAI multipart with an optional model, chat-completions, raw-body, Tencent SentenceRecognition (TC3-HMAC-SHA256, golden-pinned), iFlytek lfasr (four-step job flow), Doubao flash edition, Google Speech v1, Azure fast transcription, and Amazon Transcribe (SigV4 over S3) — with a configurable credential header and dot-path response mapping, so DeepSeek, DashScope qwen3-asr, Deepgram, ElevenLabs, Groq, and Mistral join by configuration. The voice-input bundle ships deepseek-asr and dashscope-qwen3 built-ins, and a new speech settings section (order 11, after models) renders service cards with credential management plus the default-recognizer switcher.
+
+**Verification** — 343/343 focused tests across the seven touched packages (seam chunking 35, HTTP provider 43, DashScope/OpenAI/SenseVoice/voice-input/settings-speech suites); per-package and aggregate `tsc -b` clean for every touched package and the client/host aggregates show zero errors in touched files; doc gates green for the touched surfaces (doc-standard 22/22, package-README limitations 390 files, doc budgets, doc references 5024 files, translation pairing for every edited pair, config/cordis/tool/client catalogs regenerated). Remaining aggregate reds are pre-existing (2026-11-05 baseline + later resync drift): stale bilingual records for earlier fork specs, tool-catalog zh drift, the webserver README summary, and the known Windows TMP/esbuild documentation-build issue; the duplication gate counts 27 clones with zero in the new files (13-clone baseline documented 2026-10-31, drift from later sessions). All adapter flows and signatures are fake-server and golden-vector tested; none has run against its live service in this environment.
+
+**Journey log** — The quiet-boundary cut initially picked the first scanned window whenever windows tied in energy, shattering uniform tone into 20 ms slivers; anchoring the comparison on the target window's own energy and enforcing a 1 s minimum piece fixed it. The first TC3 golden vector agreed with the implementation because both shared the same canonical-header construction mistake (per-header newlines doubled); recomputing from Tencent's documented concatenation fixed implementation and vector together. Volcano's standard submit/query edition accepts audio URLs only, so the feature landed on the flash edition, which takes base64 bytes. The registry pre-measuring duration turned non-canonical audio into a seam-level error that shadowed providers' own Prepare failures; unparseable audio now passes through whole.
 
 ## [S1] Problem
 
@@ -85,13 +91,13 @@ Regenerate the config catalog (both languages, pairing verified), update the htt
 
 ## Tasks
 
-- [ ] T1: seam chunked transcription — info cap field, wave read/slice helpers, quiet-boundary chunk loop, merge semantics, unit tests (depends: none)
-- [ ] T2: generic request layer — optional model, authHeader/authStyle, dot-path textField, raw-body form (depends: none)
-- [ ] T3: domestic flavors — tencent-sentence, xfyun-filetrans, volcano-flash, per-flavor key fields, unit tests (depends: T2)
-- [ ] T4: international flavors — deepgram-listen, google-speech-v1, azure-fasttranscribe, aws-transcribe (last; re-grill point), unit tests (depends: T2)
-- [ ] T5: built-in deepseek-asr + dashscope-qwen3 in the base voice profile (depends: T3)
-- [ ] T6: speech settings section package + host face wiring (depends: T3, T4)
-- [ ] T7: docs, catalog, upgrade guide, changelog, snapshots (depends: T1–T6)
+- [x] T1: seam chunked transcription — info cap field, wave read/slice helpers, quiet-boundary chunk loop, merge semantics, unit tests (depends: none)
+- [x] T2: generic request layer — optional model, authHeader/authStyle, dot-path textField, raw-body form (depends: none)
+- [x] T3: domestic flavors — tencent-sentence, xfyun-filetrans, volcano-flash, per-flavor key fields, unit tests (depends: T2)
+- [x] T4: international flavors — deepgram-listen, google-speech-v1, azure-fasttranscribe, aws-transcribe (last; re-grill point), unit tests (depends: T2)
+- [x] T5: built-in deepseek-asr + dashscope-qwen3 in the base voice profile (depends: T3)
+- [x] T6: speech settings section package + host face wiring (depends: T3, T4)
+- [x] T7: docs, catalog, upgrade guide, changelog, snapshots (depends: T1–T6)
 
 ## [S4] Acceptance
 

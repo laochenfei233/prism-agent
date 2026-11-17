@@ -3,13 +3,13 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/asr-providers-and-settings.md
 /:
-  en: 8adb79d0a5732efe
+  en: afa0a05858129677
   zh: 8adb79d0a5732efe
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section:
   en: 551861422003ddb5
   zh: 7593ca5426606002
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/report:
-  en: 355a41a8b4106d9f
+  en: 6dfef6e110e80210
   zh: 355a41a8b4106d9f
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s1-problem:
   en: 66702238fe666946
@@ -39,7 +39,7 @@
   en: 64431add76a6ee30
   zh: 459e7f24ce765463
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/tasks:
-  en: b20e4f547d26c4c4
+  en: 826291e3a71fef0f
   zh: a48744e70c3b337e
 /asr-provider-expansion-six-services-duration-chunking-speech-settings-section/s4-acceptance:
   en: 354349ad4abffe87
