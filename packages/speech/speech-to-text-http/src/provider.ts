@@ -13,6 +13,9 @@ import type {
 } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import { validateWave } from '@deepseek-ai/dsh-experimental-speech-to-text/wave'
 import { deadline } from '@deepseek-ai/dsh-timeout'
+import { AwsTranscribe } from './aws.ts'
+import { readAzureResult, azureFastTranscribeRequest } from './azure.ts'
+import { googleSpeechRequest, readGoogleResult } from './google.ts'
 import { readTencentResult, tencentSentenceRequest } from './tencent.ts'
 import { XfyunFiletrans } from './xfyun.ts'
 import { readVolcanoResult, volcanoFlashRequest } from './volcano.ts'
@@ -28,11 +31,16 @@ export type SpeechHttpMode =
   | 'tencent-sentence'
   | 'xfyun-filetrans'
   | 'volcano-flash'
+  | 'google-speech'
+  | 'azure-fasttranscribe'
+  | 'aws-transcribe'
 
 /** Per-request audio duration cap each provider-specific form imposes, in seconds. */
 const MODE_CAP_SECONDS: Partial<Record<SpeechHttpMode, number>> = {
   'tencent-sentence': 60,
   'volcano-flash': 2 * 3600,
+  'google-speech': 60,
+  'aws-transcribe': 4 * 3600,
 }
 
 /** Credential placement one configured service expects. */
@@ -70,7 +78,11 @@ export interface HttpAsrServiceOptions {
   readonly resolveSecretId?: () => Promise<string | undefined>
   /** Resolves the iFlytek AppId; required for `xfyun-filetrans`. */
   readonly resolveAppId?: () => Promise<string | undefined>
-  /** Delay between iFlytek progress polls, in milliseconds. */
+  /** AWS region hosting the transcription job and S3 bucket; required for `aws-transcribe`. */
+  readonly awsRegion?: string
+  /** S3 bucket receiving the upload and the transcript; required for `aws-transcribe`. */
+  readonly awsBucket?: string
+  /** Delay between job progress polls, in milliseconds. */
   readonly pollIntervalMs?: number
   /** Rejected recording size in bytes. */
   readonly maxAudioBytes: number
@@ -103,6 +115,7 @@ export class HttpSpeechProvider implements SpeechProvider {
   private readonly resolveApiKey: () => Promise<string | undefined>
   private readonly doFetch: typeof fetch
   private readonly xfyun: XfyunFiletrans | undefined
+  private readonly aws: AwsTranscribe | undefined
 
   /**
    * @param options - identity, endpoint, bounds, credential resolution, and the HTTP entry.
@@ -151,6 +164,21 @@ export class HttpSpeechProvider implements SpeechProvider {
       })
     } else {
       this.xfyun = undefined
+    }
+    if (this.mode === 'aws-transcribe') {
+      const { awsRegion, awsBucket, resolveSecretId } = options
+      if (awsRegion === undefined || awsBucket === undefined || resolveSecretId === undefined) {
+        throw new Error(`Service ${options.id} speaks aws-transcribe and must configure a region, a bucket, and an access key id`)
+      }
+      this.aws = new AwsTranscribe({
+        region: awsRegion,
+        bucket: awsBucket,
+        endpoint: options.endpoint,
+        pollIntervalMs: options.pollIntervalMs ?? 5000,
+        doFetch: this.doFetch,
+      })
+    } else {
+      this.aws = undefined
     }
   }
 
@@ -205,6 +233,24 @@ export class HttpSpeechProvider implements SpeechProvider {
     if (this.mode === 'volcano-flash') {
       const response = await this.doFetch(this.endpoint, volcanoFlashRequest(apiKey, input, signal))
       return readVolcanoResult(response, await readBody(response), this.info.name)
+    }
+    if (this.mode === 'google-speech') {
+      const response = await this.doFetch(this.endpoint, googleSpeechRequest(
+        { ...(this.model === undefined ? {} : { model: this.model }) }, input, signal))
+      return { text: readGoogleResult(await readBody(response), this.info.name) }
+    }
+    if (this.mode === 'azure-fasttranscribe') {
+      const response = await this.doFetch(this.endpoint, azureFastTranscribeRequest(apiKey, input, signal))
+      return readAzureResult(await readBody(response), this.info.name)
+    }
+    if (this.mode === 'aws-transcribe') {
+      const accessKeyId = await this.resolveSecretId?.()
+      if (accessKeyId === undefined || accessKeyId.length === 0) {
+        throw new Error(`Speech provider ${this.info.name} has no access key id; configure the credential its deployment names`)
+      }
+      const aws = this.aws
+      if (aws === undefined) throw new Error(`Speech provider ${this.info.name} lost its job adapter`)
+      return { text: await aws.transcribe(input.audio, input.language, signal, accessKeyId, apiKey) }
     }
     const response = await this.doFetch(this.endpoint, this.mode === 'chat-completions'
       ? this.chatCompletionsRequest(apiKey, input, signal)

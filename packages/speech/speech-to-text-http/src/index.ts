@@ -36,7 +36,8 @@ export interface HttpServiceConfig {
   /** Complete POST URL of the transcription endpoint; `raw-body` services carry fixed query parameters here. */
   endpoint: string
   /** Request form the service speaks; defaults to the OpenAI multipart form. */
-  mode: 'transcriptions' | 'chat-completions' | 'raw-body' | 'tencent-sentence' | 'xfyun-filetrans' | 'volcano-flash'
+  mode: 'transcriptions' | 'chat-completions' | 'raw-body' | 'tencent-sentence' | 'xfyun-filetrans'
+    | 'volcano-flash' | 'google-speech' | 'azure-fasttranscribe' | 'aws-transcribe'
   /** Literal API key; prefer {@link HttpServiceConfig.apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
   /** Credential reference holding the key. */
@@ -61,7 +62,11 @@ export interface HttpServiceConfig {
   appId?: string
   /** Credential reference holding the iFlytek AppId. */
   appIdEnv?: string
-  /** Delay between iFlytek progress polls, in milliseconds. */
+  /** AWS region hosting the transcription job and S3 bucket; required for `aws-transcribe`. */
+  awsRegion?: string
+  /** S3 bucket receiving the upload and the transcript; required for `aws-transcribe`. */
+  awsBucket?: string
+  /** Delay between job progress polls, in milliseconds. */
   pollIntervalMs: number
   /** Rejected recording size in bytes. */
   maxAudioBytes: number
@@ -90,6 +95,9 @@ export const Config = z.object({
       z.const('tencent-sentence'),
       z.const('xfyun-filetrans'),
       z.const('volcano-flash'),
+      z.const('google-speech'),
+      z.const('azure-fasttranscribe'),
+      z.const('aws-transcribe'),
     ]).default('transcriptions'),
     apiKey: z.string().role('secret'),
     apiKeyEnv: z.string().role('credential-ref').required(),
@@ -103,6 +111,8 @@ export const Config = z.object({
     secretIdEnv: z.string().role('credential-ref'),
     appId: z.string().min(1),
     appIdEnv: z.string().role('credential-ref'),
+    awsRegion: z.string().min(1),
+    awsBucket: z.string().min(1),
     pollIntervalMs: z.number().step(1).min(1).default(5000),
     maxAudioBytes: z.natural().min(46).default(25 * 1024 * 1024),
     maxDurationSeconds: z.number().min(1).default(7200),
@@ -152,6 +162,10 @@ export function apply(ctx: Context, config: Config): void {
     if (service.mode === 'xfyun-filetrans' && literalAppId === undefined && service.appIdEnv === undefined) {
       throw new Error(`Service ${service.providerId} speaks xfyun-filetrans and must configure an AppId`)
     }
+    if (service.mode === 'aws-transcribe' && (service.awsRegion === undefined || service.awsBucket === undefined
+      || (literalSecretId === undefined && service.secretIdEnv === undefined))) {
+      throw new Error(`Service ${service.providerId} speaks aws-transcribe and must configure a region, a bucket, and an access key id`)
+    }
     ctx.effect(() => ctx.speechToText.register(new HttpSpeechProvider({
       id: service.providerId,
       ...(service.name === undefined ? {} : { name: service.name }),
@@ -169,6 +183,8 @@ export function apply(ctx: Context, config: Config): void {
       ...(literalAppId === undefined && service.appIdEnv === undefined ? {}
         : { resolveAppId: () => resolveServiceKey(literalAppId,
           service.appIdEnv === undefined ? undefined : credentialRef(service.appIdEnv), service.appIdEnv, ctx) }),
+      ...(service.awsRegion === undefined ? {} : { awsRegion: service.awsRegion }),
+      ...(service.awsBucket === undefined ? {} : { awsBucket: service.awsBucket }),
       pollIntervalMs: service.pollIntervalMs,
       maxAudioBytes: service.maxAudioBytes,
       maxDurationSeconds: service.maxDurationSeconds,

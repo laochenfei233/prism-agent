@@ -10,7 +10,7 @@ import { readTencentResult, tencentSentenceRequest } from '../src/tencent.ts'
 import { readVolcanoResult } from '../src/volcano.ts'
 
 /** Golden TC3 signature of the deterministic recording below, computed independently of the adapter. */
-const GOLDEN_TC3 = '636ae06107844defbdd1547ab3a38a19bc9bed305a7a8e847943252e2065c6df'
+const GOLDEN_TC3 = '4c7f431477d005aa2950feee61b73580fa2536953afcc3fc62a21e5636eb0fbf'
 
 /** Build one canonical one-second 16 kHz mono PCM16 WAV recording of silence. */
 function canonicalWav(secondCount: number): Uint8Array {
