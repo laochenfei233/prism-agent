@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This optional bundle composes a speech Service Definition, a local SenseVoice recognizer, an online DashScope recognizer, authenticated Remote and browser microphone control. Shipped profiles leave it disabled. Recognition runs on this machine by default; selecting the online recognizer streams audio to that service instead and needs no model download.
+This optional bundle composes a speech Service Definition, a local SenseVoice recognizer, an online DashScope recognizer, built-in DeepSeek and DashScope HTTP services, authenticated Remote and browser microphone control. Shipped profiles leave it disabled. Recognition runs on this machine by default; selecting the online recognizer streams audio to that service instead and needs no model download.
 
 ## Table of Contents
 
@@ -33,8 +33,9 @@ Bundle details list every composed recognizer and the processing location it use
 
 - **SenseVoiceSmall** runs on this machine. It downloads its native runtime and models on first use, supports automatic language detection, and sends no audio anywhere.
 - **DashScope fun-asr-realtime** runs online. It streams one recording over a duplex WebSocket to `wss://dashscope.aliyuncs.com/api-ws/v1/inference`, downloads nothing, and reports ready immediately. Selecting it sends the recording to that service, so it needs a key: set `DASHSCOPE_API_KEY` in the profile credentials or in the Harness home `.env`, or set that row's `apiKey` for a controlled deployment. Without a key the recognizer still registers and fails at request time with that instruction.
+- **DeepSeek ASR** and **DashScope qwen3-asr** run online as config-driven HTTP services. Each sends the whole recording in one request (DeepSeek caps uploads at 8 MiB and 120 seconds, so longer imports split into pieces automatically) and reports ready immediately. DeepSeek needs `DEEPSEEK_API_KEY`; the DashScope service needs `DASHSCOPE_API_KEY`. Without a key the recognizer still registers and fails at request time with that instruction.
 
-Both recognizers accept `zh`, the composed default language. SenseVoice additionally supports `en`, `yue`, `ja`, `ko`, and its own `auto` detection; the online recognizer accepts no `auto` hint. A language the selected recognizer does not declare fails the preference write instead of being silently ignored.
+The local and duplex recognizers accept `zh`, the composed default language. SenseVoice additionally supports `en`, `yue`, `ja`, `ko`, and its own `auto` detection; the online recognizer accepts no `auto` hint. A language the selected recognizer does not declare fails the preference write instead of being silently ignored.
 
 -----
 
@@ -44,7 +45,7 @@ Both recognizers accept `zh`, the composed default language. SenseVoice addition
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-The static `cordis.patch.yml` adds the four voice rows, selects `sensevoice-local` as the default recognizer and supplies the provider cache directory with `dshHomePath`. Optional-bundle installation makes the package available to management without selecting it in default profiles. The browser contribution owns its generated Remote mount; stable API Remotes do not import experimental code.
+The static `cordis.patch.yml` adds the five voice rows, selects `sensevoice-local` as the default recognizer and supplies the provider cache directory with `dshHomePath`. Optional-bundle installation makes the package available to management without selecting it in default profiles. The browser contribution owns its generated Remote mount; stable API Remotes do not import experimental code.
 
 </details>
 

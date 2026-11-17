@@ -255,7 +255,8 @@ describe('chat-completions mode recognition', () => {
         ],
       })
       expect(ctx.speechToText.listProviders()).toEqual([
-        { id: 'http-chat', name: 'mimo-v2.5-asr', location: 'cloud', languages: ['auto', 'zh', 'en'], maxAudioSeconds: 819 },
+        { id: 'http-chat', name: 'mimo-v2.5-asr', location: 'cloud', languages: ['auto', 'zh', 'en'],
+          model: 'mimo-v2.5-asr', maxAudioSeconds: 819 },
       ])
       const spec = ctx.speechToText.resolve({ audio: canonicalWav(1) })
       await expect(ctx.speechToText.transcribe(spec, new AbortController().signal))
@@ -280,8 +281,8 @@ describe('HTTP provider registration', () => {
       })
       await fiber
       expect(ctx.speechToText.listProviders()).toEqual([
-        { id: 'http-a', name: 'whisper-a', location: 'cloud', languages: ['auto'], maxAudioSeconds: 819 },
-        { id: 'http-b', name: 'Second service', location: 'cloud', languages: ['auto'], maxAudioSeconds: 819 },
+        { id: 'http-a', name: 'whisper-a', location: 'cloud', languages: ['auto'], model: 'whisper-a', maxAudioSeconds: 819 },
+        { id: 'http-b', name: 'Second service', location: 'cloud', languages: ['auto'], model: 'whisper-b', maxAudioSeconds: 819 },
       ])
       const spec = ctx.speechToText.resolve({ audio: canonicalWav(1), providerId: brandString<SpeechProviderId>('http-b') })
       const result = await ctx.speechToText.transcribe(spec, new AbortController().signal)

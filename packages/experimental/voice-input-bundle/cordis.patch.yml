@@ -17,6 +17,25 @@
     # cloud recognizer performs no download and reports readiness immediately.
     - id: speech-to-text-dashscope
       name: '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
+    # Config-driven cloud recognizers: the DeepSeek and DashScope services ship
+    # as built-ins, and keys resolve per request, so registration needs no secret.
+    - id: speech-to-text-http
+      name: '@deepseek-ai/dsh-experimental-speech-to-text-http'
+      config:
+        services:
+          - providerId: deepseek-asr
+            name: DeepSeek ASR
+            endpoint: https://api.deepseek.com/v1/tools/asr
+            apiKeyEnv: DEEPSEEK_API_KEY
+            # The service caps uploads at 8 MiB and 120 seconds; the registry
+            # splits longer recordings into pieces within both bounds.
+            maxAudioBytes: 8388608
+            maxDurationSeconds: 120
+          - providerId: dashscope-qwen3
+            name: DashScope qwen3-asr
+            endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1/audio/transcriptions
+            apiKeyEnv: DASHSCOPE_API_KEY
+            model: qwen3-asr-flash
     - id: api-speech-to-text
       name: '@deepseek-ai/dsh-experimental-api-speech-to-text'
     - id: ui-voice-input

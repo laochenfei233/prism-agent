@@ -14,6 +14,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import SpeechToText from '@deepseek-ai/dsh-experimental-speech-to-text'
 import * as DashScope from '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
+import * as Plugin from '@deepseek-ai/dsh-experimental-speech-to-text-http'
 
 /** The bundle package root. */
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -52,12 +53,13 @@ afterEach(async () => {
 })
 
 describe('voice-input bundle composition', () => {
-  it('mounts both recognizers, the server Remote, and the browser control', () => {
+  it('mounts the recognizers, the built-in HTTP services, the server Remote, and the browser control', () => {
     const rows = insertedRows()
     expect(rows.map(row => row.id)).toEqual([
       'speech-to-text',
       'speech-to-text-sensevoice',
       'speech-to-text-dashscope',
+      'speech-to-text-http',
       'api-speech-to-text',
       'ui-voice-input',
     ])
@@ -65,6 +67,17 @@ describe('voice-input bundle composition', () => {
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-dashscope')
     expect(rows.find(row => row.id === 'speech-to-text-sensevoice')?.name)
       .toBe('@deepseek-ai/dsh-experimental-speech-to-text-sensevoice')
+    expect(rows.find(row => row.id === 'speech-to-text-http')?.name)
+      .toBe('@deepseek-ai/dsh-experimental-speech-to-text-http')
+    expect(rows.find(row => row.id === 'speech-to-text-http')?.config).toEqual({
+      services: [
+        { providerId: 'deepseek-asr', name: 'DeepSeek ASR', endpoint: 'https://api.deepseek.com/v1/tools/asr',
+          apiKeyEnv: 'DEEPSEEK_API_KEY', maxAudioBytes: 8 * 1024 * 1024, maxDurationSeconds: 120 },
+        { providerId: 'dashscope-qwen3', name: 'DashScope qwen3-asr',
+          endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/audio/transcriptions',
+          apiKeyEnv: 'DASHSCOPE_API_KEY', model: 'qwen3-asr-flash' },
+      ],
+    })
   })
 
   it('keeps the local recognizer as the default and one language both accept', () => {
@@ -107,5 +120,27 @@ describe('voice-input bundle composition', () => {
     expect(ctx.speechToText.resolve({ audio }).provider.info.id).toBe('dashscope-funasr')
     expect(() => ctx.speechToText.resolve({ audio, language: 'auto' }))
       .toThrow('Speech provider dashscope-funasr does not support language: auto')
+  })
+
+  it('registers both built-in HTTP services with their loader defaults', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    ctx.provide('credentials', { resolve: () => Promise.resolve(undefined) })
+    await ctx.plugin(SpeechToText, { defaultProvider: 'deepseek-asr', language: 'auto' })
+    await ctx.plugin(Plugin, {
+      services: [
+        { providerId: 'deepseek-asr', name: 'DeepSeek ASR', endpoint: 'https://api.deepseek.com/v1/tools/asr',
+          apiKeyEnv: 'DEEPSEEK_API_KEY', maxAudioBytes: 8 * 1024 * 1024, maxDurationSeconds: 120 },
+        { providerId: 'dashscope-qwen3', name: 'DashScope qwen3-asr',
+          endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/audio/transcriptions',
+          apiKeyEnv: 'DASHSCOPE_API_KEY', model: 'qwen3-asr-flash' },
+      ],
+    })
+    expect(ctx.speechToText.snapshot().providers).toEqual([
+      { id: 'deepseek-asr', name: 'DeepSeek ASR', location: 'cloud', languages: ['auto'],
+        maxAudioSeconds: 120, preparation: { phase: 'ready' } },
+      { id: 'dashscope-qwen3', name: 'DashScope qwen3-asr', location: 'cloud', languages: ['auto'],
+        model: 'qwen3-asr-flash', maxAudioSeconds: 819, preparation: { phase: 'ready' } },
+    ])
   })
 })

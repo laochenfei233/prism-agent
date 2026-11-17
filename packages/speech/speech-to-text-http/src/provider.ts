@@ -133,6 +133,7 @@ export class HttpSpeechProvider implements SpeechProvider {
       name: options.name ?? options.model ?? options.id,
       location: 'cloud',
       languages: [...options.languages],
+      ...(options.model === undefined ? {} : { model: options.model }),
       // The registry splits recordings beyond this cap, so the per-service duration,
       // byte, and form limits all stay satisfied by whatever pieces arrive.
       maxAudioSeconds: Math.min(
