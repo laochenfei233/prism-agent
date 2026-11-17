@@ -5,6 +5,7 @@
  * @module speech-to-text-http/azure
  */
 
+import { readAnswerJson } from './answer.ts'
 import type { SpeechInput, SpeechSegment } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 
 /** Locale tags the service accepts, keyed by language hint. */
@@ -36,17 +37,12 @@ export function azureFastTranscribeRequest(apiKey: string, input: SpeechInput, s
 
 /**
  * Read the recognized text and sentence segments of one fast-transcription answer.
- * @param body - the response body text.
+ * @param response - the service response.
  * @param name - the service display name for the failure messages.
  * @returns the combined text with sentence segments; silence answers empty.
  */
-export function readAzureResult(body: string, name: string): { text: string; segments?: readonly SpeechSegment[] } {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(body)
-  } catch (error) {
-    throw new Error(`Speech service ${name} answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-  }
+export async function readAzureResult(response: Response, name: string): Promise<{ text: string; segments?: readonly SpeechSegment[] }> {
+  const parsed = await readAnswerJson(response, name)
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error(`Speech service ${name} did not answer a JSON object`)
   }

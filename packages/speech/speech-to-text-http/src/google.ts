@@ -5,6 +5,7 @@
  * @module speech-to-text-http/google
  */
 
+import { readAnswerJson } from './answer.ts'
 import type { SpeechInput } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 
 /** Locale tags the service accepts, keyed by language hint. */
@@ -45,17 +46,12 @@ export function googleSpeechRequest(options: GoogleSpeechOptions, input: SpeechI
 
 /**
  * Read the recognized text of one `speech:recognize` answer.
- * @param body - the response body text.
+ * @param response - the service response.
  * @param name - the service display name for the failure messages.
  * @returns the recognized text; empty when the service recognized no speech.
  */
-export function readGoogleResult(body: string, name: string): string {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(body)
-  } catch (error) {
-    throw new Error(`Speech service ${name} answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-  }
+export async function readGoogleResult(response: Response, name: string): Promise<string> {
+  const parsed = await readAnswerJson(response, name)
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error(`Speech service ${name} did not answer a JSON object`)
   }

@@ -16,6 +16,7 @@ import { deadline } from '@deepseek-ai/dsh-timeout'
 import { AwsTranscribe } from './aws.ts'
 import { readAzureResult, azureFastTranscribeRequest } from './azure.ts'
 import { googleSpeechRequest, readGoogleResult } from './google.ts'
+import { readBody, reasonOf } from './answer.ts'
 import { readTencentResult, tencentSentenceRequest } from './tencent.ts'
 import { XfyunFiletrans } from './xfyun.ts'
 import { readVolcanoResult, volcanoFlashRequest } from './volcano.ts'
@@ -45,9 +46,6 @@ const MODE_CAP_SECONDS: Partial<Record<SpeechHttpMode, number>> = {
 
 /** Credential placement one configured service expects. */
 export type SpeechHttpAuthStyle = 'bearer' | 'token' | 'raw'
-
-/** Longest JSON answer this provider reads before giving up on the body. */
-const MAX_RESPONSE_BYTES = 1024 * 1024
 
 /** One configured third-party transcription service. */
 export interface HttpAsrServiceOptions {
@@ -103,8 +101,6 @@ export class HttpSpeechProvider implements SpeechProvider {
 
   private readonly endpoint: string
   private readonly mode: SpeechHttpMode
-  private readonly engineModel: string | undefined
-  private readonly resolveSecretId: (() => Promise<string | undefined>) | undefined
   private readonly model: string | undefined
   private readonly textField: string
   private readonly authHeader: string
@@ -114,8 +110,10 @@ export class HttpSpeechProvider implements SpeechProvider {
   private readonly timeoutMs: number
   private readonly resolveApiKey: () => Promise<string | undefined>
   private readonly doFetch: typeof fetch
-  private readonly xfyun: XfyunFiletrans | undefined
-  private readonly aws: AwsTranscribe | undefined
+  /** Recognizer bound at construction for the forms that own job flows or extra credentials. */
+  private readonly recognizeForm:
+    ((apiKey: string, input: SpeechInput, signal: AbortSignal) => Promise<{ text: string; segments?: readonly SpeechSegment[] }>)
+    | undefined
 
   /**
    * @param options - identity, endpoint, bounds, credential resolution, and the HTTP entry.
@@ -123,10 +121,23 @@ export class HttpSpeechProvider implements SpeechProvider {
   constructor(options: HttpAsrServiceOptions) {
     this.mode = options.mode ?? 'transcriptions'
     this.endpoint = options.endpoint
-    this.engineModel = options.engineModel
-    this.resolveSecretId = options.resolveSecretId
-    if (this.mode === 'tencent-sentence' && (this.engineModel === undefined || this.resolveSecretId === undefined)) {
-      throw new Error(`Service ${options.id} speaks tencent-sentence and must configure an engineModel and a SecretId`)
+    const doFetch = options.doFetch ?? ((input, init) => globalThis.fetch(input, init))
+    if (this.mode === 'tencent-sentence') {
+      const engineModel = options.engineModel
+      const resolveSecretId = options.resolveSecretId
+      if (engineModel === undefined || resolveSecretId === undefined) {
+        throw new Error(`Service ${options.id} speaks tencent-sentence and must configure an engineModel and a SecretId`)
+      }
+      const endpoint = options.endpoint
+      this.recognizeForm = async (apiKey, input, signal) => {
+        const secretId = await resolveSecretId()
+        if (secretId === undefined || secretId.length === 0) {
+          throw new Error(`Speech provider ${options.name ?? options.model ?? options.id} has no SecretId; configure the credential its deployment names`)
+        }
+        const response = await doFetch(endpoint,
+          tencentSentenceRequest(secretId, apiKey, { engineModel, endpoint }, input, signal))
+        return { text: readTencentResult(await readBody(response), options.name ?? options.model ?? options.id) }
+      }
     }
     this.info = {
       id: brandString<SpeechProviderId>(options.id),
@@ -150,36 +161,41 @@ export class HttpSpeechProvider implements SpeechProvider {
     this.maxDurationSeconds = options.maxDurationSeconds
     this.timeoutMs = options.timeoutMs
     this.resolveApiKey = options.resolveApiKey
-    this.doFetch = options.doFetch ?? ((input, init) => globalThis.fetch(input, init))
+    this.doFetch = doFetch
     if (this.mode === 'xfyun-filetrans') {
       const resolveAppId = options.resolveAppId
       if (resolveAppId === undefined) {
         throw new Error(`Service ${options.id} speaks xfyun-filetrans and must configure an AppId`)
       }
-      this.xfyun = new XfyunFiletrans({
+      const adapter = new XfyunFiletrans({
         endpoint: options.endpoint,
         pollIntervalMs: options.pollIntervalMs ?? 5000,
         resolveAppId,
         resolveApiKey: options.resolveApiKey,
-        doFetch: this.doFetch,
+        doFetch,
       })
-    } else {
-      this.xfyun = undefined
+      this.recognizeForm = async (_apiKey, input, signal) => await adapter.transcribe(input.audio, input.language, signal)
     }
     if (this.mode === 'aws-transcribe') {
       const { awsRegion, awsBucket, resolveSecretId } = options
       if (awsRegion === undefined || awsBucket === undefined || resolveSecretId === undefined) {
         throw new Error(`Service ${options.id} speaks aws-transcribe and must configure a region, a bucket, and an access key id`)
       }
-      this.aws = new AwsTranscribe({
+      const adapter = new AwsTranscribe({
         region: awsRegion,
         bucket: awsBucket,
         endpoint: options.endpoint,
         pollIntervalMs: options.pollIntervalMs ?? 5000,
-        doFetch: this.doFetch,
+        doFetch,
       })
-    } else {
-      this.aws = undefined
+      const name = options.name ?? options.model ?? options.id
+      this.recognizeForm = async (apiKey, input, signal) => {
+        const accessKeyId = await resolveSecretId()
+        if (accessKeyId === undefined || accessKeyId.length === 0) {
+          throw new Error(`Speech provider ${name} has no access key id; configure the credential its deployment names`)
+        }
+        return { text: await adapter.transcribe(input.audio, input.language, signal, accessKeyId, apiKey) }
+      }
     }
   }
 
@@ -221,37 +237,20 @@ export class HttpSpeechProvider implements SpeechProvider {
    */
   private async recognize(apiKey: string, input: SpeechInput, signal: AbortSignal):
   Promise<{ text: string; segments?: readonly SpeechSegment[] }> {
-    if (this.mode === 'xfyun-filetrans') return await this.xfyun!.transcribe(input.audio, input.language, signal)
-    if (this.mode === 'tencent-sentence') {
-      const secretId = await this.resolveSecretId?.()
-      if (secretId === undefined || secretId.length === 0) {
-        throw new Error(`Speech provider ${this.info.name} has no SecretId; configure the credential its deployment names`)
-      }
-      const response = await this.doFetch(this.endpoint,
-        tencentSentenceRequest(secretId, apiKey, { engineModel: this.engineModel!, endpoint: this.endpoint }, input, signal))
-      return { text: readTencentResult(await readBody(response), this.info.name) }
-    }
+    const bounded = this.recognizeForm
+    if (bounded !== undefined) return await bounded(apiKey, input, signal)
     if (this.mode === 'volcano-flash') {
       const response = await this.doFetch(this.endpoint, volcanoFlashRequest(apiKey, input, signal))
-      return readVolcanoResult(response, await readBody(response), this.info.name)
+      return await readVolcanoResult(response, this.info.name)
     }
     if (this.mode === 'google-speech') {
       const response = await this.doFetch(this.endpoint, googleSpeechRequest(
         { ...(this.model === undefined ? {} : { model: this.model }) }, input, signal))
-      return { text: readGoogleResult(await readBody(response), this.info.name) }
+      return { text: await readGoogleResult(response, this.info.name) }
     }
     if (this.mode === 'azure-fasttranscribe') {
       const response = await this.doFetch(this.endpoint, azureFastTranscribeRequest(apiKey, input, signal))
-      return readAzureResult(await readBody(response), this.info.name)
-    }
-    if (this.mode === 'aws-transcribe') {
-      const accessKeyId = await this.resolveSecretId?.()
-      if (accessKeyId === undefined || accessKeyId.length === 0) {
-        throw new Error(`Speech provider ${this.info.name} has no access key id; configure the credential its deployment names`)
-      }
-      const aws = this.aws
-      if (aws === undefined) throw new Error(`Speech provider ${this.info.name} lost its job adapter`)
-      return { text: await aws.transcribe(input.audio, input.language, signal, accessKeyId, apiKey) }
+      return await readAzureResult(response, this.info.name)
     }
     const response = await this.doFetch(this.endpoint, this.mode === 'chat-completions'
       ? this.chatCompletionsRequest(apiKey, input, signal)
@@ -341,31 +340,6 @@ export class HttpSpeechProvider implements SpeechProvider {
 }
 
 /**
- * Read one bounded answer body.
- * @param response - the service response.
- * @returns the body text; empty when the service sent none.
- */
-async function readBody(response: Response): Promise<string> {
-  if (!response.body) return ''
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let length = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      length += value.length
-      if (length > MAX_RESPONSE_BYTES) throw new Error(`Speech service answer exceeded ${MAX_RESPONSE_BYTES} bytes`)
-      chunks.push(value)
-    }
-  } finally {
-    await reader.cancel()
-    reader.releaseLock()
-  }
-  return Buffer.concat(chunks).toString('utf8')
-}
-
-/**
  * Read the mapped response field of one JSON answer, following the configured dot
  * path through object keys and numeric array indices.
  * @param body - the response body text.
@@ -420,9 +394,4 @@ function readChatCompletionsText(body: string, name: string): string {
     throw new Error(`Speech service ${name} answered without a "choices[0].message.content" text`)
   }
   return message.content
-}
-
-/** Operator-readable text for one thrown value. */
-function reasonOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

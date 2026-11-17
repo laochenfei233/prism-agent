@@ -6,6 +6,7 @@
  */
 
 import { createHash, createHmac } from 'node:crypto'
+import { readJsonObject, sleepFor } from './answer.ts'
 import type { SpeechSegment } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 
 /** Upload slice size the service prescribes. */
@@ -129,21 +130,11 @@ export class XfyunFiletrans {
       ...(taskId === undefined ? {} : { task_id: taskId }),
       ...fields,
     })
-    const response = await this.options.doFetch(`${this.options.endpoint}/api/${action}`, {
+    const envelope = await readJsonObject(await this.options.doFetch(`${this.options.endpoint}/api/${action}`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
       body,
-    })
-    const text = await response.text()
-    if (!response.ok) throw new Error(`Speech service answered ${response.status}: ${text}`)
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch (error) {
-      throw new Error(`Speech service answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-    }
-    if (typeof parsed !== 'object' || parsed === null) throw new Error('Speech service did not answer a JSON object')
-    const envelope = parsed as Record<string, unknown>
+    }))
     if (envelope.ok !== 0) {
       throw new Error(`Speech service ${action} failed: ${String(envelope.err_no)} ${String(envelope.failed)}`)
     }
@@ -161,18 +152,8 @@ export class XfyunFiletrans {
     form.append('task_id', taskId)
     form.append('slice_id', sliceId)
     form.append('content', new Blob([new Uint8Array(content)], { type: 'application/octet-stream' }))
-    const response = await this.options.doFetch(`${this.options.endpoint}/api/upload`, { method: 'POST', body: form, signal })
-    const text = await response.text()
-    if (!response.ok) throw new Error(`Speech service answered ${response.status}: ${text}`)
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch (error) {
-      throw new Error(`Speech service answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-    }
-    if (typeof parsed === 'object' && parsed !== null && (parsed as Record<string, unknown>).ok !== 0) {
-      throw new Error(`Speech service upload failed: ${JSON.stringify(parsed)}`)
-    }
+    const parsed = await readJsonObject(await this.options.doFetch(`${this.options.endpoint}/api/upload`, { method: 'POST', body: form, signal }))
+    if (parsed.ok !== 0) throw new Error(`Speech service upload failed: ${JSON.stringify(parsed)}`)
   }
 
   /** Poll the task progress until the result is ready, failing on any other settled status. */
@@ -187,7 +168,7 @@ export class XfyunFiletrans {
       if (status !== undefined && status > 5) {
         throw new Error(`Speech service task failed with status ${status}`)
       }
-      await sleep(this.options.pollIntervalMs, signal)
+      await sleepFor(this.options.pollIntervalMs, signal)
     }
   }
 }
@@ -252,19 +233,4 @@ function readSentences(envelope: Record<string, unknown>): readonly XfyunSentenc
 function signa(appId: string, ts: number, secretKey: string): string {
   const base = createHash('md5').update(`${appId}${ts}`).digest('hex')
   return createHmac('sha1', secretKey).update(base).digest('base64')
-}
-
-/** @returns after one delay, rejecting when the deadline signal aborts. */
-async function sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, milliseconds)
-    const onAbort = (): void => {
-      clearTimeout(timer)
-      reject(signal.reason)
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
 }

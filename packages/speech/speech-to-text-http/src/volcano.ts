@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { parseAnswerText, readBody } from './answer.ts'
 import type { SpeechInput, SpeechSegment } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 
 /** Header carrying the outcome code of one flash call. */
@@ -56,23 +57,18 @@ export function volcanoFlashRequest(apiKey: string, input: SpeechInput,
 /**
  * Read the recognized text and sentence segments of one flash answer.
  * @param response - the service response.
- * @param body - the response body text.
  * @param name - the service display name for the failure messages.
  * @returns the recognized text with sentence segments; silence answers empty.
  */
-export function readVolcanoResult(response: Response, body: string,
-  name: string): { text: string; segments?: readonly SpeechSegment[] } {
+export async function readVolcanoResult(response: Response,
+  name: string): Promise<{ text: string; segments?: readonly SpeechSegment[] }> {
   const status = response.headers.get(STATUS_HEADER)
+  const body = await readBody(response)
   if (status !== STATUS_OK && status !== STATUS_SILENT) {
     throw new Error(`Speech service ${name} answered ${status ?? response.status}: ${response.headers.get(MESSAGE_HEADER) ?? body}`)
   }
   if (status === STATUS_SILENT) return { text: '' }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(body)
-  } catch (error) {
-    throw new Error(`Speech service ${name} answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-  }
+  const parsed = parseAnswerText(body, name)
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error(`Speech service ${name} did not answer a JSON body`)
   }

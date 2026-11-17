@@ -72,11 +72,13 @@ describe('google-speech', () => {
     expect(stub.calls[0]?.url).toContain('key=api-key')
   })
 
-  it('answers empty results as no speech and reports service errors', () => {
-    expect(readGoogleResult(JSON.stringify({}), 'google')).toBe('')
-    expect(readGoogleResult(JSON.stringify({ results: [] }), 'google')).toBe('')
-    expect(() => readGoogleResult(JSON.stringify({ error: { status: 'INVALID_ARGUMENT', message: 'bad audio' } }), 'google'))
-      .toThrow('INVALID_ARGUMENT: bad audio')
+  it('answers empty results as no speech and reports service errors', async () => {
+    const answer = (body: string, headers: Record<string, string> = {}): Response =>
+      new Response(body, { status: 200, headers: { 'content-type': 'application/json', ...headers } })
+    await expect(readGoogleResult(answer(JSON.stringify({})), 'google')).resolves.toBe('')
+    await expect(readGoogleResult(answer(JSON.stringify({ results: [] })), 'google')).resolves.toBe('')
+    await expect(readGoogleResult(answer(JSON.stringify({ error: { status: 'INVALID_ARGUMENT', message: 'bad audio' } })), 'google'))
+      .rejects.toThrow('INVALID_ARGUMENT: bad audio')
   })
 })
 
@@ -118,7 +120,8 @@ describe('azure-fasttranscribe', () => {
       .resolves.toMatchObject({ text: '' })
     const form = stub.calls[0]?.init.body as FormData
     expect(JSON.parse(form.get('definition') as string)).toEqual({})
-    expect(() => readAzureResult('<html>', 'azure')).toThrow('malformed JSON')
+    const malformed = new Response('<html>', { status: 200 })
+    expect(readAzureResult(malformed, 'azure')).rejects.toThrow('malformed JSON')
   })
 })
 

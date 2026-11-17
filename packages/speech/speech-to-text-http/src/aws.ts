@@ -7,6 +7,7 @@
  */
 
 import { createHash, createHmac, randomUUID } from 'node:crypto'
+import { readJsonObject, sleepFor } from './answer.ts'
 
 /** Signing algorithm label. */
 const ALGORITHM = 'AWS4-HMAC-SHA256'
@@ -99,7 +100,7 @@ export class AwsTranscribe {
       if (polled.status === STATUS_COMPLETED && polled.transcriptFileUri !== undefined) {
         return await this.readTranscript(polled.transcriptFileUri, accessKeyId, secretAccessKey, signal)
       }
-      await sleep(this.options.pollIntervalMs, signal)
+      await sleepFor(this.options.pollIntervalMs, signal)
     }
     if (started.transcriptFileUri === undefined) {
       throw new Error('Speech service answered without a transcript file URI')
@@ -111,23 +112,11 @@ export class AwsTranscribe {
   private async transcribeCall(target: string, body: string, accessKeyId: string, secretAccessKey: string,
     region: string, signal: AbortSignal): Promise<Record<string, unknown>> {
     const host = new URL(this.options.endpoint).host
-    const response = await this.sign('POST', host, '/', [], Buffer.from(body), accessKeyId, secretAccessKey,
+    const envelope = await readJsonObject(await this.sign('POST', host, '/', [], Buffer.from(body), accessKeyId, secretAccessKey,
       'transcribe', signal, {
         'content-type': 'application/x-amz-json-1.1',
         'x-amz-target': `Com.amazonawstranscribe.TranscribeService.${target}`,
-      }, region)
-    const text = await response.text()
-    if (!response.ok) throw new Error(`Speech service answered ${response.status}: ${text}`)
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch (error) {
-      throw new Error(`Speech service answered malformed JSON: ${error instanceof Error ? error.message : String(error)}`)
-    }
-    if (typeof parsed !== 'object' || parsed === null) {
-      throw new Error('Speech service did not answer a JSON object')
-    }
-    const envelope = parsed as Record<string, unknown>
+      }, region))
     if (typeof envelope.__type === 'string') {
       throw new Error(`Speech service ${target} failed: ${envelope.__type.replace(/^.*#/, '')}`)
     }
@@ -223,19 +212,4 @@ function headerName(headers: Record<string, string>, lower: string): string {
 /** @returns lowercase hex SHA-256 of one string or byte sequence. */
 function sha256Hex(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex')
-}
-
-/** @returns after one delay, rejecting when the deadline signal aborts. */
-async function sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, milliseconds)
-    const onAbort = (): void => {
-      clearTimeout(timer)
-      reject(signal.reason)
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
 }
