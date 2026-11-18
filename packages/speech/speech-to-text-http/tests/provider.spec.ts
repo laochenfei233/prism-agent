@@ -8,6 +8,7 @@ import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import SpeechToText from '@deepseek-ai/dsh-experimental-speech-to-text'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Plugin from '../src/index.ts'
+import { liveConfig } from '../../../settings/settings/tests/live-config.ts'
 import { HttpSpeechProvider } from '../src/provider.ts'
 
 /** Build one canonical one-second 16 kHz mono PCM16 WAV recording. */
@@ -336,5 +337,30 @@ describe('service key resolution', () => {
     await expect(Plugin.resolveServiceKey(undefined, ref, 'HTTP_ASR_TEST_KEY', ctx)).resolves.toBe('ambient-key')
     vi.stubEnv('HTTP_ASR_TEST_KEY', '')
     await expect(Plugin.resolveServiceKey(undefined, ref, 'HTTP_ASR_TEST_KEY', ctx)).resolves.toBeUndefined()
+  })
+})
+
+describe('live service list', () => {
+  it('re-registers the recognizers when the profile rewrites the volatile list', async () => {
+    const stub = fetchOf(200, JSON.stringify({ text: 'live' }))
+    vi.stubGlobal('fetch', stub.doFetch)
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SpeechToText, { defaultProvider: 'http-a', language: 'auto' })
+      const live = await liveConfig(ctx, Plugin, {
+        services: [{ providerId: 'http-a', endpoint: 'https://a.example/asr', apiKey: 'k', apiKeyEnv: 'A_KEY', model: 'whisper-a' }],
+      })
+      expect(ctx.speechToText.listProviders().map(provider => provider.id)).toEqual(['http-a'])
+      await live.update({ services: [
+        { providerId: 'http-b', endpoint: 'https://b.example/asr', apiKey: 'k', apiKeyEnv: 'B_KEY', model: 'whisper-b' },
+        { providerId: 'http-c', endpoint: 'https://c.example/asr', apiKey: 'k', apiKeyEnv: 'C_KEY', model: 'whisper-c' },
+      ] })
+      // Withdrawal settles before the replacement list registers, so the roster repopulates one tick later.
+      await vi.waitFor(() => {
+        expect(ctx.speechToText.listProviders().map(provider => provider.name)).toEqual(['whisper-b', 'whisper-c'])
+      })
+      const spec = ctx.speechToText.resolve({ audio: canonicalWav(1), providerId: brandString<SpeechProviderId>('http-c') })
+      await expect(ctx.speechToText.transcribe(spec, new AbortController().signal)).resolves.toMatchObject({ text: 'live' })
+    } finally { await ctx.fiber.dispose() }
   })
 })

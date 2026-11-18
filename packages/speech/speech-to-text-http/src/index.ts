@@ -8,11 +8,12 @@
  * @module @deepseek-ai/dsh-experimental-speech-to-text-http
  */
 
-import { brandString } from '@deepseek-ai/dsh-brand'
+import type { Volatile } from '@deepseek-ai/cordis'
+// Type-only: the Loader's `loader/volatile-update` merge that a live rewrite emits.
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
-import type { SpeechProviderId } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -45,7 +46,7 @@ export interface HttpServiceConfig {
   /** Transcription model named in the request; omitted models send no model field. */
   model?: string
   /** Language hints this recognizer accepts, including `auto`. */
-  languages: string[]
+  languages: readonly string[]
   /** Response field carrying the recognized text, as a dot path. */
   textField: string
   /** Credential header; defaults to `authorization`. */
@@ -78,8 +79,12 @@ export interface HttpServiceConfig {
 
 /** Plugin configuration; every entry becomes one registered recognizer. */
 export interface Config {
-  /** Third-party services to register, in configuration order. */
-  services: HttpServiceConfig[]
+  /**
+   * Services to register, in configuration order. Live: a profile rewrite of
+   * this list (including one made from the speech settings page) re-registers
+   * the recognizers without remounting the plugin.
+   */
+  services: Volatile<HttpServiceConfig[]>
 }
 
 /** Validated deployment configuration; the loader supplies the defaults. */
@@ -117,7 +122,7 @@ export const Config = z.object({
     maxAudioBytes: z.natural().min(46).default(25 * 1024 * 1024),
     maxDurationSeconds: z.number().min(1).default(7200),
     timeoutMs: z.number().step(1).min(1).default(600_000),
-  })).min(1).required(),
+  })).min(1).required().volatile(),
 })
 
 /**
@@ -148,10 +153,54 @@ export async function resolveServiceKey(
  * Register one recognizer per configured service; every registration is
  * disposed with the plugin, and the registry rejects duplicate ids loudly.
  * @param ctx - context exposing the speech registry and credential planes.
- * @param config - validated service entries.
+ * @param config - validated service entries; the live list re-registers on change.
  */
 export function apply(ctx: Context, config: Config): void {
-  for (const service of config.services) {
+  const register = (services: readonly HttpServiceConfig[]): void => {
+    for (const service of services) registerService(ctx, service)
+  }
+  ctx.effect(() => {
+    register(config.services.get())
+    // A volatile rewrite (profile edit or the settings page) replaces the list:
+    // the previous registrations withdraw before the new ones arrive.
+    const off = ctx.on('loader/volatile-update', () => {
+      // Withdraw first so a replaced list never collides with its predecessors.
+      void withdrawAll(ctx).then(() => { register(config.services.get()) })
+    })
+    return async () => {
+      off()
+      await withdrawAll(ctx)
+    }
+  }, 'speechToTextHttp.services')
+}
+
+/** Registrations owned by one apply call, so a volatile rewrite can withdraw them. */
+const registrations = new WeakMap<Context, (() => Promise<void>)[]>()
+
+/** @returns the registrations one context currently owns. */
+function owned(ctx: Context): (() => Promise<void>)[] {
+  const existing = registrations.get(ctx)
+  if (existing !== undefined) return existing
+  const created: (() => Promise<void>)[] = []
+  registrations.set(ctx, created)
+  return created
+}
+
+/** Withdraw every registration the context owns. @returns after they settle. */
+async function withdrawAll(ctx: Context): Promise<void> {
+  const list = owned(ctx)
+  const pending = list.splice(0)
+  await Promise.allSettled(pending.map(dispose => dispose()))
+}
+
+/**
+ * Register one recognizer for one service entry, validating the form-specific
+ * credentials at load so a misconfigured row fails loud.
+ * @param ctx - context exposing the speech registry and credential planes.
+ * @param service - one configured service entry.
+ */
+function registerService(ctx: Context, service: HttpServiceConfig): void {
+  {
     const ref = credentialRef(service.apiKeyEnv)
     const literalApiKey = nonEmpty(service.apiKey)
     const literalSecretId = nonEmpty(service.secretId)
@@ -166,7 +215,7 @@ export function apply(ctx: Context, config: Config): void {
       || (literalSecretId === undefined && service.secretIdEnv === undefined))) {
       throw new Error(`Service ${service.providerId} speaks aws-transcribe and must configure a region, a bucket, and an access key id`)
     }
-    ctx.effect(() => ctx.speechToText.register(new HttpSpeechProvider({
+    const dispose = ctx.speechToText.register(new HttpSpeechProvider({
       id: service.providerId,
       ...(service.name === undefined ? {} : { name: service.name }),
       endpoint: service.endpoint,
@@ -190,7 +239,8 @@ export function apply(ctx: Context, config: Config): void {
       maxDurationSeconds: service.maxDurationSeconds,
       timeoutMs: service.timeoutMs,
       resolveApiKey: () => resolveServiceKey(literalApiKey, ref, service.apiKeyEnv, ctx),
-    })), `speechToTextHttp.${brandString<SpeechProviderId>(service.providerId)}`)
+    }))
+    owned(ctx).push(dispose)
   }
 }
 

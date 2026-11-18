@@ -1465,13 +1465,18 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-speech-to-text-http`
 
 - `inject`: `speechToText`
-- `source`: [`packages/speech/speech-to-text-http/src/index.ts:80`](../packages/speech/speech-to-text-http/src/index.ts)
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/speech/speech-to-text-http/src/index.ts:81`](../packages/speech/speech-to-text-http/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration; every entry becomes one registered recognizer. */
 export interface Config {
-  /** Third-party services to register, in configuration order. */
-  services: HttpServiceConfig[]
+  /**
+   * Services to register, in configuration order. Live: a profile rewrite of
+   * this list (including one made from the speech settings page) re-registers
+   * the recognizers without remounting the plugin.
+   */
+  services: Volatile<HttpServiceConfig[]>
 }
 
 /** One configured third-party transcription service. */
@@ -1492,7 +1497,7 @@ export interface HttpServiceConfig {
   /** Transcription model named in the request; omitted models send no model field. */
   model?: string
   /** Language hints this recognizer accepts, including `auto`. */
-  languages: string[]
+  languages: readonly string[]
   /** Response field carrying the recognized text, as a dot path. */
   textField: string
   /** Credential header; defaults to `authorization`. */

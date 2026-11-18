@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="configuration"></a>
 ## 配置
 
-插件接收 `services` 列表；每个条目注册一个识别器，重复 id 在加载时失败。每个条目命名 `providerId`、可选显示 `name`、`endpoint` 和接受的 `languages`；`mode` 选择请求形态。`apiKeyEnv` 命名一个凭据引用，受控部署也支持字面量 `apiKey`，但不应写进普通配置文件；`authHeader` 与 `authStyle`（默认 `bearer`，或 `token`、`raw`）把凭据放进服务期望的头。`textField` 以点路径（对象键与数组下标）命名应答的响应字段（默认 `text`），`maxAudioBytes`、`maxDurationSeconds` 与 `timeoutMs` 约束每次识别；缺省 `model` 时不发送 model 字段。
+插件接收实时 `services` 列表；每个条目注册一个识别器，重复 id 在加载时失败；改写列表（profile 编辑或语音设置页）会先注销原有识别器再注册新的。每个条目命名 `providerId`、可选显示 `name`、`endpoint` 和接受的 `languages`；`mode` 选择请求形态。`apiKeyEnv` 命名一个凭据引用，受控部署也支持字面量 `apiKey`，但不应写进普通配置文件；`authHeader` 与 `authStyle`（默认 `bearer`，或 `token`、`raw`）把凭据放进服务期望的头。`textField` 以点路径（对象键与数组下标）命名应答的响应字段（默认 `text`），`maxAudioBytes`、`maxDurationSeconds` 与 `timeoutMs` 约束每次识别；缺省 `model` 时不发送 model 字段。
 
 请求形态：
 
