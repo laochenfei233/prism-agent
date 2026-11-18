@@ -32,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+      FEISHU_WEBHOOK_SECRET: ${{ secrets.FEISHU_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,11 +44,17 @@ jobs:
       # happens only after a successful send; a push failure after a
       # successful send re-notifies the same tags next run, a visible
       # duplicate instead of lost state.
+      #
+      # shell: bash is load-bearing: the default step shell is `bash -e`
+      # without pipefail, so an upstream API failure inside the detection
+      # pipe would degrade to an empty tag list and a green no-op run.
       - name: detect, notify, record
+        shell: bash
         run: |
           SEEN_FILE=.github/dsh-upstream-seen.json
 
           NEW_TAGS=$(gh api --paginate "repos/$UPSTREAM_REPO/releases" --jq '.[].tag_name' \
+            | awk '!seen[$0]++' \
             | while IFS= read -r tag; do
                 [ -z "$tag" ] && continue
                 jq -e --arg t "$tag" 'index($t)' "$SEEN_FILE" >/dev/null || printf '%s\n' "$tag"
