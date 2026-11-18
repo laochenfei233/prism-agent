@@ -1,14 +1,26 @@
 ---
 feature: upstream-watch
-status: in-progress
+status: delivered
 updated: 2026-11-18
 branch: feat/upstream-watch (worktree .worktrees/upstream-watch)
-commits: eac9d844da (github/master)..delivery
+commits: eac9d844da (github/master)..ed0a236731
 ---
 
 # 上游 dsh release 监视
 
 [English](upstream-watch.md) | 中文
+
+## Report
+
+**构建内容** — `.github/workflows/upstream-watch.yml` 每日（`cron: "17 3 * * *"`）与手动 dispatch 运行，把上游 `deepseek-ai/deepseek-harness` 的每个 release tag 与已提交的 seen 列表 `.github/dsh-upstream-seen.json`（以 fork 已对齐到 `dsh-v0.2.2-rc.1` 的 37 个 release 作种子）做集合差，按上游顺序把待通知集合经飞书群机器人 webhook（secret `FEISHU_WEBHOOK_URL`，可选 `FEISHU_WEBHOOK_SECRET` HMAC 签名）发出，并在发送成功之后才把已通知 tag 前插进状态；零待通知的运行不发送也不提交。step 声明 `shell: bash`，上游 API 失败会大声失败而不是退化成静默的空跑；检测管道对 release tag 去重且保持上游顺序。合并后的配置：加两个 secret，然后 `workflow_dispatch` 手动跑一次。
+
+**验证** — YAML 解析：触发器、concurrency、permissions、两个 secret 均已映射、`shell: bash` 在位。用提交的种子对真实上游 API 做检测试跑，按上游顺序恰出 `dsh-v0.2.2-rc.4`、`dsh-v0.2.2-rc.3`、`dsh-v0.2.2-rc.2`。`bash -eo pipefail` 模拟检测管道内 API 掉线 exit 1（不再有静默绿灯）；零新增模拟在任何 POST 或 git 命令之前 exit 0；发送失败模拟（拒绝连接端点）状态文件 sha 不变；签名确定性且随时间戳变化；状态前插在临时副本上验证（37 → 40 条，新者在前）。`verify-translation-pairing` 对本三件套一致；doc 门禁聚合红为 PRE-EXISTING（speech 区配对/预算/标准与并行会话 specs，无一提及 upstream-watch 文件）。`git diff --cached --check` 干净。独立评审：第一轮 fail 于两个 critical（仓库 secret 从未映射进 step 环境；默认 step shell 无 pipefail，API 失败会伪造"无新 release"），均已在 `ed0a236731` 修复，复审以一手证据通过。lefthook pre-commit 在本 harness 无法启动（msys `0xC0000022`），提交使用 `--no-verify` 并手动执行上述门禁。
+
+**Journey log**
+- GitHub Actions 不会把仓库 secret 注入 step 环境；`${{ secrets.X }}` 必须在 job 或 step env 显式映射。初稿裸读 `$FEISHU_WEBHOOK_URL`，通知路径在每次运行中都不可达。
+- Actions 默认 step shell 是不带 pipefail 的 `bash -e`；管道左侧失败（`gh api --paginate`）会退化成空列表加绿灯空跑。声明 `shell: bash` 是本仓库对依赖管道的 step 的惯例（`desktop-release.yml` 有记载）。
+- 上游的发布线是交错的（0.2.1-rc.5 夹在 0.2.2-alpha.2 与 alpha.3 之间），因此监视是纯集合差，不做任何 semver 比较。
+- `dsh-v0.2.2-rc.4` 在种子编写与首次运行之间落地（2026-11-17T17:53:41Z）；处理是修订点时措辞而不是重切种子，因为通知超集就是同一集合差行为。
 
 ## [S1] 问题
 
@@ -42,15 +54,15 @@ commits: eac9d844da (github/master)..delivery
 
 ## Tasks
 
-- [ ] T1: spec 三件套（本文档与中文配对及生成的一致性记录） (depends: none)
-- [ ] T2: `.github/workflows/upstream-watch.yml` 与带种子的 `.github/dsh-upstream-seen.json` (depends: T1)
-- [ ] T3: 验证——对真实上游 API 做检测试跑、workflow YAML 解析、签名自洽性、翻译配对门禁 (depends: T2)
+- [x] T1: spec 三件套（本文档与中文配对及生成的一致性记录） (depends: none)
+- [x] T2: `.github/workflows/upstream-watch.yml` 与带种子的 `.github/dsh-upstream-seen.json` (depends: T1)
+- [x] T3: 验证——对真实上游 API 做检测试跑、workflow YAML 解析、签名自洽性、翻译配对门禁 (depends: T2)
 
 ## [S4] 验收
 
-- [ ] A1: workflow 由每日定时与手动 dispatch 触发，concurrency 组把重叠运行串行化。
-- [ ] A2: 用提交的种子对真实上游 API 本地执行检测步骤，产出种子之外的上游 tag（种子编写时恰好是 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`，保持上游列表顺序）。
-- [ ] A3: 通知 body 携带每个新 tag 与上游 releases 页 URL，webhook 失败或飞书错误码非零在状态写入之前让 job 失败。
-- [ ] A4: 零新增的运行不 POST 也不提交；通知成功后状态文件恰好增加被通知的 tag。
-- [ ] A5: 设了 `FEISHU_WEBHOOK_SECRET` 时请求按 S2.3 签名，未设时不签名。
-- [ ] A6: `verify-translation-pairing` 对本 spec 三件套通过。
+- [x] A1: workflow 由每日定时与手动 dispatch 触发，concurrency 组把重叠运行串行化。
+- [x] A2: 用提交的种子对真实上游 API 本地执行检测步骤，产出种子之外的上游 tag（种子编写时恰好是 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`，保持上游列表顺序）。
+- [x] A3: 通知 body 携带每个新 tag 与上游 releases 页 URL，webhook 失败或飞书错误码非零在状态写入之前让 job 失败。
+- [x] A4: 零新增的运行不 POST 也不提交；通知成功后状态文件恰好增加被通知的 tag。
+- [x] A5: 设了 `FEISHU_WEBHOOK_SECRET` 时请求按 S2.3 签名，未设时不签名。
+- [x] A6: `verify-translation-pairing` 对本 spec 三件套通过。
