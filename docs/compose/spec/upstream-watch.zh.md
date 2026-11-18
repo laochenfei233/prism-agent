@@ -1,7 +1,7 @@
 ---
 feature: upstream-watch
 status: in-progress
-updated: 2026-11-17
+updated: 2026-11-18
 branch: feat/upstream-watch (worktree .worktrees/upstream-watch)
 commits: eac9d844da (github/master)..delivery
 ---
@@ -34,7 +34,7 @@ commits: eac9d844da (github/master)..delivery
 
 ### S2.5 — 种子与首次运行
 
-提交的种子列出 fork 已对齐到 `dsh-v0.2.2-rc.1` 的 37 个 release，因此首次运行恰好通知 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`。零新增的运行不发送也不提交。
+提交的种子列出 fork 已对齐到 `dsh-v0.2.2-rc.1` 的 37 个 release。种子编写时待通知集合恰好是 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`；上游在 workflow 首次运行之前又发布了 `dsh-v0.2.2-rc.4`（2026-11-17T17:53:41Z），因此首次定时运行通知的是当前待通知集合——按上游顺序为 `dsh-v0.2.2-rc.4`、`dsh-v0.2.2-rc.3`、`dsh-v0.2.2-rc.2`——这是同一集合差行为，不是种子缺陷。零新增的运行不发送也不提交。
 
 ### S2.6 — 失败行为
 
@@ -49,7 +49,7 @@ commits: eac9d844da (github/master)..delivery
 ## [S4] 验收
 
 - [ ] A1: workflow 由每日定时与手动 dispatch 触发，concurrency 组把重叠运行串行化。
-- [ ] A2: 用提交的种子对真实上游 API 本地执行检测步骤，恰好产出 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`。
+- [ ] A2: 用提交的种子对真实上游 API 本地执行检测步骤，产出种子之外的上游 tag（种子编写时恰好是 `dsh-v0.2.2-rc.2` 与 `dsh-v0.2.2-rc.3`，保持上游列表顺序）。
 - [ ] A3: 通知 body 携带每个新 tag 与上游 releases 页 URL，webhook 失败或飞书错误码非零在状态写入之前让 job 失败。
 - [ ] A4: 零新增的运行不 POST 也不提交；通知成功后状态文件恰好增加被通知的 tag。
 - [ ] A5: 设了 `FEISHU_WEBHOOK_SECRET` 时请求按 S2.3 签名，未设时不签名。

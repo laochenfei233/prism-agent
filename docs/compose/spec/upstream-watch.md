@@ -1,7 +1,7 @@
 ---
 feature: upstream-watch
 status: in-progress
-updated: 2026-11-17
+updated: 2026-11-18
 branch: feat/upstream-watch (worktree .worktrees/upstream-watch)
 commits: eac9d844da (github/master)..delivery
 ---
@@ -34,7 +34,7 @@ The state is written only after a successful send: the new tags are prepended to
 
 ### S2.5 — Seed and first run
 
-The committed seed lists the 37 releases the fork has already reconciled through `dsh-v0.2.2-rc.1`, so the first run notifies exactly `dsh-v0.2.2-rc.2` and `dsh-v0.2.2-rc.3`. A run that finds zero new releases sends nothing and commits nothing.
+The committed seed lists the 37 releases the fork has already reconciled through `dsh-v0.2.2-rc.1`. At seed-authoring time the pending set was exactly `dsh-v0.2.2-rc.2` and `dsh-v0.2.2-rc.3`; upstream published `dsh-v0.2.2-rc.4` (2026-11-17T17:53:41Z) before the workflow's first run, so the first scheduled run notifies the current pending set — `dsh-v0.2.2-rc.4`, `dsh-v0.2.2-rc.3`, `dsh-v0.2.2-rc.2` in upstream order — which is the same set-difference behavior, not a seed defect. A run that finds zero new releases sends nothing and commits nothing.
 
 ### S2.6 — Failure behavior
 
@@ -49,7 +49,7 @@ A missing `FEISHU_WEBHOOK_URL` fails the job at run time (misconfiguration fails
 ## [S4] Acceptance
 
 - [ ] A1: the workflow triggers on the daily schedule and manual dispatch, and its concurrency group serializes overlapping runs.
-- [ ] A2: executing the detection step locally with the committed seed against the live upstream API yields exactly `dsh-v0.2.2-rc.2` and `dsh-v0.2.2-rc.3`.
+- [ ] A2: executing the detection step locally with the committed seed against the live upstream API yields the upstream tags absent from the seed (at seed-authoring time exactly `dsh-v0.2.2-rc.2` and `dsh-v0.2.2-rc.3`, keeping the upstream list order).
 - [ ] A3: the notification body carries every new tag and the upstream releases URL, and a webhook failure or nonzero feishu error code fails the job before any state write.
 - [ ] A4: a zero-new run performs no POST and no commit; after a successful notification the state file gains exactly the notified tags.
 - [ ] A5: the request is signed per S2.3 when `FEISHU_WEBHOOK_SECRET` is set and unsigned when absent.

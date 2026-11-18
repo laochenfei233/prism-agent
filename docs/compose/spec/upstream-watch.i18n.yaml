@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-watch.md
 /:
-  en: 7ded8b50d253229c
-  zh: 7ded8b50d253229c
+  en: 4c70a8924f0625f4
+  zh: 4c70a8924f0625f4
 /upstream-dsh-release-watch:
   en: 56a757044c956548
   zh: 4c5bd7aae91f5ea2
@@ -27,8 +27,8 @@
   en: a442e04ee728678e
   zh: d5f5d82c8637c52f
 /upstream-dsh-release-watch/s2-design/s2-5-seed-and-first-run:
-  en: a75157d8e0906815
-  zh: cbdfd8b68c6c496b
+  en: 467f855adc1d5c56
+  zh: 770219df066f31ec
 /upstream-dsh-release-watch/s2-design/s2-6-failure-behavior:
   en: f09f7a1ea4adc4cd
   zh: bc812c6408c1b2b0
@@ -36,5 +36,5 @@
   en: 567400a65ec68c8b
   zh: 7c40ce3872c6eb59
 /upstream-dsh-release-watch/s4-acceptance:
-  en: 3f9f78ce2fdd92d4
-  zh: db54d0b522ef2b21
+  en: bcb342afd9316660
+  zh: ce8f932922c3e0d3
