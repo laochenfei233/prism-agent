@@ -21,12 +21,12 @@ kind: "package-reference"
 <a id="summary"></a>
 ## 概述
 
-这个可选浏览器插件在设置里添加「语音识别」入口，紧邻模型设置。它为[语音 HTTP 提供者](../../speech/speech-to-text-http/README.zh.md)配置的每个转写服务渲染一张卡片，编辑卡片的显示名称、端点、模型与凭据引用，并通过凭据库管理每个服务的 API 密钥（带已配置/未配置徽标）。添加操作追加一张草稿卡片；删除操作移除一张卡片。卡片上方的选择器在[语音注册表](../../experimental/speech-to-text/README.zh.md)给出的实时花名册上切换默认识别器，选择经语音 Remote 持久化。
+这个可选浏览器插件把「语音识别」页加入模型设置的分段标签栏，与提供者列表、本地模型页并列。它为[语音 HTTP 提供者](../../speech/speech-to-text-http/README.zh.md)配置的每个转写服务渲染一张卡片，编辑卡片的显示名称、端点、模型与凭据引用，并通过凭据库管理每个服务的 API 密钥（带已配置/未配置徽标）。添加操作追加一张草稿卡片；删除操作移除一张卡片。卡片上方的选择器在[语音注册表](../../experimental/speech-to-text/README.zh.md)给出的实时花名册上切换默认识别器，选择经语音 Remote 持久化。
 
 <a id="use-this-package"></a>
 ## 使用本包
 
-在插件管理页启用[语音输入 Bundle](../voice-input-bundle/README.zh.md)；Bundle 把本分区与它管理的识别器一起装配。只有部署在服务语音 HTTP 插件的配置命名空间时本分区才注册，禁用 Bundle 后设置里不会留下痕迹。卡片上写入的密钥按服务命名的引用存入凭据库（内置 DeepSeek ASR 用 `DEEPSEEK_API_KEY`，内置 DashScope qwen3-asr 用 `DASHSCOPE_API_KEY`），从不进入配置文件。切换默认识别器的请求遵循与会议页选择器相同的校验，识别器未声明的语言提示会让写入失败。
+在插件管理页启用[语音输入 Bundle](../voice-input-bundle/README.zh.md)；Bundle 把本分区与它管理的识别器一起装配。本页以 `settings.models.tab` 的 `speech` tab 注册；部署未服务语音 HTTP 命名空间时，页内直接说明，而不显示服务卡片。卡片上写入的密钥按服务命名的引用存入凭据库（内置 DeepSeek ASR 用 `DEEPSEEK_API_KEY`，内置 DashScope qwen3-asr 用 `DASHSCOPE_API_KEY`），从不进入配置文件。切换默认识别器的请求遵循与会议页选择器相同的校验，识别器未声明的语言提示会让写入失败。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现

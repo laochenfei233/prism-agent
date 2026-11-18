@@ -1,11 +1,12 @@
 /**
- * The 语音识别 settings section: the default-recognizer switcher over the live
- * roster and one card per configured HTTP transcription service, with its
- * credential managed through the credential store.
+ * The 语音识别 page of the Models section: the default-recognizer switcher over
+ * the live roster and one card per configured HTTP transcription service, with
+ * its credential managed through the credential store. The tab renders content
+ * only — the Models section owns the page title and the tab strip.
  */
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SpeechSettingsStore, type SpeechServiceConfig, type SpeechServiceEdits } from './store.ts'
 import css from './SpeechSection.module.css'
 
@@ -15,16 +16,15 @@ export interface SpeechSectionInjected {
   readonly store: SpeechSettingsStore
 }
 
-/** Props the renderer binds for the section. */
+/** Props the renderer binds for the tab page. */
 export type SpeechSectionProps =
-  PropsRuntime<'settings.section'>
-  & PropsLocale<'settings.speech'>
+  PropsLocale<'settings.speech'>
   & InjectFace<SpeechSectionInjected>
 
 /**
- * Render the speech settings page.
- * @param props - the section runtime face, copy, and page store.
- * @returns the section content.
+ * Render the speech page.
+ * @param props - the page copy and the page store.
+ * @returns the tab content.
  */
 export function SpeechSection(props: SpeechSectionProps): ReactNode {
   const { t, store } = props
@@ -32,26 +32,32 @@ export function SpeechSection(props: SpeechSectionProps): ReactNode {
   const [selectNotice, setSelectNotice] = useState<string | undefined>(undefined)
   return (
     <div className={css.page}>
-      <h2>{t('title')}</h2>
-      <p className={css.intro}>{t('intro')}</p>
-      {state.roster === undefined
-        ? <p className={css.hint}>{t('rosterUnavailable')}</p>
-        : (
+      {state.available
+        ? (
             <div className={css.card}>
-              <label className={css.rowLabel} htmlFor='speech-default-recognizer'>{t('defaultRecognizer')}</label>
-              <select
-                id='speech-default-recognizer'
-                className={css.select}
-                value={state.roster.selected}
-                onChange={event => { void store.selectProvider(event.target.value).then(refusal => { setSelectNotice(refusal) }) }}
-              >
-                {state.roster.providers.map(provider =>
-                  <option key={provider.id} value={provider.id}>{provider.name}</option>)}
-              </select>
+              <div className={css.cardHead}>
+                <span className={css.cardTitle}>{t('defaultRecognizer')}</span>
+              </div>
+              {state.roster === undefined
+                ? <p className={css.hint}>{t('rosterUnavailable')}</p>
+                : (
+                    <div className={css.field}>
+                      <select
+                        id='speech-default-recognizer'
+                        aria-label={t('defaultRecognizer')}
+                        className={css.select}
+                        value={state.roster.selected}
+                        onChange={event => { void store.selectProvider(event.target.value).then(refusal => { setSelectNotice(refusal) }) }}
+                      >
+                        {state.roster.providers.map(provider =>
+                          <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+              {selectNotice !== undefined && <p className={css.error}>{selectNotice}</p>}
             </div>
-          )}
-      {selectNotice !== undefined && <p className={css.error}>{selectNotice}</p>}
-      <h3>{t('services')}</h3>
+          )
+        : <div className={css.card}><p className={css.hint}>{t('rosterUnavailable')}</p></div>}
       {state.services.map((service, index) => (
         <ServiceCard
           key={service.providerId ?? String(index)}
@@ -62,7 +68,9 @@ export function SpeechSection(props: SpeechSectionProps): ReactNode {
           keyConfigured={service.apiKeyEnv === undefined ? undefined : state.keyConfigured[service.apiKeyEnv]}
         />
       ))}
-      <button type='button' className={css.addButton} onClick={() => { void store.addService() }}>{t('add')}</button>
+      <button type='button' className={css.addButton} onClick={() => { void store.addService() }}>
+        <span aria-hidden='true'>+</span> {t('add')}
+      </button>
       {state.notice !== undefined && <p className={css.error}>{t('writeFailed')}</p>}
     </div>
   )

@@ -33,6 +33,8 @@ export interface SpeechServiceEdits {
 
 /** Client-sync state of the page. */
 export interface SpeechSettingsState {
+  /** Whether the host serves the speech HTTP configuration namespace. */
+  readonly available: boolean
   /** Configured services in document order. */
   readonly services: readonly SpeechServiceConfig[]
   /** Whether the namespace document accepts writes. */
@@ -177,6 +179,7 @@ export class SpeechSettingsStore {
     const services = Array.isArray(snapshot.value?.services) ? snapshot.value.services : []
     this.knownRefs = services.map(service => service.apiKeyEnv).filter((ref): ref is string => ref !== undefined && ref.length > 0)
     return {
+      available: snapshot.status === 'ready',
       services,
       writable: snapshot.writable,
       keyConfigured: {},

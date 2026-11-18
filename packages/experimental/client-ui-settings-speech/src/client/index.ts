@@ -15,6 +15,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-experimental-api-speech-to-text/remote'
 // Type-only: pulls the ctx.configForms merge and the settings.section SlotMap entry.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: pulls the Models section's settings.models.tab SlotMap entry.
+import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 // Type-only: pulls the ctx.slots merge into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -48,17 +50,18 @@ export const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'remot
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-speech: dictionaries')
-  const t = ctx.locale.bind(NS)
   const operations = createSpeechOperations(ctx)
   const store = new SpeechSettingsStore(ctx.configForms.get<SpeechHttpSection>(SPEECH_HTTP_NAMESPACE), operations)
-  ctx.effect(() => ctx.configForms.whileServed([SPEECH_HTTP_NAMESPACE], () => ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
+  // The page rides the Models section's tab strip as its `speech` page; the
+  // section owns the label, and the store reports an unserved namespace inside
+  // the tab instead of hiding it.
+  ctx.effect(() => ctx.slots.inject('settings.models.tab', () => ctx.slots.register({
+    name: 'settings.models.tab',
     id: 'speech',
-    order: 11,
+    order: 20,
     locale: NS,
-    label: () => t('nav'),
     inject: () => ({ store }),
-  }, SpeechSection))), 'ui-settings-speech: section while served')
+  }, SpeechSection)), 'ui-settings-speech: models tab')
   ctx.effect(() => {
     const refresh = (): void => { void store.refresh() }
     const disposers = [

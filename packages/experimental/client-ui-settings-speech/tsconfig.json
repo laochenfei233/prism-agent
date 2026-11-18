@@ -43,6 +43,9 @@
     },
     {
       "path": "../../speech/speech-to-text-http"
+    },
+    {
+      "path": "../../client/ui-settings-models"
     }
   ]
 }

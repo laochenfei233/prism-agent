@@ -3,6 +3,10 @@
 /** English strings (the key-set source of truth for this pair). */
 export const en = {
   nav: 'Models',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'DeepSeek Account',
   title: 'Models',
   intro: 'Enter your API keys to use models from the following providers.',
@@ -147,6 +151,10 @@ export type ModelsKey = keyof typeof en
 /** Chinese strings (same keys as {@link en}). */
 export const zh: { [Key in keyof typeof en]: string } = {
   nav: '模型',
+  tabProviders: '模型提供者',
+  tabSpeech: '语音识别',
+  tabLocal: '本地模型',
+  tabsLabel: '模型页面',
   deepSeekAccount: 'DeepSeek 账号',
   title: '模型',
   intro: '填入各提供商的 API 密钥即可使用其模型。',
@@ -288,6 +296,10 @@ export const zh: { [Key in keyof typeof en]: string } = {
 /** Japanese copy, checked against the English keys. */
 export const ja = {
   'nav': 'モデル',
+  'tabProviders': 'Providers',
+  'tabSpeech': 'Speech recognition',
+  'tabLocal': 'Local models',
+  'tabsLabel': 'Models pages',
   'deepSeekAccount': 'DeepSeekアカウント',
   'title': 'モデル',
   'intro': '以下のプロバイダーのモデルを使用するには、APIキーを入力してください。',
@@ -429,6 +441,10 @@ export const ja = {
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
   nav: 'Modelos',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'Cuenta DeepSeek',
   title: 'Modelos',
   intro: 'Ingrese sus claves API para usar modelos de los siguientes proveedores.',
@@ -570,6 +586,10 @@ export const es = {
 /** French dictionary, checked against the English keys. */
 export const fr = {
   nav: 'Modèles',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'Compte DeepSeek',
   title: 'Modèles',
   intro: 'Entrez vos clés API pour utiliser les modèles des fournisseurs suivants.',
@@ -711,6 +731,10 @@ export const fr = {
 /** German dictionary, checked against the English keys. */
 export const de = {
   nav: 'Modelle',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'DeepSeek-Konto',
   title: 'Modelle',
   intro: 'Geben Sie Ihre API-Schlüssel ein, um Modelle der folgenden Anbieter zu verwenden.',
@@ -852,6 +876,10 @@ export const de = {
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
   nav: 'Модели',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'DeepSeek Аккаунт',
   title: 'Модели',
   intro: 'Введите ключи API, чтобы использовать модели следующих поставщиков.',
@@ -993,6 +1021,10 @@ export const ru = {
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
   nav: 'Modelos',
+  tabProviders: 'Providers',
+  tabSpeech: 'Speech recognition',
+  tabLocal: 'Local models',
+  tabsLabel: 'Models pages',
   deepSeekAccount: 'DeepSeek Conta',
   title: 'Modelos',
   intro: 'Insira suas chaves API para usar modelos dos seguintes fornecedores.',

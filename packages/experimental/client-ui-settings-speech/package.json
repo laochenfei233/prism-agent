@@ -51,7 +51,8 @@
     "@deepseek-ai/dsh-experimental-speech-to-text-http": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@testing-library/react": "^16.3.3"
+    "@testing-library/react": "^16.3.3",
+    "@deepseek-ai/dsh-client-ui-settings-models": "workspace:*"
   },
   "dsh": {
     "client": {

@@ -617,7 +617,7 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: en.add }))
     // Without the pi-ai namespace nothing can be hand-declared, so the card
     // is the catalog form alone: no mode switch, no custom panel.
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.queryByRole('textbox', { name: en.customRoute })).toBeNull()
     expect(screen.queryByRole('option', { name: 'anthropic' })).toBeNull()
     expect(screen.getByRole('option', { name: 'plain' })).toBeTruthy()
@@ -1820,7 +1820,7 @@ describe('ModelsSection', () => {
     scripted.face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
     await mountFace(scripted)
     fireEvent.click(screen.getByRole('button', { name: en.add }))
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.queryByRole('combobox', { name: en.provider })).toBeNull()
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
@@ -1850,7 +1850,7 @@ describe('ModelsSection', () => {
     // custom one, whose panel was never visited.
     face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
     await act(async () => { await controller.load() })
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
 
@@ -1894,7 +1894,7 @@ describe('ModelsSection', () => {
     // Nothing can be declared any more, so the form is gone rather than left
     // to create a route the Host would refuse; the catalog form stands alone.
     expect(screen.queryByRole('textbox', { name: en.customRoute })).toBeNull()
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.getByRole('combobox', { name: en.provider })).toBeTruthy()
   })
 
@@ -1904,7 +1904,7 @@ describe('ModelsSection', () => {
     expect(screen.getByRole<HTMLSelectElement>('combobox', { name: en.provider }).value).toBe('anthropic')
     fireEvent.click(screen.getByRole('tab', { name: en.addCustom }))
     fireEvent.click(within(screen.getByRole('tabpanel', { name: en.addCustom })).getByText(en.cancel))
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     // The draft's provider gets configured elsewhere: its row must arrive closed.
     const withAnthropic = (layer: unknown): JsonValue => ({
       providers: { ...(layer as { providers: object }).providers, anthropic: { apiKeyEnv: 'ANTHROPIC_API_KEY' } },
@@ -1936,7 +1936,7 @@ describe('ModelsSection', () => {
     expect(screen.getByRole<HTMLButtonElement>('tab', { name: en.addCatalog }).disabled).toBe(true)
     await act(async () => { settle!(); await pending })
     // The apply closes the card once it lands; nothing was switched underneath it.
-    await waitFor(() => { expect(screen.queryByRole('tablist')).toBeNull() })
+    await waitFor(() => { expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull() })
     expect(mutate).toHaveBeenCalledOnce()
   })
 
@@ -1975,8 +1975,8 @@ describe('ModelsSection', () => {
     scripted.face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
     await mountFace(scripted)
     fireEvent.click(screen.getByRole('button', { name: en.add }))
-    expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.queryByRole('tabpanel')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
+    expect(screen.queryByRole('tabpanel', { name: en.addCatalog })).toBeNull()
     expect(screen.getByText(en.addCustom)).toBeTruthy()
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
@@ -2012,7 +2012,7 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: en.add }))
     fireEvent.click(screen.getByRole('tab', { name: en.addCustom }))
     fireEvent.click(within(screen.getByRole('tabpanel', { name: en.addCustom })).getByText(en.cancel))
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.getByRole('button', { name: en.add })).toBeTruthy()
   })
 
@@ -2436,4 +2436,28 @@ it.each([es, fr, de, ru, pt])('keeps capacity examples in translated validation 
       expect(parseCapacity(token!)).toBeGreaterThan(0)
     }
   }
+})
+
+describe('ModelsSection tab strip', () => {
+  it('offers the provider page plus the speech and local-model pages, mounting each on first visit', async () => {
+    const scripted = scriptedFace()
+    const { renderSlot } = await mountFace(scripted)
+    const tabs = within(screen.getByRole('tablist', { name: en.tabsLabel }))
+    expect(tabs.getByRole('tab', { name: en.tabProviders }).getAttribute('aria-selected')).toBe('true')
+    expect(tabs.getByRole('tab', { name: en.tabSpeech })).toBeTruthy()
+    expect(tabs.getByRole('tab', { name: en.tabLocal })).toBeTruthy()
+    const tabPages = (): string[] => renderSlot.mock.calls
+      .filter(call => call[0] === 'settings.models.tab')
+      .map(call => (call[2] as { only: string }).only)
+    // Only the provider page mounts until another tab is selected.
+    expect(tabPages()).toEqual([])
+    fireEvent.click(tabs.getByRole('tab', { name: en.tabSpeech }))
+    expect(tabs.getByRole('tab', { name: en.tabSpeech }).getAttribute('aria-selected')).toBe('true')
+    expect(tabPages()).toContain('speech')
+    expect(tabPages()).not.toContain('local')
+    fireEvent.click(tabs.getByRole('tab', { name: en.tabLocal }))
+    expect(tabPages()).toContain('local')
+    // Both pages stay mounted; the strip moves selection instead of remounting.
+    expect(tabs.getByRole('tab', { name: en.tabProviders }).getAttribute('aria-selected')).toBe('false')
+  })
 })

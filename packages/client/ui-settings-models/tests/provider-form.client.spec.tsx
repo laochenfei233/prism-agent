@@ -1593,7 +1593,7 @@ describe('hand-declared providers', () => {
     // Two cards at once would each be closable by the other: whichever one is
     // dismissed clears the shared state and discards the other's draft.
     openEditor('openai')
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: en.addMode })).toBeNull()
     expect(screen.queryByRole('textbox', { name: en.customRoute })).toBeNull()
   })
 
