@@ -99,13 +99,21 @@ const ABSENT_FILE_UPLOADS = {
 }
 
 /**
- * Browser-shell bridge reporting the harness-host path of a picked file. The
- * Desktop preload exposes it on the application document; a served Web page
- * has none, so every non-image file uploads there.
+ * Browser-shell bridge reporting the harness-host path of a picked file. A
+ * shell may install it on the application document (`__DSH_HOST_PATHS__`);
+ * otherwise the WebView2 Desktop shell is detected through the file itself,
+ * which carries its host path on the non-standard `path` property. A served
+ * Web page's `File` has no path, so every non-image file uploads there.
  */
 interface HostPathBridge {
   /** Absolute harness-host path of one picked file, or empty when the shell has none for it. */
   pathFor(file: File): string
+}
+
+/** The path each `File` reports about itself, empty when the runtime provides none. */
+function fileHostPath(file: File): string {
+  const path = (file as { path?: unknown }).path
+  return typeof path === 'string' ? path : ''
 }
 
 /** The shell-installed bridge, when this document runs inside the Desktop application. */
@@ -529,8 +537,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
           for (const file of files) {
             const directory = directories.has(file)
-            if (bridge === undefined && directory) return t('attachment.directoryDesktopOnly')
-            const path = bridge?.pathFor(file) ?? ''
+            const path = bridge?.pathFor(file) ?? fileHostPath(file)
+            if (bridge === undefined && directory && path === '') return t('attachment.directoryDesktopOnly')
             if (directory && path === '') return t('attachment.pathUnavailable')
             if (path === '' || (!directory && isImageMediaType(file.type))) {
               uploads.push(file)

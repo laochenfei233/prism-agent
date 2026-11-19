@@ -465,6 +465,19 @@ describe('Conversation inject API', () => {
     }
   })
 
+  it('cites a dropped folder through the WebView2 File.path fallback without a shell bridge', async () => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    const composer = b.composerApi(ROOT)
+    const { state } = b.inputApi(ROOT)
+    // No __DSH_HOST_PATHS__ stub: the WebView2 shell reports the path on the File itself.
+    const folder = new File([], 'huge-project')
+    Object.defineProperty(folder, 'path', { value: '/repos/huge-project' })
+    expect(composer.addFiles?.([folder], new Set([folder]))).toBeNull()
+    expect(state.getSnapshot().draft).toBe('@/repos/huge-project/ ')
+    expect(composer.resolveDraftAttachments?.(state.getSnapshot().attachmentIds)).toEqual([])
+  })
+
   it('preserves selected text and file order and restores pasted directory chips from the draft', async () => {
     vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `/proj/${file.name}` })
     onTestFinished(() => { vi.unstubAllGlobals(); cleanup() })
