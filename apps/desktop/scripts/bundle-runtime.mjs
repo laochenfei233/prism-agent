@@ -424,9 +424,17 @@ export function injectDesktopHostBridge(distDest) {
   }
   Object.defineProperty(window, "Notification", { configurable: true, value: DshNotification })
 
+  // The bubble listener opens only anchors the page did not handle: a page
+  // handler that claims the click with preventDefault before this listener
+  // runs (React links open in-app or through the window.open override below)
+  // suppresses the system-browser open, so an internally-routed link never
+  // also opens externally. Orphan anchors — no page handler — are prevented
+  // and routed here, ahead of the opener plugin's own click listener, which
+  // would otherwise preventDefault and then throw on the frame's missing
+  // Tauri IPC and leave the link dead.
   document.addEventListener("click", (event) => {
     const anchor = event.target.closest?.("a")
-    if (!anchor) return
+    if (!anchor || event.defaultPrevented) return
     const href = anchor.getAttribute("href")
     if (!href) return
     let url
@@ -436,7 +444,7 @@ export function injectDesktopHostBridge(distDest) {
       event.preventDefault()
       post({ kind: "open", url: url.href })
     }
-  }, true)
+  })
 
   const nativeOpen = window.open
   window.open = (url, ...rest) => {
