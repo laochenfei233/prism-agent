@@ -249,7 +249,7 @@ impl DshHandle {
         append_startup_log("spawn_child: begin");
         self.auth_url.lock().unwrap().take();
         self.ensure_home_node_modules()?;
-        crate::setup::ensure_default_plugins(&app)?;
+        crate::setup::ensure_default_plugins(&app, &self.node_path, &self.dsh_bin)?;
         append_startup_log("spawn_child: default plugins ready");
         let port = match select_port() {
             Ok(port) => port,

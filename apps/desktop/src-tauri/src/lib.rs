@@ -307,12 +307,21 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit => {
                 if let Some(dsh) = app_handle.try_state::<DshHandle>() {
                     dsh.stop();
                 }
             }
+            // macOS delivers a Dock click or Finder relaunch as Reopen; without
+            // this arm the hidden window stays hidden and the running app looks
+            // unresponsive until it is fully quit.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } => tray::show_main_window(app_handle),
+            _ => {}
         });
 }
 
