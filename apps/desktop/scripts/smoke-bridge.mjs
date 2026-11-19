@@ -61,13 +61,13 @@ try {
   // own flag exactly like a real event.
   const scriptBody = /<script>([\s\S]*?)<\/script>/.exec(after)[1];
   const opens = [];
-  const clickListeners = [];
   const frameWindow = {
     parent: { postMessage: (message) => { if (message.kind === 'open') opens.push(message.url); } },
     addEventListener: () => {},
   };
+  const clickRegistrations = [];
   const frameDocument = {
-    addEventListener: (type, handler) => { if (type === 'click') clickListeners.push(handler); },
+    addEventListener: (type, handler, options) => { if (type === 'click') clickRegistrations.push({ handler, options }); },
     documentElement: {},
     querySelector: () => null,
     readyState: 'complete',
@@ -77,6 +77,15 @@ try {
     frameWindow, frameDocument, frameLocation,
     class { observe() {} disconnect() {} },
   );
+  // The anchor listener must run on the bubble: capture registration re-opens
+  // the page's claimed clicks before their own handlers run (the original
+  // double-open), which the claimed-click flow below would otherwise catch.
+  const clickListeners = clickRegistrations
+    .filter(({ options }) => options?.capture !== true)
+    .map(({ handler }) => handler);
+  if (clickListeners.length !== clickRegistrations.length) {
+    throw new Error('the bridge must register its click listener on the bubble, not the capture phase');
+  }
   const anchor = {
     getAttribute: (name) => (name === 'href' ? 'https://example.com/page' : null),
     target: '_blank',
