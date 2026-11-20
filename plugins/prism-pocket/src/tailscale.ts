@@ -9,27 +9,10 @@
  * @module @prism/prism-pocket
  */
 
-import { execFile } from 'node:child_process'
+import { runProcess, type ExecRunner } from './exec.ts'
 import type { PocketTailscaleInfo } from './types.ts'
 
-/** Injectable process runner; arguments mirror `child_process.execFile`. */
-export type ExecRunner = (
-  file: string,
-  args: readonly string[],
-  options: { timeout: number },
-) => Promise<{ stdout: string; stderr: string }>
-
-/** Default runner around `child_process.execFile`. */
-const defaultRunner: ExecRunner = (file, args, options) =>
-  new Promise((resolve, reject) => {
-    execFile(file, [...args], { ...options, encoding: 'utf8', windowsHide: true }, (error, stdout, stderr) => {
-      if (error !== null && stdout === '') {
-        reject(error instanceof Error ? error : new Error(String(error)))
-        return
-      }
-      resolve({ stdout, stderr })
-    })
-  })
+export type { ExecRunner } from './exec.ts'
 
 /** How long the CLI may take to answer before the probe reports unavailable. */
 const PROBE_TIMEOUT_MS = 5000
@@ -43,7 +26,7 @@ const WINDOWS_CLI_PATH = 'C:\\Program Files\\Tailscale\\tailscale.exe'
  * @returns the self MagicDNS name and first Tailscale address, or an
  * `available: false` result carrying the failure detail.
  */
-export async function detectTailscale(runner: ExecRunner = defaultRunner): Promise<PocketTailscaleInfo> {
+export async function detectTailscale(runner: ExecRunner = runProcess): Promise<PocketTailscaleInfo> {
   const commands = candidateCommands()
   let lastError = 'tailscale was not found'
   for (const file of commands) {

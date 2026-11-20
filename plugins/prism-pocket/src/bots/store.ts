@@ -6,9 +6,9 @@
  * @module @prism/prism-pocket/bots
  */
 
-import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { writeJsonFile } from '../atomic-json.ts'
 import type { BotChannelId, BotConfig, BotEntry, BotStoreBody } from './types.ts'
 import { BOT_CHANNELS } from './types.ts'
 import { reviveBotConfig } from './validate.ts'
@@ -195,9 +195,6 @@ export class BotStore {
 
   /** Rewrite the file atomically with owner-only permissions. */
   private persist(): void {
-    mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 })
-    const temp = `${this.file}.${randomUUID()}.tmp`
-    writeFileSync(temp, JSON.stringify(this.body, undefined, 2), { mode: 0o600, encoding: 'utf8' })
-    renameSync(temp, this.file)
+    writeJsonFile(this.file, this.body)
   }
 }

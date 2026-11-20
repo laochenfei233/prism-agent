@@ -6,8 +6,9 @@
  * The deployment these commands describe is the desktop application, which
  * starts `dsh web` on a loopback port with fixed arguments: it can bind no
  * other address and can pass no trust flag. Exposing it to a phone therefore
- * goes through a `tailscale serve` proxy over the loopback listener, and the
- * MagicDNS authority joins the fence through the profile patch.
+ * goes through a `tailscale serve` proxy (or a stable tunnel hostname) over
+ * the loopback listener, and the remote authority joins the fence through the
+ * profile patch.
  *
  * @module @prism/prism-pocket/commands
  */
@@ -28,6 +29,35 @@ export function remoteCommands(surface: PocketServerSurface, tailscale: PocketTa
     trust: `- id: connection\n  config:\n    trustedHosts:\n      - ${tailscale.dnsName}`,
     trustedHost: `--trusted-host ${tailscale.dnsName}`,
   }
+}
+
+/**
+ * Render the copyable deployment steps for a stable tunnel hostname.
+ * @param surface - the webserver bind surface and trust list.
+ * @param tunnelUrl - the stored or advertised HTTPS root, when one exists.
+ * @returns the named-tunnel and quick-test commands, plus the fence patch and
+ * CLI flag once a hostname exists.
+ */
+export function tunnelCommands(surface: PocketServerSurface, tunnelUrl: string | undefined): PocketRemoteCommands {
+  const host = authorityOf(tunnelUrl)
+  return {
+    run: 'cloudflared tunnel run <name>',
+    quick: `cloudflared tunnel --url http://127.0.0.1:${surface.port}`,
+    ...(host === undefined ? {} : {
+      trust: `- id: connection\n  config:\n    trustedHosts:\n      - ${host}`,
+      trustedHost: `--trusted-host ${host}`,
+    }),
+  }
+}
+
+/**
+ * Render the copyable step that puts the listener on the LAN address.
+ * @param surface - the webserver bind surface and trust list.
+ * @param ipv4 - the local-network address, when one exists.
+ * @returns the bind command, or nothing without an address to bind.
+ */
+export function lanCommands(surface: PocketServerSurface, ipv4: string | undefined): PocketRemoteCommands {
+  return ipv4 === undefined ? {} : { bind: `prism web --host ${ipv4} --port ${surface.port}` }
 }
 
 /**
@@ -56,8 +86,43 @@ export function phoneAccess(
 }
 
 /**
- * Classify one request to the phone address.
+ * Resolve the tunnel transport's phone address and what still blocks it.
+ * @param surface - the webserver bind surface and trust list.
+ * @param tunnelUrl - the stored or advertised HTTPS root, when one exists.
+ * @returns the address, whether the fence already admits it, and the blocker.
+ */
+export function tunnelAccess(
+  surface: PocketServerSurface,
+  tunnelUrl: string | undefined,
+): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
+  if (tunnelUrl === undefined) return { blocker: 'no-tunnel-url', trusted: false }
+  const trusted = isOriginTrusted(originOf(tunnelUrl), surface)
+  return trusted ? { target: tunnelUrl, trusted } : { target: tunnelUrl, trusted, blocker: 'untrusted' }
+}
+
+/**
+ * Resolve the local-network transport's phone address and what still blocks it.
  *
+ * The fence admits the listener's own bind address on any port, so a server
+ * bound here needs no trust entry; a server bound elsewhere is not listening
+ * on this interface at all, which is the blocker rather than a trust miss.
+ * @param surface - the webserver bind surface and trust list.
+ * @param ipv4 - the local-network address, when one exists.
+ * @returns the address, whether the listener is bound to it, and the blocker.
+ */
+export function lanAccess(
+  surface: PocketServerSurface,
+  ipv4: string | undefined,
+): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
+  if (ipv4 === undefined) return { blocker: 'no-lan', trusted: false }
+  const target = `http://${ipv4}:${surface.port}/`
+  return normalizeHost(surface.host) === ipv4
+    ? { target, trusted: true }
+    : { target, trusted: false, blocker: 'not-bound' }
+}
+
+/**
+ * Classify one request to the phone address.
  * The Host/Origin fence answers before the session layer, so `403` is the
  * fence refusing this authority and every other answer means the request
  * reached the server. A 2xx and a 401 are therefore equally good news.
@@ -117,6 +182,18 @@ function originOf(url: string): string {
   } catch {
     return url
   }
+}
+
+/** The authority a browser sends for one URL: hostname plus a non-default port. */
+function authorityOf(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return undefined
+  }
+  return parsed.port === '' ? parsed.hostname : `${parsed.hostname}:${parsed.port}`
 }
 
 /** Mirror of the fence's `isLoopbackHostname`: localhost, `[::1]`, or 127/8. */

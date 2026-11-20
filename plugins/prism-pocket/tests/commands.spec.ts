@@ -2,11 +2,12 @@
  * Remote-access facts: the deployment steps, the phone target, and the origin
  * check.
  *
- * Spec: docs/compose/spec/prism-pocket.md S2.6 — the steps mirror the trust
- * fence, so every acceptance path here rejects a fence-invalid case.
+ * Spec: docs/compose/spec/pocket-remote-providers.md S2.4, S2.6 — both
+ * transports' steps mirror the trust fence, so every acceptance path here
+ * rejects a fence-invalid case.
  */
 import { describe, expect, it } from 'vitest'
-import { isOriginTrusted, phoneAccess, phoneTarget, probeVerdict, remoteCommands } from '../src/commands.ts'
+import { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, probeVerdict, remoteCommands, tunnelAccess, tunnelCommands } from '../src/commands.ts'
 import type { PocketServerSurface, PocketTailscaleInfo } from '../src/types.ts'
 
 const surface: PocketServerSurface = { host: '127.0.0.1', port: 3080, trustedHosts: [] }
@@ -106,5 +107,68 @@ describe('isOriginTrusted', () => {
     expect(isOriginTrusted('https://evil.tail.ts.net', fenced)).toBe(false)
     expect(isOriginTrusted('https://other.tail.ts.net:9999', { ...surface, trustedHosts: ['other.tail.ts.net:8443'] })).toBe(false)
     expect(isOriginTrusted('https://127.0.0.1:3080', { ...surface, host: '100.64.0.3', trustedHosts: [] })).toBe(false)
+  })
+})
+
+describe('lanCommands', () => {
+  it('prints the bind command and nothing without an address', () => {
+    expect(lanCommands(surface, '192.168.1.23').bind).toBe('prism web --host 192.168.1.23 --port 3080')
+    expect(lanCommands(surface, undefined)).toEqual({})
+  })
+})
+
+describe('lanAccess', () => {
+  it('names the missing local address', () => {
+    expect(lanAccess(surface, undefined)).toEqual({ blocker: 'no-lan', trusted: false })
+  })
+
+  it('reports the listener bound elsewhere as not bound, not as a trust miss', () => {
+    // A loopback listener never receives a request for the LAN address.
+    expect(lanAccess(surface, '192.168.1.23'))
+      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: false, blocker: 'not-bound' })
+  })
+
+  it('reports the address as ready once the listener binds it', () => {
+    expect(lanAccess({ ...surface, host: '192.168.1.23' }, '192.168.1.23'))
+      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: true })
+  })
+})
+
+describe('tunnelCommands', () => {
+  it('renders the tunnel commands and the fence patch once a hostname exists', () => {
+    const commands = tunnelCommands(surface, 'https://prism.example.com/')
+    expect(commands.run).toBe('cloudflared tunnel run <name>')
+    expect(commands.quick).toBe('cloudflared tunnel --url http://127.0.0.1:3080')
+    expect(commands.trust).toBe('- id: connection\n  config:\n    trustedHosts:\n      - prism.example.com')
+    expect(commands.trustedHost).toBe('--trusted-host prism.example.com')
+  })
+
+  it('keeps a non-default port in the trust entry', () => {
+    // A browser sends `host:port` for a non-default port, so the entry must too.
+    expect(tunnelCommands(surface, 'https://prism.example.com:8443').trust)
+      .toContain('prism.example.com:8443')
+  })
+
+  it('hides the host-dependent steps without a hostname', () => {
+    const commands = tunnelCommands(surface, undefined)
+    expect(commands.trust).toBeUndefined()
+    expect(commands.trustedHost).toBeUndefined()
+    expect(commands.quick).toBe('cloudflared tunnel --url http://127.0.0.1:3080')
+  })
+})
+
+describe('tunnelAccess', () => {
+  it('names the missing hostname', () => {
+    expect(tunnelAccess(surface, undefined)).toEqual({ blocker: 'no-tunnel-url', trusted: false })
+  })
+
+  it('offers the stored address as untrusted until the fence names it', () => {
+    expect(tunnelAccess(surface, 'https://prism.example.com'))
+      .toEqual({ target: 'https://prism.example.com', trusted: false, blocker: 'untrusted' })
+  })
+
+  it('reports the address as ready once the fence names it', () => {
+    expect(tunnelAccess({ ...surface, trustedHosts: ['prism.example.com'] }, 'https://prism.example.com'))
+      .toEqual({ target: 'https://prism.example.com', trusted: true })
   })
 })
