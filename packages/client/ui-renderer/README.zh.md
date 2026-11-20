@@ -29,7 +29,7 @@ kind: "package-reference"
 
 ### 挂载做什么
 
-`mount(container)` 会安装 slot 渲染器、在存在时 hydrate 现有启动 DOM、在下一次绘制前把组装后的应用渲染进容器，并返回一个卸载 React 根的 disposer。渲染器执行全程序唯一一次上下文级 `renderSlot('root')` 调用；注册的根占用方拥有产品布局与文档元数据。
+`mount(container)` 会安装 slot 渲染器、在存在时 hydrate 现有启动 DOM、在下一次绘制前把组装后的应用渲染进容器，并返回一个卸载 React 根的 disposer。渲染器执行全程序唯一一次上下文级 `renderSlot('root')` 调用；注册的根占用方拥有产品布局与文档元数据。挂载由顶层错误边界保护：组装后的应用或 root slot 组装发生渲染失败时，会把整棵树替换为自包含的崩溃页（错误信息与重新加载操作），而不是让容器留白；错误同时写入宿主日志。
 
 ### 对业务插件
 
@@ -47,7 +47,7 @@ kind: "package-reference"
 
 ### 激活与挂载
 
-插件在 `slots`、`sessions` 与 `layout` 就绪后激活；它安装 `createSlotRenderer()` 并 reflect `uiRenderer` 服务。`mountApp` 会查找启动内核的 `[data-dsh-boot]` 元素：存在时经 `BootHandoff`（一个保留加载 DOM 的单帧透传）hydrate，否则创建全新的根节点并同步提交渲染。
+插件在 `slots`、`sessions` 与 `layout` 就绪后激活；它安装 `createSlotRenderer()` 并 reflect `uiRenderer` 服务。`mountApp` 会查找启动内核的 `[data-dsh-boot]` 元素：存在时经 `BootHandoff`（一个保留加载 DOM 的单帧透传）hydrate，否则创建全新的根节点并同步提交渲染。两条路径都渲染在 `RenderFailureBoundary` 之下：捕获到渲染错误时记录错误并用崩溃页替换应用。
 
 ### Slot 绑定
 

@@ -84,6 +84,62 @@ describe('UI renderer plugin', () => {
     expect(records.some(record => record.target === boot)).toBe(false)
   })
 
+  it('renders the crash face instead of leaving an empty root when the application render throws', async () => {
+    const { ctx } = await bench()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const el = container()
+
+    act(() => { mounted.push(ctx.get('uiRenderer')!.mount(el)) })
+
+    expect(el.querySelector('[data-render-failure]')).not.toBeNull()
+    expect(el.textContent).toContain('The interface failed to render')
+    expect(el.textContent).toContain("'root' has no registration")
+    const button = el.querySelector('button')
+    expect(button?.textContent).toBe('Reload')
+    act(() => { button?.click() })
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('renders a thrown non-Error value', async () => {
+    const { ctx, slots } = await bench()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failure: unknown = 'render boom'
+    vi.spyOn(slots, 'renderSlot').mockImplementation(() => { throw failure })
+    const el = container()
+
+    act(() => { mounted.push(ctx.get('uiRenderer')!.mount(el)) })
+
+    expect(el.querySelector('[data-render-failure]')).not.toBeNull()
+    expect(el.textContent).toContain('render boom')
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('keeps the crash face visible when the failure logger throws', async () => {
+    const { ctx } = await bench()
+    const logger = vi.spyOn(ctx.logger, 'error').mockImplementation(() => { throw new Error('logger down') })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const el = container()
+
+    act(() => { mounted.push(ctx.get('uiRenderer')!.mount(el)) })
+
+    expect(el.querySelector('[data-render-failure]')).not.toBeNull()
+    expect(error).toHaveBeenCalledWith('render failure logging failed:', expect.any(Error))
+    logger.mockRestore()
+  })
+
+  it('replaces the boot page with the crash face when the application render throws', async () => {
+    const { ctx } = await bench()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const el = container()
+    el.innerHTML = '<div class="boot" data-dsh-boot=""><div><div class="spinner" data-dsh-boot-spinner="" style="--dsh-boot-arc: 180deg"></div><div>Loading plugins…</div></div></div>'
+
+    act(() => { mounted.push(ctx.get('uiRenderer')!.mount(el)) })
+
+    expect(el.querySelector('[data-dsh-boot]')).toBeNull()
+    expect(el.querySelector('[data-render-failure]')).not.toBeNull()
+    expect(error).toHaveBeenCalled()
+  })
+
   it('returns an unmount disposer', async () => {
     const { ctx, slots } = await bench()
     slots.register({ name: 'root' }, () => <div data-testid="root-probe" />)

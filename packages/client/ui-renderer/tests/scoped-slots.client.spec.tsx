@@ -322,6 +322,16 @@ describe('root outlet', () => {
     const view = render(<>{createSlotRenderer().renderRoot(h.host, { tag: 'OWNER' })}</>)
     expect(view.container.textContent).toBe('OWNER')
   })
+
+  it('renders the crash face when every root registration crashes', () => {
+    const h = makeHost()
+    h.add('root', { component: () => { throw new Error('root crashed') } })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
+    expect(view.container.querySelector('[data-render-failure]')).not.toBeNull()
+    expect(view.container.textContent).toContain('root crashed')
+    spy.mockRestore()
+  })
 })
 
 describe('child outlets and the renderSlot binding', () => {

@@ -29,7 +29,7 @@ This package is infrastructure: the web shell and the boot kernel are its only d
 
 ### What mounting does
 
-`mount(container)` installs the slot renderer, hydrates the existing boot DOM when present, renders the assembled application into the container before the next paint, and returns a disposer that unmounts the React root. The renderer performs the sole context-level `renderSlot('root')` call; the registered root occupant owns product layout and document metadata.
+`mount(container)` installs the slot renderer, hydrates the existing boot DOM when present, renders the assembled application into the container before the next paint, and returns a disposer that unmounts the React root. The renderer performs the sole context-level `renderSlot('root')` call; the registered root occupant owns product layout and document metadata. A top-level error boundary guards the mount: a render failure in the assembled application or in root-slot assembly replaces the tree with a self-contained crash face (the error message plus a reload action) instead of leaving the container blank; the error is also logged through the host logger.
 
 ### For business plugins
 
@@ -47,7 +47,7 @@ The package realizes one boundary: the object layer (runtime, React-free) owns b
 
 ### Activation and mount
 
-The plugin activates after `slots`, `sessions`, and `layout`; it installs `createSlotRenderer()` and reflects the `uiRenderer` service. `mountApp` looks for the boot kernel's `[data-dsh-boot]` element: when present it hydrates through `BootHandoff` (a one-frame pass-through that preserves the loading DOM), otherwise it creates a fresh root and flushes the render synchronously.
+The plugin activates after `slots`, `sessions`, and `layout`; it installs `createSlotRenderer()` and reflects the `uiRenderer` service. `mountApp` looks for the boot kernel's `[data-dsh-boot]` element: when present it hydrates through `BootHandoff` (a one-frame pass-through that preserves the loading DOM), otherwise it creates a fresh root and flushes the render synchronously. Both paths render under `RenderFailureBoundary`: a caught render error is logged and replaces the application with the crash face.
 
 ### Slot bindings
 

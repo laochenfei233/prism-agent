@@ -19,6 +19,8 @@ import {
   useScopeBinding,
 } from './bindings.tsx'
 import { SlotAssemblyError } from './errors.ts'
+import { RENDER_FAILURE_COPY } from './locales.ts'
+import { renderFailureSurface } from './render-failure.ts'
 
 type InjectedProps = Record<string, unknown>
 type SlotAnchorTag = 'div' | 'span'
@@ -400,15 +402,25 @@ function sessionGenerationKeyOf(binding: ScopedStandardSourceBinding): number {
  * seam); for shadowing kinds the report abdicates the entry, the outlet
  * re-renders onto the cell's next survivor, and this boundary's crash face
  * only shows until that re-render lands (permanently once the cell is dry —
- * the outlet then owns the crash face).
+ * the outlet then owns the crash face). The root outlet supplies a visible
+ * fallback, so a dry root renders the render-failure surface rather than an
+ * empty anchor.
  */
 class SlotErrorBoundary extends Component<
-  { slotKey: string; anchor?: SlotAnchorTag; onEntryError: (error: unknown) => void; children: ReactNode }, { failed: boolean }
+  {
+    slotKey: string
+    anchor?: SlotAnchorTag
+    onEntryError: (error: unknown) => void
+    /** Visible crash face; the default anchor marks a contained entry. */
+    fallback?: (error: unknown) => ReactNode
+    children: ReactNode
+  },
+  { failed: boolean; error?: unknown }
 > {
-  override state = { failed: false }
-  static getDerivedStateFromError(error: unknown): { failed: boolean } {
+  override state: { failed: boolean; error?: unknown } = { failed: false }
+  static getDerivedStateFromError(error: unknown): { failed: boolean; error?: unknown } {
     if (error instanceof SlotAssemblyError) throw error
-    return { failed: true }
+    return { failed: true, error }
   }
   override componentDidCatch(error: unknown): void {
     console.error(`slot entry crashed in '${this.props.slotKey}':`, error)
@@ -416,7 +428,11 @@ class SlotErrorBoundary extends Component<
   }
   override render(): ReactNode {
     const Anchor = this.props.anchor ?? 'div'
-    if (this.state.failed) return <Anchor data-slot-error={this.props.slotKey} />
+    if (this.state.failed) {
+      return this.props.fallback === undefined
+        ? <Anchor data-slot-error={this.props.slotKey} />
+        : this.props.fallback(this.state.error)
+    }
     return this.props.children
   }
 }
@@ -1274,6 +1290,7 @@ function renderChainResult(
 /** Root outlet: the shell's single ctx-level render entry — an unregistered 'root' is a boot-order failure, never a silent blank. */
 function RootOutlet({ ownerProps }: { ownerProps: object }) {
   const host = useHost()
+  const lastError = useRef<unknown>(undefined)
   useSyncExternalStore(
     fn => host.subscribe('root', fn),
     () => host.getVersion('root'),
@@ -1282,9 +1299,12 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
   const entry = host.entriesOfSlot('root')[0]
   if (!entry) {
     // Registrations exist but every one abdicated: the shadowing collapse ran
-    // dry, so the crash face replaces the tree (registered-but-broken is a
-    // crash, not the boot-order assembly failure below).
-    if (host.entriesOf('root').length > 0) return <div data-slot-error="root" />
+    // dry, so the visible crash face replaces the empty marker (a blank root
+    // is the one crash the user cannot diagnose or retry).
+    if (host.entriesOf('root').length > 0) {
+      const failure = lastError.current ?? new SlotAssemblyError("renderSlot('root') has no live registration")
+      return renderFailureSurface(failure, RENDER_FAILURE_COPY)
+    }
     throw new SlotAssemblyError("renderSlot('root') before any 'root' registration (boot order)")
   }
   // Same anchor contract as SlotOutlet: 'root' is a slot like any other, and
@@ -1294,7 +1314,11 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
       <SlotErrorBoundary
         slotKey="root"
         key={entryKeyOf(entry)}
-        onEntryError={(error) => { host.reportEntryError('root', entry, error, { abdicate: true }) }}
+        fallback={error => renderFailureSurface(error, RENDER_FAILURE_COPY)}
+        onEntryError={(error) => {
+          lastError.current = error
+          host.reportEntryError('root', entry, error, { abdicate: true })
+        }}
       >
         <RootEntry
           entry={entry}

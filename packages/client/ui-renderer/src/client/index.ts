@@ -9,6 +9,7 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
 import type { Context } from '@deepseek-ai/cordis'
 import { createSlotRenderer } from './scoped-slots.tsx'
 import { buildRenderApp } from './app.tsx'
+import { RenderFailureBoundary } from './render-failure.ts'
 import { SlotRegistry } from './registry.ts'
 
 export { SlotRegistry } from './registry.ts'
@@ -23,7 +24,10 @@ export type {
 /** Mount operation exposed to the framework-free boot kernel. */
 export interface UiRendererService {
   /**
-   * Mount the assembled application into the supplied element.
+   * Mount the assembled application into the supplied element. A render
+   * failure is caught by the mount's top-level boundary, reported through the
+   * host logger, and replaced by the built-in crash face; a failed render never
+   * leaves the container blank.
    * @param container - Application mount point.
    * @returns Disposer that unmounts the React root.
    */
@@ -68,17 +72,30 @@ function BootHandoff(props: { app: () => ReactNode; boot: BootSnapshot }): React
   })
 }
 
+/** Render the application factory below the failure boundary. */
+function AppRoot({ app }: { app: () => ReactNode }): ReactNode {
+  return app()
+}
+
+/**
+ * Guard the mount tree: without a boundary, a render error unmounts the React
+ * root after the boot page has handed off, leaving an empty document.
+ */
+function guardApp(children: ReactNode, onError: (error: unknown) => void): ReactNode {
+  return createElement(RenderFailureBoundary, { onError, children })
+}
+
 /** Mount React while preserving the framework-free boot DOM through hydration. */
-function mountApp(container: HTMLElement, app: () => ReactNode): Root {
+function mountApp(container: HTMLElement, app: () => ReactNode, onError: (error: unknown) => void): Root {
   const boot = container.querySelector<HTMLElement>(':scope > [data-dsh-boot]')
   if (boot !== null) {
-    return hydrateRoot(container, createElement(BootHandoff, {
+    return hydrateRoot(container, guardApp(createElement(BootHandoff, {
       app,
       boot: { className: boot.className, html: boot.innerHTML },
-    }))
+    }), onError))
   }
   const root = createRoot(container)
-  flushSync(() => { root.render(app()) })
+  flushSync(() => { root.render(guardApp(createElement(AppRoot, { app }), onError)) })
   return root
 }
 
@@ -89,9 +106,15 @@ function mountApp(container: HTMLElement, app: () => ReactNode): Root {
 export function apply(ctx: Context): void {
   const slots = new SlotRegistry(ctx)
   slots.install(createSlotRenderer())
+  const onError = (error: unknown): void => {
+    try { ctx.logger.error(error) } catch (logError) {
+      // The crash face must render even when the logger is the failed dependency.
+      console.error('render failure logging failed:', logError)
+    }
+  }
   ctx.reflect.provide('uiRenderer', {
     mount: (container: HTMLElement): (() => void) => {
-      const root = mountApp(container, buildRenderApp({ ctx }))
+      const root = mountApp(container, buildRenderApp({ ctx }), onError)
       return () => { root.unmount() }
     },
   })
