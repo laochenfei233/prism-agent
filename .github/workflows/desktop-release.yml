@@ -150,16 +150,11 @@ jobs:
           mv pnpm-workspace.yaml pnpm-workspace.yaml.bak
           node -e 'const fs=require("fs");const p="package.json";const j=JSON.parse(fs.readFileSync(p,"utf8"));delete j.workspaces;fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")'
 
-      - name: Build Tauri app
-        if: matrix.platform == 'macos-latest'
-        working-directory: apps/desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
-
+      # Every platform builds and uploads through the action: the macOS
+      # bundles ship unsigned (no Apple signing identity or notarization in
+      # this repo), and their minisign-signed updater artifacts still belong
+      # in latest.json so an installed app can update itself.
       - name: Build Tauri app and upload to Release
-        if: matrix.platform != 'macos-latest'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -172,6 +167,7 @@ jobs:
           releaseBody: |
             Prism Agent 桌面客户端，内置 Node 运行时与 harness（四预设 standard / minimal / code / cordis 完整保留）。
             首次启动向导默认安装插件中心与 Windows 终端检测，可选 IM 频道（企微/飞书/钉钉/微信/QQ）等插件。
+            macOS 安装包未签名、未公证：首次打开需在「系统设置 → 隐私与安全性」中允许，或执行 xattr -dr com.apple.quarantine /Applications/Prism\ Agent.app。
           releaseDraft: true
           prerelease: false
           args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
