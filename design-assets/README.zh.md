@@ -22,6 +22,7 @@ Prism 品牌标识矢量源与从 Prism-Agent 旧代码库提取的设计内容�
 
 | 文件 | 来源 |
 | --- | --- |
+| prism-hero.svg | 当前 README 的 hero 图（2026-11-20，按现行 Prism 品牌标记与棱镜色散母题绘制，被根 README.md / README.zh.md 引用） |
 | hero.svg | `assets/readme/hero.svg` |
 | features.svg | `assets/readme/features.svg` |
 
