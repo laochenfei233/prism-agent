@@ -170,6 +170,9 @@ jobs:
             macOS 安装包未签名、未公证：首次打开需在「系统设置 → 隐私与安全性」中允许，或执行 xattr -dr com.apple.quarantine /Applications/Prism\ Agent.app。
           releaseDraft: true
           prerelease: false
+          # DMG bundling intermittently fails on macOS runners with
+          # `hdiutil: create failed - Resource busy`; a rebuild retries it.
+          retryAttempts: 3
           args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
 
       - name: Upload build artifacts
