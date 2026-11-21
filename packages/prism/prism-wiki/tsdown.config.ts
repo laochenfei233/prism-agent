@@ -1,3 +1,3 @@
 import { clientBundle } from '../../client/tsdown.client.ts'
 
-export default clientBundle('@prism/prism-wiki', ['lib/types/index.js'], { hostPhase: true })
+export default clientBundle(import.meta.dirname, ['lib/types/index.js'], { hostPhase: true })
