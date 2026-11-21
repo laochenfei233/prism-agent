@@ -105,20 +105,20 @@ export function tunnelAccess(
  *
  * The fence admits the listener's own bind address on any port, so a server
  * bound here needs no trust entry; a server bound elsewhere is not listening
- * on this interface at all, which is the blocker rather than a trust miss.
+ * on this interface at all, which is the blocker rather than a trust miss —
+ * the address is then withheld, because a link to a port nothing listens on
+ * only hands the phone a connection timeout.
  * @param surface - the webserver bind surface and trust list.
  * @param ipv4 - the local-network address, when one exists.
- * @returns the address, whether the listener is bound to it, and the blocker.
+ * @returns the address only when the listener is bound to it, else the blocker.
  */
 export function lanAccess(
   surface: PocketServerSurface,
   ipv4: string | undefined,
 ): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
   if (ipv4 === undefined) return { blocker: 'no-lan', trusted: false }
-  const target = `http://${ipv4}:${surface.port}/`
-  return normalizeHost(surface.host) === ipv4
-    ? { target, trusted: true }
-    : { target, trusted: false, blocker: 'not-bound' }
+  if (normalizeHost(surface.host) !== ipv4) return { blocker: 'not-bound', trusted: false }
+  return { target: `http://${ipv4}:${surface.port}/`, trusted: true }
 }
 
 /**

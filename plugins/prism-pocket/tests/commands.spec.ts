@@ -122,10 +122,11 @@ describe('lanAccess', () => {
     expect(lanAccess(surface, undefined)).toEqual({ blocker: 'no-lan', trusted: false })
   })
 
-  it('reports the listener bound elsewhere as not bound, not as a trust miss', () => {
-    // A loopback listener never receives a request for the LAN address.
+  it('reports the listener bound elsewhere as not bound, with no address to open', () => {
+    // A loopback listener never receives a request for the LAN address, so the
+    // composed address would only hand the phone a connection timeout.
     expect(lanAccess(surface, '192.168.1.23'))
-      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: false, blocker: 'not-bound' })
+      .toEqual({ blocker: 'not-bound', trusted: false })
   })
 
   it('reports the address as ready once the listener binds it', () => {
