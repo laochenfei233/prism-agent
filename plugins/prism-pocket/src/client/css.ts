@@ -25,8 +25,16 @@ html.prism-active {
    show icons and steals it from the conversation. The drawer is the way in, so
    the rail column leaves the flow while the drawer is closed. The :has() parent
    selector reaches the column because the slot wrapper renders display:contents
-   and owns no box of its own. */
-html.prism-active.prism-rail-hidden div:has(> [data-slot="sidebar"]) {
+   and owns no box of its own.
+   The shell has its own narrow-viewport drawer ("data-sidebar-drawer" on the
+   frame, opened by the header toggle): while that drawer is open the column
+   must stay visible in the shell's own overlay presentation, so this rule
+   yields there — hiding it anyway is what made the header toggle look dead.
+   The root-level :not(:has(...)) is the state test: a descendant combinator
+   would let html itself match the :not() and the rule would never yield.
+   When the shell drawer is closed (or the viewport is outside drawer mode)
+   the rail stays hidden exactly as before. */
+html.prism-active.prism-rail-hidden:not(:has([data-sidebar-drawer]:not([data-sidebar-collapsed]))) div:has(> [data-slot="sidebar"]) {
   display: none;
 }
 
