@@ -1,6 +1,7 @@
 /**
  * Settings · About section: the app's identity, the in-app updater (update
- * source fixed to this repository's GitHub Releases), and the project links.
+ * source fixed to the domestic mirror with GitHub Releases as the fallback),
+ * and the project links.
  *
  * The section is a pure reader of the shell-injected update carrier. Outside
  * the desktop shell it degrades to one static line — no dead buttons — and a
@@ -10,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import {
   deriveButtonState,
+  deriveSourceView,
   readCarrier,
   type AboutUpdateState,
   type ButtonState,
@@ -125,6 +127,7 @@ export function AboutSection({ t }: AboutSectionProps) {
 
   const repo = state?.source?.repo ?? ''
   const releaseUrl = state?.source?.releaseUrl ?? ''
+  const { badgeKey, href, label } = deriveSourceView(state?.source)
 
   return (
     <section className="pa-about" aria-label={t('nav')}>
@@ -166,10 +169,12 @@ export function AboutSection({ t }: AboutSectionProps) {
       <div className="pa-card">
         <div className="pa-row">
           <span className="pa-label">{t('sourceTitle')}</span>
-          <span className="pa-badge">{t('sourceGitHub')}</span>
+          <span className="pa-badge">{t(badgeKey)}</span>
         </div>
-        {repo !== ''
-          ? <a className="pa-repo" href={releaseUrl} target="_blank" rel="noreferrer">{repo}</a>
+        {label !== ''
+          ? href !== ''
+            ? <a className="pa-repo" href={href} target="_blank" rel="noreferrer">{label}</a>
+            : <span className="pa-repo">{label}</span>
           : <span className="pa-muted">{t('sourceUnavailable')}</span>}
       </div>
       <div className="pa-links">

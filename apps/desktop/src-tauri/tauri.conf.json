@@ -74,6 +74,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5ODdDRjUwNTQ4MDA5QUIKUldTckNZQlVVTStIT1NYUlF4RVl4OU9MUUluZ0pyc0VuOXBRMGVwbzJQVzVva1ZoL3VvWXhIM2oK",
       "endpoints": [
+        "https://cdn.xyern.com/prism-agent/updates/latest.json",
         "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json"
       ],
       "windows": {
