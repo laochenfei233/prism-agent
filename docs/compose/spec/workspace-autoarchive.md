@@ -35,7 +35,7 @@ Projects never leave the sidebar. The session auto-archive sweep already hides e
 
 **D4 — Wire and client model.** `WorkspaceBaseline` gains `archivedWorkspaceIds`, and one new follow increment `{ type: 'archived-workspaces', archivedWorkspaceIds }` joins the existing `archived`/`pinned` set frames; the feed diffs the field off the parsed domain state exactly as it does the Session sets. The client model carries the set in its snapshot, the service decodes the frame, and `UiWorkspaceService` gains `unarchiveWorkspace(workspaceId)` calling the new Remote method with the same echo discipline as the Session mutations.
 
-**D5 — New Remote methods.** `workspace.archiveWorkspace` and `workspace.unarchiveWorkspace` accept a `workspaceId` and return the complete updated set; unknown ids resolve idempotently (removal cannot introduce an unknown id, and archiving an unknown id is a no-op rather than a failure, matching `unarchiveSession`).
+**D5 — New Remote methods.** `workspace.archiveWorkspace` and `workspace.unarchiveWorkspace` accept a `workspaceId` and return the complete updated set. Archiving an unknown id rejects with `WorkspaceUnknownWorkspaceError`, the loud match of `archiveSession`; unarchiving tolerates any id because removal cannot introduce an unknown one, matching `unarchiveSession`.
 
 **D6 — Client projection filter.** Snapshots stay authoritative — hidden Workspaces remain in `items` — and every projection filters by the set: sidebar tree sections, the conversation-hero Workspace picker, and session search. A hidden Workspace's Sessions render nowhere, exactly like archived Sessions.
 

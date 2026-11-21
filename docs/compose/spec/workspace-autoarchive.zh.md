@@ -35,7 +35,7 @@ commits: f9433f3732..HEAD
 
 **D4 — 线路与客户端模型。** `WorkspaceBaseline` 增加 `archivedWorkspaceIds`，一条新的增量帧 `{ type: 'archived-workspaces', archivedWorkspaceIds }` 加入既有 `archived`/`pinned` 集合帧；feed 与会话集合一样从解析后的 domain 状态做差量。客户端模型把集合装进快照，service 解码该帧，`UiWorkspaceService` 增加 `unarchiveWorkspace(workspaceId)`，以与会话变更相同的 echo 纪律调用新的 Remote 方法。
 
-**D5 — 新 Remote 方法。** `workspace.archiveWorkspace` 与 `workspace.unarchiveWorkspace` 接受 `workspaceId` 并返回完整更新后的集合；未知 id 幂等解析（移除不会引入未知 id，归档未知 id 是无操作而非失败，与 `unarchiveSession` 一致）。
+**D5 — 新 Remote 方法。** `workspace.archiveWorkspace` 与 `workspace.unarchiveWorkspace` 接受 `workspaceId` 并返回完整更新后的集合。归档未知 id 以 `WorkspaceUnknownWorkspaceError` 拒绝，与 `archiveSession` 同样报错；恢复容忍任意 id，因为移除不会引入未知 id，与 `unarchiveSession` 一致。
 
 **D6 — 客户端投影过滤。** 快照保持权威 —— 隐藏项目仍在 `items` 里 —— 每个投影按集合过滤：侧栏树分组、对话首行的项目选择器、会话搜索。隐藏项目的会话无处渲染，与已归档会话完全一致。
 
