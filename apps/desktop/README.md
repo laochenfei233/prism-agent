@@ -65,7 +65,7 @@ CI (`.github/workflows/desktop-release.yml`) runs the same flow on a three-platf
 
 ## In-app updates
 
-The shell embeds `tauri-plugin-updater`, and the update source is fixed to this repository's GitHub Releases: `tauri.conf.json` pins the endpoint to `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`, and there is no custom-source override. The URL resolves against the newest published release, which carries the `latest.json` manifest and the signed installer; the plugin verifies the minisign signature before installing. Draft releases are invisible to the endpoint — publish the release to serve updates.
+The shell embeds `tauri-plugin-updater`, and the update source is fixed to the two endpoints pinned in `tauri.conf.json` — there is no custom-source override. The domestic mirror goes first (`https://cdn.xyern.com/prism-agent/updates/latest.json`, shown in the About section as the official host `prism.xyern.com`), and this repository's GitHub Releases is the fallback (`https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`); the updater tries the endpoints in order and uses the first successful response. The serving release carries the `latest.json` manifest and the signed installer; the plugin verifies the minisign signature before installing. Draft releases are invisible to the GitHub endpoint — publish the release to serve updates there.
 
 Release prerequisite: updater artifacts require the minisign private key. The public key is committed in `tauri.conf.json`; keep the private key outside the repository (this machine: `~/.prism-updater/prism-updater.key`, no password) and expose it as `TAURI_SIGNING_PRIVATE_KEY`:
 

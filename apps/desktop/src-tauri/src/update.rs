@@ -6,7 +6,8 @@
 //! superset of the Web client's `DesktopUpdatePresentation` (`phase`,
 //! `version`, `percent`, `failure`) plus the About-page facts (current
 //! version, last check, last error, and the update source derived from the
-//! configured endpoint — GitHub Releases only, no override seam). Every
+//! configured endpoints — the domestic mirror first with the GitHub Releases
+//! fallback, no override seam). Every
 //! transition emits [`STATE_EVENT`]; the shell page relays it into the
 //! embedded UI, where the compact indicator, the sidebar badge, and the
 //! About section all render from it.
@@ -66,13 +67,17 @@ enum Operation {
     Install,
 }
 
-/// Where updates come from, parsed from the configured updater endpoint.
+/// Where updates come from, parsed from the configured updater endpoints.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSource {
-    /// `owner/name` of the GitHub repository serving updates; empty when the
-    /// endpoint is not a GitHub releases URL (the About section then hides
-    /// the repository line; the plugin-side checks still fail loudly).
+    /// Display host shown as the About section's source line: the named
+    /// official host when a domestic mirror endpoint is configured, empty
+    /// otherwise (a bare GitHub configuration shows the repository instead).
+    host: String,
+    /// `owner/name` of the GitHub repository serving updates; empty when no
+    /// configured endpoint is a GitHub releases URL (the About section then
+    /// hides the repository line; the plugin-side checks still fail loudly).
     repo: String,
     /// Human-facing releases page used by the About section's links.
     release_url: String,
@@ -130,7 +135,7 @@ pub struct UpdateState {
 
 impl UpdateState {
     /// Builds the initial state: current version from the package, the update
-    /// source from the configured endpoint, and the durable fields from disk.
+    /// source from the configured endpoints, and the durable fields from disk.
     pub fn new(app: &AppHandle) -> Self {
         let fields = Fields {
             phase: Phase::Idle,
@@ -141,7 +146,7 @@ impl UpdateState {
             last_error: None,
             known_latest: None,
             current_version: app.package_info().version.to_string(),
-            source: source_from_endpoint(endpoint_from_config(app)),
+            source: source_from_endpoints(&endpoints_from_config(app)),
         };
         let persisted = load_persisted(&state_path(app));
         Self {
@@ -186,43 +191,67 @@ fn progress_percent(downloaded: u64, total: Option<u64>, previous: Option<u8>) -
     (Some(percent) != previous).then_some(percent)
 }
 
-/// Maps the configured updater endpoint to the human-facing source facts.
-/// Anything that is not a GitHub releases URL yields an empty source, which
-/// the About section renders as "source unavailable" while checks fail loudly.
-fn source_from_endpoint(endpoint: Option<&str>) -> UpdateSource {
-    let parsed = endpoint.and_then(|value| tauri::Url::parse(value).ok());
-    let segments = parsed
-        .filter(|url| url.host_str() == Some("github.com"))
-        .map(|url| {
-            url.path_segments()
-                .map(|segments| segments.map(str::to_string).collect::<Vec<_>>())
+/// The domestic mirror: the CDN host and path the updater actually requests,
+/// and the named official host the About section displays for it. Display and
+/// request are intentionally separated, following the Easel updater
+/// convention — the official host is not a navigable page.
+const MIRROR_REQUEST_HOST: &str = "cdn.xyern.com";
+const MIRROR_REQUEST_PATH: &str = "/prism-agent/";
+const MIRROR_DISPLAY_HOST: &str = "prism.xyern.com";
+
+/// Maps the configured updater endpoints to the human-facing source facts.
+/// An endpoint on the mirror CDN marks the display host; the first GitHub
+/// releases endpoint anywhere in the list provides the repository facts that
+/// back the changelog and feedback links, which stay on GitHub
+/// Releases/issues. Anything unrecognized yields empty facts, which the
+/// About section renders as "source unavailable" while checks fail loudly.
+fn source_from_endpoints(endpoints: &[String]) -> UpdateSource {
+    let parsed = endpoints
+        .iter()
+        .filter_map(|value| tauri::Url::parse(value).ok())
+        .collect::<Vec<_>>();
+    let host = parsed
+        .iter()
+        .any(|url| {
+            url.host_str() == Some(MIRROR_REQUEST_HOST)
+                && url.path().starts_with(MIRROR_REQUEST_PATH)
+        })
+        .then(|| MIRROR_DISPLAY_HOST.to_string())
+        .unwrap_or_default();
+    let (repo, release_url) = parsed
+        .iter()
+        .find(|url| url.host_str() == Some("github.com"))
+        .and_then(|url| {
+            let segments = url.path_segments()?.map(str::to_string).collect::<Vec<_>>();
+            (segments.len() >= 2).then(|| {
+                let repo = format!("{}/{}", segments[0], segments[1]);
+                let release_url = format!("https://github.com/{repo}/releases");
+                (repo, release_url)
+            })
         })
         .unwrap_or_default();
-    match segments {
-        Some(segments) if segments.len() >= 2 => {
-            let repo = format!("{}/{}", segments[0], segments[1]);
-            UpdateSource {
-                release_url: format!("https://github.com/{repo}/releases"),
-                repo,
-            }
-        }
-        _ => UpdateSource {
-            repo: String::new(),
-            release_url: String::new(),
-        },
+    UpdateSource {
+        host,
+        release_url,
+        repo,
     }
 }
 
-/// First endpoint of `plugins.updater.endpoints` from the Tauri config.
-fn endpoint_from_config(app: &AppHandle) -> Option<&str> {
+/// All endpoints of `plugins.updater.endpoints` from the Tauri config.
+fn endpoints_from_config(app: &AppHandle) -> Vec<String> {
     app.config()
         .plugins
         .0
         .get("updater")
         .and_then(|updater| updater.get("endpoints"))
         .and_then(|endpoints| endpoints.as_array())
-        .and_then(|endpoints| endpoints.first())
-        .and_then(|endpoint| endpoint.as_str())
+        .map(|endpoints| {
+            endpoints
+                .iter()
+                .filter_map(|endpoint| endpoint.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn state_path(app: &AppHandle) -> Option<PathBuf> {
@@ -584,6 +613,7 @@ mod tests {
             known_latest: Some("0.2.2".to_string()),
             current_version: "0.2.1-rc.4".to_string(),
             source: UpdateSource {
+                host: String::new(),
                 repo: "laochenfei233/prism-agent".to_string(),
                 release_url: "https://github.com/laochenfei233/prism-agent/releases".to_string(),
             },
@@ -609,6 +639,7 @@ mod tests {
         assert_eq!(object["phase"], "error");
         assert_eq!(object["failure"], "download-network");
         assert_eq!(object["currentVersion"], "0.2.1-rc.4");
+        assert_eq!(object["source"]["host"], String::new());
         assert_eq!(object["source"]["repo"], "laochenfei233/prism-agent");
         assert_eq!(
             object["source"]["releaseUrl"],
@@ -627,6 +658,7 @@ mod tests {
             known_latest: None,
             current_version: "0.2.1-rc.4".to_string(),
             source: UpdateSource {
+                host: String::new(),
                 repo: String::new(),
                 release_url: String::new(),
             },
@@ -639,6 +671,25 @@ mod tests {
                 && object.contains_key("currentVersion")
                 && object.contains_key("source")
         );
+
+        // The mirror display rides the same wire under its camelCase key.
+        let mirror = Fields {
+            phase: Phase::Idle,
+            version: None,
+            percent: None,
+            failure: None,
+            last_check: None,
+            last_error: None,
+            known_latest: None,
+            current_version: "0.2.1-rc.4".to_string(),
+            source: UpdateSource {
+                host: "prism.xyern.com".to_string(),
+                repo: "laochenfei233/prism-agent".to_string(),
+                release_url: "https://github.com/laochenfei233/prism-agent/releases".to_string(),
+            },
+        };
+        let wire = serde_json::to_value(snapshot_from(&mirror)).expect("snapshot serializes");
+        assert_eq!(wire["source"]["host"], "prism.xyern.com");
     }
 
     #[test]
@@ -666,29 +717,50 @@ mod tests {
     }
 
     #[test]
-    fn source_parses_from_github_release_endpoints_only() {
-        let github = source_from_endpoint(Some(
-            "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json",
-        ));
-        assert_eq!(github.repo, "laochenfei233/prism-agent");
+    fn source_separates_mirror_display_from_github_facts() {
+        let mirror = source_from_endpoints(&[
+            "https://cdn.xyern.com/prism-agent/updates/latest.json".to_string(),
+            "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json"
+                .to_string(),
+        ]);
+        assert_eq!(mirror.host, "prism.xyern.com");
+        assert_eq!(mirror.repo, "laochenfei233/prism-agent");
         assert_eq!(
-            github.release_url,
+            mirror.release_url,
             "https://github.com/laochenfei233/prism-agent/releases"
         );
 
-        let bare = source_from_endpoint(None);
+        // A bare GitHub configuration shows the repository instead of a host.
+        let github = source_from_endpoints(&[
+            "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json"
+                .to_string(),
+        ]);
+        assert_eq!(github.host, String::new());
+        assert_eq!(github.repo, "laochenfei233/prism-agent");
+
+        // The mirror display does not imply repository facts, and foreign,
+        // shallow, or other-product endpoints stay empty.
+        let mirror_only =
+            source_from_endpoints(&["https://cdn.xyern.com/prism-agent/updates/latest.json".to_string()]);
+        assert_eq!(mirror_only.host, "prism.xyern.com");
+        assert_eq!(mirror_only.repo, String::new());
+        let foreign = source_from_endpoints(&[
+            "https://example.com/a/b/releases/latest/download/latest.json".to_string(),
+        ]);
         assert_eq!(
-            bare,
+            foreign,
             UpdateSource {
+                host: String::new(),
                 repo: String::new(),
-                release_url: String::new()
+                release_url: String::new(),
             }
         );
-        let foreign = source_from_endpoint(Some(
-            "https://example.com/a/b/releases/latest/download/latest.json",
-        ));
-        assert_eq!(foreign.repo, String::new());
-        let shallow = source_from_endpoint(Some("https://github.com/releases"));
+        let shallow = source_from_endpoints(&["https://github.com/releases".to_string()]);
         assert_eq!(shallow.repo, String::new());
+        let other_product = source_from_endpoints(&[
+            "https://cdn.xyern.com/easel/updates/latest.json".to_string(),
+        ]);
+        assert_eq!(other_product.host, String::new());
+        assert_eq!(source_from_endpoints(&[]).host, String::new());
     }
 }

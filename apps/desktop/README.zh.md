@@ -65,8 +65,7 @@ CI（`.github/workflows/desktop-release.yml`）在三平台矩阵上执行同一
 
 ## 应用内更新
 
-壳内置 `tauri-plugin-updater`，更新源固定为本仓库的 GitHub Releases：`tauri.conf.json` 把 endpoint 钉在
-`https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`，没有自定义更新源入口。该 URL 始终解析到最新**已发布**的 release，其中携带 `latest.json` 清单与签名过的安装包；插件在安装前校验 minisign 签名。draft release 对该 endpoint 不可见——发布 release 后更新才会生效。
+壳内置 `tauri-plugin-updater`，更新源固定为 `tauri.conf.json` 钉住的两个 endpoint——没有自定义更新源入口：国内镜像在前（`https://cdn.xyern.com/prism-agent/updates/latest.json`，关于页显示为官方地址 `prism.xyern.com`），本仓库 GitHub Releases 为兜底（`https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`），更新器按声明顺序逐个尝试、第一个成功的生效。承载更新的 release 携带 `latest.json` 清单与签名过的安装包；插件在安装前校验 minisign 签名。draft release 对 GitHub endpoint 不可见——发布 release 后该链路的更新才会生效。
 
 发布前置：更新器产物需要 minisign 私钥。公钥已提交在 `tauri.conf.json`；私钥放在仓库之外（本机：`~/.prism-updater/prism-updater.key`，无口令），并以 `TAURI_SIGNING_PRIVATE_KEY` 提供：
 
