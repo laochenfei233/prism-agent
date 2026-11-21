@@ -12,11 +12,7 @@ commits: 205657d63d..
 
 ## [S1] Problem
 
-In-app updates resolve against a single GitHub Releases endpoint, which is slow
-or unreachable for users in mainland China. A domestic CDN mirror exists at
-`cdn.xyern.com` (the same arrangement the Easel app migrated to); the desktop
-app must check it first and keep GitHub as the fallback, while the About
-section still shows a stable official address.
+In-app updates resolve against a single GitHub Releases endpoint, which is slow or unreachable for users in mainland China. A domestic CDN mirror exists at `cdn.xyern.com` (the same arrangement the Easel app migrated to); the desktop app must check it first and keep GitHub as the fallback, while the About section still shows a stable official address.
 
 ## [S2] Design
 
@@ -24,47 +20,23 @@ section still shows a stable official address.
 
 `apps/desktop/src-tauri/tauri.conf.json` lists two endpoints in priority order:
 
-1. `https://cdn.xyern.com/prism-agent/updates/latest.json` — the domestic
-   mirror manifest (Tencent CDN, per the Easel release-sync convention).
-2. `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`
-   — the existing GitHub Releases fallback.
+1. `https://cdn.xyern.com/prism-agent/updates/latest.json` — the domestic mirror manifest (Tencent CDN, per the Easel release-sync convention).
+2. `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json` — the existing GitHub Releases fallback.
 
-The Tauri updater tries endpoints in declared order and uses the first
-successful response, so the mirror serves checks whenever it is reachable and
-GitHub covers the window before the CDN side is provisioned. The pubkey,
-install mode, and signature verification are unchanged.
+The Tauri updater tries endpoints in declared order and uses the first successful response, so the mirror serves checks whenever it is reachable and GitHub covers the window before the CDN side is provisioned. The pubkey, install mode, and signature verification are unchanged.
 
 ### S2.2 Display/actual separation
 
-The About card shows the named official host `prism.xyern.com` while the
-updater actually requests `cdn.xyern.com`, mirroring the Easel convention.
-The Rust shell's `UpdateSource` wire gains a `host` field: it carries the
-display host when an endpoint on `cdn.xyern.com` with a `/prism-agent/` path
-is configured, and stays empty on a bare GitHub configuration (the card then
-renders the repository as before). The `repo`/`releaseUrl` facts keep coming
-from the first GitHub releases endpoint in the list regardless of position —
-the changelog and feedback links stay on GitHub Releases/issues.
+The About card shows the named official host `prism.xyern.com` while the updater actually requests `cdn.xyern.com`, mirroring the Easel convention. The Rust shell's `UpdateSource` wire gains a `host` field: it carries the display host when an endpoint on `cdn.xyern.com` with a `/prism-agent/` path is configured, and stays empty on a bare GitHub configuration (the card then renders the repository as before). The `repo`/`releaseUrl` facts keep coming from the first GitHub releases endpoint in the list regardless of position — the changelog and feedback links stay on GitHub Releases/issues.
 
 ### S2.3 About card rendering
 
-The prism-about client derives the source card from the snapshot through a
-pure helper: mirror configured → badge copy `国内镜像`/`China mirror` and the
-display host as plain text (the display name is not a navigable page);
-otherwise the current repository link and GitHub Releases badge. Copy adds one
-key (`sourceMirror`) to both dictionaries; the zh/en parity test keeps them
-paired.
+The prism-about client derives the source card from the snapshot through a pure helper: mirror configured → badge copy `国内镜像`/`China mirror` and the display host as plain text (the display name is not a navigable page); otherwise the current repository link and GitHub Releases badge. Copy adds one key (`sourceMirror`) to both dictionaries; the zh/en parity test keeps them paired.
 
 ## [S3] Scope
 
-- In scope: the endpoint list, the Rust source-facts mapping and its tests,
-  the About card's mirror rendering, the plugin's dictionaries and README,
-  the desktop README pair, `desktop-dev-notes.md`, a changelog entry, and the
-  rebuilt plugin `lib/` bundles.
-- Out of scope: a custom-source override UI; CDN-side sync tooling (lives in
-  the website repository); connectivity verification of the CDN URL (deferred
-  by the user); recorded-session snapshot coverage (the About card is only
-  reachable inside the desktop carrier, which keyless web replay cannot
-  produce — a pre-existing gap, not a new one).
+- In scope: the endpoint list, the Rust source-facts mapping and its tests, the About card's mirror rendering, the plugin's dictionaries and README, the desktop README pair, `desktop-dev-notes.md`, a changelog entry, and the rebuilt plugin `lib/` bundles.
+- Out of scope: a custom-source override UI; CDN-side sync tooling (lives in the website repository); connectivity verification of the CDN URL (deferred by the user); recorded-session snapshot coverage (the About card is only reachable inside the desktop carrier, which keyless web replay cannot produce — a pre-existing gap, not a new one).
 
 ## Tasks
 

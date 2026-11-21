@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for domestic-update-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/domestic-update-source.md
+/:
+  en: 9b1c01e2564074b1
+  zh: 9b1c01e2564074b1
+/domestic-update-source:
+  en: f23654b85ba2c8a6
+  zh: 5ecbe42e04566c41
+/domestic-update-source/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/domestic-update-source/s1-problem:
+  en: 2502a69d780e82bb
+  zh: 2a28b1a86837efe8
+/domestic-update-source/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/domestic-update-source/s2-design/s2-1-updater-endpoints:
+  en: 487d834bbfba0894
+  zh: 5848058bedc0f2dc
+/domestic-update-source/s2-design/s2-2-display-actual-separation:
+  en: 06780abbc65da036
+  zh: d1a66f3eacddee92
+/domestic-update-source/s2-design/s2-3-about-card-rendering:
+  en: ae82a5d685adba9f
+  zh: dbcad445f1f59c55
+/domestic-update-source/s3-scope:
+  en: 11b72df6d4ced0e3
+  zh: f14c9821fb319331
+/domestic-update-source/tasks:
+  en: da917d9d5e641ecc
+  zh: 09437b355d20b651
+/domestic-update-source/s4-acceptance:
+  en: f9439042a844a65b
+  zh: 1ce75016e4001689
