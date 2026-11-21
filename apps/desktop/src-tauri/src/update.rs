@@ -135,7 +135,7 @@ pub struct UpdateState {
 
 impl UpdateState {
     /// Builds the initial state: current version from the package, the update
-    /// source from the configured endpoint, and the durable fields from disk.
+    /// source from the configured endpoints, and the durable fields from disk.
     pub fn new(app: &AppHandle) -> Self {
         let fields = Fields {
             phase: Phase::Idle,
@@ -639,6 +639,7 @@ mod tests {
         assert_eq!(object["phase"], "error");
         assert_eq!(object["failure"], "download-network");
         assert_eq!(object["currentVersion"], "0.2.1-rc.4");
+        assert_eq!(object["source"]["host"], String::new());
         assert_eq!(object["source"]["repo"], "laochenfei233/prism-agent");
         assert_eq!(
             object["source"]["releaseUrl"],
@@ -670,6 +671,25 @@ mod tests {
                 && object.contains_key("currentVersion")
                 && object.contains_key("source")
         );
+
+        // The mirror display rides the same wire under its camelCase key.
+        let mirror = Fields {
+            phase: Phase::Idle,
+            version: None,
+            percent: None,
+            failure: None,
+            last_check: None,
+            last_error: None,
+            known_latest: None,
+            current_version: "0.2.1-rc.4".to_string(),
+            source: UpdateSource {
+                host: "prism.xyern.com".to_string(),
+                repo: "laochenfei233/prism-agent".to_string(),
+                release_url: "https://github.com/laochenfei233/prism-agent/releases".to_string(),
+            },
+        };
+        let wire = serde_json::to_value(snapshot_from(&mirror)).expect("snapshot serializes");
+        assert_eq!(wire["source"]["host"], "prism.xyern.com");
     }
 
     #[test]

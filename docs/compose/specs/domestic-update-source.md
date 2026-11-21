@@ -37,7 +37,7 @@ The prism-about client derives the source card from the snapshot through a pure 
 
 ## [S3] Scope
 
-- In scope: the endpoint list, the Rust source-facts mapping and its tests, the About card's mirror rendering, the plugin's dictionaries and README, the desktop README pair, `desktop-dev-notes.md`, a changelog entry, and the rebuilt plugin `lib/` bundles.
+- In scope: the endpoint list, the Rust source-facts mapping and its tests, the About card's mirror rendering, the plugin's dictionaries and README, the desktop README pair, `desktop-dev-notes.md`, and a changelog entry; the plugin `lib/` bundles are a gitignored build output rebuilt at packaging time by `bundle-runtime.mjs`, so the change verifies with a local tsdown build rather than a commit.
 - Out of scope: a custom-source override UI; CDN-side sync tooling (lives in the website repository); connectivity verification of the CDN URL (deferred by the user); recorded-session snapshot coverage (the About card is only reachable inside the desktop carrier, which keyless web replay cannot produce — a pre-existing gap, not a new one).
 
 ## Tasks
@@ -45,7 +45,7 @@ The prism-about client derives the source card from the snapshot through a pure 
 - [ ] T1: reorder `tauri.conf.json` endpoints to mirror-first with GitHub fallback (depends: none)
 - [ ] T2: extend `UpdateSource` with the display host and map endpoints to mirror/GitHub facts, with tests (depends: none)
 - [ ] T3: render the mirror state in the About card — bridge type, pure helper, section, dictionaries, tests (depends: none)
-- [ ] T4: rebuild the prism-about `lib/` bundles (depends: T3)
+- [ ] T4: rebuild the prism-about `lib/` bundles locally as a build smoke — `lib/` is gitignored and rebuilt at packaging time (depends: T3)
 - [ ] T5: update docs — desktop README pair, prism-about README pair and description, `desktop-dev-notes.md` (depends: none)
 - [ ] T6: add the changelog entry (depends: none)
 
@@ -55,4 +55,4 @@ The prism-about client derives the source card from the snapshot through a pure 
 - [ ] A mirror-first configuration produces About facts `{ host: "prism.xyern.com", repo: "laochenfei233/prism-agent", releaseUrl: ".../releases" }`; a bare GitHub configuration produces the current facts with an empty host; unrecognizable endpoints produce empty facts.
 - [ ] The About card renders `prism.xyern.com` as text with the mirror badge under the mirror configuration, keeps the repository link, GitHub Releases badge, and GitHub links under a bare GitHub configuration, and keeps the unavailable state otherwise.
 - [ ] zh/en dictionaries keep key parity, and the plugin's tests pass.
-- [ ] `cargo test` passes for the desktop crate, and the rebuilt `lib/` bundles are committed.
+- [ ] `cargo test` passes for the desktop crate, and the plugin builds cleanly through tsdown (the `lib/` output is gitignored and rebuilt at packaging time).

@@ -37,7 +37,7 @@ prism-about 客户端经一个纯函数从快照派生源卡片：配置镜像 �
 
 ## [S3] 范围
 
-- 范围内：endpoint 列表、Rust 源事实映射及其测试、关于卡片的镜像渲染、插件字典与 README、桌面 README 对、`desktop-dev-notes.md`、一条 changelog 条目、重建的插件 `lib/` 产物。
+- 范围内：endpoint 列表、Rust 源事实映射及其测试、关于卡片的镜像渲染、插件字典与 README、桌面 README 对、`desktop-dev-notes.md`、一条 changelog 条目；插件 `lib/` 产物是 gitignore 的构建产物，打包时由 `bundle-runtime.mjs` 重建，故以本地 tsdown 构建验证而不入库。
 - 范围外：自定义更新源 UI；CDN 侧同步工具（在网站仓库）；CDN 地址连通性验证（用户要求暂缓）；recorded-session 快照覆盖（关于卡片只在桌面载具内可达，keyless web 重放无法产生——既有缺口，非新增）。
 
 ## Tasks
@@ -45,7 +45,7 @@ prism-about 客户端经一个纯函数从快照派生源卡片：配置镜像 �
 - [ ] T1: `tauri.conf.json` endpoint 重排为镜像在前、GitHub 兜底（依赖: 无）
 - [ ] T2: `UpdateSource` 扩展显示地址并把 endpoint 映射为镜像/GitHub 事实，附测试（依赖: 无）
 - [ ] T3: 关于卡片渲染镜像态——bridge 类型、纯函数、节组件、字典、测试（依赖: 无）
-- [ ] T4: 重建 prism-about `lib/` 产物（依赖: T3）
+- [ ] T4: 本地重建 prism-about `lib/` 产物作构建冒烟——`lib/` 不入库、打包时重建（依赖: T3）
 - [ ] T5: 更新文档——桌面 README 对、prism-about README 对与描述、`desktop-dev-notes.md`（依赖: 无）
 - [ ] T6: 添加 changelog 条目（依赖: 无）
 
@@ -55,4 +55,4 @@ prism-about 客户端经一个纯函数从快照派生源卡片：配置镜像 �
 - [ ] 镜像在前配置产出关于事实 `{ host: "prism.xyern.com", repo: "laochenfei233/prism-agent", releaseUrl: ".../releases" }`；纯 GitHub 配置产出当前事实且 host 为空；不可识别 endpoint 产出空事实。
 - [ ] 关于卡片在镜像配置下以文本渲染 `prism.xyern.com` 与镜像徽标，纯 GitHub 配置下保留仓库链接、GitHub Releases 徽标与 GitHub 链接，其余保持不可用态。
 - [ ] zh/en 字典保持键配对，插件测试通过。
-- [ ] 桌面 crate `cargo test` 通过，重建的 `lib/` 产物已提交。
+- [ ] 桌面 crate `cargo test` 通过，插件经 tsdown 干净构建（`lib/` 产物不入库、打包时重建）。
