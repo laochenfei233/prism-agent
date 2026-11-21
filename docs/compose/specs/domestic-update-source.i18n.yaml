@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/domestic-update-source.md
 /:
-  en: 9b1c01e2564074b1
-  zh: 9b1c01e2564074b1
+  en: cbcae11121df2d8e
+  zh: cbcae11121df2d8e
 /domestic-update-source:
   en: e90886b874431b20
   zh: d848bd947f39f96e
 /domestic-update-source/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 6ec65f88dd6af93f
+  zh: 88b936c556998eec
 /domestic-update-source/s1-problem:
   en: 2502a69d780e82bb
   zh: 2a28b1a86837efe8
@@ -30,8 +30,8 @@
   en: fdfa12d6ef48a6df
   zh: 9871aa753811c495
 /domestic-update-source/tasks:
-  en: 79321a69ee9d5626
-  zh: f9d63cc6f146de6d
+  en: ae5af35257306b0c
+  zh: 7ce33480e3a70543
 /domestic-update-source/s4-acceptance:
-  en: 3cc0b25243ce6fd6
-  zh: 378cf3100b5773a0
+  en: 15e3f7b89a3a6e21
+  zh: 3428a825553c2074
