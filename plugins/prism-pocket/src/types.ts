@@ -8,6 +8,13 @@
 export interface PocketServerSurface {
   /** Bind address literal (loopback by default). */
   host: string
+  /**
+   * Extra addresses the listener also bound (`--bind-lan` resolves them at
+   * startup). A LAN provider address that appears here is genuinely served,
+   * so the page can offer its link; an address the OS reports but this list
+   * lacks is not bound, which is the LAN provider's blocker.
+   */
+  additionalHosts?: string[]
   /** Listen port. */
   port: number
   /** Advertised public URL from `--public-url`, when set. */

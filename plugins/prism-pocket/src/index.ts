@@ -88,6 +88,7 @@ interface ConnectionRoute {
 /** Structural view of the startup-provided web surface values. */
 interface WebStartupLike {
   readonly host?: string
+  readonly additionalHosts?: readonly string[]
   readonly port?: number
   readonly publicUrl?: string
   readonly trustedHosts?: readonly string[]
@@ -119,6 +120,9 @@ export function apply(ctx: Context, config: Config = {}): void {
   const runtime: PocketRuntime = {
     surface: {
       host: webStartup.host ?? '127.0.0.1',
+      ...(webStartup.additionalHosts !== undefined && webStartup.additionalHosts.length > 0
+        ? { additionalHosts: [...webStartup.additionalHosts] }
+        : {}),
       port: webStartup.port ?? 3080,
       ...(webStartup.publicUrl !== undefined ? { publicUrl: webStartup.publicUrl } : {}),
       trustedHosts: [...(webStartup.trustedHosts ?? [])],

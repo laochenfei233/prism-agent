@@ -31,9 +31,10 @@ function fakeHttpServer(
   upgrades: WebUpgradeRoute[],
   host = '127.0.0.1',
   protocol: WebServer['protocol'] = 'http:',
-): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host' | 'protocol'> {
+): Pick<WebServer, 'register' | 'registerUpgrade' | 'tapIndex' | 'port' | 'host' | 'hosts' | 'protocol'> {
   return {
     host,
+    hosts: [host],
     protocol,
     register(route: WebRoute) {
       if (routes.some(candidate => candidate.kind === route.kind && candidate.path === route.path)) {

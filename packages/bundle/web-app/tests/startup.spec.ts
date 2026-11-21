@@ -11,8 +11,15 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import { internals, provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, WEB_STARTUP_SERVICE, type WebStartupValues } from '../src/startup.ts'
+
+// The machine's interfaces must not decide a test: the LAN discovery is
+// stubbed to two deterministic private addresses.
+vi.mock('@deepseek-ai/dsh-host-webserver', async importOriginal => ({
+  ...await importOriginal<typeof import('@deepseek-ai/dsh-host-webserver')>(),
+  detectLanBindAddresses: (): string[] => ['192.168.1.23', '10.0.0.7'],
+}))
 
 /** What one fixture boot observed. */
 interface Observed {
@@ -61,6 +68,7 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     `  inject: [${WEB_STARTUP_SERVICE}]`,
     '  config:',
     "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
+    '    additionalHosts: !!js ctx.webStartup.additionalHosts ?? []',
     '    openBrowser: !!js ctx.webStartup.openBrowser',
     '    port: !!js ctx.webStartup.port ?? 3080',
     '    publicUrl: !!js ctx.webStartup.publicUrl',
@@ -105,6 +113,7 @@ describe('web command-line provider', () => {
       '--tls-key', 'private-key.pem',
     ])
     expect(values).toEqual({
+      additionalHosts: [],
       host: '127.0.0.1',
       openBrowser: false,
       port: 8080,
@@ -127,13 +136,31 @@ describe('web command-line provider', () => {
 
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ openBrowser: true, trustedHosts: [] })
+    expect(values).toEqual({ additionalHosts: [], openBrowser: true, trustedHosts: [] })
     expect(observed.readerConfig).toEqual({
+      additionalHosts: [],
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,
       trustedHosts: [],
     })
+  })
+
+  it('resolves --bind-lan to the machine\'s private addresses and refuses port 0', async () => {
+    const bound = await bootProvider(['--bind-lan', '--port', '8080'])
+    expect(bound.values).toEqual({
+      additionalHosts: ['192.168.1.23', '10.0.0.7'],
+      openBrowser: true,
+      port: 8080,
+      trustedHosts: [],
+    })
+    expect(bound.observed.exits).toEqual([])
+    // Port 0 asks the OS for a fresh port per listener, so the addresses
+    // would serve different ports; the invocation is a usage error instead.
+    const zero = await bootProvider(['--bind-lan', '--port', '0'])
+    expect(zero.values).toBeUndefined()
+    expect(zero.observed.out).toContain('error: --bind-lan needs a fixed --port')
+    expect(zero.observed.exits).toEqual([1])
   })
 
   it('prints its own help and leaves the consumer pending', async () => {
@@ -161,11 +188,13 @@ describe('web command-line provider', () => {
       '--trusted-host', 'lab.internal',
     ])
     expect(values).toEqual({
+      additionalHosts: [],
       openBrowser: true,
       publicUrl: 'https://web.example/ui',
       trustedHosts: ['lab.internal'],
     })
     expect(observed.readerConfig).toEqual({
+      additionalHosts: [],
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,

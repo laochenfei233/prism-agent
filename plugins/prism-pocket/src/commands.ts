@@ -103,21 +103,23 @@ export function tunnelAccess(
 /**
  * Resolve the local-network transport's phone address and what still blocks it.
  *
- * The fence admits the listener's own bind address on any port, so a server
- * bound here needs no trust entry; a server bound elsewhere is not listening
- * on this interface at all, which is the blocker rather than a trust miss —
- * the address is then withheld, because a link to a port nothing listens on
- * only hands the phone a connection timeout.
+ * The fence admits the listener's own bind addresses on any port, so a server
+ * bound here needs no trust entry; an address the OS reports but the listener
+ * did not bind is not listening on that interface at all, which is the blocker
+ * rather than a trust miss — the address is then withheld, because a link to a
+ * port nothing listens on only hands the phone a connection timeout.
  * @param surface - the webserver bind surface and trust list.
  * @param ipv4 - the local-network address, when one exists.
- * @returns the address only when the listener is bound to it, else the blocker.
+ * @returns the address only when the listener bound it, else the blocker.
  */
 export function lanAccess(
   surface: PocketServerSurface,
   ipv4: string | undefined,
 ): { blocker?: PocketPhoneAccess['blocker']; target?: string; trusted: boolean } {
   if (ipv4 === undefined) return { blocker: 'no-lan', trusted: false }
-  if (normalizeHost(surface.host) !== ipv4) return { blocker: 'not-bound', trusted: false }
+  const bound = normalizeHost(surface.host) === ipv4
+    || (surface.additionalHosts ?? []).some(entry => normalizeHost(entry) === ipv4)
+  if (!bound) return { blocker: 'not-bound', trusted: false }
   return { target: `http://${ipv4}:${surface.port}/`, trusted: true }
 }
 
@@ -150,22 +152,23 @@ export function phoneTarget(surface: PocketServerSurface, tailscale: PocketTails
 /**
  * Whether a page origin already passes the host trust fence for the reported
  * server surface — a display-side mirror of `api-request-trust.ts`: the
- * fence accepts any loopback hostname when the server binds loopback, the
- * bind address itself (port-ignored, `%zone` stripped), and `trustedHosts`
- * entries where a port-less entry matches any port. Display logic only; the
- * fence itself stays host-side.
+ * fence accepts any loopback hostname when the server binds loopback, each of
+ * the listener's own bind addresses (port-ignored, `%zone` stripped), and
+ * `trustedHosts` entries where a port-less entry matches any port. Display
+ * logic only; the fence itself stays host-side.
  * @param origin - the page origin, for example `https://machine.tailnet.ts.net`.
  * @param surface - the server bind surface the page is asking about.
  */
 export function isOriginTrusted(
   origin: string,
-  surface: Pick<PocketServerSurface, 'host' | 'port' | 'trustedHosts'>,
+  surface: Pick<PocketServerSurface, 'host' | 'additionalHosts' | 'port' | 'trustedHosts'>,
 ): boolean {
   const authority = origin.replace(/^https?:\/\//, '')
   const { hostname } = splitAuthority(authority)
   if (hostname === undefined) return false
+  const bindHosts = [surface.host, ...(surface.additionalHosts ?? [])]
   if (isLoopbackHostname(hostname) && isLoopbackHostname(normalizeHost(surface.host))) return true
-  if (hostname === normalizeHost(surface.host)) return true
+  if (bindHosts.some(host => hostname === normalizeHost(host))) return true
   return surface.trustedHosts.some((entry) => {
     const { hostname: entryHost, port: entryPort } = splitAuthority(entry)
     if (entryHost === undefined) return false

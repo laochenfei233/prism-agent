@@ -84,6 +84,8 @@ describe('isOriginTrusted', () => {
     expect(isOriginTrusted('http://127.0.0.1:3080', surface)).toBe(true)
     expect(isOriginTrusted('http://100.64.0.3:3080', { ...surface, host: '100.64.0.3' })).toBe(true)
     expect(isOriginTrusted('http://100.64.0.3:9999', { ...surface, host: '100.64.0.3' })).toBe(true)
+    expect(isOriginTrusted('http://192.168.1.23:3080', { ...surface, additionalHosts: ['192.168.1.23'] })).toBe(true)
+    expect(isOriginTrusted('http://192.168.1.24:3080', { ...surface, additionalHosts: ['192.168.1.23'] })).toBe(false)
   })
 
   it('accepts any loopback origin when the server binds loopback', () => {
@@ -132,6 +134,15 @@ describe('lanAccess', () => {
   it('reports the address as ready once the listener binds it', () => {
     expect(lanAccess({ ...surface, host: '192.168.1.23' }, '192.168.1.23'))
       .toEqual({ target: 'http://192.168.1.23:3080/', trusted: true })
+  })
+
+  it('reports the address as ready when the listener bound it through --bind-lan', () => {
+    expect(lanAccess({ ...surface, additionalHosts: ['192.168.1.23'] }, '192.168.1.23'))
+      .toEqual({ target: 'http://192.168.1.23:3080/', trusted: true })
+    // A different LAN address the OS reports but the listener did not bind
+    // stays blocked: nothing listens for it.
+    expect(lanAccess({ ...surface, additionalHosts: ['192.168.1.23'] }, '192.168.1.24'))
+      .toEqual({ blocker: 'not-bound', trusted: false })
   })
 })
 

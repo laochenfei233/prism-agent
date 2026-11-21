@@ -266,6 +266,11 @@ impl DshHandle {
             .arg("web")
             .arg("--port")
             .arg(port.to_string())
+            // Bind the machine's private LAN addresses too, so a phone on the
+            // same network reaches the hub on INTERNAL_PORT without a
+            // forwarder; the hub resolves the addresses itself at startup, so
+            // a DHCP change takes effect on the next relaunch.
+            .arg("--bind-lan")
             .arg("--no-open")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());

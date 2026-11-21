@@ -10,7 +10,7 @@
 import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
-import { isWildcardHost, type TlsConfig } from '@deepseek-ai/dsh-host-webserver'
+import { detectLanBindAddresses, isWildcardHost, type TlsConfig } from '@deepseek-ai/dsh-host-webserver'
 import { parsePublicUrl } from './public-url.ts'
 
 /** Stable Cordis plugin name. */
@@ -28,6 +28,13 @@ export interface WebStartupValues {
   openBrowser: boolean
   /** `--host`, absent when the invocation did not name one. */
   host?: string
+  /**
+   * Extra bind addresses resolved for this invocation: the private IPv4
+   * addresses of the machine's own interfaces when `--bind-lan` is set, so a
+   * phone on the same network reaches the port directly. Resolved per boot, so
+   * a DHCP address change takes effect on restart.
+   */
+  additionalHosts: string[]
   /** `--port`, absent when the invocation did not name one. */
   port?: number
   /**
@@ -43,6 +50,7 @@ export interface WebStartupValues {
 
 /** The web flag family, as commander parsed it. */
 interface WebOptions {
+  bindLan?: boolean
   host?: string
   open: boolean
   port?: string
@@ -62,6 +70,7 @@ function webCommand(): Command {
     .description('Serve the DeepSeek Harness browser UI.')
     .helpOption('-h, --help', 'show this help')
     .option('--host <host>', 'bind address: one concrete IPv4 or IPv6 literal of a local interface; wildcard addresses are rejected')
+    .option('--bind-lan', 'also bind the machine\'s own private IPv4 addresses (192.168/10/172.16-31), resolved at startup; requires an explicit --port')
     .option('--no-open', 'do not open the Web UI in the default browser')
     .option('--port <port>', 'listen port; pass 0 to let the OS pick a free one')
     .option('--public-url <url>', 'advertise this HTTP(S) root in the printed, opened, runtime-context, and DSH_WEB_URL forms; grants no trust')
@@ -74,6 +83,7 @@ Examples:
   dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
   dsh --profile web --host 10.0.0.7          bind one local interface address
+  dsh --profile web --bind-lan --port 8080   also serve the machine's private IPv4 addresses on port 8080
   dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
                                              advertise a prefix-stripping HTTPS proxy entry and admit its authority
   dsh --profile web --tls-cert ./server-chain.pem --tls-key ./server-key.pem
@@ -98,6 +108,10 @@ export function apply(ctx: Context): void {
     if (options.port !== undefined && !/^\d+$/.test(options.port)) {
       program.error(`error: --port must be a number, got ${JSON.stringify(options.port)}`)
     }
+    const additionalHosts = options.bindLan === true ? detectLanBindAddresses() : []
+    if (additionalHosts.length > 0 && options.port !== undefined && options.port === '0') {
+      program.error('error: --bind-lan needs a fixed --port; port 0 asks the OS for a fresh port per listener, so the addresses would serve different ports')
+    }
     let tls: TlsConfig | undefined
     if (options.tlsCert !== undefined && options.tlsKey !== undefined) {
       tls = { certFile: options.tlsCert, keyFile: options.tlsKey }
@@ -114,6 +128,7 @@ export function apply(ctx: Context): void {
     ctx.provide(WEB_STARTUP_SERVICE, {
       openBrowser: options.open,
       ...options.host !== undefined && { host: options.host },
+      additionalHosts,
       ...options.port !== undefined && { port: Number(options.port) },
       ...options.publicUrl !== undefined && { publicUrl: options.publicUrl },
       ...tls !== undefined && { tls },

@@ -25,24 +25,29 @@ describe('isTrustedApiRequest', () => {
     }
   })
 
-  it('accepts the listener\'s own bind address port-lessly, and nothing that merely resembles it', () => {
-    // A browser dialing the bind address sends that IP literal as Host; the
-    // port is not part of the grant.
-    for (const host of ['10.1.2.3', '10.1.2.3:3080', '10.1.2.3:9999']) {
-      expect(isTrustedApiRequest(request({ host }), [], '10.1.2.3')).toBe(true)
+  it('accepts the listener\'s own bind addresses port-lessly, and nothing that merely resembles them', () => {
+    // A browser dialing a bind address sends that IP literal as Host; the
+    // port is not part of the grant. A multi-bind deployment passes every
+    // bound address, and a non-bound address of the same subnet stays out.
+    const binds = ['10.1.2.3', 'fd00::1']
+    for (const host of ['10.1.2.3', '10.1.2.3:3080', '10.1.2.3:9999', '[fd00::1]', '[fd00::1]:3080']) {
+      expect(isTrustedApiRequest(request({ host }), [], binds)).toBe(true)
     }
-    expect(isTrustedApiRequest(request({ host: '10.1.2.4:3080' }), [], '10.1.2.3')).toBe(false)
-    expect(isTrustedApiRequest(request({ host: 'dsh-direct.lan:3080' }), [], '10.1.2.3')).toBe(false)
+    expect(isTrustedApiRequest(request({ host: '10.1.2.4:3080' }), [], binds)).toBe(false)
+    expect(isTrustedApiRequest(request({ host: 'dsh-direct.lan:3080' }), [], binds)).toBe(false)
     expect(isTrustedApiRequest(request({ host: '10.1.2.3:3080' }), [])).toBe(false)
     // IPv6 spellings compare through the same normalization as Host, mapped
     // forms included; a zone id selects the local interface, not the address.
     for (const host of ['[fd00::1]', '[fd00::1]:3080', '[::ffff:a01:203]:3080', '[::ffff:10.1.2.3]:3080']) {
-      const bindHost = host.startsWith('[::ffff') ? '::ffff:10.1.2.3' : 'fd00::1'
-      expect(isTrustedApiRequest(request({ host }), [], bindHost)).toBe(true)
+      expect(isTrustedApiRequest(request({ host }), [], ['::ffff:10.1.2.3', 'fd00::1'])).toBe(true)
     }
-    expect(isTrustedApiRequest(request({ host: '[fd00::2]:3080' }), [], 'fd00::1')).toBe(false)
-    expect(isTrustedApiRequest(request({ host: '[fd00::1]:3080' }), [], 'fe80::1%lo')).toBe(false)
-    expect(isTrustedApiRequest(request({ host: '[fe80::1]:3080' }), [], 'fe80::1%lo')).toBe(true)
+    expect(isTrustedApiRequest(request({ host: '[fd00::2]:3080' }), [], binds)).toBe(false)
+    expect(isTrustedApiRequest(request({ host: '[fd00::1]:3080' }), [], ['fe80::1%lo'])).toBe(false)
+    expect(isTrustedApiRequest(request({ host: '[fe80::1]:3080' }), [], ['fe80::1%lo'])).toBe(true)
+    // A failed additional bind serves nothing, so its address leaves the list
+    // the fence sees; a bound subset admits only itself.
+    expect(isTrustedApiRequest(request({ host: '10.1.2.3:3080' }), [], ['192.168.1.9'])).toBe(false)
+    expect(isTrustedApiRequest(request({ host: '192.168.1.9:3080' }), [], ['192.168.1.9'])).toBe(true)
   })
 
   it('refuses a rebound Host: the attacker domain names the socket it did not expect', () => {

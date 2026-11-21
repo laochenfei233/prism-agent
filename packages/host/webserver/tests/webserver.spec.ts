@@ -8,6 +8,7 @@
  * denial goes through the real Loader.
  */
 
+import { strict as assert } from 'node:assert'
 import { generateKeyPairSync } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
@@ -23,7 +24,8 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import HttpServer, {
-  bindUrlHost, isLoopbackHost, normalizeBindAddress, renderIndexInjections, type TlsConfig, type WebResource, type WebRoute,
+  bindUrlHost, detectLanBindAddresses, isLoopbackHost, normalizeBindAddress,
+  renderIndexInjections, type TlsConfig, type WebResource, type WebRoute,
 } from '../src/index.ts'
 import { materializeTlsFixture, type TlsFixture } from './tls-fixture.ts'
 
@@ -92,6 +94,7 @@ async function loadComposition(
   gzip = false,
   host = '127.0.0.1',
   tls?: Partial<TlsConfig> | null,
+  additionalHosts?: string[],
 ): Promise<Context> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-webserver-loader-'))
   const configPath = join(root, 'cordis.yml')
@@ -100,6 +103,12 @@ async function loadComposition(
     '  config:',
     `    host: '${host}'`,
     `    port: ${String(port)}`,
+    ...(additionalHosts === undefined
+      ? []
+      : [
+        '    additionalHosts:',
+        ...additionalHosts.map(entry => `      - '${entry}'`),
+      ]),
     ...(tls === undefined
       ? []
       : tls === null
@@ -154,8 +163,8 @@ function boundPort(port: number | undefined): number {
 }
 
 /** Write one raw request (fetch always sends Host) and collect the response text until the server closes. */
-async function rawExchange(listenerPort: number | undefined, text: string): Promise<string> {
-  const socket = connect(boundPort(listenerPort), '127.0.0.1')
+async function rawExchange(listenerPort: number | undefined, text: string, host = '127.0.0.1'): Promise<string> {
+  const socket = connect(boundPort(listenerPort), host)
   await once(socket, 'connect')
   const { promise, resolve, reject } = Promise.withResolvers<string>()
   let received = ''
@@ -168,6 +177,20 @@ async function rawExchange(listenerPort: number | undefined, text: string): Prom
     return await promise
   } finally {
     socket.destroy()
+  }
+}
+
+/** One port the OS has free right now; the probe releases it (and the test waits for the release) before the caller binds. */
+async function freePort(): Promise<number> {
+  const probe = createTcpServer()
+  const { promise, resolve, reject } = Promise.withResolvers<number>()
+  probe.listen(0, '127.0.0.1', () => { resolve((probe.address() as AddressInfo).port) })
+  probe.on('error', reject)
+  try {
+    return await promise
+  } finally {
+    probe.close()
+    await once(probe, 'close')
   }
 }
 
@@ -253,6 +276,27 @@ function tlsUpgrade(port: number | undefined, path: string, ca: string): Promise
   return promise
 }
 
+describe('detectLanBindAddresses', () => {
+  const entry = (address: string, family = 'IPv4', internal = false): { address: string; family: string; internal: boolean } =>
+    ({ address, family, internal })
+
+  it('collects the machine\'s private IPv4 addresses, deduplicated and home-range first', () => {
+    expect(detectLanBindAddresses({
+      ethernet: [entry('192.168.1.23')],
+      wifi: [entry('10.0.0.7'), entry('169.254.9.9')],
+      virtual: [entry('192.168.1.23'), entry('172.16.4.4')],
+      loopback: [entry('127.0.0.1', 'IPv4', true)],
+      tailscale: [entry('100.66.201.3')],
+      v6: [entry('fd00::1', 'IPv6')],
+    })).toEqual(['192.168.1.23', '10.0.0.7', '172.16.4.4'])
+  })
+
+  it('is empty without a private address', () => {
+    expect(detectLanBindAddresses({ only: [entry('169.254.1.1'), entry('100.64.0.9'), entry('8.8.8.8')] })).toEqual([])
+    expect(detectLanBindAddresses({})).toEqual([])
+  })
+})
+
 describe('real Loader composition', () => {
   it('accepts one concrete IP literal, keeping an IPv6 zone for listen', () => {
     for (const host of ['127.0.0.1', '10.1.2.3', '0.1.2.3', '::1', 'fd00::1', '::ffff:10.1.2.3', '::ffff:0.1.2.3', '0:0:0:0:0:0:0:1', 'fe80::1%lo', '::0.0.0.1', '::0.0.0.1%lo', '::127.0.0.1']) {
@@ -286,6 +330,51 @@ describe('real Loader composition', () => {
     const fiber = webserverFiber(denied)
     expect(fiber?.state).toBe(FiberState.FAILED)
     await expect(fiber?.await()).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+  })
+
+  it('binds every additional address on the same port and serves both', { timeout: 30_000 }, async () => {
+    const port = await freePort()
+    const composition = await loadComposition(port, false, '127.0.0.1', undefined, ['127.0.0.2'])
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    expect(server.hosts).toEqual(['127.0.0.1', '127.0.0.2'])
+    expect(server.port).toBe(port)
+    for (const address of ['127.0.0.1', '127.0.0.2']) {
+      // No route is registered in this bare composition, so the listener
+      // answers 404 on both addresses — the point is that both answer.
+      expect((await fetch(`http://${address}:${String(port)}/`)).status).toBe(404)
+    }
+  })
+
+  it('drops an additional address that cannot bind and keeps the primary', { timeout: 30_000 }, async () => {
+    // 192.0.2.1 is TEST-NET-1: no machine holds it, so the listen fails while
+    // the primary stays up and the fiber stays active.
+    const port = await freePort()
+    const composition = await loadComposition(port, false, '127.0.0.1', undefined, ['192.0.2.1'])
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    expect(server.hosts).toEqual(['127.0.0.1'])
+    expect((await fetch(`http://127.0.0.1:${String(port)}/`)).status).toBe(404)
+    expect(webserverFiber(composition)?.state).toBe(FiberState.ACTIVE)
+  })
+
+  it('fails the load when an additional address repeats one already bound', async () => {
+    const composition = await loadComposition(4567, false, '127.0.0.1', undefined, ['127.0.0.1'])
+    const fiber = webserverFiber(composition)
+    expect(fiber?.state).toBe(FiberState.FAILED)
+    await expect(fiber?.await()).rejects.toThrow(/repeats an address already bound/)
+  })
+
+  it('denies a wildcard additional address through the real plugin load', async () => {
+    const composition = await loadComposition(4567, false, '127.0.0.1', undefined, ['0.0.0.0'])
+    const fiber = webserverFiber(composition)
+    expect(fiber?.state).toBe(FiberState.FAILED)
+    await expect(fiber?.await()).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+  })
+
+  it('rejects additional hosts without an explicit port, at load', () => {
+    expect(() => new HttpServer(new Context(), HttpServer.Config({ host: '127.0.0.1', port: 0, additionalHosts: ['127.0.0.2'] })))
+      .toThrow('webserver: additionalHosts requires an explicit port; port 0 binds a fresh OS port per listener')
   })
 
   it('classifies loopback bind addresses from the parsed value, including mapped and zone forms', () => {
@@ -761,7 +850,7 @@ describe('real Loader composition', () => {
       once: (event: string, listener: () => void) => res.on(event, listener),
       off: (event: string, listener: () => void) => { listeners.get(event)?.delete(listener); return res },
     }
-    const httpServer = Reflect.get(server, 'server') as { emit(event: 'request', req: object, res: object): boolean }
+    const httpServer = Reflect.get(server, 'servers')[0] as { emit(event: 'request', req: object, res: object): boolean }
     httpServer.emit('request', { url: '/tunnel', method: 'GET', headers: { host: 'tunnel.invalid' } }, res)
     await vi.waitFor(() => { expect(listeners.get('close')?.size ?? 0).toBeGreaterThan(0) })
     finished = true

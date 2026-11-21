@@ -58,8 +58,9 @@ function stageDist(): string {
 
 /** Web carrier without a network listener. */
 function fakeHttpServer(host = '127.0.0.1'): { server: WebServer } {
-  const server: Pick<WebServer, 'host' | 'port' | 'protocol' | 'getOrigin' | 'registerFallback' | 'renderIndex'> = {
+  const server: Pick<WebServer, 'host' | 'hosts' | 'port' | 'protocol' | 'getOrigin' | 'registerFallback' | 'renderIndex'> = {
     host,
+    hosts: [host],
     port: 4567,
     protocol: 'http:',
     getOrigin() { return `http://${bindUrlHost(host) ?? ''}:${String(this.port)}` },
