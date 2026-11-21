@@ -39,6 +39,9 @@ const FAILURE_KEYS: Readonly<Record<UpdateFailureKind, string>> = {
   'stop-failed': 'failureStop',
 }
 
+/** The fork's repository, for the links the non-desktop About page still shows. */
+const REPO = 'laochenfei233/prism-agent'
+
 /** The primary button's label for its current state. */
 function buttonLabel(button: ButtonState, t: AboutSectionProps['t']): string {
   switch (button) {
@@ -73,9 +76,25 @@ export function AboutSection({ t }: AboutSectionProps) {
   }, [carrier])
 
   if (carrier === null) {
+    // Outside the desktop shell (a phone browser) there is no update carrier:
+    // still show the identity — name, embedded version, tagline — and the
+    // project links, then the honest one-liner about the updater.
     return (
       <section className="pa-about" aria-label={t('nav')}>
         <style>{ABOUT_CSS}</style>
+        <header className="pa-brand">
+          <div className="pa-identity">
+            <div className="pa-title">
+              <h2>{t('appName')}</h2>
+              <span className="pa-version" title={t('versionLabel')}>{process.env.DSH_CLIENT_VERSION ?? '—'}</span>
+            </div>
+            <p className="pa-muted">{t('tagline')}</p>
+          </div>
+        </header>
+        <div className="pa-links">
+          <a href={`https://github.com/${REPO}/releases`} target="_blank" rel="noreferrer">{t('changelog')}</a>
+          <a href={`https://github.com/${REPO}/issues`} target="_blank" rel="noreferrer">{t('feedback')}</a>
+        </div>
         <p className="pa-muted">{t('desktopOnly')}</p>
       </section>
     )

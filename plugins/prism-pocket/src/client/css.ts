@@ -21,6 +21,13 @@ html.prism-active {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Buttons keep their content width: a flex sibling allowed to shrink wraps
+   its label mid-word (the data section's change-location button was the
+   first victim). Rows that need to wrap carry flex-wrap of their own. */
+html.prism-active .dsh-settings-dialog button {
+  flex-shrink: 0;
+}
+
 /* The soft keyboard: the header yields, the dock stays. */
 html.prism-active.prism-keyboard [data-slot="conversation.session.header"],
 html.prism-active.prism-keyboard [data-slot="conversation.header"] {
