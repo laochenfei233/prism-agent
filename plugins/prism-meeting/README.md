@@ -30,7 +30,7 @@ This bundle adds meeting capture to a base-backed `dsh` profile: a durable meeti
 Install the tarball into a base-backed DSH profile, then restart that profile:
 
 ```sh
-dsh plugin --profile <profile> add /absolute/path/to/prism-prism-meeting-0.1.0.tgz
+dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
 dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
@@ -85,11 +85,9 @@ No runtime invariant companion is published: the service owns the only independe
 <a id="further-exploration"></a>
 ## Further Exploration
 
-- Meetings subsystem — the record vocabulary, the recording lifecycle, the service semantics, and the browser interface (documented on the meeting line).
-- [Speech-to-text](../../speech/speech-to-text/README.md) — the recognition seam `ctx.meetingMinutes` resolves.
+- [Speech-to-text](../../packages/experimental/speech-to-text/README.md) — the recognition seam `ctx.meetingMinutes` resolves.
 - [Generated tool catalog](../../docs/tool-catalog.md) — the exact schemas the model sees.
-- [Generated composition graph](../../../apps/cli/composition.md) — how a shipped profile resolves these rows.
-- [Prism package group](../../packages/prism/README.md) — the other Prism surfaces.
+- [Generated composition graph](../../apps/cli/composition.md) — how a shipped profile resolves these rows.
 
 -----
 

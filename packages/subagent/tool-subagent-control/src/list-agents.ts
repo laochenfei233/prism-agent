@@ -1,10 +1,8 @@
 /**
  * The globally named `list_agents` tool: a thin model-facing adapter over
  * the continuable projection of `ctx.subagents.listChildren()` and, for the
- * `descendants` scope, `ctx.subagents.listDescendants()`. It stays separately
- * loadable from the root `send_message` plugin so a deployment can register
- * continuation delivery without exposing discovery.
- * @module @deepseek-ai/dsh-tool-subagent-control/list-agents
+ * `descendants` scope, `ctx.subagents.listDescendants()`. The control plugin owns
+ * registration and disposal alongside messaging and interruption.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -15,9 +13,6 @@ import type {
   SubagentCatalogEntry, SubagentDescendantListEntry, SubagentListEntry,
 } from '@deepseek-ai/dsh-subagent'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
-
-export const name = 'tool-subagent-list-agents'
-export const inject = ['tools', 'subagents', 'agents']
 
 type ListAgentsScope = 'children' | 'descendants'
 
@@ -82,27 +77,20 @@ function project(
  * Register the `list_agents` tool.
  * @param ctx - context carrying the tool registry, subagent service, and live Agent registry.
  */
-export function apply(ctx: Context): void {
+export function registerListAgents(ctx: Context): void {
   ctx.tools.register(defineTool({
     name: 'list_agents',
     description:
-      'List your continuable background subagents by durable id and label. Use it to recall which ones '
-      + 'you started, not to poll for completion — you are told when one finishes. Status comes from the live '
-      + 'registry: running means the agent is working right now; inactive means no turn is executing, whether '
-      + 'the child is loaded or must be resumed. inactive does not describe task completion, success, failure, '
-      + 'or waiting for other agents. A `send_message` steers a running child at its nearest step boundary '
-      + 'or starts or resumes a turn for an inactive child, and a direct child remains a `send_message` '
-      + 'candidate in every status. The snapshot is not a delivery '
-      + 'promise — `send_message` performs the authoritative check and may still fail. Children that could '
-      + 'not be read are reported as diagnostics only in `descendants` scope. Scope `descendants` '
-      + 'walks the whole tree below you in stable pre-order, annotating each entry with its durable direct-parent '
-      + 'session id and depth. You may use `send_message` only for depth-1 entries; deeper entries are '
-      + 'candidates for `interrupt_agent` only.',
+      'List subagents you started, with their ids, labels, and status. '
+      + 'running means it is working; inactive means it is not currently working. '
+      + 'You will be notified when a subagent finishes; there is no need to keep checking its status. '
+      + 'Use send_message to continue the conversation.',
     parameters: {
       scope: {
         type: 'string',
         enum: ['children', 'descendants'],
-        description: 'children (default) lists direct children only; descendants walks the complete tree below you.',
+        description: 'children (default) lists direct children, which accept send_message in any status. '
+          + 'descendants lists the whole tree below you with each entry\'s parent session id and depth; entries deeper than 1 accept only interrupt_agent.',
       },
     },
     output: {
@@ -171,7 +159,6 @@ export function apply(ctx: Context): void {
             .filter(entry => entry !== undefined)
         }
         case 'descendants': {
-          // Complete-corpus reads can await storage, so they observe tool cancellation.
           const entries = await ctx.subagents.listDescendants(parent.id, exec.signal)
           return entries
             .map(entry => project(ctx.agents, entry, entry))

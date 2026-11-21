@@ -1,0 +1,8 @@
+# The Prism Pocket rows: one Host service (remote status, push delivery, PWA
+# assets) and the browser roster row that loads the client half. `webStartup`
+# exists on every profile that mounts the web-app bundle, which is the only
+# place this plugin is meant to load.
+- insert:
+    - id: pocket
+      name: '@prism/prism-pocket'
+      inject: [webStartup]

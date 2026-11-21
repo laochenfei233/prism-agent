@@ -60,3 +60,7 @@
         repeatAskAfter: 2
         maxStepsPerTurn: 8
         skillInvocationGuidance: true
+        # The scenarios script every model step in order; a judge call issued
+        # mid-scenario would consume a scripted step, so the nudge rail — which
+        # ships on — is turned off here and covered by the unit suite.
+        stuckNudgeAfterFailures: 0

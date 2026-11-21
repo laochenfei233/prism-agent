@@ -412,8 +412,9 @@ const PUSH_CHUNK_BYTES = 1 << 16
 /** Byte capacity retained by the response stream before ZIP production waits for pull. */
 const RESPONSE_HIGH_WATER_MARK_BYTES = 1 << 16
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
 /** One producer waiter released only when ReadableStream pull restores capacity. */
-class ResponseCapacityGate {
+export class ResponseCapacityGate {
   private releasePending: (() => void) | undefined
 
   /**
@@ -445,6 +446,7 @@ class ResponseCapacityGate {
   }
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
 /**
  * Push one media object's bytes into a deflate stream in bounded chunks,
  * waiting for consumer capacity between chunks like the artifact path does.
@@ -454,7 +456,7 @@ class ResponseCapacityGate {
  * @param capacity - pull-driven response-capacity gate.
  * @param signal - cancellation; throws when aborted.
  */
-async function pushBinaryChunks(
+export async function pushBinaryChunks(
   deflate: ZipDeflate,
   data: Uint8Array,
   controller: ReadableStreamDefaultController<Uint8Array>,
@@ -472,8 +474,16 @@ async function pushBinaryChunks(
   } while (offset < data.byteLength)
 }
 
-/** Push one streamed file entry without retaining its complete byte sequence. */
-async function pushStreamChunks(
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
+/** Push one streamed file entry without retaining its complete byte sequence.
+ * @param deflate - the zip entry sink receiving each chunk.
+ * @param chunks - the source byte chunks, streamed as they arrive.
+ * @param controller - the response stream controller the capacity gate backpressures.
+ * @param capacity - the response capacity gate awaited between chunks.
+ * @param signal - the abort signal that stops the push mid-stream.
+ * @returns resolution when the stream drained or aborted.
+ */
+export async function pushStreamChunks(
   deflate: ZipDeflate,
   chunks: AsyncIterable<Uint8Array>,
   controller: ReadableStreamDefaultController<Uint8Array>,
@@ -491,6 +501,7 @@ async function pushStreamChunks(
   await capacity.wait(controller, signal)
 }
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A14.
 /**
  * Push one artifact's text into a deflate stream in bounded chunks, never
  * splitting a surrogate pair across a chunk boundary (a lone high surrogate
@@ -501,7 +512,7 @@ async function pushStreamChunks(
  * @param capacity - pull-driven response-capacity gate.
  * @param signal - cancellation; throws when aborted.
  */
-async function pushArtifactChunks(
+export async function pushArtifactChunks(
   deflate: ZipDeflate,
   content: string,
   controller: ReadableStreamDefaultController<Uint8Array>,

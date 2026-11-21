@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-rc.4/windows-acl-grant-timeout/guide.md
+/:
+  en: e76b90523cb8ba27
+  zh: 3c860fd3a1e0de88
+/windows-sandbox-preparation-can-no-longer-freeze-the-host:
+  en: aeb0add43129ce4e
+  zh: 7b78d37a064b74da
+/windows-sandbox-preparation-can-no-longer-freeze-the-host/change:
+  en: 5282bb475dda307c
+  zh: 5f472a241fec26cc
+/windows-sandbox-preparation-can-no-longer-freeze-the-host/migration:
+  en: 3953a8490f35f4ce
+  zh: 2851baf6521db114

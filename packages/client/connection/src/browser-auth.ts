@@ -1,6 +1,8 @@
 /** Browser-session authentication for the Host Connection carrier. */
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import type { PeerId } from '@deepseek-ai/dsh-typert-protocol'
+import { CONNECT_PATH, type ConnectionInteractions } from './connect-protocol.ts'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider, CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import type {
@@ -30,6 +32,13 @@ interface BrowserCookiePayload {
   readonly issuedAt: number
   readonly expiresAt: number
 }
+
+interface ApiCookiePayload extends Omit<BrowserCookiePayload, 'version'> {
+  readonly version: 2
+  readonly id: PeerId
+}
+
+type CookiePayload = BrowserCookiePayload | ApiCookiePayload
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -66,12 +75,13 @@ function header(
   return typeof value === 'string' ? value : undefined
 }
 
-/** Canonical request authority used as the cookie name and signed audience. */
-function requestAuthority(headers: ConnectionTrustRequest['headers']): string | undefined {
+/** Protocol-scoped cookie audience; HTTP retains its existing authority-only spelling. */
+function requestAudience(headers: ConnectionTrustRequest['headers'], secure: boolean): string | undefined {
   const host = header(headers, 'host')
   if (host === undefined) return undefined
   try {
-    return new URL(`http://${host}`).host
+    const url = new URL(`${secure ? 'https:' : 'http:'}//${host}`)
+    return secure ? url.origin : url.host
   } catch {
     return undefined
   }
@@ -117,24 +127,43 @@ function cookieValue(headerValue: string, name: string): string | undefined {
   return undefined
 }
 
+/** Session-cookie names the request still carries for other authorities; minting expires them. */
+function staleCookieNames(rawCookie: string, keepName: string): string[] {
+  const stale = new Set<string>()
+  for (const segment of rawCookie.split(';')) {
+    const at = segment.indexOf('=')
+    if (at === -1) continue
+    const name = segment.slice(0, at).trim()
+    if (name !== keepName && name.startsWith(COOKIE_PREFIX)) stale.add(name)
+  }
+  return [...stale]
+}
+
 /** Serialize the fixed browser-session attributes; generated names and values are cookie-safe base64url. */
-function sessionCookie(name: string, value: string, expiresAt: number, maxAgeSeconds: number): string {
-  return `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`
+function sessionCookie(
+  name: string,
+  value: string,
+  expiresAt: number,
+  maxAgeSeconds: number,
+  secure: boolean,
+): string {
+  const attributes = `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`
+  return secure ? `${attributes}; Secure` : attributes
 }
 
 function signature(secret: Buffer, body: string): Buffer {
   return createHmac('sha256', secret).update(body).digest()
 }
 
-function encodeCookie(payload: BrowserCookiePayload, secret: Buffer): string {
+function encodeCookie(payload: CookiePayload, secret: Buffer): string {
   const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), 'utf8'))
-  return `v1.${body}.${encodeBase64Url(signature(secret, body))}`
+  return `v${payload.version}.${body}.${encodeBase64Url(signature(secret, body))}`
 }
 
-function decodeCookie(value: string, secret: Buffer): BrowserCookiePayload | undefined {
+function decodeCookie(value: string, secret: Buffer): CookiePayload | undefined {
   const parts = value.split('.')
   const [version, body, encodedSignature] = parts
-  if (parts.length !== 3 || version !== 'v1' || body === undefined || encodedSignature === undefined) {
+  if (parts.length !== 3 || (version !== 'v1' && version !== 'v2') || body === undefined || encodedSignature === undefined) {
     return undefined
   }
   const actualSignature = decodeBase64Url(encodedSignature)
@@ -151,11 +180,15 @@ function decodeCookie(value: string, secret: Buffer): BrowserCookiePayload | und
     return undefined
   }
   if (!isRecord(decoded)
-    || decoded.version !== COOKIE_PAYLOAD_VERSION
+    || (decoded.version !== COOKIE_PAYLOAD_VERSION && decoded.version !== 2)
+    || version !== `v${decoded.version}`
     || typeof decoded.authority !== 'string'
-    || !Number.isSafeInteger(decoded.issuedAt)
-    || !Number.isSafeInteger(decoded.expiresAt)) return undefined
-  return decoded as unknown as BrowserCookiePayload
+    || typeof decoded.issuedAt !== 'number' || !Number.isSafeInteger(decoded.issuedAt)
+    || typeof decoded.expiresAt !== 'number' || !Number.isSafeInteger(decoded.expiresAt)) return undefined
+  const payload = { authority: decoded.authority, issuedAt: decoded.issuedAt, expiresAt: decoded.expiresAt }
+  if (decoded.version === COOKIE_PAYLOAD_VERSION) return { version: COOKIE_PAYLOAD_VERSION, ...payload }
+  if (typeof decoded.id !== 'string' || decoded.id.length === 0) return undefined
+  return { version: 2, ...payload, id: decoded.id as PeerId }
 }
 
 async function initializeSecret(credentials: CredentialProvider): Promise<Buffer> {
@@ -180,7 +213,9 @@ async function initializeSecret(credentials: CredentialProvider): Promise<Buffer
 /**
  * Process launch-token exchange and persistent signed-cookie verification.
  * Connection loads the credential provider's signing secret during activation
- * and retains it for synchronous request authentication.
+ * and retains it for synchronous request authentication. Minting expires the
+ * request's other session cookies, so a browser store stays at one cookie per
+ * authority even when the loopback port churns across launches.
  */
 export class BrowserAuth {
   private readonly launchToken: string
@@ -227,20 +262,25 @@ export class BrowserAuth {
   }
 
   /**
-   * Authenticate an index request. A valid root query token mints the cookie
-   * and redirects to the directory-relative clean `./`; a valid cookie lets
+   * Authenticate an index request. A valid root query token mints the cookie —
+   * expiring every other session cookie the request still carries — and
+   * redirects to the directory-relative clean `./`; a valid cookie lets
    * the caller serve the index; every other request receives the same minimal
    * 401 response.
    * @param req - incoming root or configured-index request.
    * @param res - response owned when this method returns false.
+   * @param secure - whether the listener receiving this request serves TLS; the
+   * minted cookie carries `Secure` when it does. Only that listener's own
+   * protocol decides, never a `publicUrl` announcement or a forwarded header:
+   * those describe a hop this process does not terminate.
    * @returns true only when the caller may serve index.html.
    */
-  authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse): boolean {
+  authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse, secure = false): boolean {
     /* v8 ignore next -- node:http always supplies url on server requests. */
     const url = new URL(req.url ?? '/', 'http://dsh.invalid')
     const tokens = url.searchParams.getAll(TOKEN_QUERY)
     if (tokens.length > 0) {
-      const authority = requestAuthority(req.headers)
+      const authority = requestAudience(req.headers, secure)
       if (req.method === 'GET' && url.pathname === '/' && tokens.length === 1
         && authority !== undefined && tokenMatches(tokens.join(''), this.launchToken)) {
         const issuedAt = Date.now()
@@ -255,14 +295,12 @@ export class BrowserAuth {
           'cache-control': 'no-store',
           'location': './',
           'referrer-policy': 'no-referrer',
-          'set-cookie': sessionCookie(
-            cookieName(authority), value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000),
-          ),
+          'set-cookie': this.sessionCookies(authority, value, expiresAt, secure, header(req.headers, 'cookie')),
         })
         res.end()
         return false
       }
-      if (req.method === 'GET' && url.pathname === '/' && this.isAuthenticated(req)) {
+      if (req.method === 'GET' && url.pathname === '/' && this.isAuthenticated(req, secure)) {
         res.writeHead(303, {
           'cache-control': 'no-store',
           'location': './',
@@ -274,29 +312,121 @@ export class BrowserAuth {
       this.writeUnauthorized(req, res)
       return false
     }
-    if (this.isAuthenticated(req)) return true
+    if (this.isAuthenticated(req, secure)) return true
     this.writeUnauthorized(req, res)
     return false
   }
 
   /**
+   * Exchange the launch token for an independent API operator; omitted interactions default to none.
+   * @param req - trusted GET request on /connect with at most one interactions declaration.
+   * @param res - response owned to completion, redirecting to the API mux on success.
+   * @param secure - whether the receiving listener serves TLS.
+   * @param publish - synchronously create the operator before exposing its signed credential.
+   */
+  authorizeConnect(
+    req: ConnectionIndexRequest,
+    res: ConnectionIndexResponse,
+    secure: boolean,
+    publish: (interactions: ConnectionInteractions) => PeerId,
+  ): void {
+    const url = new URL(req.url ?? '/', 'http://dsh.invalid')
+    const declarations = url.searchParams.getAll('interactions')
+    const interactions = declarations[0] ?? 'none'
+    if (declarations.length > 1 || (interactions !== 'answer' && interactions !== 'none')) {
+      res.writeHead(400, { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' })
+      res.end('interactions must be declared once as answer or none\n')
+      return
+    }
+    const tokens = url.searchParams.getAll(TOKEN_QUERY)
+    const authority = requestAudience(req.headers, secure)
+    if (req.method !== 'GET' || url.pathname !== CONNECT_PATH || tokens.length !== 1
+      || authority === undefined || !tokenMatches(tokens.join(''), this.launchToken)) {
+      this.writeUnauthorized(req, res)
+      return
+    }
+    const issuedAt = Date.now()
+    const expiresAt = issuedAt + this.maxAgeMilliseconds
+    const id = publish(interactions)
+    const value = encodeCookie({ version: 2, authority, id, issuedAt, expiresAt }, this.secret)
+    res.writeHead(302, {
+      'cache-control': 'no-store',
+      'location': './api/remote.mux',
+      'referrer-policy': 'no-referrer',
+      'set-cookie': this.sessionCookies(authority, value, expiresAt, secure, header(req.headers, 'cookie')),
+    })
+    res.end()
+  }
+
+  /**
    * Verify the authority-bound browser cookie on a Host request.
    * @param request - request headers carrying Host and Cookie.
+   * @param secure - whether the receiving listener uses TLS, including its default port.
    * @returns true only for an unexpired cookie signed by this activation's loaded secret.
    */
-  isAuthenticated(request: ConnectionTrustRequest): boolean {
-    const authority = requestAuthority(request.headers)
+  isAuthenticated(request: ConnectionTrustRequest, secure = false): boolean {
+    return this.authenticate(request, secure)?.version === COOKIE_PAYLOAD_VERSION
+  }
+
+  /**
+   * Verify an API credential without creating or reviving its operator.
+   * @param request - request headers carrying Host and Cookie.
+   * @param secure - whether the receiving listener uses TLS.
+   * @returns the signed operator id, or undefined for invalid, expired, or browser cookies.
+   */
+  authenticateApi(request: ConnectionTrustRequest, secure = false): PeerId | undefined {
+    const payload = this.authenticate(request, secure)
+    return payload?.version === 2 ? payload.id : undefined
+  }
+
+  /**
+   * Serialize the mint cookie plus one expired cookie per other session-cookie
+   * name the request still carries. Cookies ignore ports, so a browser store
+   * keeps one name per past loopback authority, and those stale cookies would
+   * eventually push every request past the listener's header bound. Each stale
+   * name gets both secure variants of the deletion: deletion must cover both
+   * secure variants or a TLS→HTTP switch cannot clear the stale cookie — a
+   * non-secure Set-Cookie never deletes a Secure-only cookie (RFC 6265bis),
+   * and the request's Cookie header does not reveal which variant the store
+   * holds.
+   * @param authority - the mint cookie's audience.
+   * @param value - signed cookie payload.
+   * @param expiresAt - absolute mint expiry timestamp.
+   * @param secure - whether the minted cookie carries `Secure`.
+   * @param rawCookie - the request's Cookie header, when present.
+   * @returns the Set-Cookie values to write; Node sends the array as repeated
+   * Set-Cookie headers.
+   */
+  private sessionCookies(
+    authority: string,
+    value: string,
+    expiresAt: number,
+    secure: boolean,
+    rawCookie: string | undefined,
+  ): string[] {
+    const name = cookieName(authority)
+    return [
+      sessionCookie(name, value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure),
+      ...staleCookieNames(rawCookie ?? '', name)
+        .flatMap(stale => [
+          sessionCookie(stale, '', 0, 0, secure),
+          sessionCookie(stale, '', 0, 0, !secure),
+        ]),
+    ]
+  }
+
+  private authenticate(request: ConnectionTrustRequest, secure: boolean): CookiePayload | undefined {
+    const authority = requestAudience(request.headers, secure)
     const rawCookie = header(request.headers, 'cookie')
-    if (authority === undefined || rawCookie === undefined) return false
+    if (authority === undefined || rawCookie === undefined) return undefined
     const value = cookieValue(rawCookie, cookieName(authority))
-    if (value === undefined) return false
+    if (value === undefined) return undefined
     const payload = decodeCookie(value, this.secret)
-    if (payload === undefined || payload.authority !== authority) return false
+    if (payload === undefined || payload.authority !== authority) return undefined
     const now = Date.now()
-    return payload.issuedAt <= now
-      && payload.expiresAt > now
-      && payload.expiresAt > payload.issuedAt
-      && payload.expiresAt - payload.issuedAt <= this.maxAgeMilliseconds
+    if (payload.issuedAt > now || payload.expiresAt <= now || payload.expiresAt <= payload.issuedAt
+      || payload.expiresAt - payload.issuedAt > this.maxAgeMilliseconds) return undefined
+    return payload
   }
 
   private writeUnauthorized(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {

@@ -1,7 +1,9 @@
 /**
  * Behaviour of the wiki browser routes: the six exact Fetch routes the
- * Knowledge page calls, dispatched through the real Connection registry against
- * a real vault on disk, together with the request validation each route owns.
+ * Knowledge page calls, dispatched through a recording Connection registry
+ * against a real vault on disk, together with the request validation each route
+ * owns. The real WebServer and Connection composition is the composition
+ * suite's case; this one answers what each route does with its body.
  */
 
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -10,7 +12,7 @@ import { join } from 'node:path'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { apply as connectionApply, inject as connectionInject } from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import WikiVaultService from '../src/index.ts'
 import * as web from '../src/web.ts'
@@ -19,16 +21,13 @@ import type { WikiFrontmatter, WikiPagePath, WikiSourcePath } from '../src/types
 /** Every route this plugin owns, named as its endpoint below `/api/prism-wiki`. */
 const ROUTES = ['list', 'read', 'search', 'save', 'source', 'lint'] as const
 
-/** The browser-session signing secret Connection stores on its first activation. */
-const BROWSER_SESSION_SECRET = Buffer.alloc(32, 7).toString('base64url')
-
 /** One route answer as the Knowledge page receives it. */
 interface Answer {
   readonly status: number
   readonly body: Record<string, unknown>
 }
 
-/** The mounted deployment: the real Connection registry, the vault, and the browser half. */
+/** The mounted deployment: the recording registry, the vault, and the browser half. */
 interface WebHarness {
   readonly webFiber: Fiber
   /** Send one request body to a wiki route and read its envelope. */
@@ -76,37 +75,42 @@ afterEach(async () => {
 })
 
 /**
- * Mount the vault service and the browser half over the real Connection fetch
- * registry, then seed the vault every case reads.
+ * Mount the vault service and the browser half over a recording Connection
+ * registry, then seed the vault every case reads. A recording registry keeps
+ * this suite about route behaviour; the real service is the composition suite's
+ * case.
  * @param vaultRoot - the temp vault directory the service owns.
  * @returns the mounts a case drives and disposes.
  */
 async function webHarness(vaultRoot: string): Promise<WebHarness> {
   const ctx = new Context()
   roots.push(ctx)
-  // Connection loads its browser-session signing secret from the credential
-  // provider and mounts its `/api` route on the Web server. Neither carrier
-  // takes part in dispatch through the exact Fetch registry this suite uses.
-  ctx.provide('credentials', {
-    modifyRecord: async () => ({
-      kind: 'grant',
-      payload: { version: 1, secret: BROWSER_SESSION_SECRET },
-    }),
+  const routes = new Map<string, ConnectionFetchRoute>()
+  ctx.provide('connection', {
+    fetch: {
+      register: (route: ConnectionFetchRoute) => {
+        routes.set(route.path, route)
+        return async () => { routes.delete(route.path) }
+      },
+    },
   })
+  // The row declares `webServer` because Connection's registries resolve
+  // services through the caller's context; the stub only has to exist.
   ctx.provide('webServer', { register: () => () => {} })
-  await ctx.plugin({ inject: [...connectionInject], apply: connectionApply })
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(WikiVaultService, { vaultRoot })
   await seed(ctx)
   const webFiber = ctx.plugin({ name: web.name, inject: [...web.inject], apply: web.apply })
   await webFiber
-  const shared = ctx.connection.createSharedFetchHandler('/api')
-  const send = async (endpoint: string, body: string): Promise<Response> =>
-    await shared.fetch(new Request(`http://127.0.0.1/api/prism-wiki/${endpoint}`, {
+  const send = async (endpoint: string, body: string): Promise<Response> => {
+    const route = routes.get(`/api/prism-wiki/${endpoint}`)
+    if (route === undefined) return new Response(null, { status: 404 })
+    return await route.fetch(new Request(`http://127.0.0.1/api/prism-wiki/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
     }))
+  }
   return {
     webFiber,
     send,

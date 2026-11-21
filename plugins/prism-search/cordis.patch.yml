@@ -1,0 +1,8 @@
+# The Prism Search row: one Host service that registers a keyless `ctx.web`
+# search provider. The browser half joins the client roster through the
+# package's `dsh.client` manifest, so the row name must stay the bare package
+# name the profile can resolve. It needs the web seam it contributes to.
+- insert:
+    - id: prism-search
+      name: '@prism/prism-search'
+      inject: [web]

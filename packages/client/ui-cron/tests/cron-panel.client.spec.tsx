@@ -65,12 +65,18 @@ interface CommandMocks {
   runNow: MockedFunction<CronPanelProps['runNow']>
 }
 
+/** One builder per command: the panel's command signatures differ per verb, so each stub is the concrete mock its own seat member takes. */
+const stubBuilders: { [Name in keyof CommandMocks]: () => CommandMocks[Name] } = {
+  create: () => vi.fn<CronPanelProps['create']>(async () => null),
+  update: () => vi.fn<CronPanelProps['update']>(async () => null),
+  setEnabled: () => vi.fn<CronPanelProps['setEnabled']>(async () => null),
+  remove: () => vi.fn<CronPanelProps['remove']>(async () => null),
+  runNow: () => vi.fn<CronPanelProps['runNow']>(async () => null),
+}
+
 /** One command stub answering success until a case scripts a refusal. */
 function commandMock<Name extends keyof CommandMocks>(name: Name): CommandMocks[Name] {
-  void name
-  // The panel's command signatures differ per verb, so the stub is created with
-  // the bare argument list this spec drives and published as the seat's own type.
-  return vi.fn(async () => null) as unknown as CommandMocks[Name]
+  return stubBuilders[name]()
 }
 
 function props(snapshot: CronSnapshot, overrides: Partial<CommandMocks> = {}): CronPanelProps {

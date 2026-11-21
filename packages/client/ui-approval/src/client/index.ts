@@ -1,23 +1,41 @@
-/** Browser approval consumer over the existing scoped Remote Event waterfall. */
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5).
+/**
+ * Browser approval consumer over the existing scoped Remote Event waterfall,
+ * presenting one request in two places: the composer takeover of the Session
+ * that asked, and the second line of that Session's row in the sidebar. A
+ * placement preference decides which of the two carries the decisions.
+ */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { PendingInteractionPublisher } from '@deepseek-ai/dsh-client-ui-session/client'
+// Type-only: pulls the row seat this package registers its occupant into.
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TypertClientEventListener } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { ApprovalCard } from './ApprovalCard.tsx'
 import { ApprovalPanel } from './ApprovalPanel.tsx'
+import { ApprovalPlacementRow } from './ApprovalPlacementRow.tsx'
+import { RowApproval } from './RowApproval.tsx'
+import type { ApprovalInjected, ApprovalRowInjected } from './contract/slots.ts'
 import { PendingApproval } from './contract/slots.ts'
-import { en, zh } from './locales.ts'
+import { approvalPlacementSource, writeApprovalPlacement } from './placement.ts'
+import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 
 export type {
+  ApprovalCardInput,
   ApprovalComposerProps,
   ApprovalDecision,
   ApprovalDetailOwnerProps,
   ApprovalPresentationRequest,
+  ApprovalRowInjected,
+  ApprovalRowProps,
   PendingApproval,
 } from './contract/slots.ts'
+export type { ApprovalPlacement } from './placement.ts'
 export type { ApprovalKey } from './locales.ts'
 
 /** Required services: Agent scopes, Remote Events, Session UI, Slot registry, and copy. */
@@ -47,6 +65,7 @@ async function answerApproval(
       ? {}
       : { callId: request.callId }),
     ...(request.reason === undefined ? {} : { reason: request.reason }),
+    ...(request.displayReason === undefined ? {} : { displayReason: request.displayReason }),
     ...(request.signal === undefined ? {} : { signal: request.signal }),
   })
   const completed = Promise.withResolvers<void>()
@@ -73,20 +92,59 @@ async function answerApproval(
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-approval: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-approval: dictionaries')
+  ctx.inject(['shortcuts'], (scope) => {
+    const t = ctx.locale.bind(NS)
+    scope.effect(() => scope.shortcuts.registerFixed({
+      id: 'approval.allow' as ShortcutCommandId, label: () => t('allow'), keys: ['Enter'], bindings: [{ code: 'Enter', modifiers: [] }], group: 'approval',
+    }), 'ui-approval: fixed allow reference')
+    scope.effect(() => scope.shortcuts.registerFixed({
+      id: 'approval.reject' as ShortcutCommandId, label: () => t('reject'), keys: ['Esc'], bindings: [{ code: 'Escape', modifiers: [] }], group: 'approval',
+    }), 'ui-approval: fixed reject reference')
+  })
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingApproval>(
     () => 0,
   )
+  // Both presentations resolve requester-owned copy the same way.
+  const approvalInjected = (): ApprovalInjected => ({
+    resolveReason: (reason: NonNullable<PendingApproval['displayReason']>) => ctx.locale.resolveText(reason),
+  })
+  // One source per registration would also work; sharing one instance keeps the
+  // renderer's hook cache keyed on a single identity for the whole plugin.
+  const placement = approvalPlacementSource()
+  const rowApprovalInjected = (): ApprovalRowInjected => ({
+    ...approvalInjected(),
+    hooks: { placement },
+  })
+  ctx.slots.registerFactory({
+    name: 'conversation.approval.card', scope: 'session', locale: NS,
+    children: { 'conversation.approval.detail': { kind: 'single', scope: 'session' } },
+  }, ApprovalCard)
   ctx.slots.inject('conversation.composer', () => ctx.slots.register({
     name: 'conversation.composer',
     priority: 1,
     select: ({ pendingInteraction }: ComposerChainProps): PendingApproval | null =>
       pendingInteraction instanceof PendingApproval ? pendingInteraction : null,
     locale: NS,
-    children: {
-      'conversation.approval.detail': { kind: 'single', scope: 'session' },
-    },
+    inject: approvalInjected,
   }, ApprovalPanel))
+  // The same request answered from its Session row: the occupant reads it from
+  // the Session status snapshot, so it works while another Session is open.
+  ctx.slots.inject('sidebar.workspaces.session.pending', () => ctx.slots.register({
+    name: 'sidebar.workspaces.session.pending',
+    id: 'approval.pending',
+    locale: NS,
+    inject: rowApprovalInjected,
+  }, RowApproval))
+  // General settings carries the same preference, for readers who never open
+  // the Progress panel's header.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'approval-placement',
+    order: 160,
+    locale: NS,
+    inject: () => ({ hooks: { placement }, setPlacement: writeApprovalPlacement }),
+  }, ApprovalPlacementRow))
   ctx.remote.$on('approval/request', function (request, next) {
     return answerApproval(ctx, this, request, next, registerPendingInteraction)
   })

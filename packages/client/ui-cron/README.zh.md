@@ -7,18 +7,18 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 `dsh-client-ui-cron` 在一个会话头部控件中显示本部署的定时任务。每行给出 Cron 规则、其 IANA 时区、该时区下的下次触发时间以及是否启用；一行可以被编辑、启用或停用、在二次确认后删除、立即运行一次，其最近运行结果就地展开。该面板是可选组件——Web bundle 以停用状态发布它，Cron overlay 与 Host 能力一同启用它。
 
-## Table of Contents
+## 目录
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -89,7 +89,7 @@ kind: "package-reference"
 - **没有分页或过滤。** 所有已存任务渲染在一个列表中，这对靠手工排布的部署规模足够，对更大规模则不够。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
 <summary>供维护者的工作上下文 — 点击展开</summary>

@@ -1,5 +1,7 @@
 # Agentic Benchmark Evidence
 
+English | [中文](README.zh.md)
+
 This directory is reserved for sanitized, immutable Agentic Benchmark result
 snapshots that have passed the repository's offline validation and separate
 publication approval.

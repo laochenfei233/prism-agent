@@ -8,7 +8,7 @@
  * denied write leaves no file on disk.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,6 +49,7 @@ beforeEach(async ({ onTestFinished }) => {
   await mkdir(outside)
 })
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await fiber?.dispose()
 })
 
@@ -90,6 +91,18 @@ describe('read-only', () => {
 
 describe('workspace-write containment', () => {
   beforeEach(() => boot('workspace-write'))
+
+  it('rejects an extra directory replaced by a symlink to an ungranted sibling', async () => {
+    const extra = join(workspace, 'extra')
+    await mkdir(extra)
+    const policy = { mode: 'workspace-write' as const, workspaceRoot: workspace, additionalWritableRoots: [extra] }
+    await fs.writeText(await target(join(extra, 'before.txt')), 'allowed', undefined, undefined, policy)
+    await rm(extra, { recursive: true })
+    await symlink(outside, extra, 'dir')
+    await expect(fs.writeText(await target(join(outside, 'escape.txt')), 'denied', undefined, undefined, policy))
+      .rejects.toMatchObject({ code: 'SANDBOX_INVALID_ROOT' })
+    expect(existsSync(join(outside, 'escape.txt'))).toBe(false)
+  })
 
   it('a write under the workspace lands', async () => {
     const path = join(workspace, 'nested', 'ok.txt')
@@ -191,6 +204,52 @@ describe('workspace-write with the filesystem root as the workspace (a root endi
   })
 })
 
+describe('workspace-write harness-home fence', () => {
+  /** A harness home nested inside the workspace, which workspace-write would otherwise allow. */
+  async function homeInsideWorkspace(): Promise<string> {
+    const home = join(workspace, '.prism')
+    await mkdir(home, { recursive: true })
+    vi.stubEnv('DSH_HOME', home)
+    return home
+  }
+
+  it('refuses a write under the harness home', async () => {
+    const home = await homeInsideWorkspace()
+    await boot('workspace-write')
+    const patch = join(home, 'cordis.patch.yml')
+    await expect(fs.writeText(await target(patch), '- insert: []')).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(existsSync(patch)).toBe(false)
+  })
+
+  it('refuses an edit of an existing home file, leaving it unchanged', async () => {
+    const home = await homeInsideWorkspace()
+    const patch = join(home, 'cordis.patch.yml')
+    await writeFile(patch, 'original')
+    await boot('workspace-write')
+    await expect(fs.editText(await target(patch), { oldString: 'original', newString: 'changed', replaceAll: false }))
+      .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(await readFile(patch, 'utf8')).toBe('original')
+  })
+
+  it('still reads the harness home and writes workspace siblings', async () => {
+    const home = await homeInsideWorkspace()
+    await writeFile(join(home, 'AGENTS.md'), 'read me')
+    await boot('workspace-write')
+    expect(await fs.readText(await target(join(home, 'AGENTS.md')))).toBe('read me')
+    const sibling = join(workspace, 'sibling.txt')
+    await fs.writeText(await target(sibling), 'ok')
+    expect(await readFile(sibling, 'utf8')).toBe('ok')
+  })
+
+  it('an approved danger-full-access policy may write the home', async () => {
+    const home = await homeInsideWorkspace()
+    await boot('danger-full-access')
+    const patch = join(home, 'cordis.patch.yml')
+    await fs.writeText(await target(patch), '- insert: []')
+    expect(await readFile(patch, 'utf8')).toBe('- insert: []')
+  })
+})
+
 describe('danger-full-access', () => {
   beforeEach(() => boot('danger-full-access'))
 
@@ -239,5 +298,40 @@ describe('FsError identity', () => {
     const error = await fs.writeText(await target(join(workspace, 'x.txt')), 'x').catch((e: unknown) => e)
     expect(error).toBeInstanceOf(FsError)
     expect((error as FsError).code).toBe('FS_SANDBOX_DENIED')
+  })
+})
+
+describe('patch, delete, and move fences', () => {
+  it.each(['read-only', 'workspace-write', 'danger-full-access'] as const)('fences every new mutation under %s', async (mode) => {
+    await boot(mode)
+    const sourcePath = join(workspace, 'source')
+    const outsidePath = join(outside, 'file')
+    await writeFile(sourcePath, 'source\n')
+    await writeFile(outsidePath, 'outside\n')
+    const source = await target(sourcePath)
+    const out = await target(outsidePath)
+    const patch = [{ lineNumber: 3, oldLines: ['source'], newLines: ['patched'], isEndOfFile: false }]
+    if (mode === 'read-only') {
+      await expect(fs.patchText(source, patch)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      await expect(fs.deleteFile(source)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      await expect(fs.moveFile(source, out, {})).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      expect(await readFile(sourcePath, 'utf8')).toBe('source\n')
+    } else if (mode === 'workspace-write') {
+      await expect(fs.moveFile(source, out, {})).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      await expect(fs.moveFile(out, source, {})).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      await expect(fs.patchText(out, [])).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      await expect(fs.deleteFile(out)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+      expect(await readFile(sourcePath, 'utf8')).toBe('source\n')
+      expect(await readFile(outsidePath, 'utf8')).toBe('outside\n')
+      expect(await fs.patchText(source, patch)).toMatchObject({ after: 'patched\n' })
+      const destination = await target(join(workspace, 'moved'))
+      expect(await fs.moveFile(source, destination, {})).toMatchObject({ sourceDeleted: true })
+      expect(await fs.deleteFile(destination)).toEqual({ before: 'patched\n' })
+    } else {
+      expect(await fs.patchText(source, patch)).toMatchObject({ after: 'patched\n' })
+      expect(await fs.moveFile(source, out, {})).toMatchObject({ sourceDeleted: true })
+      expect(await readFile(outsidePath, 'utf8')).toBe('patched\n')
+      expect(await fs.deleteFile(out)).toEqual({ before: 'patched\n' })
+    }
   })
 })

@@ -10,7 +10,7 @@ Status: proposed
 
 ## 提案
 
-将这些候选与[一期更新设计](2026-09-08-desktop-update-policy-and-installation.zh.md)分开。它们不是一期验收要求，也不授权修改依赖；实现前需要产品批准与平台验证。[强制更新接口](2026-09-08-desktop-mandatory-update-api.zh.md)继续独立，自动安装不向其中增加安装器字段。
+将这些候选与一期更新设计分开。它们不是一期验收要求，也不授权修改依赖；实现前需要产品批准与平台验证。[强制更新接口](2026-09-08-desktop-mandatory-update-api.zh.md)继续独立，自动安装不向其中增加安装器字段。
 
 ### 独立修订
 
@@ -34,7 +34,7 @@ Status: proposed
 | 稳定版 | `latest.yml` / `latest-mac.yml` | 仅稳定版本 |
 | Nightly | `nightly.yml` / `nightly-mac.yml` | alpha、rc 和稳定版本 |
 
-[一期发布规则](2026-09-08-desktop-update-policy-and-installation.zh.md)在共用稳定版本出现时增加稳定 feed，不切换固定 Nightly 客户端。面向用户的稳定版订阅与选择器仍延后。启用后持久化所选通道，不从已安装版本反推。设置 updater 通道时保持 `allowDowngrade = false`。从 Nightly 切到稳定版时，较高的已安装 Nightly 持续运行，直到出现更高稳定版；不得降级 Desktop 或内置 dsh。
+一期发布规则在共用稳定版本出现时增加稳定 feed，不切换固定 Nightly 客户端。面向用户的稳定版订阅与选择器仍延后。启用后持久化所选通道，不从已安装版本反推。设置 updater 通道时保持 `allowDowngrade = false`。从 Nightly 切到稳定版时，较高的已安装 Nightly 持续运行，直到出现更高稳定版；不得降级 Desktop 或内置 dsh。
 
 切换通道可以立即检查，下载行为必须遵循获准设置。忽略旧通道响应，安装前按新通道重新确认已下载产物。通道改变不能在缺少新条件有效策略响应时解除强制阻断。选择器下方常驻 Nightly 说明，候选中文为“提前体验新功能，版本可能不稳定。”；选择稳定版后隐藏，必要时另行说明需等待更高稳定版。
 

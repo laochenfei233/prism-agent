@@ -104,6 +104,28 @@ describe('protocolOf', () => {
     expect(protocolOf('/a/b.txt')).toBeUndefined()
     expect(protocolOf('')).toBeUndefined()
   })
+
+  it('reads the protocol from the address text where the engine leaves the host empty', () => {
+    // The WebView2 runtime behind the Desktop shell (Chromium 132) folds a
+    // non-special scheme's authority into the path, so `hostname` is empty for
+    // every `dsh-resource://` address there. Without the text fallback the
+    // address would name no protocol, its record would stay `none`, and the
+    // panel would report a missing service while the provider is registered.
+    const nativeUrl = globalThis.URL
+    class HostlessUrl extends nativeUrl {
+      override get hostname(): string { return '' }
+    }
+    Object.defineProperty(globalThis, 'URL', { value: HostlessUrl, configurable: true, writable: true })
+    try {
+      expect(protocolOf('dsh-resource://file/session/s1/home/ys/b.txt')).toBe('file')
+      expect(protocolOf('DSH-RESOURCE://File/session/s1/a')).toBe('file')
+      expect(protocolOf('dsh-resource:///no-host')).toBeUndefined()
+      expect(protocolOf('sidebar://guide')).toBeUndefined()
+      expect(protocolOf('')).toBeUndefined()
+    } finally {
+      Object.defineProperty(globalThis, 'URL', { value: nativeUrl, configurable: true, writable: true })
+    }
+  })
 })
 
 describe('ResourceRegistry providers', () => {

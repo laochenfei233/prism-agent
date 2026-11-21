@@ -30,7 +30,7 @@ kind: "package-bundle"
 把 tarball 安装到基于 base 的 DSH profile，然后重启该 profile：
 
 ```sh
-dsh plugin --profile <profile> add /absolute/path/to/prism-prism-meeting-0.1.0.tgz
+dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
 dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
@@ -85,11 +85,9 @@ patch 条目会整体替换目标行的 `config` 而不是合并进去，后续 
 <a id="further-exploration"></a>
 ## 进一步探索
 
-- 会议子系统 —— 记录词汇、录音生命周期、服务语义和浏览器接口（文档位于会议线）。
-- [语音转文字](../../speech/speech-to-text/README.md) —— `ctx.meetingMinutes` 解析的识别接缝。
+- [语音转文字](../../packages/experimental/speech-to-text/README.zh.md) —— `ctx.meetingMinutes` 解析的识别接缝。
 - [生成的工具目录](../../docs/tool-catalog.zh.md) —— 模型看到的精确 schema。
-- [生成的组合图](../../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
-- [Prism 包分组](../../packages/prism/README.zh.md) —— 其他 Prism 能力面。
+- [生成的组合图](../../apps/cli/composition.md) —— 随包发布的 profile 如何解析这些行。
 
 -----
 

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for upstream-resync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-resync.md
+/:
+  en: a6cf0dd1fccc4534
+  zh: aa76efae9213aa9c
+/upstream-resync-dsh-0-2-x:
+  en: c2c093d8e73d102e
+  zh: bffcb47458648fee
+/upstream-resync-dsh-0-2-x/report:
+  en: 77c9236e55896be8
+  zh: 96a30fea8641e7f1
+/upstream-resync-dsh-0-2-x/s1-problem:
+  en: 184240909e866c70
+  zh: 0470cf7dde2cdc73
+/upstream-resync-dsh-0-2-x/s2-design:
+  en: af21ec5c34482db3
+  zh: 2112ecffadebca14
+/upstream-resync-dsh-0-2-x/s3-scope:
+  en: c2f2af5dc1794021
+  zh: dd579146c3a27b24
+/upstream-resync-dsh-0-2-x/tasks:
+  en: 357641fbf39fac4d
+  zh: 5a5a44d27be234e8
+/upstream-resync-dsh-0-2-x/s4-acceptance:
+  en: 8694a0d781db1761
+  zh: 19b25f3eb1251efc

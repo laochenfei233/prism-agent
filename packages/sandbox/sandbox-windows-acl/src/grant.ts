@@ -12,7 +12,7 @@
  * @module @deepseek-ai/dsh-sandbox-windows-acl/grant
  */
 
-import { grantWrite, revokeWrite } from './acl.ts'
+import { grantWrite, denyWrite, revokeWrite } from './acl.ts'
 import { allocPtrSlot, decodePtr, isNullPtr, throwLastError, win32Sync } from './ffi.ts'
 import type { NativePtr, Win32Bindings } from './ffi.ts'
 import { makeWellKnownSid } from './token.ts'
@@ -105,6 +105,17 @@ export class AclWriteGrant {
   add(path: string, standing = false): void {
     ;(standing ? this.standingPaths : this.revocablePaths).push(path)
     grantWrite(this.api, path, this.sidPtr, this.lowLabelSidPtr, this.worldSidPtr)
+  }
+
+  /**
+   * Deny this grant's SID every right {@link add} confers at `path`, inheriting
+   * to the subtree. The workspace identity owns one standing grant; a home
+   * inside it must stay unreachable, and Windows evaluates the deny ACE before
+   * the inherited allow. Standing like the grant it narrows.
+   * @param path - the directory to pin against the capability SID.
+   */
+  deny(path: string): void {
+    denyWrite(this.api, path, this.sidPtr)
   }
 
   /** Every directory currently carrying the grant, in grant order. */

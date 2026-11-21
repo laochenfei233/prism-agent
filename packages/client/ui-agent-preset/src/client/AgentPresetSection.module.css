@@ -18,43 +18,6 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.pickerPreference {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 14px 16px;
-  border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 14px;
-  background: var(--dsw-alias-bg-module-platform);
-}
-
-.pickerPreferenceCopy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.pickerPreferenceTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.pickerPreferenceTitle {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.pickerPreferenceDescription {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--dsw-alias-label-tertiary);
-}
-
 /* Cards, not rows: a preset is a thing you pick, and the description is the
    part that tells them apart — a row would bury it beside the actions. */
 .group {
@@ -89,17 +52,19 @@
 }
 
 .card {
-  border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 20px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-xl);
   display: flex;
   flex-direction: column;
-  background: transparent;
+  background: var(--dsw-alias-settings-card-fill);
   transition: border-color .16s, background .16s;
 }
 
 
-.card:hover:not(.cardActive):not(.cardSelectionDisabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .card:hover:not(.cardActive) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* The default preset reads as selected exactly like the Appearance cubes:
@@ -112,22 +77,16 @@
 
 /* Mode selection is off, not the preset itself: mute only the selectable
    body while the independent view/copy/location actions stay fully usable. */
-.cardSelectionDisabled {
-  background: var(--dsw-alias-bg-module-platform);
-}
-
-.cardSelectionDisabled .cardMain {
-  opacity: 0.48;
-}
-
 /* A broken preset reads as damaged before anything else: the card cannot be
    picked, so its border carries the warning the disabled body cannot. */
 .cardBroken {
   border-color: var(--dsw-alias-state-error-primary);
 }
 
-.cardBroken:hover {
-  border-color: var(--dsw-alias-state-error-primary);
+@media (hover: hover) {
+  .cardBroken:hover {
+    border-color: var(--dsw-alias-state-error-primary);
+  }
 }
 
 .brokenBadge {
@@ -155,7 +114,7 @@
   width: max-content;
   max-width: 100%;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-label-primary);
   color: var(--dsw-alias-bg-layer-3);
   font-size: 11px;
@@ -172,9 +131,14 @@
 /* Focusing the card reveals it too: a broken card keeps its place in the tab
    order (`aria-disabled`, not `disabled`), so this is the keyboard path to a
    reason the card face no longer shows. */
-.brokenBadge:hover .brokenTip,
 .cardMain:focus-visible .brokenTip {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .brokenBadge:hover .brokenTip {
+    opacity: 1;
+  }
 }
 
 .cardMain[aria-disabled='true'] {
@@ -182,7 +146,7 @@
 }
 
 .cardMain:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
 }
 
@@ -200,6 +164,18 @@
   white-space: nowrap;
 }
 
+@media (hover: none) {
+  .cardBrokenReason {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
 /* The card body is the control that picks the preset. */
 .cardMain {
   flex: 1;
@@ -214,7 +190,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px 16px 12px;
-  border-radius: 12px 12px 0 0;
+  border-radius: var(--dsw-radius-xl) var(--dsw-radius-xl) 0 0;
 }
 
 .cardMain:disabled {
@@ -222,7 +198,7 @@
 }
 
 .cardMain:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
 }
 
@@ -275,6 +251,12 @@
   overflow-wrap: anywhere;
 }
 
+@media (pointer: coarse) {
+  .cardDesc {
+    -webkit-line-clamp: unset;
+  }
+}
+
 .cardId {
   flex-shrink: 0;
   max-width: 35%;
@@ -312,9 +294,14 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.helpButton:hover,
 .helpButton:focus-visible {
   color: var(--dsw-alias-label-primary);
+}
+
+@media (hover: hover) {
+  .helpButton:hover {
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 /* Icon-only actions: the label rides `data-tip` so the row stays quiet until
@@ -323,7 +310,7 @@
   position: relative;
   appearance: none;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--dsw-radius-sm);
   padding: 6px;
   background: none;
   color: var(--dsw-alias-label-tertiary);
@@ -332,13 +319,15 @@
   align-items: center;
 }
 
-.iconButton:hover {
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
+@media (hover: hover) {
+  .iconButton:hover {
+    background: var(--dsw-alias-bg-layer-1);
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .iconButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -1px;
 }
 
@@ -349,7 +338,7 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-label-primary);
   color: var(--dsw-alias-bg-layer-3);
   font-size: 11px;
@@ -360,9 +349,14 @@
   transition: opacity .12s;
 }
 
-.iconButton:hover::after,
 .iconButton:focus-visible::after {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .iconButton:hover::after {
+    opacity: 1;
+  }
 }
 
 .dialog {
@@ -376,7 +370,7 @@
   max-height: min(60vh, 560px);
   overflow: auto;
   border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-secondary);
   font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -406,7 +400,7 @@
   gap: 6px;
   height: 44px;
   border: 1px dashed var(--dsw-alias-border-l3);
-  border-radius: 20px;
+  border-radius: var(--dsw-radius-lg);
   font: inherit;
   font-size: 14px;
   line-height: 22px;
@@ -415,8 +409,10 @@
   cursor: pointer;
 }
 
-.creatorButton:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .creatorButton:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .creatorButton:disabled {

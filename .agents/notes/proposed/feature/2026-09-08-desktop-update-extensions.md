@@ -10,7 +10,7 @@ Frequent releases may eventually benefit from independently revised Desktop pack
 
 ## Proposal
 
-Keep these candidates separate from the [initial update design](2026-09-08-desktop-update-policy-and-installation.md). None is an initial acceptance requirement or authorization to change dependencies. Product approval and platform qualification are required before implementation. The [mandatory-update API](2026-09-08-desktop-mandatory-update-api.md) remains independent; automatic installation does not add installer fields to it.
+Keep these candidates separate from the initial update design. None is an initial acceptance requirement or authorization to change dependencies. Product approval and platform qualification are required before implementation. The [mandatory-update API](2026-09-08-desktop-mandatory-update-api.md) remains independent; automatic installation does not add installer fields to it.
 
 ### Independent revisions
 
@@ -34,7 +34,7 @@ Do not use `0.1.3-dsk.1` to repair stable `0.1.3`: SemVer orders it below the st
 | Stable | `latest.yml` / `latest-mac.yml` | Stable only |
 | Nightly | `nightly.yml` / `nightly-mac.yml` | Alpha, rc, and stable |
 
-The [initial publication rule](2026-09-08-desktop-update-policy-and-installation.md) adds the stable feed when shared stable releases exist, without switching fixed-Nightly clients. A user-facing stable subscription and selector remain deferred. If enabled, persist the selected channel; never infer it from the installed version. Preserve `allowDowngrade = false` when assigning the updater channel. Moving from Nightly to stable keeps a higher installed Nightly until a higher stable version exists, without downgrading Desktop or bundled dsh.
+The initial publication rule adds the stable feed when shared stable releases exist, without switching fixed-Nightly clients. A user-facing stable subscription and selector remain deferred. If enabled, persist the selected channel; never infer it from the installed version. Preserve `allowDowngrade = false` when assigning the updater channel. Moving from Nightly to stable keeps a higher installed Nightly until a higher stable version exists, without downgrading Desktop or bundled dsh.
 
 Channel switching may immediately check; download behavior must follow the approved setting. Ignore old-channel responses and reconfirm downloaded artifacts against the new channel before installation. A channel change does not clear mandatory blocking without a valid policy response for the new conditions. Display a persistent Nightly explanation under the selector, with candidate Chinese copy “提前体验新功能，版本可能不稳定。”; hide it after selecting stable, while separately explaining any wait for a higher stable version.
 

@@ -39,7 +39,16 @@
       "path": "../ui-session"
     },
     {
+      "path": "../ui-settings/tsconfig.client.json"
+    },
+    {
       "path": "../ui-slots"
+    },
+    {
+      "path": "../ui-workspace"
+    },
+    {
+      "path": "../shortcuts/tsconfig.client.json"
     }
   ]
 }

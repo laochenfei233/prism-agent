@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
  * The workspace/session browsing region filling the sidebar shell's
  * `sidebar.workspaces` hole: section header (title + view options + add
@@ -16,27 +17,30 @@
  */
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
-  Button, IconArchiveCheckOutlineRegular, IconArchiveOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
-  IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
-  IconWorkspaceTreeOutlineRegular, Menu, Modal, Tooltip,
+  AnimatedRows, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
+  IconChecklistOutlineRegular, IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
+  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular, IconLikeFillRegular,
+  IconListPenOutlineRegular, IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
+  IconWorkspaceTreeOutlineRegular, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SessionListState, SessionSearchResultItem,
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import { type AnnotationFilter, NO_ANNOTATIONS, type SessionAnnotation } from '../annotations.ts'
+import type { BatchAction, WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
+  deriveFlat, deriveGroups, deriveSearchResults, filteredSessionIds, orderByPriority, orderByRecency, owningGroupKey,
+  owningParentFolder, pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
-import { AnimatedRows } from './AnimatedRows.tsx'
+import { BatchActionsToolbar } from './BatchActions.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
@@ -50,22 +54,58 @@ const EXPAND_SLIDE_MS = 300
 const SEARCH_DEBOUNCE_MS = 250
 /** `session.search` wire bound, measured in JavaScript UTF-16 code units. */
 const SEARCH_QUERY_MAX_CODE_UNITS = 500
-/** Idle Session rows visible per Workspace before the local overflow control. */
-const COLLAPSED_SESSION_LIMIT = 5
+/** Non-blank Session rows visible per Workspace while no Session raises its watermark. */
+const SESSION_WATERMARK_BASE = 5
+/** Highest watermark that attention-bearing Sessions raise automatically; Show more and search reveals may exceed it. */
+const SESSION_WATERMARK_AUTO_MAX = 50
 
-/** Keep provisional and running rows outside the idle-session quota, including parents with running children. */
-function collapsedSessionRows(sessions: readonly SessionNode[], limit = COLLAPSED_SESSION_LIMIT): {
+/** Show the blank row plus the first `watermark` non-blank rows, in list order. */
+function watermarkRows(sessions: readonly SessionNode[], watermark: number): {
   rows: readonly SessionNode[]
   hiddenCount: number
 } {
-  let idleCount = 0
+  let count = 0
   const rows = sessions.filter((session) => {
-    if (session.blank || session.running || session.runningSubagentCount > 0) return true
-    if (idleCount >= limit) return false
-    idleCount += 1
-    return true
+    if (session.blank) return true
+    count += 1
+    return count <= watermark
   })
   return { rows, hiddenCount: sessions.length - rows.length }
+}
+
+/**
+ * Smallest watermark that covers every non-blank row within the automatic maximum that is running, has a running
+ * child, awaits the user, carries an unread completion, or is current, and the reveal target at any position.
+ */
+function requiredWatermark(
+  sessions: readonly SessionNode[],
+  current: SessionId | undefined,
+  revealSessionId: SessionId | undefined,
+): number {
+  let index = 0
+  let required = 0
+  for (const session of sessions) {
+    if (session.blank) continue
+    index += 1
+    const attention = index <= SESSION_WATERMARK_AUTO_MAX && (
+      session.running || session.runningSubagentCount > 0 || session.pendingInteraction !== undefined
+      || session.completed || session.id === current
+    )
+    if (attention || session.id === revealSessionId) required = index
+  }
+  return required
+}
+
+/** Raise each listed group's watermark to its requirement; returns `marks` itself when nothing rises. */
+function raiseWatermarks(
+  marks: Readonly<Record<string, number>>,
+  required: ReadonlyMap<string, number>,
+): Readonly<Record<string, number>> {
+  let raised = marks
+  for (const [key, watermark] of required) {
+    if (watermark > (raised[key] ?? SESSION_WATERMARK_BASE)) raised = { ...raised, [key]: watermark }
+  }
+  return raised
 }
 
 /** Keep controlled input and RPC payload inside the session.search wire contract. */
@@ -101,14 +141,19 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
-/** Grouping, ordering, and archived-filter menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
+/** Grouping, ordering, and both filter menus; own open state so it resets with the wide chrome. */
+function ViewOptionsMenu({
+  groupBy, orderBy, archivedFilter, annotationFilter,
+  onGroupPick, onOrderPick, onArchivedFilterPick, onAnnotationFilterPick, t,
+}: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   archivedFilter: ArchivedFilter
+  annotationFilter: AnnotationFilter
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
   onArchivedFilterPick: (filter: ArchivedFilter) => void
+  onAnnotationFilterPick: (filter: AnnotationFilter) => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
@@ -125,24 +170,33 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
         { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
+        { id: 'priority', label: t('orderBy.priority'), icon: <IconChecklistOutlineRegular /> },
         { type: 'separator' as const, id: 'archived-filter-separator' },
         { type: 'label' as const, id: 'filter-by', text: t('filterBy.label') },
-        { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconArchiveOutlineRegular /> },
+        { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
+        { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconQueueOutlineRegular /> },
         { id: 'only-archived', label: t('viewOptions.onlyArchived'), icon: <IconArchiveCheckOutlineRegular /> },
+        { type: 'separator' as const, id: 'annotation-filter-separator' },
+        { type: 'label' as const, id: 'annotation-filter', text: t('annotationFilter.label') },
+        { id: 'all-annotations', label: t('annotationFilter.all'), icon: <IconQueueOutlineRegular /> },
+        { id: 'favorite-only', label: t('annotationFilter.favorite'), icon: <IconLikeFillRegular /> },
+        { id: 'review-later-only', label: t('annotationFilter.reviewLater'), icon: <IconListPenOutlineRegular /> },
       ]}
       selectedIds={[
         groupBy,
         orderBy,
-        ...archivedFilter === 'show' ? ['show-archived'] : [],
-        ...archivedFilter === 'only' ? ['only-archived'] : [],
+        { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
+        { all: 'all-annotations', favorite: 'favorite-only', reviewLater: 'review-later-only' }[annotationFilter],
       ]}
       onSelect={(id) => {
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
-        else if (id === 'manual' || id === 'updated') onOrderPick(id)
-        // The two archived items are mutually exclusive; re-picking the
-        // selected one returns to the default hide-archived view.
-        else if (id === 'show-archived') onArchivedFilterPick(archivedFilter === 'show' ? 'default' : 'show')
-        else if (id === 'only-archived') onArchivedFilterPick(archivedFilter === 'only' ? 'default' : 'only')
+        else if (id === 'manual' || id === 'updated' || id === 'priority') onOrderPick(id)
+        else if (id === 'hide-archived') onArchivedFilterPick('default')
+        else if (id === 'show-archived') onArchivedFilterPick('show')
+        else if (id === 'only-archived') onArchivedFilterPick('only')
+        else if (id === 'all-annotations') onAnnotationFilterPick('all')
+        else if (id === 'favorite-only') onAnnotationFilterPick('favorite')
+        else if (id === 'review-later-only') onAnnotationFilterPick('reviewLater')
         setOpen(false)
       }}
       align="end"
@@ -152,7 +206,7 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
       // be cut off at the header's bounds.
       portal
       anchor={(
-        <Tooltip label={t('viewOptions.label')} side="bottom" delayMs={500}>
+        <Tooltip label={t('viewOptions.label')} side="bottom" delayMs={500} portal>
           <button
             type="button"
             className={clsx(css.iconButton, css.wide)}
@@ -165,6 +219,12 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
       )}
     />
   )
+}
+
+/** Batch-mode selection threaded into both list bodies: membership plus the flip callback. */
+interface BatchSelection {
+  selected: ReadonlySet<SessionId>
+  toggle: (sessionId: SessionId) => void
 }
 
 /** In-flight root-row drag: source identity plus the current insert marker. */
@@ -202,6 +262,32 @@ function sessionDragOrder(
   return pinCurrentBlank(next, rows.find(row => row.blank)?.id)
 }
 
+/**
+ * Order one account's members by the browser's selected mode: current
+ * recency, annotation priority, or the saved manual positions.
+ * @param mode - the selected order.
+ * @param memberIds - account membership to rank.
+ * @param saved - browser-local manual positions for this account.
+ * @param summaries - current Session metadata.
+ * @param rowState - pin and archive sets the manual order reconciles against.
+ * @param annotations - per-Session annotations holding the priorities.
+ * @returns member ids in display order.
+ */
+function orderMembers(
+  mode: SessionOrderBy,
+  memberIds: readonly SessionId[],
+  saved: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+  rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>,
+  annotations: Readonly<Record<SessionId, SessionAnnotation>>,
+): SessionId[] {
+  switch (mode) {
+    case 'updated': return orderByRecency(memberIds, summaries)
+    case 'priority': return orderByPriority(memberIds, summaries, annotations)
+    case 'manual': return reconcileManualOrder(memberIds, saved, summaries, rowState)
+  }
+}
+
 /** In-flight Workspace-row drag: source identity plus the current marker. */
 interface WorkspaceDragState {
   workspaceId: WorkspaceId
@@ -216,9 +302,18 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
-  'useSessionStatus' | 'startSession' | 'open'
-  | 'insertWorkspaceBefore' | 't' | 'usePanelInfo'
-> & PropsRenderSlots<'sidebar.workspaces.session.menu.item' | 'sidebar.workspaces.session.row.action'> & {
+  'useSessionStatus' | 'startSession' | 'open' | 'openSessionMenu' | 'openWorkspaceMenu' | 'useContextMenuTarget' | 'useContextMenu'
+  | 'insertWorkspaceBefore' | 'revealWorkspace' | 't' | 'usePanelInfo'
+  | 'useRemoteAccess' | 'useSessionAccess' | 'useWorkspaceAccess'
+> & PropsRenderSlots<
+  | 'sidebar.workspaces.project.menu.item'
+  | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.session.pending'
+  | 'sidebar.session.row.trailing'
+  | 'sidebar.session.row.leading'
+  | 'sidebar.session.row.hover'
+> & {
+  shortcuts: readonly import('@deepseek-ai/dsh-client-shortcuts/client').ShortcutCatalogEntry[]
   /** Always-mounted Session list snapshot. */
   list: SessionListState
   /** Host account home for POSIX hover-path abbreviation. */
@@ -227,6 +322,8 @@ type SessionTreeProps = Pick<
   workspaces: readonly WorkspaceView[]
   /** Browser-projected order for Sessions outside every Workspace. */
   ungroupedSessionIds: readonly SessionId[]
+  /** Project-section order matching the selected Session order. */
+  groupOrder: 'registry' | 'activity'
   /** Whether the current Workspace stream has a complete Host baseline. */
   workspaceReady: boolean
   /** Grouping, ordering, and filter changes replace the view without row motion. */
@@ -241,6 +338,10 @@ type SessionTreeProps = Pick<
   setSessionOrder: (accountKey: string, order: readonly string[]) => void
   /** Registry-global pin and archive sets plus the archived-visibility choice. */
   rowState: SessionRowState
+  /** Switch the archived filter back to the default hide-archived view. */
+  onLeaveArchivedOnly: () => void
+  /** Clear the annotation filter back to no filter. */
+  onLeaveAnnotationFilter: () => void
   /** Open the browser-owned rename dialog for a real Workspace group. */
   onRenameRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned delete-confirmation dialog for a real Workspace group. */
@@ -251,19 +352,44 @@ type SessionTreeProps = Pick<
   revealSessionId?: SessionId | undefined
   /** Acknowledge that the chosen Session row has been revealed. */
   onSessionRevealed: (sessionId: SessionId) => void
+  /** Batch-mode selection; absent while batch mode is off. */
+  batch?: BatchSelection | undefined
 }
 
-/** The scrolling session tree; unmounting drops the sessions subscription and local row limits. */
+/** The list-empty placeholder — a glyph over the text; the archived-only view names its filter and offers the way back. */
+function EmptySessions({ rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, t }: Pick<SessionTreeProps, 'rowState' | 'onLeaveArchivedOnly' | 't'> & { onLeaveAnnotationFilter: () => void }) {
+  const archivedOnly = rowState.archivedFilter === 'only'
+  const annotationOnly = rowState.annotationFilter !== undefined && rowState.annotationFilter !== 'all'
+  return (
+    <div className={css.emptyState} data-row-key="empty">
+      {archivedOnly ? <IconArchiveOutlineRegular size={24} /> : <IconQueueOutlineRegular size={24} />}
+      <div>
+        {archivedOnly ? t('empty.noneArchived') : annotationOnly ? t('empty.noneAnnotated') : t('empty.none')}
+      </div>
+      {(archivedOnly || annotationOnly) && (
+        <button
+          type="button"
+          className={css.emptyAction}
+          onClick={archivedOnly ? onLeaveArchivedOnly : onLeaveAnnotationFilter}
+        >
+          {archivedOnly ? t('empty.viewOthers') : t('empty.viewAllAnnotations')}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
 function SessionTree({
-  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds,
-  rowState,
-  workspaceReady, animationResetKey, usePanelInfo,
+  list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, groupOrder,
+  rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter,
+  workspaceReady, animationResetKey, usePanelInfo, useRemoteAccess, useSessionAccess, useWorkspaceAccess,
   onRenameRequest, onDeleteRequest, onSessionRenameRequest,
-  renderSlot,
-  insertWorkspaceBefore,
+  renderSlot, openSessionMenu, openWorkspaceMenu, useContextMenuTarget, useContextMenu,
+  insertWorkspaceBefore, revealWorkspace,
   nestWorkspaces, groupExpansion, setGroupExpanded,
   setSessionOrder, home, t,
-  revealSessionId, onSessionRevealed,
+  revealSessionId, onSessionRevealed, shortcuts, batch,
 }: SessionTreeProps) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -273,7 +399,10 @@ function SessionTree({
   const revealGroup = revealSessionId === undefined || !workspaceReady
     ? undefined
     : owningGroupKey(workspaces, revealSessionId)
-  const [sessionLimits, setSessionLimits] = useState<Readonly<Record<string, number>>>({})
+  // Per-group raised watermarks; an absent key means the base watermark.
+  const [storedWatermarks, setStoredWatermarks] = useState<Readonly<Record<string, number>>>({})
+  // Advances on user-driven watermark changes so AnimatedRows settles them; automatic raises animate.
+  const [watermarkMotionKey, setWatermarkMotionKey] = useState(0)
   // Transient drag marker state; the selected mode owns the resulting order.
   const [drag, setDrag] = useState<DragState | null>(null)
   const sessionDropCommitted = useRef(false)
@@ -313,8 +442,9 @@ function SessionTree({
     () => deriveGroups(list, workspaces, rowState, statuses, {
       expandedGroups,
       ungroupedOrder: ungroupedSessionIds,
+      groupOrder,
     }),
-    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds],
+    [list, workspaces, rowState, statuses, expandedGroups, ungroupedSessionIds, groupOrder],
   )
   useEffect(() => {
     for (let key = revealGroup; key !== undefined; key = parents.get(key)) {
@@ -323,13 +453,34 @@ function SessionTree({
       }
     }
   }, [groupExpansion, parents, revealGroup, setGroupExpanded])
-  useEffect(() => {
-    if (revealSessionId === undefined || revealGroup === undefined) return
-    const group = groups.find(candidate => candidate.key === revealGroup)
-    if (group === undefined || !group.expanded || !group.sessions.some(row => row.id === revealSessionId)) return
-    if (collapsedSessionRows(group.sessions).rows.some(row => row.id === revealSessionId)) return
-    setSessionLimits(limits => limits[revealGroup] === Infinity ? limits : { ...limits, [revealGroup]: Infinity })
-  }, [groups, revealGroup, revealSessionId])
+  const baselines = new Map(groups.map(group => [group.key, Math.max(SESSION_WATERMARK_BASE, requiredWatermark(
+    group.sessions,
+    current,
+    group.key === revealGroup ? revealSessionId : undefined,
+  ))]))
+  const foldedKeys = new Set(groups.filter(group => !group.expanded).map(group => group.key))
+  const underFoldedAncestor = (key: string): boolean => {
+    for (let owner = parents.get(key); owner !== undefined; owner = parents.get(owner)) {
+      if (foldedKeys.has(owner)) return true
+    }
+    return false
+  }
+  // A group hidden by a folded ancestor keeps its own expansion and rows but must not raise its watermark.
+  const requiredWatermarks = new Map([...baselines].filter(([key]) => !underFoldedAncestor(key)))
+  const sessionWatermarks = raiseWatermarks(storedWatermarks, requiredWatermarks)
+  // Raising during render keeps the watermark monotonic without committing a lower frame first.
+  if (sessionWatermarks !== storedWatermarks) setStoredWatermarks(marks => raiseWatermarks(marks, requiredWatermarks))
+  const dropWatermarks = (drop: (key: string) => boolean): void => {
+    if (!Object.keys(storedWatermarks).some(drop)) return
+    setStoredWatermarks(marks => Object.fromEntries(Object.entries(marks).filter(([key]) => !drop(key))))
+    setWatermarkMotionKey(key => key + 1)
+  }
+  const withinGroup = (key: string, root: string): boolean => {
+    for (let owner: string | undefined = key; owner !== undefined; owner = parents.get(owner)) {
+      if (owner === root) return true
+    }
+    return false
+  }
   const now = Date.now()
   const commitSessionDrag = (activeDrag: DragState, over: NonNullable<DragState['over']>): void => {
     if (sessionDropCommitted.current) return
@@ -342,7 +493,7 @@ function SessionTree({
       ? ungroupedSessionIds
       : workspaces.find(workspace => workspace.workspaceId === activeDrag.accountKey)?.sessionIds
     if (accountSessionIds === undefined) return
-    const renderedSessions = collapsedSessionRows(group.sessions, sessionLimits[group.key]).rows
+    const renderedSessions = watermarkRows(group.sessions, sessionWatermarks[group.key] ?? SESSION_WATERMARK_BASE).rows
     const nextOrder = sessionDragOrder(accountSessionIds, renderedSessions, activeDrag, over)
     if (nextOrder !== undefined) setSessionOrder(activeDrag.accountKey, nextOrder)
   }
@@ -369,9 +520,13 @@ function SessionTree({
     })
   }
   const childrenByParent = useMemo(() => {
+    const rendered = new Set(groups.map(group => group.key))
     const children = new Map<string | undefined, GroupNode[]>()
     for (const group of groups) {
-      const parent = parents.get(group.key)
+      // The archived-only view drops empty groups, so an ancestor may be
+      // absent; nest under the nearest rendered one.
+      let parent = parents.get(group.key)
+      while (parent !== undefined && !rendered.has(parent)) parent = parents.get(parent)
       const siblings = children.get(parent)
       if (siblings === undefined) children.set(parent, [group])
       else siblings.push(group)
@@ -388,8 +543,9 @@ function SessionTree({
     const workspaceId = group.workspaceId
     const children = childrenByParent.get(group.key) ?? []
     const compatibleDrag = workspaceDrag !== null && parents.get(workspaceDrag.workspaceId) === parents.get(group.key)
-    const collapsed = collapsedSessionRows(group.sessions)
-    const visible = collapsedSessionRows(group.sessions, sessionLimits[group.key])
+    const watermark = sessionWatermarks[group.key] ?? SESSION_WATERMARK_BASE
+    const collapsed = watermarkRows(group.sessions, baselines.get(group.key) ?? SESSION_WATERMARK_BASE)
+    const visible = watermarkRows(group.sessions, watermark)
     const sessionsExpanded = visible.hiddenCount === 0
     rowKeys.push(`workspace:${group.key}`)
     const childRows = group.expanded ? children.map(child => renderGroup(child, depth + 1)) : []
@@ -466,14 +622,17 @@ function SessionTree({
           }}
       >
         <ProjectRowItem
+          newShortcut={shortcuts.find(row => row.id === 'session.new')}
           group={group}
+          openWorkspaceMenu={openWorkspaceMenu} useContextMenu={useContextMenu} useContextMenuTarget={useContextMenuTarget}
+          useRemoteAccess={useRemoteAccess}
+          useWorkspaceAccess={useWorkspaceAccess}
           containsCurrentDescendant={currentAncestors.has(group.key)}
           home={home}
+          renderSlot={renderSlot}
           t={t}
           onToggle={() => {
-            if (group.expanded) {
-              setSessionLimits(limits => ({ ...limits, [group.key]: COLLAPSED_SESSION_LIMIT }))
-            }
+            if (group.expanded) dropWatermarks(key => withinGroup(key, group.key))
             setGroupExpanded(group.key, !group.expanded)
           }}
           onCreate={() => {
@@ -493,6 +652,18 @@ function SessionTree({
               delete: () => {
               /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                 if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
+              },
+              moveToTop: () => {
+                if (group.workspaceId === undefined) return
+                const first = workspaces.find(candidate => candidate.workspaceId !== group.workspaceId)
+                if (first !== undefined) void insertWorkspaceBefore(group.workspaceId, first.workspaceId)
+              },
+              moveToBottom: () => {
+                if (group.workspaceId === undefined) return
+                void insertWorkspaceBefore(group.workspaceId)
+              },
+              reveal: () => {
+                if (group.cwd !== undefined) revealWorkspace(group.cwd)
               },
             }}
         />
@@ -541,10 +712,17 @@ function SessionTree({
               onOpen={open}
               onRenameRequest={onSessionRenameRequest}
               renderSlot={renderSlot}
+              openSessionMenu={openSessionMenu} useContextMenu={useContextMenu}
+              useContextMenuTarget={useContextMenuTarget}
               onReveal={node.id === revealSessionId && group.key === revealGroup
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               drag={dragProps}
+              selection={batch === undefined || node.blank
+                ? undefined
+                : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
+              home={home}
+              useSessionAccess={useSessionAccess}
               t={t}
             />
           )
@@ -556,14 +734,15 @@ function SessionTree({
             data-row-key={`overflow:${group.key}`}
             aria-expanded={sessionsExpanded}
             onClick={() => {
-              setSessionLimits(limits => ({
-                ...limits,
-                [group.key]: sessionsExpanded
-                  ? COLLAPSED_SESSION_LIMIT
-                  : visible.hiddenCount <= COLLAPSED_SESSION_LIMIT
-                    ? Infinity
-                    : (limits[group.key] ?? COLLAPSED_SESSION_LIMIT) + COLLAPSED_SESSION_LIMIT,
+              if (sessionsExpanded) {
+                dropWatermarks(key => key === group.key)
+                return
+              }
+              setStoredWatermarks(marks => ({
+                ...marks,
+                [group.key]: visible.hiddenCount <= SESSION_WATERMARK_BASE ? Infinity : watermark + SESSION_WATERMARK_BASE,
               }))
+              setWatermarkMotionKey(key => key + 1)
             }}
           >
             {sessionsExpanded
@@ -577,37 +756,44 @@ function SessionTree({
 
   const groupRows = rootGroups.map(group => renderGroup(group, 0))
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
+    <HoverCardGroup className={clsx(css.treeBody, css.wide)}>
       {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
       <AnimatedRows
         className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
+        role="tree"
         label={t('section.sessions')}
         rowKeys={rowKeys}
         ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
-        resetKey={JSON.stringify([animationResetKey, sessionLimits])}
+        resetKey={JSON.stringify([animationResetKey, watermarkMotionKey])}
       >
         {groups.length === 0 && (
-          <div className={css.empty} data-row-key="empty">{t('empty.none')}</div>
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {groupRows}
       </AnimatedRows>
       <span className={css.fade} />
-    </div>
+    </HoverCardGroup>
   )
 }
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  list, sessionIds, rowState, useSessionStatus, open, onSessionRenameRequest,
-  renderSlot,
+  list, sessionIds, rowState, onLeaveArchivedOnly, onLeaveAnnotationFilter, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, setSessionOrder, workspaceReady, animationResetKey,
-  revealSessionId, onSessionRevealed, t,
+  revealSessionId, onSessionRevealed, renderSlot, openSessionMenu, useContextMenuTarget, useContextMenu, batch, home, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessionStatus'
+  | 'useSessionAccess'
   | 'open'
   | 'onSessionRenameRequest'
   | 'renderSlot'
+  | 'openSessionMenu' | 'useContextMenuTarget' | 'useContextMenu'
   | 'usePanelInfo'
   | 'setSessionOrder'
   | 'workspaceReady'
@@ -615,6 +801,10 @@ function FlatList({
   | 'revealSessionId'
   | 'onSessionRevealed'
   | 'rowState'
+  | 'onLeaveArchivedOnly'
+  | 'onLeaveAnnotationFilter'
+  | 'batch'
+  | 'home'
   | 't'
 > & {
   list: SessionListState
@@ -641,16 +831,22 @@ function FlatList({
   }
   const now = Date.now()
   return (
-    <div className={clsx(css.treeBody, css.wide)}>
+    <HoverCardGroup className={clsx(css.treeBody, css.wide)}>
       <AnimatedRows
         className={clsx(css.list, css.flatList)}
+        role="tree"
         label={t('section.sessions')}
         rowKeys={rows.length === 0 ? ['empty'] : rows.map(row => `session:${row.id}`)}
         ready={list.phase === 'ready' && workspaceReady && drag === null}
         resetKey={animationResetKey}
       >
         {rows.length === 0 && (
-          <div className={css.empty} data-row-key="empty">{t('empty.none')}</div>
+          <EmptySessions
+            rowState={rowState}
+            onLeaveArchivedOnly={onLeaveArchivedOnly}
+            onLeaveAnnotationFilter={onLeaveAnnotationFilter}
+            t={t}
+          />
         )}
         {rows.map((node) => {
           const active = drag !== null && drag.pinned === node.pinned
@@ -665,10 +861,15 @@ function FlatList({
               onOpen={open}
               onRenameRequest={onSessionRenameRequest}
               renderSlot={renderSlot}
+              openSessionMenu={openSessionMenu} useContextMenu={useContextMenu}
+              useContextMenuTarget={useContextMenuTarget}
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
-              flat
+              selection={batch === undefined || node.blank
+                ? undefined
+                : { selected: batch.selected.has(node.id), toggle: () => { batch.toggle(node.id) } }}
+              useSessionAccess={useSessionAccess}
               drag={{
                 start: () => {
                   dropCommitted.current = false
@@ -690,13 +891,14 @@ function FlatList({
                   dropCommitted.current = false
                 },
               }}
+              home={home}
               t={t}
             />
           )
         })}
       </AnimatedRows>
       <span className={css.fade} />
-    </div>
+    </HoverCardGroup>
   )
 }
 
@@ -714,18 +916,17 @@ function SearchResults({
   open,
   onUnarchive,
   workspaces,
-  archivedSessionIds,
-  archivedFilter,
+  rowState,
   query,
   remote,
   resultLimit,
   usePanelInfo,
+  useSessionAccess,
   t,
-}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo'> & {
+}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo' | 'useSessionAccess'> & {
   workspaces: readonly WorkspaceView[]
-  archivedSessionIds: readonly SessionNode['id'][]
-  /** Search matches follow the archived filter selected for the list. */
-  archivedFilter: ArchivedFilter
+  /** Registry-global archive set, annotations, and both filters; search follows them. */
+  rowState: SessionRowState
   /** Unarchive an archived result row in place. */
   onUnarchive: (id: SessionNode['id']) => void
   query: string
@@ -743,13 +944,12 @@ function SearchResults({
       list,
       workspaces,
       query,
-      archivedSessionIds,
-      archivedFilter,
+      rowState,
       statuses,
       currentRemote,
       resultLimit,
     ),
-    [list, workspaces, query, archivedSessionIds, archivedFilter, statuses, currentRemote, resultLimit],
+    [list, workspaces, query, rowState, statuses, currentRemote, resultLimit],
   )
   const pending = currentRemote.status === 'loading'
   const currentId = panelActive
@@ -767,6 +967,7 @@ function SearchResults({
               currentId={currentId}
               onOpen={open}
               onUnarchive={onUnarchive}
+              useSessionAccess={useSessionAccess}
               t={t}
             />
           ))}
@@ -811,6 +1012,9 @@ export function WorkspaceBrowser({
   expandSidebar,
   useSessions,
   useSessionStatus,
+  useRemoteAccess,
+  useSessionAccess,
+  useWorkspaceAccess,
   useWorkspaces,
   useStore,
   actions,
@@ -818,22 +1022,44 @@ export function WorkspaceBrowser({
   open,
   requestSessionRename,
   notifyArchivedNotOpenable,
-  renameWorkspace,
+  renameWorkspace, useWorkspaceActionRequest, settleWorkspaceAction, requestWorkspaceAction,
   deleteWorkspace,
   insertWorkspaceBefore,
+  revealWorkspace,
   unarchiveSession,
   createWorkspace,
+  applyBatch,
   searchSessions,
   searchResultLimit,
   useDirectoryFlow,
   useHostInfo,
-  renderSlot,
+  useShortcuts,
+  useWorkspaceShortcuts,
+  requestSearch,
+  requestAddWorkspace,
+  closeAddWorkspace,
+  setDirectoryBusy,
+  renderSlot, openSessionMenu, openWorkspaceMenu, useContextMenuTarget, useContextMenu,
   t,
 }: WorkspaceBrowserProps) {
   const home = useHostInfo(info => info.home)
+  const shortcuts = useShortcuts(rows => rows)
+  const searchShortcut = shortcuts.find(row => row.id === 'session.search')
+  const addShortcut = shortcuts.find(row => row.id === 'workspace.add')
+  const shortcutState = useWorkspaceShortcuts(state => state)
   // Ordering remains live while the rail or search replaces the list body.
   const list = useSessions(state => state)
-  const workspaces = useWorkspaces(state => state.items)
+  const storedWorkspaces = useWorkspaces(state => state.items)
+  // The resolved name, not `t`, is the memo dependency: the bound seat keeps
+  // its identity across a language switch.
+  const defaultWorkspaceName = t('workspace.defaultName')
+  const workspaces = useMemo(
+    () => storedWorkspaces.map(workspace => ({
+      ...workspace,
+      title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
+    })),
+    [storedWorkspaces, defaultWorkspaceName],
+  )
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
@@ -846,6 +1072,8 @@ export function WorkspaceBrowser({
   // Persisted view blobs written before the archived filter existed rehydrate
   // without the field; they read as the default hide-archived view.
   const archivedFilter = useStore(s => s.archivedFilter ?? 'default')
+  const annotations = useStore(s => s.annotations ?? NO_ANNOTATIONS)
+  const annotationFilter = useStore(s => s.annotationFilter ?? 'all')
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -857,6 +1085,7 @@ export function WorkspaceBrowser({
     }
     open(sessionId)
   }
+  const leaveArchivedOnly = (): void => { actions.setArchivedFilter('default') }
   const workspaceReady = workspacePhase === 'ready' && workspaceStreamState !== 'loading'
   const mainSessionId = Object.values(list.byId)
     .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
@@ -872,15 +1101,15 @@ export function WorkspaceBrowser({
     [archivedSessionIds, pinnedSessionIds],
   )
   const rowState = useMemo<SessionRowState>(
-    () => ({ ...orderState, archivedFilter }),
-    [orderState, archivedFilter],
+    () => ({ ...orderState, archivedFilter, annotations, annotationFilter }),
+    [orderState, archivedFilter, annotations, annotationFilter],
   )
   const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
     const memberIds = workspace.sessionIds
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(memberIds, list.byId)
-      : reconcileManualOrder(memberIds, sessionOrderByAccount[workspace.workspaceId], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, memberIds, sessionOrderByAccount[workspace.workspaceId], list.byId, orderState, annotations,
+    )
     return {
       ...workspace,
       sessionIds: pinCurrentBlank(
@@ -888,25 +1117,25 @@ export function WorkspaceBrowser({
         currentBlank !== undefined && memberIds.includes(currentBlank) ? currentBlank : undefined,
       ),
     }
-  }), [currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, workspaces])
+  }), [annotations, currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, workspaces])
   const orderedUngroupedSessionIds = useMemo(() => {
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(ungroupedMemberIds, list.byId)
-      : reconcileManualOrder(ungroupedMemberIds, sessionOrderByAccount[UNGROUPED_KEY], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, ungroupedMemberIds, sessionOrderByAccount[UNGROUPED_KEY], list.byId, orderState, annotations,
+    )
     return pinCurrentBlank(
       baseOrder,
       currentBlank !== undefined && ungroupedMemberIds.includes(currentBlank) ? currentBlank : undefined,
     )
-  }, [currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, ungroupedMemberIds])
+  }, [annotations, currentBlank, list.byId, orderBy, orderState, sessionOrderByAccount, ungroupedMemberIds])
   const orderedFlatSessionIds = useMemo(() => {
-    const baseOrder = orderBy === 'updated'
-      ? orderByRecency(flatMemberIds, list.byId)
-      : reconcileManualOrder(flatMemberIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], list.byId, orderState)
+    const baseOrder = orderMembers(
+      orderBy, flatMemberIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], list.byId, orderState, annotations,
+    )
     return pinCurrentBlank(
       baseOrder,
       currentBlank !== undefined && flatMemberIds.includes(currentBlank) ? currentBlank : undefined,
     )
-  }, [currentBlank, flatMemberIds, list.byId, orderBy, orderState, sessionOrderByAccount])
+  }, [annotations, currentBlank, flatMemberIds, list.byId, orderBy, orderState, sessionOrderByAccount])
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
     ...orderedWorkspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
     [UNGROUPED_KEY, orderedUngroupedSessionIds] as const,
@@ -959,10 +1188,54 @@ export function WorkspaceBrowser({
   const saveSessionOrder = (accountKey: string, order: readonly string[]): void => {
     actions.setSessionOrder(accountKey, order, activeSessionOrders)
   }
+  // Batch mode is a browser-local interaction: the selection never persists,
+  // and leaving the mode always drops it.
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedSessionIds, setSelectedSessionIds] = useState<readonly SessionId[]>([])
+  const selectedIdSet = useMemo(() => new Set(selectedSessionIds), [selectedSessionIds])
+  const leaveBatch = (): void => {
+    setBatchMode(false)
+    setSelectedSessionIds([])
+  }
+  const batch = useMemo<BatchSelection | undefined>(() => batchMode
+    ? {
+      selected: selectedIdSet,
+      toggle: (sessionId) => {
+        setSelectedSessionIds(current => current.includes(sessionId)
+          ? current.filter(id => id !== sessionId)
+          : [...current, sessionId])
+      },
+    }
+    : undefined, [batchMode, selectedIdSet])
+  const runBatch = (action: BatchAction): void => {
+    if (selectedSessionIds.length === 0) return
+    void applyBatch(selectedSessionIds, action).then((result) => {
+      // Failures stay selected, so the retry covers exactly what did not apply.
+      if (result.failed === 0) setSelectedSessionIds([])
+    })
+  }
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
   const [searchExpanded, setSearchExpanded] = useState(false)
+  const [searchSpacingMotionEnabled, setSearchSpacingMotionEnabled] = useState(false)
+  const [searchOnExpand, setSearchOnExpand] = useState(false)
+  const [lastSearchRequest, setLastSearchRequest] = useState(0)
+  // Search state must commit before the effect expands the shell's external store.
+  if (lastSearchRequest !== shortcutState.searchRequest) {
+    setLastSearchRequest(shortcutState.searchRequest)
+    if (shortcutState.searchRequest !== 0) {
+      setSearchExpanded(true)
+      setSearchSpacingMotionEnabled(wide)
+      if (!wide) setSearchOnExpand(true)
+    }
+  }
+  // Search gestures animate spacing; entering wide layout from the rail lands at its final geometry.
+  if (!wide && searchSpacingMotionEnabled) setSearchSpacingMotionEnabled(false)
+  const changeSearchExpanded = (expanded: boolean): void => {
+    setSearchSpacingMotionEnabled(wide)
+    setSearchExpanded(expanded)
+  }
   const [revealSessionId, setRevealSessionId] = useState<SessionId | undefined>(undefined)
   const normalizedQuery = sanitizeSearchQuery(query).trim()
   const [remoteSearch, setRemoteSearch] = useState<RemoteSearchState>({
@@ -975,9 +1248,9 @@ export function WorkspaceBrowser({
   const searchInput = useRef<HTMLInputElement | null>(null)
   // Section-header ＋ opens the picker menu (same popover in wide and rail
   // states; the menu anchors on this button).
-  const [wsPickerOpen, setWsPickerOpen] = useState(false)
+  const wsPickerOpen = shortcutState.addRequested
   const wsPlusRef = useRef<HTMLButtonElement>(null)
-  const composingRef = useRef(false)
+  const workspaceActionRequest = useWorkspaceActionRequest(value => value)
 
   const openSearchResult = (sessionId: SessionId): void => {
     if (archivedSessionIds.includes(sessionId)) {
@@ -986,7 +1259,7 @@ export function WorkspaceBrowser({
     }
     setRevealSessionId(sessionId)
     setQuery('')
-    setSearchExpanded(false)
+    changeSearchExpanded(false)
     open(sessionId)
   }
   const acknowledgeSessionReveal = (sessionId: SessionId): void => {
@@ -998,7 +1271,6 @@ export function WorkspaceBrowser({
 
   // Rail search = expand + land in the search box: the flag arms before the
   // expand request; once the shell flips wide the input mounts and takes focus.
-  const [searchOnExpand, setSearchOnExpand] = useState(false)
   useEffect(() => {
     if (wide && searchOnExpand) {
       const timer = window.setTimeout(() => {
@@ -1008,6 +1280,14 @@ export function WorkspaceBrowser({
       return () => { window.clearTimeout(timer) }
     }
   }, [wide, searchOnExpand])
+  useEffect(() => {
+    if (shortcutState.searchRequest === 0) return
+    closeAddWorkspace()
+    if (!wide || searchInput.current?.closest('[inert]')) {
+      setSearchOnExpand(true)
+      expandSidebar()
+    } else searchInput.current?.focus({ preventScroll: true })
+  }, [shortcutState.searchRequest])
 
   useEffect(() => {
     if (!wide || !searchExpanded || searchOnExpand) return
@@ -1025,7 +1305,7 @@ export function WorkspaceBrowser({
       if (!(event.target instanceof Node) || searchRoot.current?.contains(event.target) === true) return
       searchInput.current?.blur()
       if (normalizedQuery !== '') return
-      setSearchExpanded(false)
+      changeSearchExpanded(false)
     }
     document.addEventListener('click', onClick)
     return () => { document.removeEventListener('click', onClick) }
@@ -1068,34 +1348,6 @@ export function WorkspaceBrowser({
     }
   }, [normalizedQuery, searchSessions])
 
-  // Rename dialog (browser-owned so it outlives row unmounts during collapse).
-  const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId; currentTitle: string } | null>(null)
-  const [renameDraft, setRenameDraft] = useState('')
-  const [renaming, setRenaming] = useState(false)
-  const [renameError, setRenameError] = useState<string | null>(null)
-  const renameTrimmed = renameDraft.trim()
-  const renameDuplicate = renameTarget !== null && renameTrimmed !== '' && renameTrimmed !== renameTarget.currentTitle
-    && workspaces.some(w => w.title === renameTrimmed)
-  const renameBlocked = renaming || renameTrimmed === ''
-    || renameTarget === null || renameTrimmed === renameTarget.currentTitle || renameDuplicate
-  const closeRename = () => {
-    if (renaming) return
-    setRenameTarget(null)
-    setRenameError(null)
-  }
-  const confirmRename = () => {
-    if (renameBlocked) return
-    setRenaming(true)
-    setRenameError(null)
-    renameWorkspace(renameTarget.workspaceId, renameTrimmed).then(() => {
-      setRenaming(false)
-      setRenameTarget(null)
-    }).catch((reason: unknown) => {
-      setRenaming(false)
-      setRenameError(reason instanceof Error ? reason.message : String(reason))
-    })
-  }
-
   // The search results' restore button; the row actions own the rest of the
   // Session verbs as slot entries.
   const onSessionUnarchive = (sessionId: SessionNode['id']) => {
@@ -1103,45 +1355,9 @@ export function WorkspaceBrowser({
       console.warn('session unarchive rejected:', reason)
     })
   }
-
-  // Delete dialog is separate from the row so a successful removal can
-  // unmount that row without tearing down the in-flight confirmation state.
-  const [deleteTarget, setDeleteTarget] = useState<{ workspaceId: WorkspaceId; title: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteCommittedId, setDeleteCommittedId] = useState<WorkspaceId | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
-  useEffect(() => {
-    if (deleteCommittedId === null
-      || workspaces.some(workspace => workspace.workspaceId === deleteCommittedId)) return
-    setDeleting(false)
-    setDeleteCommittedId(null)
-    setDeleteTarget(null)
-  }, [deleteCommittedId, workspaces])
-  const closeDelete = () => {
-    if (deleting) return
-    setDeleteTarget(null)
-    setDeleteError(null)
-  }
-  const confirmDelete = () => {
-    /* v8 ignore next -- the Modal is absent without a target and its button is disabled while deleting. */
-    if (deleting || deleteTarget === null) return
-    setDeleting(true)
-    setDeleteCommittedId(null)
-    setDeleteError(null)
-    deleteWorkspace(deleteTarget.workspaceId).then(() => {
-      // Keep the confirmation pending until this component has rendered the
-      // committed list projection without the deleted id. Closing earlier
-      // exposes one stale React frame to the next Create Workspace gesture.
-      setDeleteCommittedId(deleteTarget.workspaceId)
-    }).catch((reason: unknown) => {
-      setDeleting(false)
-      setDeleteError(reason instanceof Error ? reason.message : String(reason))
-    })
-  }
-
   return (
     <div className={clsx(css.root, !wide && css.rail)}>
-      <div className={css.sectionHeader}>
+      <div className={clsx(css.sectionHeader, wide && searchSpacingMotionEnabled && css.searchSpacingMotion)}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
             {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
@@ -1153,20 +1369,20 @@ export function WorkspaceBrowser({
               ref={searchRoot}
               className={clsx(css.search, searchExpanded && css.searchExpanded)}
               onClick={() => {
-                setWsPickerOpen(false)
-                setSearchExpanded(true)
+                closeAddWorkspace()
+                changeSearchExpanded(true)
                 searchInput.current?.focus()
               }}
             >
-              <Tooltip label={t('search')} side="bottom" delayMs={500} disabled={searchExpanded}>
+              <Tooltip label={t('search')} shortcutKeys={searchShortcut?.keys} side="bottom" delayMs={500} disabled={searchExpanded} portal>
                 <button
                   type="button"
                   className={css.searchButton}
                   aria-label={t('search.sessions.aria')}
+                  aria-keyshortcuts={searchShortcut?.aria}
                   aria-expanded={searchExpanded}
                   onClick={() => {
-                    setWsPickerOpen(false)
-                    setSearchExpanded(true)
+                    requestSearch()
                   }}
                 >
                   <IconSearchOutlineRegular size={searchExpanded ? 11 : 14} />
@@ -1180,11 +1396,17 @@ export function WorkspaceBrowser({
                 maxLength={SEARCH_QUERY_MAX_CODE_UNITS}
                 value={query}
                 tabIndex={searchExpanded ? 0 : -1}
-                onChange={(e) => { setQuery(sanitizeSearchQuery(e.target.value)) }}
+                onChange={(e) => {
+                  const next = sanitizeSearchQuery(e.target.value)
+                  // Result rows carry no selection checkbox and Select all reads
+                  // the list, so typing a query ends batch mode.
+                  if (next.trim() !== '') leaveBatch()
+                  setQuery(next)
+                }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
-                  setSearchExpanded(false)
+                  changeSearchExpanded(false)
                 }}
               />
               {searchExpanded && (
@@ -1195,7 +1417,7 @@ export function WorkspaceBrowser({
                   onClick={(e) => {
                     e.stopPropagation()
                     setQuery('')
-                    setSearchExpanded(false)
+                    changeSearchExpanded(false)
                   }}
                 >
                   <IconCloseFillRegular />
@@ -1206,13 +1428,28 @@ export function WorkspaceBrowser({
         )}
         <div className={clsx(css.headerActions, wide && searchExpanded && css.headerActionsHidden)}>
           {wide && (
+            <Tooltip label={t('batch.mode')} side="bottom" delayMs={500}>
+              <button
+                type="button"
+                className={clsx(css.iconButton, css.wide, batchMode && css.iconButtonActive)}
+                aria-label={t('batch.mode')}
+                aria-pressed={batchMode}
+                onClick={() => { if (batchMode) leaveBatch(); else setBatchMode(true) }}
+              >
+                <IconChecklistOutlineRegular />
+              </button>
+            </Tooltip>
+          )}
+          {wide && (
             <ViewOptionsMenu
               groupBy={groupBy}
               orderBy={orderBy}
               archivedFilter={archivedFilter}
+              annotationFilter={annotationFilter}
               onGroupPick={actions.setGroupBy}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
               onArchivedFilterPick={actions.setArchivedFilter}
+              onAnnotationFilterPick={actions.setAnnotationFilter}
               t={t}
             />
           )}
@@ -1220,14 +1457,15 @@ export function WorkspaceBrowser({
               picking affordance has nothing to offer here: the region hides the
               button rather than leaving a dead one in the header. */}
           {directoryFlowAvailable && (
-            <Tooltip label={t('workspace.add')} side="bottom" delayMs={500}>
+            <Tooltip label={t('workspace.add')} shortcutKeys={addShortcut?.keys} side="bottom" delayMs={500} portal>
               <button
                 ref={wsPlusRef}
                 type="button"
                 className={css.iconButton}
                 aria-label={t('workspace.add')}
+                aria-keyshortcuts={addShortcut?.aria}
                 onClick={() => {
-                  setWsPickerOpen(v => !v)
+                  requestAddWorkspace()
                 }}
               >
                 <IconProjectAddOutlineRegular size={wide ? 16 : 18} />
@@ -1245,26 +1483,26 @@ export function WorkspaceBrowser({
           useDirectoryFlow={useDirectoryFlow}
           renderDirectoryFlow={owner => renderSlot('sidebar.workspaces.directoryFlow', owner)}
           addOnly
+          onBusyChange={setDirectoryBusy}
           side="right"
           onPick={(workspaceId) => {
-            setWsPickerOpen(false)
-            startSession(workspaceId)
+            closeAddWorkspace()
+            startSession(workspaceId, { clearPreviousDraft: false })
           }}
-          onClose={() => { setWsPickerOpen(false) }}
+          onClose={() => { closeAddWorkspace() }}
         />
       </div>
 
       {/* The collapsed rail keeps search as its own 36px control. */}
       {!wide && <div className={css.search}>
-        <Tooltip label={t('search')}>
+        <Tooltip label={t('search')} shortcutKeys={searchShortcut?.keys} portal>
           <button
             type="button"
             className={css.searchButton}
             aria-label={t('search.sessions.aria')}
+            aria-keyshortcuts={searchShortcut?.aria}
             onClick={() => {
-              setSearchExpanded(true)
-              setSearchOnExpand(true)
-              expandSidebar()
+              requestSearch()
             }}
           >
             <IconSearchOutlineRegular size={18} />
@@ -1275,17 +1513,30 @@ export function WorkspaceBrowser({
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
       <div className={css.listArea}>
+        {wide && batchMode && (
+          <BatchActionsToolbar
+            count={selectedSessionIds.length}
+            onSelectAll={() => {
+              // The provisional blank row is not an archive or marking target.
+              setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
+            }}
+            onClear={() => { setSelectedSessionIds([]) }}
+            onPick={runBatch}
+            onExit={leaveBatch}
+            t={t}
+          />
+        )}
         {wide && (normalizedQuery !== ''
           ? (
             <SearchResults
               usePanelInfo={usePanelInfo}
+              useSessionAccess={useSessionAccess}
               useSessions={useSessions}
               useSessionStatus={useSessionStatus}
               open={openSearchResult}
               onUnarchive={onSessionUnarchive}
               workspaces={workspaces}
-              archivedSessionIds={archivedSessionIds}
-              archivedFilter={archivedFilter}
+              rowState={rowState}
               query={normalizedQuery}
               remote={remoteSearch}
               resultLimit={searchResultLimit}
@@ -1295,31 +1546,48 @@ export function WorkspaceBrowser({
           : groupBy === 'flat'
             ? (
               <FlatList
+                useSessionAccess={useSessionAccess}
                 usePanelInfo={usePanelInfo}
                 list={list}
                 sessionIds={orderedFlatSessionIds}
                 rowState={rowState}
+                onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 workspaceReady={workspaceReady}
                 animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
                 useSessionStatus={useSessionStatus}
                 open={guardedOpen}
                 onSessionRenameRequest={requestSessionRename}
                 renderSlot={renderSlot}
+                openSessionMenu={openSessionMenu} useContextMenu={useContextMenu}
+                useContextMenuTarget={useContextMenuTarget}
                 setSessionOrder={saveSessionOrder}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
+                batch={batch}
+                home={home}
                 t={t}
               />
             )
             : (
               <SessionTree
+                useRemoteAccess={useRemoteAccess}
+                useSessionAccess={useSessionAccess}
+                useWorkspaceAccess={useWorkspaceAccess}
                 usePanelInfo={usePanelInfo}
                 list={list}
+                shortcuts={shortcuts}
                 useSessionStatus={useSessionStatus}
                 onSessionRenameRequest={requestSessionRename}
+                onRenameRequest={(workspaceId, displayTitle) => requestWorkspaceAction(workspaceId, displayTitle, 'rename')}
+                onDeleteRequest={(workspaceId, title) => requestWorkspaceAction(workspaceId, title, 'delete')}
                 renderSlot={renderSlot}
+                openSessionMenu={openSessionMenu} useContextMenu={useContextMenu}
+                openWorkspaceMenu={openWorkspaceMenu}
+                useContextMenuTarget={useContextMenuTarget}
                 workspaces={orderedWorkspaces}
                 ungroupedSessionIds={orderedUngroupedSessionIds}
+                groupOrder={orderBy === 'updated' ? 'activity' : 'registry'}
                 workspaceReady={workspaceReady}
                 nestWorkspaces={groupBy === 'workspace-tree'}
                 animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}`}
@@ -1327,86 +1595,24 @@ export function WorkspaceBrowser({
                 setGroupExpanded={actions.setGroupExpanded}
                 setSessionOrder={saveSessionOrder}
                 rowState={rowState}
+                onLeaveArchivedOnly={leaveArchivedOnly}
+                onLeaveAnnotationFilter={() => { actions.setAnnotationFilter('all') }}
                 startSession={startSession}
                 open={guardedOpen}
                 insertWorkspaceBefore={insertWorkspaceBefore}
+                revealWorkspace={revealWorkspace}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
+                batch={batch}
                 home={home}
                 t={t}
-                onRenameRequest={(workspaceId, currentTitle) => {
-                  setRenameTarget({ workspaceId, currentTitle })
-                  setRenameDraft(currentTitle)
-                  setRenameError(null)
-                }}
-                onDeleteRequest={(workspaceId, title) => {
-                  setDeleteTarget({ workspaceId, title })
-                  setDeleteError(null)
-                }}
               />
             ))}
       </div>
 
-      <Modal
-        open={renameTarget !== null}
-        onClose={closeRename}
-        closeLabel={t('close')}
-        title={t('rename.workspace.title')}
-        footer={(
-          <>
-            <Button variant="outline" disabled={renaming} onClick={closeRename}>{t('cancel')}</Button>
-            <Button variant="primary" disabled={renameBlocked} onClick={confirmRename}>{t('rename')}</Button>
-          </>
-        )}
-      >
-        <input
-          className={css.renameInput}
-          value={renameDraft}
-          aria-label={t('field.workspaceName')}
-          autoFocus
-          disabled={renaming}
-          onFocus={(e) => { e.target.select() }}
-          onChange={(e) => { setRenameDraft(e.target.value); setRenameError(null) }}
-          onCompositionStart={() => { composingRef.current = true }}
-          onCompositionEnd={() => { composingRef.current = false }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !composingRef.current) {
-              e.preventDefault()
-              confirmRename()
-            }
-          }}
-        />
-        {renameDuplicate && (
-          <div className={css.renameError} role="alert">{t('conflict.named', { name: renameTrimmed })}</div>
-        )}
-        {renameError !== null && <div className={css.renameError} role="alert">{renameError}</div>}
-      </Modal>
-
-      <Modal
-        open={deleteTarget !== null}
-        onClose={closeDelete}
-        closeLabel={t('close')}
-        title={t('delete.workspace')}
-        {...deleteTarget === null
-          ? {}
-          : { description: t('delete.desc', { name: deleteTarget.title }) }}
-        footer={(
-          <>
-            <Button variant="outline" disabled={deleting} onClick={closeDelete}>{t('cancel')}</Button>
-            <Button
-              variant="outline"
-              className={css.deleteAction}
-              disabled={deleting}
-              onClick={confirmDelete}
-            >
-              {t('delete.workspace')}
-            </Button>
-          </>
-        )}
-      >
-        {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
-        {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
-      </Modal>
+      {workspaceActionRequest !== null && <WorkspaceDialogs key={`${workspaceActionRequest.action}/${workspaceActionRequest.workspaceId}`}
+        request={workspaceActionRequest} workspaces={workspaces} renameWorkspace={renameWorkspace} deleteWorkspace={deleteWorkspace}
+        settleWorkspaceAction={settleWorkspaceAction} t={t} />}
     </div>
   )
 }

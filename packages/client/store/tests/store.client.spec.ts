@@ -150,6 +150,28 @@ describe('createSnapshotStore', () => {
     expect(revived.getSnapshot().a.n).toBe(42)
   })
 
+  it('runs the persist merge hook over the parsed value before install', () => {
+    const backing = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => backing.get(k) ?? null,
+      setItem: (k: string, v: string) => { backing.set(k, v) },
+      removeItem: (k: string) => { backing.delete(k) },
+    })
+    backing.set('spec-merge', JSON.stringify({ a: { n: 42 } }))
+    let seen: unknown
+    const store = createSnapshotStore(init(), {
+      persist: {
+        name: 'spec-merge',
+        merge: (persisted, current) => {
+          seen = persisted
+          return { ...current, a: { n: Array.isArray(persisted) ? 1 : 7 } }
+        },
+      },
+    })
+    expect(seen).toEqual({ a: { n: 42 } })
+    expect(store.getSnapshot().a.n).toBe(7)
+  })
+
   it('reports rehydration failures without preventing store creation', () => {
     const failure = new Error('storage read failed')
     vi.stubGlobal('localStorage', {

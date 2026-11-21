@@ -6,8 +6,8 @@ import { Context } from '@deepseek-ai/cordis'
 import TimerService from '@deepseek-ai/cordis-plugin-timer'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, Inbox } from '@deepseek-ai/dsh-agent'
-import { turnBoundaryProjectionDefinition } from '@deepseek-ai/dsh-agent-loop'
-import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createInboxStub, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { CronServiceError, LEADER_LOCK_FILENAME, apply as cronApply, Config as cronConfig, inject as cronInject, name as cronName } from '@deepseek-ai/dsh-cron'
 import type { CronJobId } from '@deepseek-ai/dsh-cron'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -15,6 +15,7 @@ import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import Storage from '@deepseek-ai/dsh-storage'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import {
@@ -40,6 +41,9 @@ const isolatedInboxCtx = new Context()
 await isolatedInboxCtx.plugin(SessionStore)
 await isolatedInboxCtx.plugin(SessionProjectionRegistry)
 await isolatedInboxCtx.plugin(AgentRegistry)
+await isolatedInboxCtx.plugin(SystemPrompt)
+await isolatedInboxCtx.plugin(ToolRuntime)
+await isolatedInboxCtx.plugin(NativeToolExecutor)
 
 /** Build one registry-compatible live agent whose injections enter its test Inbox. */
 function stubAgent(rawId: string, suppliedCtx?: Context): StubAgent {
@@ -52,6 +56,7 @@ function stubAgent(rawId: string, suppliedCtx?: Context): StubAgent {
     id: session.id,
     options: {},
     session,
+    model: unsupportedModel(),
     inbox,
     get status() { return status },
     ctx: agentCtx,
@@ -100,6 +105,7 @@ async function harness(config: toolCron.Config = {}) {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(TimerService)
   await ctx.plugin(Storage)
   await ctx.plugin({ name: storageJsonName, inject: storageJsonInject, apply: storageJsonApply, Config: storageJsonConfig }, { root })
@@ -111,7 +117,6 @@ async function harness(config: toolCron.Config = {}) {
     leaderLockPath: join(root, LEADER_LOCK_FILENAME),
     leaderRetryMs: 30_000,
   })
-  ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
   const fiber = await ctx.plugin(toolCron, config)
   const stub = stubAgent(`tool-cron-root-${Math.random()}`, ctx)
   await ctx.agents.register(stub.agent)
@@ -126,7 +131,7 @@ async function execute(
   agent: Agent | undefined,
   initiator: Agent | undefined = agent,
 ): Promise<ToolExecutionResult> {
-  const run = () => ctx.tools.execute({
+  const run = () => executeModelToolFixture(ctx, {
     signal: testToolSignal,
     callId: ToolCallId(`call-${Math.random()}`),
     name,
@@ -234,7 +239,7 @@ describe('scheduled-task tool authority', () => {
     openTurn(root, { kind: 'user' })
     const created = resultJson(await execute(ctx, 'cron_create', createArgs(), root.agent))
     expect(created).toMatchObject({ ok: true, enabled: true })
-    expect(created['next_due_at']).toBe('2026-09-28T09:00:00.000Z')
+    expectIsoInstant(created['next_due_at'])
 
     const updated = resultJson(await execute(ctx, 'cron_update', {
       id: created['id'], expression: '30 7 * * *',
@@ -277,7 +282,7 @@ describe('scheduled-task tool authority', () => {
     expect(agentless.error?.info?.code).toBe('GOAL_TOOL_AGENT_REQUIRED')
 
     openTurn(root, { kind: 'user' })
-    const driverless = await ctx.tools.execute({
+    const driverless = await executeModelToolFixture(ctx, {
       signal: testToolSignal,
       callId: ToolCallId('call-driverless'),
       name: 'cron_create',

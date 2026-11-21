@@ -1,5 +1,7 @@
 # Scenario E: Local GREEN Is Not Final Completion
 
+English | [中文](README.zh.md)
+
 This scenario validates the TDD completion boundary after one strict TDD slice
 reaches GREEN.
 

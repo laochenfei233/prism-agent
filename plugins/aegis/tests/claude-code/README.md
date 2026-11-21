@@ -1,5 +1,7 @@
 # Claude Code Skills Tests
 
+English | [中文](README.zh.md)
+
 Automated tests for Aegis skills using Claude Code CLI.
 
 ## Overview

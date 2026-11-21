@@ -15,7 +15,7 @@ kind: "package-group"
 
 - [包](#packages)
 - [相关文档](#related-documentation)
-- [开发笔记](#dev-note)
+- [开发备注](#dev-note)
 
 <a id="packages"></a>
 ## 包
@@ -34,7 +34,7 @@ kind: "package-group"
 - [Agent preset](../../.agents/notes/implemented/architecture/2026-09-18-declarative-agent-presets.zh.md)
 
 <a id="dev-note"></a>
-## 开发笔记
+## 开发备注
 
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>

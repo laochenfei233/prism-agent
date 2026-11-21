@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for client-context-menus.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/client-context-menus.md
+/:
+  en: 7e6a06240c504675
+  zh: 2ef5b4e014297ec6
+/client-context-menus:
+  en: 40c24661ee8ba6b6
+  zh: bf7e3247d1f58d1f
+/client-context-menus/s1-problem:
+  en: 58f6668c9aa6131b
+  zh: 8705981be8f3ce64
+/client-context-menus/s2-design:
+  en: 3b04dec3f7765eb7
+  zh: a37382b06a490d90
+/client-context-menus/s3-scope:
+  en: 33ee73ce482c5992
+  zh: 3d262c87b1c8ed04
+/client-context-menus/tasks:
+  en: 264cf505c1ccbd15
+  zh: 3eb530eff6b92d7e
+/client-context-menus/s4-acceptance:
+  en: b1571c32e9a7a3df
+  zh: 9c624e1c38f28460

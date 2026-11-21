@@ -1,0 +1,30 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+/**
+ * The changes type's chip title: the branch glyph before the type's label.
+ * Registered under `sidebar.right.pane.tab.title`; without it the chip would
+ * show the bare label.
+ */
+import type { ReactNode } from 'react'
+import { IconBranchOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+
+/** The title seat narrowed to the one member this component draws. */
+type TitleSeat = ReturnType<PropsRuntime<'sidebar.right.pane.tab.title'>['useTabInfo']>['tab']
+
+/** The title's props, keeping the framework's type for the seat it reads. */
+export type GitTitleProps = { useTabInfo: () => { tab: Pick<TitleSeat, 'title'> } }
+
+/**
+ * The title as the chip and a floating panel's header show it.
+ * @param props - the tab information hook.
+ * @returns the branch glyph followed by the tab's title text.
+ */
+export function GitTitle({ useTabInfo }: GitTitleProps): ReactNode {
+  const { tab } = useTabInfo()
+  return (
+    <>
+      <IconBranchOutlineRegular size={16} />
+      {tab.title}
+    </>
+  )
+}

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.30.1"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -18,7 +18,9 @@ Issues = "https://github.com/deepseek-ai/deepseek-harness/issues"
 Source = "https://github.com/deepseek-ai/deepseek-harness"
 
 [project.scripts]
-dsh = "deepseek_harness_runtime:main"
+# PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+# Upstream installs this console script as `dsh`; this fork installs `prism` so a wheel beside another harness build cannot shadow its command.
+prism = "deepseek_harness_runtime:main"
 
 # Include the injected dsh executable and sidecars; exclude the dev-only node closure.
 [tool.hatch.build]
@@ -33,6 +35,8 @@ exclude = ["src/deepseek_harness_runtime/runtime/node"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deepseek_harness_runtime"]
+# The release job uses Twine 6.2.0, which accepts core metadata through 2.4.
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 

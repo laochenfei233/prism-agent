@@ -3,7 +3,7 @@
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type {
   FileAttachmentRef,
   ImageAttachmentLimits,
@@ -31,15 +31,19 @@ export type { PreparedImageFile } from './store.ts'
 export { readRequestImageFile, requestImageVariantId } from './request-image.ts'
 
 /** Default maximum encoded bytes for one submitted image; oversized sources are refused, not shrunk. */
-export const DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+export const DEFAULT_MAX_IMAGE_BYTES = 50 * 1024 * 1024
 /** Default maximum images in one prompt. */
 export const DEFAULT_MAX_IMAGES_PER_MESSAGE = 20
 /** Default maximum aggregate image bytes in one prompt. */
 export const DEFAULT_MAX_MESSAGE_IMAGE_BYTES = 200 * 1024 * 1024
 /** Default maximum intrinsic pixels for one submitted image. */
 export const DEFAULT_MAX_IMAGE_PIXELS = 64_000_000
-/** Default per-side pixel cap for one submitted image. */
-export const DEFAULT_MAX_IMAGE_DIMENSION = 8192
+/**
+ * Default per-side pixel cap for one submitted image: the largest side a JPEG
+ * can carry. Normalization downscales a long side, so by default the
+ * decoded-pixel limit alone bounds admission.
+ */
+export const DEFAULT_MAX_IMAGE_DIMENSION = 65_535
 /**
  * Default total-pixel budget of the stored normalized image. A larger source
  * is admitted and downscaled proportionally, so admission bounds what rides
@@ -59,9 +63,9 @@ export const MAX_IMAGE_COMPRESSION_CONCURRENCY = 8
 
 /** Local attachment backend configuration. */
 export interface Config {
-  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.dsh`. */
+  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.prism`. */
   dshHome?: string
-  /** Maximum encoded bytes accepted for one submitted image. Default: 20 MiB. */
+  /** Maximum encoded bytes accepted for one submitted image. Default: 50 MiB. */
   maxImageBytes?: number
   /** Maximum image count accepted in one submitted message. Default: 20. */
   maxImagesPerMessage?: number
@@ -69,7 +73,7 @@ export interface Config {
   maxMessageImageBytes?: number
   /** Maximum intrinsic width multiplied by height accepted for one submitted image. Default: 64,000,000. */
   maxImagePixels?: number
-  /** Maximum intrinsic width and maximum intrinsic height accepted for one submitted image. Default: 8192px. */
+  /** Maximum intrinsic width and maximum intrinsic height accepted for one submitted image. Default: 65,535px. */
   maxImageDimension?: number
   /** Total-pixel budget of the stored provider-independent normalized image. */
   normalizedImageMaxPixels?: number
@@ -89,6 +93,29 @@ function abortReason(signal: AbortSignal): Error {
   return reason instanceof Error
     ? reason
     : new Error('Attachment request cancelled with a non-Error reason.', { cause: reason })
+}
+
+/**
+ * Re-check one stored reference against the store's admission limits. A
+ * reference can name an object this process never admitted: session import
+ * copies foreign objects into the store without running admission, so the read
+ * path is the last check before a decode. The media type cannot drift here —
+ * the verified reference already matches the stored header's type — so the
+ * checks are the same pixel-then-dimension order admission applies.
+ * @param ref - reference verified against the stored bytes.
+ * @param limits - resolved admission limits of this store.
+ * @throws {AttachmentError} when the object exceeds a configured admission limit.
+ */
+function assertAdmitted(ref: ImageAttachmentRef, limits: ImageAttachmentLimits): void {
+  if (ref.bytes > limits.maxImageBytes) {
+    throw new AttachmentError('Stored image exceeds the configured byte limit.', 'IMAGE_TOO_LARGE')
+  }
+  if (ref.width * ref.height > limits.maxImagePixels) {
+    throw new AttachmentError('Stored image exceeds the configured pixel limit.', 'IMAGE_TOO_MANY_PIXELS')
+  }
+  if (ref.width > limits.maxImageDimension || ref.height > limits.maxImageDimension) {
+    throw new AttachmentError('Stored image exceeds the configured dimension limit.', 'IMAGE_DIMENSION_TOO_LARGE')
+  }
 }
 
 class SharedRequest<T> {
@@ -222,7 +249,9 @@ export class LocalAttachmentStore extends AttachmentStore {
   }
 
   async readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment> {
-    return readImageFile(this.root, ref, signal)
+    const stored = await readImageFile(this.root, ref, signal)
+    assertAdmitted(stored.ref, this.imageLimits)
+    return stored
   }
 
   override imageHostPath(ref: ImageAttachmentRef): string {

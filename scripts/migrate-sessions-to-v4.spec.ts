@@ -334,11 +334,20 @@ describe('one-time V4 migration command', () => {
     const backendUrl = pathToFileURL(join(repository, 'packages/session/session-persistence-jsonl/src/index.ts')).href
     const generationUrl = pathToFileURL(join(repository, 'packages/session/session-persistence-jsonl/src/generation.ts')).href
     await writeFile(entrypoint, `
-      const { default: Backend } = await import(${JSON.stringify(backendUrl)});
+      const Backend = await import(${JSON.stringify(backendUrl)});
+      const { Context } = await import(${JSON.stringify(pathToFileURL(join(repository, 'vendor/cordis/src/index.ts')).href)});
       const { JsonlGenerationSourceChangedError } = await import(${JSON.stringify(generationUrl)});
-      const open = Backend.prototype.open;
+      const ctx = new Context();
+      let prototype;
+      try {
+        await ctx.plugin(Backend, { root: ${JSON.stringify(temporaryRoot())} });
+        prototype = Object.getPrototypeOf(ctx.sessionPersistence);
+      } finally {
+        await ctx.fiber.dispose();
+      }
+      const open = prototype.open;
       let changed = false;
-      Backend.prototype.open = async function(id, access, options) {
+      prototype.open = async function(id, access, options) {
         if (id === 'a-parent' && access === 'write' && !changed) {
           changed = true;
           throw new JsonlGenerationSourceChangedError(${JSON.stringify(child.path)});
@@ -390,7 +399,7 @@ describe('one-time V4 migration command', () => {
 
   it('shows help, rejects unknown arguments, and logs a missing root failure', async () => {
     const help = await run('--help')
-    expect(help.stdout).toContain('Defaults to ~/.dsh/sessions')
+    expect(help.stdout).toContain("Defaults to the resolved Harness home's sessions directory")
     expect(help.stdout).toContain('CPU count capped at 16')
     expect((await run('--unknown')).status).toBe(1)
     const missing = join(temporaryRoot(), 'missing')

@@ -1,0 +1,22 @@
+# Optional second layer: a durable session-history index.
+#
+# The shipped base and Web layers mount `session-query-sqlite` with an ephemeral
+# in-memory path and `openAt: never`, so ranked content search over past
+# conversations is off and `node:sqlite` is never even imported. This layer gives
+# that index a durable file under the Harness home and defers the import to the
+# first search, which keeps startup quiet.
+#
+# It deliberately does NOT mount a model-facing tool. `dsh-tool-session-query` is
+# not part of every Harness installation — the bundled desktop runtime ships the
+# session-query service and its SQLite provider but not the tool package — so a
+# row naming it fails to import on every boot. Where that package is installed,
+# mount it from the deployment's own patch layer rather than from a bundle that
+# does not depend on it.
+#
+# The cost of this layer is the derived database alone; drop
+# `./session-search.patch.yml` from this package's `dsh.bundle.patch` list to keep
+# the shipped ephemeral index and the memory rows unchanged.
+- id: session-query-sqlite
+  config:
+    path: !!js dshHomePath('session-search.db')
+    openAt: first-search

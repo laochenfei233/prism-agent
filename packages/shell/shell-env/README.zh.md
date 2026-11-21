@@ -54,11 +54,11 @@ contributor 必须声明它返回的每个键；返回未声明或非字符串�
 
 ### 选择 Harness 主目录
 
-唯一配置字段决定暴露为 `DSH_HOME` 的主目录；默认解析顺序为 `dshHome` 配置、环境变量 `$DSH_HOME`，然后是 `~/.dsh`。
+唯一配置字段决定暴露为 `DSH_HOME` 的主目录；默认解析顺序为 `dshHome` 配置、环境变量 `$DSH_HOME`，然后是 `~/.prism`。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `dshHome` | `$DSH_HOME`，然后 `~/.dsh` | 暴露为 `DSH_HOME` 的 Harness 主目录绝对路径 |
+| `dshHome` | `$DSH_HOME`，然后 `~/.prism` | 暴露为 `DSH_HOME` 的 Harness 主目录绝对路径 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-shell-env)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
@@ -87,7 +87,6 @@ contributor 必须声明它返回的每个键；返回未声明或非字符串�
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口、`ShellEnvRegistry` 服务与内置事实 |
-| — | 不发布运行时不变式伴生入口；环境注册表会在每次注册和收集时校验所有权与收集值，也不发布可供伴生入口交叉检查的独立快照。 |
 
 ### 收集
 

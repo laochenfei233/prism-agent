@@ -23,6 +23,9 @@ function updateCopy(state: DesktopUpdatePresentation, t: SettingsTranslate): { l
     error: t('desktop.update.retry'),
   }
   const label = labels[state.phase]
+  if (state.phase === 'checking' || state.phase === 'verifying' || state.phase === 'installing') {
+    return { label, detail: state.version ?? label }
+  }
   if (state.phase === 'error') {
     const failures: Readonly<Record<DesktopUpdateFailureKind, string>> = {
       check: t('desktop.update.checkFailed'),
@@ -34,6 +37,7 @@ function updateCopy(state: DesktopUpdatePresentation, t: SettingsTranslate): { l
       'stop-failed': t('desktop.update.stopFailed'),
       'tasks-changed': t('desktop.update.tasksChanged'),
       'tasks-unavailable': t('desktop.update.tasksUnavailable'),
+      'fullscreen-timeout': t('desktop.update.fullscreenTimeout'),
     }
     return { label, detail: failures[state.failure ?? 'install'] }
   }

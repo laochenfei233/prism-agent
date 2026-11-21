@@ -423,7 +423,7 @@ export async function saveImageFile(
 /**
  * Read and verify one content-addressed image.
  * @param root - absolute `DSH_HOME/attachments/v1` root.
- * @param ref - reference recorded in the session log.
+ * @param ref - supplied image reference; display fields are returned unchanged.
  * @param signal - optional cancellation for filesystem and verification work.
  * @returns verified bytes and reference.
  * @throws the signal reason when aborted, or an AttachmentError when verification fails.
@@ -445,9 +445,11 @@ export async function readImageFile(
   }
   signal?.throwIfAborted()
   if (digest(data) !== sha256) throw new AttachmentError('Stored attachment failed integrity verification.', 'ATTACHMENT_CORRUPT')
-  // The digest proves these are the exact bytes admission fully decoded, so
-  // the read path only re-derives the header fields (no raster decode, no
-  // per-request pixel amplification on history replay).
+  // The digest proves these are the bytes the writer published; the store
+  // re-checks admission limits afterwards because a reference can name an
+  // object copied in by session import. The read path still only re-derives
+  // the header fields (no raster decode, no per-request pixel amplification on
+  // history replay).
   const metadata = await probeImage(data)
   signal?.throwIfAborted()
   if (metadata.mediaType !== ref.mediaType || data.byteLength !== ref.bytes

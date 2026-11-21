@@ -2,7 +2,7 @@
 
 English | [中文](python-sdk.zh.md)
 
-This tutorial installs the published Python SDK, runs the shipped standalone minimal profile, and shows how to customize the same `dsh` profile from your own program.
+This tutorial installs the published Python SDK, runs the shipped standalone minimal profile, and shows how to customize the same harness profile from your own program.
 
 ## Prerequisites
 
@@ -39,7 +39,7 @@ python -m pip install deepseek-harness-sdk
 
 :::
 
-The installation includes a matching native runtime wheel and the `dsh` command. Normal SDK execution needs no system Node.js. Repository contributors who build the artifacts should use the [Python contributor workflow](../../../python/development.md).
+The installation includes a matching native runtime wheel and the `prism` command. Normal SDK execution needs no system Node.js. Repository contributors who build the artifacts should use the [Python contributor workflow](../../../python/development.md).
 
 ## Run the checked-in example
 
@@ -91,7 +91,7 @@ python python/sdk/examples/minimal.py `
 
 :::
 
-The script prints the final assistant response. The selected home receives the generated `sdk-minimal` profile, installed plugins, and uncompressed JSONL session logs under `sessions/`. The example and SDK never silently read `~/.dsh`.
+The script prints the final assistant response or the command result supplied by the selected profile. The selected home receives the generated `sdk-minimal` profile, installed plugins, and uncompressed JSONL session logs under `sessions/`. The example and SDK never silently resolve a default home.
 
 ## Use the SDK in your program
 
@@ -118,11 +118,11 @@ with DeepSeekHarness(
 print(result.final_response)
 ```
 
-The SDK starts the bundled `dsh --profile sdk-minimal` process lazily and reuses it until context-manager exit. The profile, its persistent patch, the home patch, and any ordered `patches` tuple form the application configuration. There is no separate Python runtime bin or complete-config option.
+The SDK starts the bundled `prism --profile sdk-minimal` process lazily and reuses it until context-manager exit. The profile, its persistent patch, the home patch, and any ordered `patches` tuple form the application configuration. There is no separate Python runtime bin or complete-config option.
 
 ## Install or define plugins
 
-Use `dsh plugin` for dependencies and bundle layers that should persist in this home:
+Use `prism plugin` for dependencies and bundle layers that should persist in this home:
 
 <div>
 <a id="linux-and-macos-3"></a>
@@ -133,14 +133,14 @@ Use `dsh plugin` for dependencies and bundle layers that should persist in this 
 
 ```sh [Linux/macOS]
 export DSH_HOME=/absolute/path/to/example-dsh-home
-dsh --profile sdk-minimal --dump-default-config >/dev/null
-dsh plugin --profile sdk-minimal add file:/absolute/path/to/my-plugin-bundle
+prism --profile sdk-minimal --dump-default-config >/dev/null
+prism plugin --profile sdk-minimal add file:/absolute/path/to/my-plugin-bundle
 ```
 
 ```powershell [Windows PowerShell]
 $env:DSH_HOME = "C:\work\example-dsh-home"
-dsh --profile sdk-minimal --dump-default-config | Out-Null
-dsh plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
+prism --profile sdk-minimal --dump-default-config | Out-Null
+prism plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
 ```
 
 :::
@@ -152,19 +152,15 @@ Another `profile` is valid when it includes `@deepseek-ai/dsh-sdk-app` or anothe
 <a id="opt-in-to-str_replace_editor"></a>
 ### Opt in to `str_replace_editor`
 
-The bundled runtime includes `str_replace_editor`, but `sdk-minimal` omits it from the default Cordis tree. To use it, save this configuration as `editor.patch.yml`; `insert` adds both the editor and the filesystem provider that the minimal profile lacks:
+The bundled runtime includes `str_replace_editor`, but `sdk-minimal` omits it from the default Cordis tree. To use it, save this configuration as `editor.patch.yml`; `insert` adds the editor using the existing filesystem provider:
 
 ```yaml
 - insert:
-    - id: fs-local
-      name: '@deepseek-ai/dsh-fs-local'
-      config:
-        cwd: !!js process.cwd()
     - id: tool-str-replace-editor
       name: '@deepseek-ai/dsh-tool-str-replace-editor'
 ```
 
-Pass `patches=("/absolute/path/to/editor.patch.yml",)` when constructing `DeepSeekHarness(profile="sdk-minimal", ...)`, or put the patch in `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent configuration. On the next runtime launch, model requests include `str_replace_editor` beside the persistent shell. The local filesystem provider uses the runtime working directory for relative paths; like the minimal shell, it does not confine access to that directory. For the standard `sdk` profile, insert only the editor row so it uses the existing filesystem provider and policies.
+Pass `patches=("/absolute/path/to/editor.patch.yml",)` when constructing `DeepSeekHarness(profile="sdk-minimal", ...)`, or put the patch in `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent configuration. On the next runtime launch, model requests include `str_replace_editor` beside the default tools. The local filesystem provider uses the runtime working directory for relative paths; like the minimal shell, it does not confine access to that directory. The same patch works with the standard `sdk` profile.
 
 ## Understand the minimal profile
 
@@ -172,15 +168,18 @@ Pass `patches=("/absolute/path/to/editor.patch.yml",)` when constructing `DeepSe
 |---|---|
 | System prompt | `DSH_SYSTEM_PROMPT`, falling back to `You are a helpful software engineer assistant.` |
 | Model in `minimal.py` | `--model`, then `DSH_MODEL`, then `deepseek-v4-flash` |
-| Model-facing tool | Persistent `bash` on Linux/macOS or `pwsh` on Windows |
+| Model-facing tools | Persistent `bash` on Linux/macOS or `pwsh` on Windows, `read_image`, and `working_directory` |
 | Shell timeout | 300 seconds |
-| Runtime context and compaction | Absent |
+| Optional runtime context | Absent |
+| Context compaction | Automatic; summarizes older history through an additional model request |
 | Session persistence | Uncompressed JSONL under `<dsh_home>/sessions` |
 
-The profile's sole bundle inserts the complete tree over an empty root and does not include `dsh-base`; later base-profile tools therefore cannot appear implicitly. It contains the SDK protocol, one environment-configured DeepSeek adapter, local execution, and persistence, while filesystem tools, settings, managed credentials, OTel telemetry, Web tools, subagents, local instruction discovery, and compaction are absent. The [DeepSeek session-log contributor](../../../packages/session/session-log-deepseek/README.md) uploads complete unaccepted log suffixes with DeepSeek requests by default; set `session-log-deepseek.enabled: false` in a profile patch to disable it. It pins `danger-full-access`, so the platform-selected persistent shell can modify any path visible to the runtime; use a disposable checkout or container.
+The profile's sole bundle inserts the complete tree over an empty root and does not include `dsh-base`; later base-profile tools therefore cannot appear implicitly. It contains the SDK protocol, one environment-configured DeepSeek adapter, local execution, and persistence, while text file tools, settings, managed credentials, OTel telemetry, Web tools, subagents, and local instruction discovery are absent. The [DeepSeek session-log contributor](../../../packages/session/session-log-deepseek/README.md) uploads unaccepted log events with DeepSeek requests by default, at most `maxBytes` (8 MiB) per request; set `session-log-deepseek.enabled: false` in a profile patch to disable it. It pins `danger-full-access`, so the platform-selected persistent shell can modify any path visible to the runtime; use a disposable checkout or container.
+
+Image reading requires an image-capable route. Automatic compaction preserves the complete Session log; see the [bundle reference](../../../packages/bundle/sdk-minimal/README.md) for model and storage effects. In this `sdk-minimal` composition, unsupported slash input remains ordinary prompt text.
 
 The installed wheel still packages the full `web` profile and frontend assets. Run `dsh web` against an explicit `DSH_HOME` when a Python SDK deployment also needs the browser application; `web` is a separate CLI application and cannot serve a Python SDK client.
 
 Use a fresh home when profiles, plugins, credentials, settings, and sessions must be isolated. Use a fresh session id for independent work; reuse a harness, home, and id only to continue the same durable conversation and session-owned resources.
 
-The [bundle reference](../../../packages/bundle/sdk-minimal/README.md) owns the exact tree, and the [example reference](../../../python/sdk/examples/README.md) owns the runnable program. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, and low-level behavior; the [dsh CLI reference](../../../apps/cli/reference/README.md) covers profile layering.
+The [bundle reference](../../../packages/bundle/sdk-minimal/README.md) owns the exact tree, and the [example reference](../../../python/sdk/examples/README.md) owns the runnable program. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, and low-level behavior; the [prism CLI reference](../../../apps/cli/reference/README.md) covers profile layering.

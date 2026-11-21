@@ -9,7 +9,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { PreparationCard, VoicePreparation } from '../src/client/PreparationCard.tsx'
 import type { VoiceInputProps } from '../src/client/VoiceInput.tsx'
 import type { SpeechReadiness } from '../src/client/readiness.ts'
-import { zh } from '../src/client/locales.ts'
+import { Recording } from '../src/client/audio.ts'
+import { zh, en, ja, es, fr, de, ru, pt } from '../src/client/locales.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
 const id = 'local' as SpeechProviderId, t = makeTranslate(zh, commonZh)
@@ -113,11 +114,13 @@ it('persists settings and reports disconnection in the detail card', async () =>
   const store = createSnapshotStore<SpeechReadiness>({ connected: true, error: null, catalog: {
     selection: { providerId: id, language: 'auto' }, maxAudioBytes: 100, maxDurationSeconds: 120,
     providers: [{ id, name: 'SenseVoiceSmall', location: 'host-local', languages: ['auto', 'zh', 'en', 'ja'], preparation: { phase: 'ready' } },
-      { id: 'cloud' as SpeechProviderId, name: 'Cloud', location: 'cloud', languages: ['auto', 'en', 'zh', 'ja', 'fr'], preparation: { phase: 'ready' } }],
+      { id: 'cloud' as SpeechProviderId, name: 'Cloud', location: 'cloud', languages: ['auto', 'en', 'zh', 'ja', 'fr', 'it'], preparation: { phase: 'ready' } }],
   } })
   const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
   const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
-    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn() }
+    useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })),
+    selectMicrophone: vi.fn(), createRecording: () => new Recording(() => {}),
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}) }
   const view = render(<VoicePreparation {...props} />)
   fireEvent.change(screen.getByLabelText(zh.provider), { target: { value: 'cloud' } })
   await waitFor(() => { expect(configure).toHaveBeenCalledWith({ providerId: 'cloud' }) })
@@ -125,8 +128,9 @@ it('persists settings and reports disconnection in the detail card', async () =>
   act(() => { store.set({ ...current, catalog: { ...current.catalog!, selection: { providerId: 'cloud' as SpeechProviderId, language: 'en' } } }) })
   expect(screen.getByText(zh.cloud)).toBeTruthy()
   expect(within(screen.getByLabelText(zh.language)).getAllByRole<HTMLOptionElement>('option').map(item => item.value))
-    .toEqual(['auto', 'en', 'zh', 'ja', 'fr'])
-  expect(within(screen.getByLabelText(zh.language)).getByRole('option', { name: 'fr' })).toBeTruthy()
+    .toEqual(['auto', 'en', 'zh', 'ja', 'fr', 'it'])
+  expect(within(screen.getByLabelText(zh.language)).getByRole('option', { name: zh.fr })).toBeTruthy()
+  expect(within(screen.getByLabelText(zh.language)).getByRole('option', { name: 'it' })).toBeTruthy()
   configure.mockRejectedValueOnce(new Error('settings are read-only'))
   fireEvent.change(screen.getByLabelText(zh.language), { target: { value: 'zh' } })
   await screen.findByText('语音识别失败：settings are read-only')
@@ -137,6 +141,40 @@ it('persists settings and reports disconnection in the detail card', async () =>
   view.rerender(<VoicePreparation {...props} />)
   expect(screen.getByText(zh.loading)).toBeTruthy()
   expect(screen.getByRole('alert').textContent).toContain('disconnected')
+})
+it('offers the models a recognizer publishes and persists the choice', async () => {
+  const store = createSnapshotStore<SpeechReadiness>({ connected: true, error: null, catalog: {
+    selection: { providerId: id, language: 'auto' }, maxAudioBytes: 100, maxDurationSeconds: 120,
+    providers: [
+      { id, name: 'SenseVoiceSmall', location: 'host-local', languages: ['auto'], preparation: { phase: 'ready' } },
+      { id: 'cloud' as SpeechProviderId, name: 'Cloud', location: 'cloud', languages: ['auto'], model: 'whisper-1',
+        models: ['whisper-1', 'gpt-4o-transcribe'], preparation: { phase: 'ready' } },
+      { id: 'unnamed' as SpeechProviderId, name: 'Unnamed', location: 'cloud', languages: ['auto'],
+        models: ['a', 'b'], preparation: { phase: 'ready' } },
+    ],
+  } })
+  const configure = vi.fn<VoiceInputProps['configure']>(async () => {})
+  const props = { useSpeechReadiness: bindSnapshotSelector(store), configure, t,
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), transcribe: vi.fn(), createRecording: vi.fn(),
+    selectMicrophone: vi.fn(), useMicrophoneDevice: bindSnapshotSelector(createSnapshotStore({ id: '', label: '' })) }
+  render(<VoicePreparation {...props} />)
+  const select = (): HTMLSelectElement => screen.getByLabelText(zh.model) as HTMLSelectElement
+  const selectProvider = (providerId: string, model?: string): void => {
+    const current = store.getSnapshot()
+    act(() => { store.set({ ...current, catalog: { ...current.catalog!,
+      selection: { providerId: providerId as SpeechProviderId, language: 'auto', ...model === undefined ? {} : { model } } } }) })
+  }
+  // A recognizer that offers no choice runs the model its deployment configured.
+  expect(screen.queryByLabelText(zh.model)).toBeNull()
+  selectProvider('cloud')
+  expect(select().value).toBe('whisper-1')
+  fireEvent.change(select(), { target: { value: 'gpt-4o-transcribe' } })
+  await waitFor(() => { expect(configure).toHaveBeenCalledWith({ model: 'gpt-4o-transcribe' }) })
+  selectProvider('cloud', 'gpt-4o-transcribe')
+  expect(select().value).toBe('gpt-4o-transcribe')
+  // A recognizer that lists choices without naming a default has no current value to show.
+  selectProvider('unnamed')
+  expect(screen.queryByLabelText(zh.model)).toBeNull()
 })
 it.each(['cancelled', 'standby', 'cancelling'] as const)('displays Host state %s', (phase) => {
   fixture(phase === 'cancelling' ? { phase, startedAt: Date.now() } : { phase })
@@ -208,4 +246,15 @@ it('locks source changes while a preparation request is pending and hides them d
   expect(screen.getByLabelText<HTMLSelectElement>(zh.sourceChoice).disabled).toBe(true)
   b.rerender(<PreparationCard {...b.props} provider={{ ...provider, preparation: { phase: 'downloading', resource: 'model.onnx', completedBytes: 0 } }} />)
   expect(screen.queryByLabelText(zh.sourceChoice)).toBeNull()
+})
+
+it('gives each speech recognition language a distinct localized name', () => {
+  for (const dictionary of [zh, en, ja, es, fr, de, ru, pt]) {
+    const names = [
+      dictionary.zh, dictionary.en, dictionary.yue, dictionary.ja, dictionary.es,
+      dictionary.fr, dictionary.de, dictionary.ru, dictionary.pt, dictionary.ko,
+    ]
+    expect(new Set(names).size).toBe(names.length)
+  }
+  expect(zh.fr).toBe('法语')
 })

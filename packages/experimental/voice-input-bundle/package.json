@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-voice-input-bundle",
-  "description": "Experimental voice input with local SenseVoice; downloads its runtime on first use",
-  "version": "0.1.7-rc.1",
+  "description": "Experimental voice input with a local SenseVoice recognizer and a DashScope online recognizer; the local runtime downloads on first use",
+  "version": "0.2.2-rc.1",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -27,6 +27,7 @@
   "files": [
     "icon.svg",
     "locale/*.json",
+    "docs",
     "lib/index.js",
     "cordis.patch.yml",
     "lib/types/**/*.d.ts"
@@ -35,8 +36,11 @@
   "dependencies": {
     "@deepseek-ai/dsh-experimental-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-experimental-speech-to-text-sensevoice": "workspace:*",
+    "@deepseek-ai/dsh-experimental-speech-to-text-dashscope": "workspace:*",
+    "@deepseek-ai/dsh-experimental-speech-to-text-http": "workspace:*",
     "@deepseek-ai/dsh-experimental-api-speech-to-text": "workspace:*",
-    "@deepseek-ai/dsh-experimental-client-ui-voice-input": "workspace:*"
+    "@deepseek-ai/dsh-experimental-client-ui-voice-input": "workspace:*",
+    "@deepseek-ai/dsh-experimental-client-ui-settings-speech": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~"
@@ -44,7 +48,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
-    "js-yaml": "^4.2.0"
+    "js-yaml": "^4.3.2"
   },
   "dsh": {
     "bundle": {

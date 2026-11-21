@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for session-workspace-manager.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/session-workspace-manager.md
+/:
+  en: 3f01fe68653019ba
+  zh: 3f01fe68653019ba
+/section:
+  en: 3ef4690f297e43f2
+  zh: a489a0829fc65f28
+/section/report:
+  en: c167d17eed9dcc78
+  zh: c167d17eed9dcc78
+/section/s1:
+  en: 69fdf673f814d7b2
+  zh: 69fdf673f814d7b2
+/section/s2:
+  en: 3c4e147edaa36f87
+  zh: 3c4e147edaa36f87
+/section/s2/s2-1:
+  en: c8e462f3cffa86d3
+  zh: c8e462f3cffa86d3
+/section/s2/s2-2:
+  en: 65fa24a4439b4d2e
+  zh: 65fa24a4439b4d2e
+/section/s2/s2-3:
+  en: 2dc90f9811c2d4ae
+  zh: 2dc90f9811c2d4ae
+/section/s2/s2-4:
+  en: e03952cfa9991261
+  zh: e03952cfa9991261
+/section/s2/s2-5:
+  en: a7d248e7f00764b9
+  zh: a7d248e7f00764b9
+/section/s2/s2-6-ai:
+  en: 5284026d2e50cff2
+  zh: 5284026d2e50cff2
+/section/s2/s2-7:
+  en: a6f31bfba285fea7
+  zh: a6f31bfba285fea7
+/section/s2/s2-8:
+  en: 1c295e46b9632058
+  zh: 1c295e46b9632058
+/section/s3:
+  en: 2bb6e2b190e9e13e
+  zh: 2bb6e2b190e9e13e
+/section/tasks:
+  en: 65bbe4f7158d002b
+  zh: 65bbe4f7158d002b
+/section/s4:
+  en: eaccd606e19c2413
+  zh: eaccd606e19c2413

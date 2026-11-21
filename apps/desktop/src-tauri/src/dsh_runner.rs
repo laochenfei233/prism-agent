@@ -2,6 +2,7 @@
 //! start left running, spawn, port health probe, automatic crash restart, and
 //! clean teardown on app exit.
 
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -9,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
@@ -27,6 +28,13 @@ const SERVER_RECORD_NAME: &str = "desktop-server.json";
 /// milliseconds; anything slower is treated as absent so the cold path never
 /// waits on a dead record.
 const ADOPT_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+/// Bound on reaping the hub at exit. The kill itself is immediate; a hub that
+/// somehow outlives it must not hold the shell's exit open.
+const HUB_KILL_TIMEOUT: Duration = Duration::from_secs(3);
+/// Budget for enumerating rival hubs. The sweep sits on the startup path, so a
+/// stuck shell is killed and treated as an empty sweep instead of holding the
+/// splash.
+const ENUMERATION_TIMEOUT: Duration = Duration::from_secs(3);
 
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-startup-latency.md (S5).
 /// The live server a previous shell start left behind, named by the launch URL
@@ -128,6 +136,9 @@ impl DshHandle {
                 }
                 continue;
             }
+            // No hub to adopt: every one of our hubs still running is a rival
+            // of the fresh one this shell is about to boot.
+            sweep_rival_servers(None).await;
             let (child, port) = match self.spawn_child(app.clone()).await {
                 Ok(owned) => owned,
                 Err(err) => {
@@ -147,6 +158,12 @@ impl DshHandle {
             };
             if !ready {
                 if self.stopping.load(Ordering::SeqCst) {
+                    // Quit landed while this hub was still booting: it was not
+                    // in the child slot yet when the exit path looked, so it is
+                    // ended here instead of being left serving the port.
+                    if let Some(mut child) = self.child.lock().await.take() {
+                        end_owned_child(&mut child).await;
+                    }
                     return;
                 }
                 // Process died before the port ever answered.
@@ -214,6 +231,10 @@ impl DshHandle {
             .await
             .ok()
             .flatten()?;
+        // The adopted hub is the sole survivor: rivals left by dead shells or
+        // parallel launches hold session writer locks the user sees as
+        // "occupied by another dsh".
+        sweep_rival_servers(Some(record.pid)).await;
         self.port.store(record.port, Ordering::SeqCst);
         *self.auth_url.lock().unwrap() = Some(record.url.clone());
         append_startup_log(&format!(
@@ -228,7 +249,7 @@ impl DshHandle {
         append_startup_log("spawn_child: begin");
         self.auth_url.lock().unwrap().take();
         self.ensure_home_node_modules()?;
-        crate::setup::ensure_default_plugins(&app)?;
+        crate::setup::ensure_default_plugins(&app, &self.node_path, &self.dsh_bin)?;
         append_startup_log("spawn_child: default plugins ready");
         let port = match select_port() {
             Ok(port) => port,
@@ -238,13 +259,18 @@ impl DshHandle {
             }
         };
         let mut cmd = Command::new(&self.node_path);
-        // The dsh child only understands `DSH_HOME`, so hand it Prism's
-        // resolved home; without this it falls back to `~/.dsh`.
+        // The dsh child reads its home from `$DSH_HOME`, so pin the shell's
+        // resolved Prism home instead of leaving the resolved default in play.
         cmd.env("DSH_HOME", crate::setup::dsh_home());
         cmd.arg(&self.dsh_bin)
             .arg("web")
             .arg("--port")
             .arg(port.to_string())
+            // Bind the machine's private LAN addresses too, so a phone on the
+            // same network reaches the hub on INTERNAL_PORT without a
+            // forwarder; the hub resolves the addresses itself at startup, so
+            // a DHCP change takes effect on the next relaunch.
+            .arg("--bind-lan")
             .arg("--no-open")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -364,17 +390,34 @@ impl DshHandle {
         Ok((child, port))
     }
 
-    /// Stop the dsh process for good — app exit and tray Quit. A hub this shell
-    /// only adopted has no child to end and keeps serving, so its record stays
-    /// for the next start; nothing here touches it.
+    /// End every hub this home is serving, then return — app exit and tray
+    /// Quit. Nothing this app runs outlives its window, so a hub this shell only
+    /// adopted is ended here too: an earlier shell that died abruptly leaves the
+    /// hub it started on the loopback port, and quitting is the last point that
+    /// can end it.
+    ///
+    /// The kill runs to completion before the process exits rather than on a
+    /// spawned task: a task is dropped with the runtime, and the hub of every
+    /// quit survived it.
     pub fn stop(&self) {
         self.stopping.store(true, Ordering::SeqCst);
-        let child = self.child.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Some(mut child) = child.lock().await.take() {
+        tauri::async_runtime::block_on(async {
+            if let Some(mut child) = self.child.lock().await.take() {
+                end_owned_child(&mut child).await;
                 forget_server();
-                let _ = child.kill().await;
-                let _ = child.wait().await;
+                return;
+            }
+            // An adopted hub is no longer this shell's child, so it is ended by
+            // pid — and only a pid the record still proves: re-reading it
+            // requires the process on that port to answer with the launch token
+            // the recorded hub printed, which the pid of a replaced hub cannot.
+            let path = server_record_path();
+            let bin = self.dsh_bin.clone();
+            let adopted =
+                tauri::async_runtime::spawn_blocking(move || adopt_decision(&path, &bin)).await;
+            if let Ok(Some(record)) = adopted {
+                terminate_pid(record.pid);
+                forget_server();
             }
         });
     }
@@ -569,6 +612,21 @@ fn forget_server() {
     let _ = std::fs::remove_file(server_record_path());
 }
 
+/// End the hub this shell spawned, together with everything it derived. The
+/// hub's own children — language servers, persistent terminals, commands
+/// started through the shell tool, MCP servers — hold the workspace and the
+/// loopback port; ending the hub alone leaves them with no parent and no record
+/// for a later shell to adopt, which is how a quit used to leave a workspace in
+/// use by nobody.
+async fn end_owned_child(child: &mut Child) {
+    if let Some(pid) = child.id() {
+        terminate_pid(pid);
+    }
+    // The tree kill runs as another process and can lose the race against a hub
+    // that exits on its own; this one cannot, and it reaps.
+    let _ = tokio::time::timeout(HUB_KILL_TIMEOUT, child.kill()).await;
+}
+
 /// Stop a server an earlier shell start left running. Windows has no portable
 /// std API for a foreign pid, so this reuses the hidden-console `cmd` pattern
 /// that `ensure_home_node_modules` uses for junctions; the pid is only ever
@@ -590,6 +648,131 @@ fn terminate_pid(pid: u32) {
             .arg(pid.to_string())
             .status();
     }
+}
+
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/desktop-single-hub-sweep.md (S5).
+/// True when `command_line` boots one of this product's `dsh web` hubs: the
+/// installed closure (`<install>/runtime/prism/lib/bin.js`, or the mac app's
+/// `Contents/Resources/runtime/prism/...`) or this checkout's built CLI
+/// (`.../prism-agent/apps/cli/lib/bin.js`, linked worktrees included). Another
+/// harness build boots from a different path and must never match.
+fn is_our_dsh_web_server(command_line: &str) -> bool {
+    // CIM returns the quoted image path, so the two flags are matched as
+    // separate substrings; separator normalization makes one rule match the
+    // Windows and macOS command lines.
+    let line = command_line.to_lowercase().replace('\\', "/");
+    let own_runtime = line.contains("/runtime/prism/")
+        || (line.contains("prism-agent/") && line.contains("/apps/cli/"));
+    own_runtime && line.contains("bin.js") && line.contains(" web --port")
+}
+
+/// The sweep decision: every sampled pid that boots one of this product's
+/// hubs except `keep`, the hub the shell is about to adopt.
+fn rival_pids(samples: &[(u32, String)], keep: Option<u32>) -> Vec<u32> {
+    samples
+        .iter()
+        .filter(|(pid, line)| Some(*pid) != keep && is_our_dsh_web_server(line))
+        .map(|(pid, _)| *pid)
+        .collect()
+}
+
+/// Enumerate `node.exe` command lines as (pid, command line) samples under the
+/// enumeration budget.
+#[cfg(windows)]
+async fn list_process_samples() -> Vec<(u32, String)> {
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut cmd = Command::new("powershell");
+    cmd.creation_flags(CREATE_NO_WINDOW)
+        .kill_on_drop(true)
+        .args([
+            "-NoProfile",
+            "-Command",
+            // PowerShell 5.1 encodes redirected output in the console code page,
+            // so a non-ASCII path would make the JSON invalid UTF-8 and disable
+            // the sweep. The parser reads UTF-8.
+            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
+        ]);
+    match tokio::time::timeout(ENUMERATION_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => parse_cim_samples(&output.stdout),
+        _ => Vec::new(),
+    }
+}
+
+/// Parses the CIM query's `ConvertTo-Json` output: one match is a bare object,
+/// several are an array. Entries whose command line is unreadable are skipped,
+/// and output that is not JSON yields an empty sweep.
+#[cfg(windows)]
+fn parse_cim_samples(stdout: &[u8]) -> Vec<(u32, String)> {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(stdout) else {
+        return Vec::new();
+    };
+    let items: Vec<serde_json::Value> = match value {
+        serde_json::Value::Array(items) => items,
+        item @ serde_json::Value::Object(_) => vec![item],
+        _ => return Vec::new(),
+    };
+    items
+        .iter()
+        .filter_map(|item| {
+            let pid = item.get("ProcessId")?.as_u64()? as u32;
+            let line = item.get("CommandLine")?.as_str()?.to_owned();
+            Some((pid, line))
+        })
+        .collect()
+}
+
+/// Enumerate process command lines as (pid, command line) samples under the
+/// enumeration budget. `ps` lists every process; the signature decides which
+/// ones are ours.
+#[cfg(not(windows))]
+async fn list_process_samples() -> Vec<(u32, String)> {
+    let mut cmd = Command::new("ps");
+    // -ww disables the terminal-width truncation that would cut off the
+    // ` web --port` tail.
+    cmd.kill_on_drop(true)
+        .args(["-axo", "pid=,command=", "-ww"]);
+    match tokio::time::timeout(ENUMERATION_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) => parse_ps_samples(&String::from_utf8_lossy(&output.stdout)),
+        _ => Vec::new(),
+    }
+}
+
+/// Parses `ps -axo pid=,command= -ww`: right-aligned pid, one space, command.
+#[cfg(not(windows))]
+fn parse_ps_samples(stdout: &str) -> Vec<(u32, String)> {
+    stdout
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            let (pid, command) = line.split_once(' ')?;
+            let pid = pid.trim().parse().ok()?;
+            Some((pid, command.trim_start().to_owned()))
+        })
+        .collect()
+}
+
+/// One shell, one hub: end every rival hub of this product except `keep`.
+/// Rivals are what a dead shell leaves behind, what a parallel launch boots
+/// beside the adopted hub, and what a dev shell runs from this checkout; their
+/// session writer locks are the `session/writer-held` the user sees. Runs
+/// before an adoption is published and before every spawn.
+async fn sweep_rival_servers(keep: Option<u32>) {
+    if cfg!(debug_assertions) {
+        // Dev shells compare against the installed app; they must not end its hub.
+        return;
+    }
+    let targets = rival_pids(&list_process_samples().await, keep);
+    if targets.is_empty() {
+        return;
+    }
+    let attempted = targets.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        for pid in &targets {
+            terminate_pid(*pid);
+        }
+    })
+    .await;
+    append_startup_log(&format!("rival dsh web sweep targets: {attempted:?}"));
 }
 
 /// Choose the port for the next `dsh web` spawn: the default `INTERNAL_PORT`
@@ -775,7 +958,7 @@ where
 ///
 /// Production layout (bundled by `scripts/bundle-runtime.mjs`):
 ///   <resource>/runtime/node/<node>          node binary
-///   <resource>/runtime/dsh/.../lib/bin.js   @deepseek-ai/dsh CLI
+///   <resource>/runtime/prism/.../lib/bin.js   this fork's CLI (prism-agent)
 ///
 /// Dev fallback: `node` from PATH and `DSH_DESKTOP_DSH_BIN`, defaulting to
 /// the repo's built `apps/cli/lib/bin.js` when present.
@@ -789,7 +972,7 @@ pub(crate) fn resolve_runtime(app: &AppHandle) -> Result<(PathBuf, PathBuf), Str
     let node_exe = if cfg!(windows) { "node.exe" } else { "node" };
     let bundled_node = runtime_root.join("node").join(node_exe);
     // pnpm deploy lays the target package out at the closure root: lib/bin.js.
-    let bundled_bin = runtime_root.join("dsh").join("lib").join("bin.js");
+    let bundled_bin = runtime_root.join("prism").join("lib").join("bin.js");
 
     if bundled_node.exists() && bundled_bin.exists() {
         return Ok((plain_path(&bundled_node), plain_path(&bundled_bin)));
@@ -880,6 +1063,102 @@ fn plain_path(p: &Path) -> PathBuf {
         p.to_path_buf()
     }
 }
+
+/// Name and value of the signed browser-session cookie the launch exchange mints.
+#[derive(Debug)]
+struct AuthCookie {
+    name: String,
+    value: String,
+}
+
+/// The proxy origin the app window loads after the launch-token exchange.
+#[derive(Serialize)]
+pub struct WebviewSession {
+    pub url: String,
+}
+
+/// Read the sole dsh browser-session cookie from the token-exchange response.
+fn auth_cookie_from_response(response: &str) -> Option<AuthCookie> {
+    let header_block = response.split("\r\n\r\n").next()?;
+    let set_cookie = header_block.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("set-cookie")
+            .then(|| value.trim())
+    })?;
+    let (name, value) = set_cookie.split(';').next()?.split_once('=')?;
+    let name = name.trim();
+    if !name.starts_with("dsh-auth-") {
+        return None;
+    }
+    Some(AuthCookie {
+        name: name.to_owned(),
+        value: value.trim().to_owned(),
+    })
+}
+
+/// Exchange the one-time URL token over loopback HTTP for the signed session.
+/// The exchange doubles as the liveness probe, failing before any window can
+/// display the 401 body.
+async fn launch_exchange(parsed: Url) -> Result<AuthCookie, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let port = parsed.port().ok_or("invalid dsh web launch URL")?;
+        let target = match parsed.query() {
+            Some(query) => format!("{}?{query}", parsed.path()),
+            None => parsed.path().to_owned(),
+        };
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        use std::io::Write;
+        stream
+            .write_all(
+                format!(
+                    "GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        let mut response = String::new();
+        std::io::Read::read_to_string(&mut stream, &mut response)
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        auth_cookie_from_response(&response)
+            .ok_or_else(|| "launch-token response contained no dsh browser cookie".to_owned())
+    })
+    .await
+    .map_err(|e| format!("launch-token exchange task failed: {e}"))?
+}
+
+/// Exchange the launch token, point the app proxy at the session it mints, and
+/// return the proxy origin the window loads.
+///
+/// The window never authenticates through its own cookie jar: the proxy
+/// attaches the signed session to every request and WebSocket handshake. The
+/// frame therefore keeps working where a third-party cookie is withheld, and a
+/// restarted server only replaces the session behind an origin that never
+/// changes.
+#[tauri::command]
+pub async fn authenticate_webview(url: String) -> Result<WebviewSession, String> {
+    let parsed = url
+        .parse::<Url>()
+        .ok()
+        .filter(|parsed| {
+            parsed.scheme() == "http"
+                && parsed.host_str() == Some("127.0.0.1")
+                && parsed.port().is_some()
+        })
+        .ok_or("invalid dsh web launch URL")?;
+    let port = parsed.port().ok_or("invalid dsh web launch URL")?;
+    let cookie = launch_exchange(parsed).await?;
+    crate::proxy::session_updated(port, format!("{}={}", cookie.name, cookie.value));
+    let proxy_port = crate::proxy::ensure_started().await?;
+    crate::proxy::self_check().await;
+    Ok(WebviewSession {
+        url: format!("http://127.0.0.1:{proxy_port}/"),
+    })
+}
+
 
 #[derive(Serialize)]
 pub struct DshStatus {
@@ -1004,6 +1283,96 @@ mod tests {
     }
 
     #[test]
+    fn rival_sweep_kills_orphans_and_dev_hubs_but_spares_the_kept_hub() {
+        let hub = r#""C:\Users\fei\AppData\Local\Prism Agent\runtime\prism\lib\bin.js" web --port 3081 --no-open"#.to_string();
+        // An orphan from a dead shell: same product, differently cased install dir.
+        let orphan = r#""C:\Users\fei\AppData\Local\PRISM AGENT\runtime\prism\lib\bin.js" web --port 3082 --no-open"#.to_string();
+        // This checkout's dev fallback, from a linked worktree.
+        let dev = r#""C:\Users\fei\Documents\GitHub\prism-agent\.worktrees\hub\apps\cli\lib\bin.js" web --port 3083 --no-open"#.to_string();
+        // Another harness build boots from a different path and keeps running.
+        let stock = r#""C:\Users\fei\AppData\Local\deepseek-harness\runtime\dsh\lib\bin.js" web --port 3099 --no-open"#.to_string();
+        let easel = r#""C:\Users\fei\AppData\Local\Easel-dsh\runtime\dsh\lib\bin.js" web --port 3098 --no-open"#.to_string();
+        // A CLI server the user started by hand keeps its own 3080 contract.
+        let manual = "node --import tsx/esm apps/cli/src/bin.ts web".to_string();
+        let unrelated = r#""C:\Tools\server.js" --port 7000"#.to_string();
+        let samples = vec![
+            (34096, hub),
+            (40456, orphan),
+            (21944, dev),
+            (111, stock),
+            (112, easel),
+            (113, manual),
+            (222, unrelated),
+        ];
+        // Adopting 3081: the orphan and the dev hub go, another product stays.
+        assert_eq!(rival_pids(&samples, Some(34096)), vec![40456, 21944]);
+        // Cold spawn: every one of our hubs goes, still sparing another product.
+        assert_eq!(rival_pids(&samples, None), vec![34096, 40456, 21944]);
+        // A keep that names no live process only loses the exemption.
+        assert_eq!(rival_pids(&samples, Some(999)), vec![34096, 40456, 21944]);
+    }
+
+    #[test]
+    fn rival_sweep_matches_mac_app_bundle_and_dev_paths() {
+        let installed = "/Applications/Prism Agent.app/Contents/Resources/runtime/prism/lib/bin.js web --port 3081 --no-open".to_string();
+        let dev =
+            "/Users/fei/Documents/GitHub/prism-agent/apps/cli/lib/bin.js web --port 3083 --no-open"
+                .to_string();
+        let easel = "/Applications/Easel-dsh.app/Contents/Resources/runtime/dsh/lib/bin.js web --port 3098 --no-open".to_string();
+        let samples = vec![(40456, installed), (21944, dev), (111, easel)];
+        assert_eq!(rival_pids(&samples, None), vec![40456, 21944]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cim_sample_parser_accepts_a_bare_object_and_an_array() {
+        let one = br#"{"ProcessId":60884,"CommandLine":"\"C:\\x\\runtime\\prism\\lib\\bin.js\" web --port 3999 --no-open"}"#;
+        assert_eq!(
+            parse_cim_samples(one),
+            vec![(
+                60884,
+                "\"C:\\x\\runtime\\prism\\lib\\bin.js\" web --port 3999 --no-open".to_string()
+            )]
+        );
+        let many = br#"[{"ProcessId":1,"CommandLine":"a"},{"ProcessId":2,"CommandLine":null},{"ProcessId":3,"CommandLine":"b"}]"#;
+        assert_eq!(
+            parse_cim_samples(many),
+            vec![(1, "a".to_string()), (3, "b".to_string())]
+        );
+        assert!(parse_cim_samples(b"").is_empty());
+
+        // PowerShell is told to emit UTF-8; a non-ASCII install path must
+        // survive both the decode and the signature.
+        let non_ascii = "\"C:\\Users\\陈\\AppData\\Local\\Prism Agent\\runtime\\prism\\lib\\bin.js\" web --port 3084 --no-open";
+        let json = format!(
+            r#"{{"ProcessId":7,"CommandLine":{}}}"#,
+            serde_json::to_string(non_ascii).expect("encode command line")
+        );
+        let samples = parse_cim_samples(json.as_bytes());
+        assert_eq!(samples, vec![(7, non_ascii.to_string())]);
+        assert!(is_our_dsh_web_server(&samples[0].1));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn ps_sample_parser_accepts_ps_output() {
+        let samples = parse_ps_samples(
+            "  40456 /usr/local/bin/node /Users/fei/.prism/runtime/prism/lib/bin.js web --port 3081\n  1 /sbin/launchd\n",
+        );
+        assert_eq!(
+            samples,
+            vec![
+                (
+                    40456u32,
+                    "/usr/local/bin/node /Users/fei/.prism/runtime/prism/lib/bin.js web --port 3081"
+                        .to_string()
+                ),
+                (1u32, "/sbin/launchd".to_string()),
+            ]
+        );
+    }
+
+    #[test]
     fn adopts_the_recorded_server_while_its_token_is_accepted() {
         let token = "live-token";
         let port = stub_web_server(token);
@@ -1059,6 +1428,37 @@ mod tests {
         let _ = std::fs::remove_file(&record);
 
         assert!(adopt_decision(&record, &bin).is_none());
+    }
+
+    /// Quitting ends the hub through `end_owned_child`, so prove that primitive
+    /// ends a live process rather than only the shell's pid bookkeeping. A
+    /// machine without the runtime the hub runs on cannot pose the question.
+    #[test]
+    fn ends_a_live_child_process() {
+        let Some(mut child) = spawn_sleeper() else {
+            return;
+        };
+        assert!(
+            child.try_wait().expect("probe the sleeper").is_none(),
+            "the sleeper runs before the quit"
+        );
+
+        tauri::async_runtime::block_on(end_owned_child(&mut child));
+
+        assert!(
+            matches!(child.try_wait(), Ok(Some(_))),
+            "the quit ended the hub"
+        );
+    }
+
+    /// A live process standing in for a hub: what the quit must end.
+    fn spawn_sleeper() -> Option<Child> {
+        Command::new("node")
+            .args(["-e", "setTimeout(() => {}, 60000)"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()
     }
 
     /// Cross-process check of the adoption contract against a real `dsh web`

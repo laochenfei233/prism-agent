@@ -4,18 +4,35 @@
  * @module @deepseek-ai/dsh-home-paths
  */
 
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { opendir, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A9.
+// Upstream defaults the harness home to `~/.dsh`; this fork defaults to `~/.prism`
+// so a CLI beside any other harness build never shares a data root.
 /** Directory name for the default DeepSeek Harness home under the OS home. */
-export const DSH_HOME_DIR_NAME = '.dsh'
+export const DSH_HOME_DIR_NAME = '.prism'
 
 /** Stable user-facing display form for the default DeepSeek Harness home. */
 export const DEFAULT_DSH_HOME_DISPLAY = `~/${DSH_HOME_DIR_NAME}`
 
 /** Environment variable that overrides the default DeepSeek Harness home. */
 export const DSH_HOME_ENV = 'DSH_HOME'
+
+/** Directory name for the default shared agent configuration root under the OS home. */
+export const AGENTS_HOME_DIR_NAME = '.agents'
+
+/** Stable user-facing display form for the default shared agent configuration root. */
+export const DEFAULT_AGENTS_HOME_DISPLAY = `~/${AGENTS_HOME_DIR_NAME}`
+
+/** Environment variable that overrides the default shared agent configuration root. */
+export const AGENTS_HOME_ENV = 'DSH_AGENTS_HOME'
+
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A17.
+/** Launcher pointer file, a sibling of the default home that names the selected one. */
+export const DATA_HOME_POINTER_FILE_NAME = '.prism-data-home'
 
 /**
  * Give a native filesystem watcher one canonical spelling of a path, even
@@ -63,6 +80,14 @@ export function defaultDshHome(): string {
 }
 
 /**
+ * Resolve the default shared agent configuration root using Node's platform path rules.
+ * @returns the absolute default shared agent configuration root.
+ */
+export function defaultAgentsHome(): string {
+  return join(homedir(), AGENTS_HOME_DIR_NAME)
+}
+
+/**
  * Expand supported tilde prefixes against the operating-system home.
  * @param path - configured path that may begin with `~`, `~/`, or `~\`.
  * @returns the expanded path, or the original value when no supported prefix is present.
@@ -74,10 +99,41 @@ export function expandHomePath(path: string): string {
 }
 
 /**
+ * Resolve one user-data root from an explicit path, an environment override, and a default.
+ * @param configured - explicit path, which has highest precedence.
+ * @param env - environment mapping to read.
+ * @param envName - environment variable that overrides the default.
+ * @param fallback - default root, used when neither the explicit path nor the environment provides one.
+ * @returns the normalized absolute root.
+ */
+function resolveRoot(
+  configured: string | undefined,
+  env: Record<string, string | undefined>,
+  envName: string,
+  fallback: () => string,
+): string {
+  const fromEnv = env[envName]
+  const selected = configured ?? (fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : fallback())
+  return resolve(expandHomePath(selected))
+}
+
+/**
+ * Label one resolved user-data root symbolically for user-facing display.
+ * @param resolvedRoot - absolute path returned by the matching resolver.
+ * @param defaultRoot - absolute default root whose symbolic label applies to a match.
+ * @param defaultLabel - symbolic label for the default root.
+ * @param envName - environment variable name that labels any other root.
+ * @returns the symbolic label.
+ */
+function rootDisplay(resolvedRoot: string, defaultRoot: string, defaultLabel: string, envName: string): string {
+  return resolvedRoot === resolve(defaultRoot) ? defaultLabel : `$${envName}`
+}
+
+/**
  * Resolve the single-root DeepSeek Harness home.
  *
  * Precedence, highest first: an explicit configured path, `$DSH_HOME`, then
- * `~/.dsh`. The harness keeps all user data under one root. An empty or
+ * `~/.prism`. The harness keeps all user data under one root. An empty or
  * whitespace-only `$DSH_HOME` is treated as unset, so a blank override never
  * resolves the home to the current working directory.
  * @param configured - explicit harness-home override, which has highest precedence.
@@ -85,9 +141,23 @@ export function expandHomePath(path: string): string {
  * @returns the normalized absolute harness home path.
  */
 export function resolveDshHome(configured?: string, env: Record<string, string | undefined> = process.env): string {
-  const fromEnv = env[DSH_HOME_ENV]
-  const selected = configured ?? (fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : defaultDshHome())
-  return resolve(expandHomePath(selected))
+  return resolveRoot(configured, env, DSH_HOME_ENV, defaultDshHome)
+}
+
+/**
+ * Resolve the shared agent configuration root.
+ *
+ * Precedence, highest first: an explicit configured path, `$DSH_AGENTS_HOME`,
+ * then `~/.agents`. The root holds configuration shared with other agent tools,
+ * so it stays independent of the DeepSeek Harness home. An empty or
+ * whitespace-only `$DSH_AGENTS_HOME` is treated as unset, so a blank override
+ * never resolves the root to the current working directory.
+ * @param configured - explicit shared-root override, which has highest precedence.
+ * @param env - environment mapping used to read `DSH_AGENTS_HOME`.
+ * @returns the normalized absolute shared agent configuration root.
+ */
+export function resolveAgentsHome(configured?: string, env: Record<string, string | undefined> = process.env): string {
+  return resolveRoot(configured, env, AGENTS_HOME_ENV, defaultAgentsHome)
 }
 
 /**
@@ -114,10 +184,70 @@ export function dshCachePath(optionsOrSegment: { dshHome?: string } | string = {
  * Describe a resolved harness home symbolically for user-facing display.
  *
  * It never returns an absolute machine path: the default home is labelled
- * `~/.dsh`, and any configured home is labelled `$DSH_HOME`.
+ * `~/.prism`, and any configured home is labelled `$DSH_HOME`.
  * @param resolvedHome - the absolute path returned by {@link resolveDshHome}.
- * @returns `~/.dsh` for the default home, otherwise `$DSH_HOME`.
+ * @returns `~/.prism` for the default home, otherwise `$DSH_HOME`.
  */
 export function dshHomeDisplay(resolvedHome: string): string {
-  return resolvedHome === resolve(defaultDshHome()) ? DEFAULT_DSH_HOME_DISPLAY : `$${DSH_HOME_ENV}`
+  return rootDisplay(resolvedHome, defaultDshHome(), DEFAULT_DSH_HOME_DISPLAY, DSH_HOME_ENV)
+}
+
+/**
+ * Describe a resolved shared agent configuration root symbolically for user-facing display.
+ *
+ * It never returns an absolute machine path: the default root is labelled
+ * `~/.agents`, and any configured root is labelled `$DSH_AGENTS_HOME`.
+ * @param resolvedHome - the absolute path returned by {@link resolveAgentsHome}.
+ * @returns `~/.agents` for the default root, otherwise `$DSH_AGENTS_HOME`.
+ */
+export function agentsHomeDisplay(resolvedHome: string): string {
+  return rootDisplay(resolvedHome, defaultAgentsHome(), DEFAULT_AGENTS_HOME_DISPLAY, AGENTS_HOME_ENV)
+}
+
+/**
+ * Locate the launcher pointer beside the default home.
+ *
+ * The pointer names the harness home a launch should use after the settings
+ * page moves it. It never lives inside the home it selects, so reading it
+ * cannot depend on its own value.
+ * @param home - operating-system home directory the pointer sits in.
+ * @returns the absolute pointer path.
+ */
+export function dataHomePointerPath(home: string = homedir()): string {
+  return join(home, DATA_HOME_POINTER_FILE_NAME)
+}
+
+/**
+ * Read the home the launcher pointer names.
+ * @param home - operating-system home directory the pointer sits in.
+ * @returns the recorded absolute path, or `undefined` when the pointer is
+ * absent, unreadable, blank, or names a relative path.
+ */
+export function readDataHomePointer(home: string = homedir()): string | undefined {
+  try {
+    const recorded = readFileSync(dataHomePointerPath(home), 'utf8').trim()
+    return isAbsolute(recorded) ? recorded : undefined
+  } catch (_pointerUnavailable) {
+    // No pointer, or one this process may not read: the launch keeps its default.
+    return undefined
+  }
+}
+
+/**
+ * Record the home the next launch should use.
+ * @param root - absolute harness home to select.
+ * @param home - operating-system home directory the pointer sits in.
+ * @throws when `root` is not absolute, or the pointer cannot be written.
+ */
+export function writeDataHomePointer(root: string, home: string = homedir()): void {
+  if (!isAbsolute(root)) throw new Error(`data home pointer requires an absolute path: ${JSON.stringify(root)}`)
+  writeFileSync(dataHomePointerPath(home), `${root}\n`, 'utf8')
+}
+
+/**
+ * Drop the launcher pointer so the next launch returns to the default home.
+ * @param home - operating-system home directory the pointer sits in.
+ */
+export function clearDataHomePointer(home: string = homedir()): void {
+  rmSync(dataHomePointerPath(home), { force: true })
 }

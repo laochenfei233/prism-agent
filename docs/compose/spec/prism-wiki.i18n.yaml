@@ -1,6 +1,64 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for prism-wiki.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-wiki.md
-prism-wiki.md: ce8a0ac710a2c662fefab618408049cada267a5e
-prism-wiki.zh.md: 0ec8d7df1c98d7c06c1ed0fbf6af1f729d7ecdac
+/:
+  en: 65bf50e3dd0d8b9c
+  zh: 656e0db153f9f63c
+/prism-wiki:
+  en: db1f87306d690053
+  zh: 1ceb996cf7777734
+/prism-wiki/report:
+  en: effb4cdd41d64917
+  zh: 487ad882bb67549f
+/prism-wiki/s1-problem:
+  en: 9e91246c6207aa3b
+  zh: 4516cfb2ec016509
+/prism-wiki/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/prism-wiki/s2-design/layers-and-layout:
+  en: 1c264c2e65e79938
+  zh: 8d4e4faeb5d415ca
+/prism-wiki/s2-design/file-access:
+  en: b7ff43003822af43
+  zh: 5d6c7d7fb9faaa98
+/prism-wiki/s2-design/page-frontmatter:
+  en: 04ef3d3e998ff75e
+  zh: bc49674ccfa22aae
+/prism-wiki/s2-design/division-of-labor:
+  en: b4b65695fe7e4f41
+  zh: 43b5179fd8c7a7df
+/prism-wiki/s2-design/model-facing-tools:
+  en: 967b9848a17a860a
+  zh: 40d3e5041a42b79d
+/prism-wiki/s2-design/operator-command:
+  en: 13690b8696bf5434
+  zh: 631d78ee6f7a23f6
+/prism-wiki/s2-design/schema-delivery:
+  en: c32373f05a153ddc
+  zh: 79297dd5c0f610a6
+/prism-wiki/s2-design/the-seeded-schema:
+  en: 383615fa152f7fba
+  zh: 758181c91d2a4a34
+/prism-wiki/s2-design/retrieval:
+  en: 511a257fa0a93924
+  zh: 5aa9f911a9a5ef89
+/prism-wiki/s2-design/concurrency:
+  en: 608a30c716df4739
+  zh: dd2bd11693af7591
+/prism-wiki/s2-design/the-web-page:
+  en: b4fa8d329c2f9a34
+  zh: ad555fab893b496e
+/prism-wiki/s2-design/where-the-plugin-lives:
+  en: dfeee95de4914910
+  zh: a814c9ff96193013
+/prism-wiki/s3-scope:
+  en: df89f1fb81c8b65c
+  zh: e1d24608ec618141
+/prism-wiki/tasks:
+  en: 3b5221c32ce2b7c5
+  zh: 67216398a8552157
+/prism-wiki/s4-acceptance:
+  en: da2872edc900b11a
+  zh: 37fa1b6cc8b85009

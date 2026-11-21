@@ -1,5 +1,7 @@
 # Aegis Current Docs
 
+English | [中文](README.zh.md)
+
 Status: `Approved`
 
 ## 1. Purpose

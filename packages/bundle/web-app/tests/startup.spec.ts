@@ -11,8 +11,15 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import { internals, provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, WEB_STARTUP_SERVICE, type WebStartupValues } from '../src/startup.ts'
+
+// The machine's interfaces must not decide a test: the LAN discovery is
+// stubbed to two deterministic private addresses.
+vi.mock('@deepseek-ai/dsh-host-webserver', async importOriginal => ({
+  ...await importOriginal<typeof import('@deepseek-ai/dsh-host-webserver')>(),
+  detectLanBindAddresses: (): string[] => ['192.168.1.23', '10.0.0.7'],
+}))
 
 /** What one fixture boot observed. */
 interface Observed {
@@ -61,9 +68,12 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     `  inject: [${WEB_STARTUP_SERVICE}]`,
     '  config:',
     "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
+    '    additionalHosts: !!js ctx.webStartup.additionalHosts ?? []',
     '    openBrowser: !!js ctx.webStartup.openBrowser',
     '    port: !!js ctx.webStartup.port ?? 3080',
+    '    publicUrl: !!js ctx.webStartup.publicUrl',
     '    trustedHosts: !!js ctx.webStartup.trustedHosts',
+    '    tls: !!js ctx.webStartup.tls',
     '- id: provider',
     `  name: ${pathToFileURL(join(dir, 'provider.mjs')).href}`,
     '',
@@ -99,21 +109,36 @@ describe('web command-line provider', () => {
       '--port', '8080',
       '--trusted-host', 'lab.internal', 'lab-2.internal',
       '--trusted-host', '10.0.0.9',
+      '--tls-cert', 'fullchain.pem',
+      '--tls-key', 'private-key.pem',
     ])
     expect(values).toEqual({
+      additionalHosts: [],
       host: '127.0.0.1',
       openBrowser: false,
       port: 8080,
       trustedHosts: ['lab.internal', 'lab-2.internal', '10.0.0.9'],
+      tls: { certFile: 'fullchain.pem', keyFile: 'private-key.pem' },
     })
     expect(observed.readerConfig).toEqual(values)
     expect(observed.exits).toEqual([])
   })
 
+  // The webserver suite owns the wildcard spellings; the CLI only has to
+  // refuse them by address value before any consumer activates.
+  it.each(['0.0.0.0', '::ffff:0.0.0.0'])('rejects wildcard --host %s before activating consumers', async (host) => {
+    const { values, observed } = await bootProvider(['--host', host])
+    expect(observed.out).toContain(`error: --host ${host} is an unspecified (wildcard) address`)
+    expect(values).toBeUndefined()
+    expect(observed.readerConfig).toBeUndefined()
+    expect(observed.exits).toEqual([1])
+  })
+
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ openBrowser: true, trustedHosts: [] })
+    expect(values).toEqual({ additionalHosts: [], openBrowser: true, trustedHosts: [] })
     expect(observed.readerConfig).toEqual({
+      additionalHosts: [],
       host: '127.0.0.1',
       openBrowser: true,
       port: 3080,
@@ -121,10 +146,28 @@ describe('web command-line provider', () => {
     })
   })
 
+  it('resolves --bind-lan to the machine\'s private addresses and refuses port 0', async () => {
+    const bound = await bootProvider(['--bind-lan', '--port', '8080'])
+    expect(bound.values).toEqual({
+      additionalHosts: ['192.168.1.23', '10.0.0.7'],
+      openBrowser: true,
+      port: 8080,
+      trustedHosts: [],
+    })
+    expect(bound.observed.exits).toEqual([])
+    // Port 0 asks the OS for a fresh port per listener, so the addresses
+    // would serve different ports; the invocation is a usage error instead.
+    const zero = await bootProvider(['--bind-lan', '--port', '0'])
+    expect(zero.values).toBeUndefined()
+    expect(zero.observed.out).toContain('error: --bind-lan needs a fixed --port')
+    expect(zero.observed.exits).toEqual([1])
+  })
+
   it('prints its own help and leaves the consumer pending', async () => {
     const { values, observed } = await bootProvider(['--help'])
     expect(observed.out).toContain('dsh --profile web')
     expect(observed.out).toContain('--no-open')
+    expect(observed.out).toContain('--public-url')
     expect(observed.out).toContain('--trusted-host')
     expect(values).toBeUndefined()
     expect(observed.readerConfig).toBeUndefined()
@@ -139,9 +182,41 @@ describe('web command-line provider', () => {
     expect(observed.exits).toEqual([1])
   })
 
-  it('rejects the intentionally unsupported all-interfaces host before the consumer activates', async () => {
-    const { values, observed } = await bootProvider(['--host', '0.0.0.0'])
-    expect(observed.out).toContain('--host 0.0.0.0 is intentionally not supported yet for safety: it would expose remote code execution to the network; use 127.0.0.1 instead')
+  it('publishes --public-url as advertisement only, leaving the fence to --trusted-host', async () => {
+    const { values, observed } = await bootProvider([
+      '--public-url', 'https://web.example/ui',
+      '--trusted-host', 'lab.internal',
+    ])
+    expect(values).toEqual({
+      additionalHosts: [],
+      openBrowser: true,
+      publicUrl: 'https://web.example/ui',
+      trustedHosts: ['lab.internal'],
+    })
+    expect(observed.readerConfig).toEqual({
+      additionalHosts: [],
+      host: '127.0.0.1',
+      openBrowser: true,
+      port: 3080,
+      publicUrl: 'https://web.example/ui',
+      trustedHosts: ['lab.internal'],
+    })
+    expect(observed.exits).toEqual([])
+  })
+
+  it.each(['--tls-cert', '--tls-key'])('rejects an unpaired %s before activating consumers', async (flag) => {
+    const { values, observed } = await bootProvider([flag, 'server.pem'])
+    expect(observed.out).toContain('--tls-cert and --tls-key must be supplied together')
+    expect(values).toBeUndefined()
+    expect(observed.readerConfig).toBeUndefined()
+    expect(observed.exits).toEqual([1])
+  })
+
+  it('rejects a malformed --public-url before the consumer activates', async () => {
+    // The parser's own suite owns the exhaustive spellings; the provider only
+    // has to fail the invocation before any consumer activates.
+    const { values, observed } = await bootProvider(['--public-url', '/web/ui'])
+    expect(observed.out).toContain('error: --public-url must be an absolute http or https URL of the form http(s)://host[/prefix]')
     expect(values).toBeUndefined()
     expect(observed.readerConfig).toBeUndefined()
     expect(observed.exits).toEqual([1])

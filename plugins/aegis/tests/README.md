@@ -1,5 +1,7 @@
 # Aegis Test Surface
 
+English | [中文](README.zh.md)
+
 This directory is split into two test surfaces.
 
 ## Public Quality Verification

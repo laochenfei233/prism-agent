@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for keyboard-control.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/keyboard-control.md
+/:
+  en: 21601fa9295aeead
+  zh: cfb4e32e4b59f8b4
+/keyboard-control-for-the-prism-agent-gui:
+  en: 41e3c6e42048b340
+  zh: 044bda0e10602002
+/keyboard-control-for-the-prism-agent-gui/report:
+  en: 75a11cb093265e5b
+  zh: 3d5e16cd7e531ce4
+/keyboard-control-for-the-prism-agent-gui/s1-problem:
+  en: b628ee46ac0a4163
+  zh: 6f70bd2d851e8c3d
+/keyboard-control-for-the-prism-agent-gui/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-1-a-palette-that-runs-the-registered-catalog:
+  en: 99cd1743e5a8bbac
+  zh: 897e8ec8770c1cb6
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-2-region-landmarks-and-cycling:
+  en: 156f2a9f55d5039b
+  zh: 0ee3cded2130542d
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-3-composer-focus:
+  en: bc7a0928e5f8f51e
+  zh: 1755ff86d9b5bdda
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-4-session-tree-keyboard-navigation:
+  en: c13b6c4ed5321190
+  zh: 890b5c2b6d3000e2
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-5-phase-1-keymap:
+  en: 033d2259023b170b
+  zh: c83fd0f4f6b4c433
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-6-phase-2-backlog-out-of-scope-here:
+  en: 434e1385a3cb2903
+  zh: 3d87e89c876e7397
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-7-compatibility-feedback-and-gates:
+  en: e8dce640b7e39680
+  zh: e35ff21a7da794c2
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-8-questions-and-approvals-on-the-keyboard:
+  en: c03e016d93d64330
+  zh: 95f27e329782c669
+/keyboard-control-for-the-prism-agent-gui/s2-design/s2-9-what-can-be-rebound-and-what-stays-fixed:
+  en: dd83e811bb9053c9
+  zh: 93ff6adbef31b80c
+/keyboard-control-for-the-prism-agent-gui/s3-scope:
+  en: 0c961a838f2e1152
+  zh: af27ca1fab9f662a
+/keyboard-control-for-the-prism-agent-gui/tasks:
+  en: 036ae4e2fb3d6b8a
+  zh: 1aaaea1d37ce9e33
+/keyboard-control-for-the-prism-agent-gui/s4-acceptance:
+  en: 8dae78a08da64935
+  zh: b25aa12396f78a50

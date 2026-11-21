@@ -43,9 +43,6 @@
       "path": "../../core/session"
     },
     {
-      "path": "../../core/tools"
-    },
-    {
       "path": "../../interaction/commands"
     },
     {
@@ -56,6 +53,9 @@
     },
     {
       "path": "../../llm/token-meter"
+    },
+    {
+      "path": "../../typert/protocol"
     },
     {
       "path": "../../util/workspace-path"
@@ -70,7 +70,13 @@
       "path": "../../subagent/subagent"
     },
     {
+      "path": "../connection/tsconfig.client.json"
+    },
+    {
       "path": "../locale/tsconfig.client.json"
+    },
+    {
+      "path": "../resources"
     },
     {
       "path": "../store"
@@ -113,6 +119,18 @@
     },
     {
       "path": "../ui-input-trigger"
+    },
+    {
+      "path": "../product-analytics/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-file-drag"
+    },
+    {
+      "path": "../../core/tool-executor-ptc"
+    },
+    {
+      "path": "../ui-context-menu"
     }
   ],
   "exclude": [

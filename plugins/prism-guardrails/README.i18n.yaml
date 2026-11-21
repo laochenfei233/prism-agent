@@ -1,6 +1,67 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
-README.md: d3e8b74af74a09738ed08fb451274bd43c9c3d38
-README.zh.md: 1137839101d856cf75effc55f5e346a36a912e20
+/prism-guardrails:
+  en: 572182f4055f0c71
+  zh: 511db76383c23061
+/prism-guardrails/why-this-exists:
+  en: 40b0909f2e3fba77
+  zh: 2f80f75d98d31251
+/prism-guardrails/ponytail-mode:
+  en: a3a015188eef2d2b
+  zh: 24954e3d6f274975
+/prism-guardrails/configuration:
+  en: 6f6fd1ec4b8b8db1
+  zh: 8d785f2cfcde9287
+/prism-guardrails/rails:
+  en: 72f7891b97c27a02
+  zh: ebcc7fab8b465344
+/prism-guardrails/rails/plan-mode-tool-denial:
+  en: e87c9d76094bb019
+  zh: 9e58655c16f77aed
+/prism-guardrails/rails/repeated-call-approval:
+  en: 7d3f9e0ca55ea9ff
+  zh: a3ed962b273e2b44
+/prism-guardrails/rails/turn-budget:
+  en: f6f435b17a36510a
+  zh: ae4a5ebb8a500f29
+/prism-guardrails/rails/skill-invocation-guidance:
+  en: 86cb593d0a429fd6
+  zh: 00c7c72823ab840e
+/prism-guardrails/rails/routing-contract:
+  en: 125a8b8635dbb37c
+  zh: a0d2f24eb7f3b431
+/prism-guardrails/rails/write-budget:
+  en: 37ab01194de41080
+  zh: 0d683e22467dc2c6
+/prism-guardrails/rails/ponytail-marker-discipline:
+  en: e18d5349f1ee5e87
+  zh: 432850f3d322671c
+/prism-guardrails/rails/dependency-approval:
+  en: 9c32c070e0713014
+  zh: 61b58c977ef15ab2
+/prism-guardrails/rails/verification-gate:
+  en: 55ffca0972e64c83
+  zh: db32c25688214930
+/prism-guardrails/rails/unfinished-todo-gate:
+  en: 318e2a5ba2187af8
+  zh: 6188ba0d8339ce1b
+/prism-guardrails/rails/sensitive-read-denial:
+  en: 00a65648809b7a58
+  zh: 7dd25e46e0fbf867
+/prism-guardrails/rails/command-guard:
+  en: 549affec11a149b9
+  zh: 852d92c1b6c83a98
+/prism-guardrails/guardrails:
+  en: 96bd3ab2e8fde10f
+  zh: 38d06328bc158678
+/prism-guardrails/wiring:
+  en: d2545073e0cae122
+  zh: b1a4060392290b3f
+/prism-guardrails/build-and-verify:
+  en: 547f3d9993484ebe
+  zh: 1986d6879729b95f
+/prism-guardrails/known-limitations-and-deferred-work:
+  en: 9d606c15b75d660e
+  zh: 003583e776e6a3ab

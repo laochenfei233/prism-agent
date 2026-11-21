@@ -28,7 +28,7 @@ export function browserCookie(ctx: Context): string {
   if (existing !== undefined) return existing
   const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
   const target = new URL(ctx.connection.authenticatedUrl(origin))
-  let setCookie: string | undefined
+  let setCookie: string | string[] | undefined
   ctx.connection.authorizeIndex({
     method: 'GET',
     url: `${target.pathname}${target.search}`,
@@ -38,7 +38,8 @@ export function browserCookie(ctx: Context): string {
     end() {},
   })
   if (setCookie === undefined) throw new Error('gateway fixture did not receive a browser cookie')
-  const cookie = setCookie.split(';', 1)[0]!
+  // The mint cookie leads the array; prune cookies may follow.
+  const cookie = (Array.isArray(setCookie) ? setCookie[0]! : setCookie).split(';', 1)[0]!
   browserCookies.set(ctx, cookie)
   return cookie
 }

@@ -27,9 +27,10 @@
     <div id="splash" class="splash">
       <!-- The desktop application icon, inlined so the first paint needs no
            asset fetch. The vector source is
-           design-assets/app-icons/prism-icon-badge.svg, which is also what
-           generates icons/icon.ico and the installer artwork, so the mark here
-           is the logo the user already sees on the shortcut and the taskbar. -->
+           design-assets/app-icons/prism-icon-badge.svg, which also generates
+           the macOS icon and the installer artwork. Windows taskbar and
+           shortcuts use the fuller-badge prism-icon-badge-windows.svg so the
+           mark fills a 24px slot; the splash keeps the shared badge. -->
       <svg class="splash-mark" viewBox="0 0 1024 1024" aria-hidden="true">
         <defs>
           <linearGradient id="splash-mark-ink" x1="20%" y1="10%" x2="80%" y2="90%">

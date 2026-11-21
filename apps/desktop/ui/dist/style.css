@@ -48,7 +48,10 @@ body.shell { display: flex; flex-direction: column; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
 .frame-host { flex: 1; min-height: 0; position: relative; }
-#dsh-frame { width: 100%; height: 100%; border: none; background: #fff; }
+/* display:block keeps the frame out of a line box: an inline frame sits on the
+   text baseline, and the descender below it made the full-height page overflow
+   by a few pixels — a permanent scrollbar at every window size. */
+#dsh-frame { display: block; width: 100%; height: 100%; border: none; background: #fff; }
 
 /* ── splash: the first paint while the server and UI bundle boot ────────
    Shown until the injected host bridge reports a mounted interface, later

@@ -1,87 +1,57 @@
 /**
  * Artifact-plane smoke test for the built bundle.
  *
- * The Vitest suite drives `src/`, so this covers the two facts only the emitted
- * file can show: that `lib/index.js` loads as a dependency-free ESM module, and
- * that `apply()` registers exactly the surfaces the four rails need. A wrong
- * export name would otherwise fail only at profile boot.
+ * The Vitest suite drives `src/`, so this covers what only the emitted files can
+ * show: that the harness packages stayed external, that every Loader-facing
+ * entry kept its export shape, and that the two rows the bundle patch inserts
+ * resolve to code the Loader can mount. A wrong export name would otherwise
+ * fail only at profile boot.
+ *
+ * It deliberately does not execute the modules: they import the profile's
+ * harness packages, which a checkout without a profile install cannot resolve.
+ * Rail, mode, and command registration are asserted by the Vitest suite against
+ * `src/`.
  *
  * Usage: node scripts/smoke.mjs
  */
 import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
-const libUrl = new URL('../lib/index.js', import.meta.url)
-const source = readFileSync(libUrl, 'utf8')
+const read = relative => readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8')
+const importsOf = source => [...source.matchAll(/(?:^|\n)\s*import\s+(?:[^'"\n]*?\s+from\s+)?['"]([^'"]+)['"]/gu)]
+  .map(match => match[1])
 
-// Every harness import in src/ is `import type`, so the artifact must carry no
-// import at all — that is what lets a deployment install nothing.
-assert.doesNotMatch(source, /^\s*import[\s{'"]/mu, 'the bundle must not import anything at runtime')
-assert.doesNotMatch(source, /\brequire\(/u, 'the bundle must not require anything at runtime')
-
-const bundle = await import(libUrl.href)
-assert.equal(bundle.name, 'prism-guardrails', 'the Cordis plugin name must match the patch row id')
-assert.deepEqual(bundle.inject, ['tools'], 'the bundle must declare the tool registry it registers on')
-assert.equal(typeof bundle.apply, 'function', 'the bundle must export a function plugin apply()')
-assert.equal(bundle.default, undefined, 'a function plugin must not also default-export a service')
-
-/** A recording stand-in for the four extension points the bundle registers on. */
-function recordingContext() {
-  const guards = []
-  const listeners = []
-  return {
-    guards,
-    listeners,
-    ctx: {
-      tools: { guard: (guard) => { guards.push(guard); return () => {} } },
-      on: (event, listener) => { listeners.push([event, listener]); return () => {} },
-      get: () => undefined,
-      logger: { warn: () => {} },
-    },
-  }
+const entries = {
+  host: { file: 'lib/index.js', name: 'prism-guardrails', inject: '["tools"]' },
+  mode: { file: 'lib/ponytail.js', name: 'prism-guardrails-ponytail', inject: '["systemPrompt", "commands"]' },
 }
 
-const { guards, listeners, ctx } = recordingContext()
-bundle.apply(ctx, {
-  planDeniedTools: ['write'],
-  repeatAskAfter: 2,
-  maxStepsPerTurn: 3,
-  skillInvocationGuidance: true,
-})
+for (const [label, entry] of Object.entries(entries)) {
+  const source = read(entry.file)
 
-assert.equal(guards.length, 1, 'the plan-mode rail must register exactly one monotonic guard')
-assert.deepEqual(
-  listeners.map(([event]) => event),
-  ['tools/pre-execute', 'tools/post-execute', 'agent/pre-step', 'agent/pre-step', 'tools/pre-execute'],
-  'the rails must register on the documented extension points, in this order',
-)
+  // The harness stays external so the profile that loads this bundle resolves
+  // it, exactly as the sibling prism-memory plugin does: a bundled copy would
+  // shadow the profile's own service instances. Relative imports are the
+  // rolldown shared chunks this bundle emits for its own modules.
+  for (const specifier of importsOf(source)) {
+    assert.ok(
+      specifier.startsWith('node:') || specifier.startsWith('@deepseek-ai/') || specifier.startsWith('./'),
+      `${label} must import only Node builtins, external harness packages, and its own chunks, saw ${specifier}`,
+    )
+  }
+  assert.doesNotMatch(source, /\brequire\(/u, `${label} must not require anything at runtime`)
 
-// The guard reads the optional plan-mode service per call, so a deployment that
-// mounts the service later is still covered.
-const planDenial = guards[0]({ name: 'write', arguments: {}, agent: {} })
-assert.equal(planDenial, undefined, 'a guard must not deny without a plan-mode service')
-assert.equal(guards[0]({ name: 'read', arguments: {}, agent: {} }), undefined, 'an unnamed tool is never denied')
+  // The Loader reads `name`, `inject`, and `apply`; a function plugin that also
+  // default-exported a service would have its namespace discarded.
+  assert.match(source, /export \{[^}]*\bapply\b[^}]*\}/u, `${label} must export apply()`)
+  assert.match(source, /export \{[^}]*\binject\b[^}]*\}/u, `${label} must export its injection list`)
+  assert.match(source, /export \{[^}]*\bname\b[^}]*\}/u, `${label} must export its Cordis plugin name`)
+  assert.doesNotMatch(source, /export default/u, `${label} must not default-export a service`)
+  assert.match(source, new RegExp(`const name = "${entry.name}"`, 'u'), `${label} name must match its patch row id`)
+  assert.ok(source.includes(`const inject = ${entry.inject}`), `${label} must inject the services it registers on`)
+}
 
-// A misconfiguration must fail the load, not disable a rail quietly.
-assert.throws(() => bundle.apply(recordingContext().ctx, { maxStepsPerTurn: 0 }), /integer >= 1/u)
-assert.throws(() => bundle.apply(recordingContext().ctx, { planDeniedTools: [] }), /must not be empty/u)
-assert.throws(() => bundle.apply(recordingContext().ctx, { repeats: 2 }), /unknown config key/u)
+assert.match(read('cordis.patch.yml'), /id: prism-guardrails-ponytail/u, 'the patch must insert the mode row')
+assert.match(read('cordis.patch.yml'), /name: 'prism-guardrails\/ponytail'/u, 'the mode row must resolve the ./ponytail export')
 
-// The skill rail is a pure text improvement, so it defaults on: an unconfigured
-// bundle registers exactly that one listener and nothing else.
-const defaults = recordingContext()
-bundle.apply(defaults.ctx, {})
-assert.equal(defaults.guards.length, 0, 'an unconfigured bundle must register no guard')
-assert.deepEqual(
-  defaults.listeners.map(([event]) => event),
-  ['tools/pre-execute'],
-  'only the default-on skill rail registers without configuration',
-)
-
-// Switching the last rail off leaves the bundle contributing nothing.
-const off = recordingContext()
-bundle.apply(off.ctx, { skillInvocationGuidance: false })
-assert.equal(off.guards.length, 0, 'guidance-off must register no guard')
-assert.deepEqual(off.listeners.map(([event]) => event), [], 'guidance-off must register no listener')
-
-console.log('smoke: ok — dependency-free ESM artifact, four rails on the documented extension points, fail-loud config')
+console.log('smoke: ok — two entries, external harness imports only, patch rows resolve')

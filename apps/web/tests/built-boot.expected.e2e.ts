@@ -61,18 +61,20 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
 
   // The sidebar renders from the boot graph: every inject layer activated.
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
+  // The fallback brand label carries no suffix, so the assembled version badge
+  // is what tells the official brand and the local-build fallback apart.
+  const version = clientBuildValue('DSH_CLIENT_VERSION')
+  if (version === undefined) throw new Error('default client build record must carry DSH_CLIENT_VERSION')
+  const commit = clientBuildValue('DSH_CLIENT_COMMIT_HASH')
+  const buildVersion = version
+    + (commit === undefined ? '' : `-${commit}`)
+    + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
   if (clientBuildValue('DSH_CLIENT_BUILD_PROFILE') === 'official') {
     expect(document.querySelector('svg[viewBox="34 0 123.2 24"]')).not.toBeNull()
-    expect(screen.queryByText('Prism Agent Local Build')).toBeNull()
+    expect(screen.queryByText(buildVersion)).toBeNull()
   } else {
     expect(document.querySelector('svg[viewBox="0 0 24 24"]')).not.toBeNull()
-    const version = clientBuildValue('DSH_CLIENT_VERSION')
-    if (version === undefined) throw new Error('default client build record must carry DSH_CLIENT_VERSION')
-    const commit = clientBuildValue('DSH_CLIENT_COMMIT_HASH')
-    const buildVersion = version
-      + (commit === undefined ? '' : `-${commit}`)
-      + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
-    screen.getByText('Prism Agent Local Build')
+    screen.getByText('Prism Agent')
     screen.getByText(buildVersion)
   }
   // The compact layout dropped group session counts; the fixture workspace
@@ -97,6 +99,8 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   fireEvent.click(waitingTitle)
   await waitFor(() => {
     expect(document.querySelector('[data-sample="bash"]')).not.toBeNull()
+    expect(document.querySelector('[data-chat-running]')?.parentElement?.getAttribute('data-slot'))
+      .toBe('conversation.chat.flow')
   }, { timeout: 10_000 })
   // The generated bundle roster mounts the question UI before the approval UI.
   // Skip the resident fixture's three questions, then resolve its approval so
@@ -109,7 +113,17 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     within(waitingRow).getByText('Waiting for approval')
     within(waitingRow).getByText('Approval')
   })
+  // The same request is readable in its Session row. The shipped placement puts
+  // the decisions in the Progress panel, so the row shows the requester's
+  // summary and says where the decisions are instead of repeating them.
+  await waitFor(() => {
+    within(waitingRow).getByText('fixture 常驻审批（可答：批准/拒绝后消失）')
+  })
+  within(waitingRow).getByText('Approve in Progress')
+  expect(within(waitingRow).queryByRole('button', { name: 'Allow once for Fixture 历史会话' })).toBeNull()
   fireEvent.click(allowOnce)
+  // Answering in either place settles the one Host request and withdraws both.
+  await waitFor(() => { expect(document.querySelector('[data-row-approval]')).toBeNull() })
 
   // The fixture mirrors all three token-meter projections, so the assembled
   // ContextMeter reaches its composition panel instead of only the occupancy
@@ -129,7 +143,8 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   const writeRow = mutationRows.find(row => row.getAttribute('data-variant') === 'write'
     && row.textContent?.includes('new-demo.txt'))
   if (writeRow === undefined) throw new Error('fixture write row missing')
-  expect(within(writeRow).getAllByText('+1 -0', { exact: true })).toHaveLength(1)
+  expect(within(writeRow).getAllByText('+1', { exact: true })).toHaveLength(1)
+  expect(within(writeRow).getAllByText('-0', { exact: true })).toHaveLength(1)
   expect(writeRow.querySelector('[data-diff]')).toBeNull()
   for (const row of mutationRows) {
     const toggle = row.querySelector('[data-expandable]')
@@ -140,7 +155,8 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   const writeDiff = writeRow.querySelector<HTMLElement>('[data-diff]')
   if (writeDiff === null) throw new Error('expanded fixture write diff missing')
   within(writeDiff).getByText('hello fixture', { exact: true })
-  expect(within(writeRow).getAllByText('+1 -0', { exact: true })).toHaveLength(1)
+  expect(within(writeRow).getAllByText('+1', { exact: true })).toHaveLength(1)
+  expect(within(writeRow).getAllByText('-0', { exact: true })).toHaveLength(1)
   expect(writeDiff.textContent).not.toContain('+1 -0')
 
   // The web render intent reaches the assembled boot graph: the fixture's

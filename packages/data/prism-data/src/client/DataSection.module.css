@@ -1,0 +1,46 @@
+/* The 数据 page: page title, the tab control, and one panel per visited tab. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dsw-alias-label-tertiary);
+  max-width: 60ch;
+}
+
+.tabs {
+  max-width: 420px;
+  margin-top: 2px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+/* A class that sets `display` also beats the user agent's `[hidden]` rule, so
+ * a hidden panel would otherwise stay on screen. */
+.panel[hidden] {
+  display: none;
+}
+
+.page {
+  min-width: 0;
+}

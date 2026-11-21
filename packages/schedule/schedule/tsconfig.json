@@ -15,10 +15,10 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../util/brand"
+      "path": "../../../vendor/schemastery"
     },
     {
-      "path": "../../util/time"
+      "path": "../../util/brand"
     },
     {
       "path": "../../llm/llm"
@@ -39,13 +39,22 @@
       "path": "../../session/session-persistence-jsonl"
     },
     {
-      "path": "../../session/session-projection"
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../api/session-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../util/time"
     },
     {
       "path": "../../workspace/workspace"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

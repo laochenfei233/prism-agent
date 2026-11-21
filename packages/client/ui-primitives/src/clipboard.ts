@@ -1,5 +1,6 @@
-// Host clipboard write shared by Web UI copy controls. Success feedback stays
-// with each control; this helper only reports whether the host accepted a write.
+// Host clipboard access shared by Web UI copy and paste controls. Success
+// feedback stays with each control; these helpers only report what the host
+// accepted.
 
 /**
  * Write text to the host clipboard, preferring the async Clipboard API and
@@ -44,4 +45,21 @@ export async function writeClipboard(text: string): Promise<boolean> {
     el.remove()
   }
   /* oxlint-enable typescript/no-deprecated */
+}
+
+/**
+ * Read the host clipboard as text.
+ *
+ * There is no fallback: a browser that omits `navigator.clipboard.readText`
+ * (insecure context, jsdom) or denies the permission rejects, and the caller
+ * reports that it could not read rather than importing stale text.
+ * @returns the clipboard text.
+ * @throws when the host exposes no read API or refuses the read.
+ */
+export async function readClipboard(): Promise<string> {
+  /* oxlint-disable-next-line typescript/no-unnecessary-condition */
+  if (navigator.clipboard?.readText === undefined) {
+    throw new Error('clipboard: this host exposes no clipboard read API')
+  }
+  return navigator.clipboard.readText()
 }

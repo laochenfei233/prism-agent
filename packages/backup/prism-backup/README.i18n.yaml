@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/backup/prism-backup/README.md
+/:
+  en: 75b4741179bea398
+  zh: 75b4741179bea398
+/prism-backup:
+  en: c24009d4d717d0bb
+  zh: 15046cd6d82a4a80
+/prism-backup/summary:
+  en: 939d790d5ef344fe
+  zh: b6f87d31512ac68a
+/prism-backup/table-of-contents:
+  en: 4e53164159b5ce41
+  zh: bd61ce1bef78579b
+/prism-backup/use-this-package:
+  en: c6961e5fe8707d9b
+  zh: dc6c40cff8462075
+/prism-backup/use-this-package/what-one-archive-holds:
+  en: ad2433dadc609468
+  zh: 80d8f5acb0b0ca18
+/prism-backup/use-this-package/config:
+  en: 9b1a40c61a0098c1
+  zh: c303d5dd57ff4ad1
+/prism-backup/model-experience:
+  en: 2493a34919c49eb9
+  zh: 9850b98f48e17b37
+/prism-backup/model-experience/kv-cache-effect:
+  en: 8d526ce1ae82538c
+  zh: 7f3f5002fa0e0858
+/prism-backup/known-limitations-and-deferred-work:
+  en: e9a13e5b3fbf0850
+  zh: 224ac9f5d52fe63c
+/prism-backup/known-limitations-and-deferred-work/dev-note:
+  en: 27bf52b81447a86f
+  zh: 79275f1f83c63db0

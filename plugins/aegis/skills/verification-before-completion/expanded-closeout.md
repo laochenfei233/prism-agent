@@ -57,7 +57,12 @@ structure, not evidence sufficiency, semantic correctness, or completion.
 ## Baseline and ADR Closure
 
 For product/requirement or durable architecture work, use
-`docs/current/AEGIS_PROCESS_BASELINE.md` §3.0e and §16. Record:
+`docs/current/AEGIS_PROCESS_BASELINE.md` §4 (Baseline Roles and Alignment).
+For skill-only installs without current docs, use the project's confirmed
+requirement and architecture owners with these portable definitions: Design
+Defect means the baseline itself is wrong; Implementation Drift means work
+deviated from a confirmed correct baseline. Correct the wrong owner, never
+rewrite a baseline merely to bless drift. Record:
 
 ```text
 Baseline Alignment:
@@ -111,6 +116,11 @@ Anti-Entropy Declaration:
 - Source-of-Truth Data Risk: none | possible | confirmed
 - User Confirmation Required: no | yes
 ```
+
+For external-unknown code, a generic original deletion request does not satisfy
+scoped confirmation. An existing user instruction counts only if it explicitly
+accepts the concrete external risk and authorizes the exact retirement scope;
+otherwise disclose the risk and request scoped confirmation before editing.
 
 If the target is persistent state or another irreversible source-of-truth
 object, use confirmation-first and stop at:

@@ -1,5 +1,530 @@
 # Aegis Release Notes
 
+## v2.14.2 (2026-10-25)
+
+### English
+
+- Require scoped causal coverage before retaining repairs or optimizations:
+  trace relevant data, control, and state influences, justify exclusions, and
+  resolve unknowns that could change the solution. Diagnostic experiments may
+  precede closure; small fixes keep the same evidence standard with compact readback.
+- Check sufficient failure paths masked by earlier failures, independent and
+  joint causes, timing, and feedback. Repair each evidenced cause at its owner
+  instead of forcing independent causes into one owner or treating alternative
+  in-scope failure paths as optional defense-in-depth.
+- Distinguish confirmed causes, scoped causal closure, and verified outcomes.
+  Reopen diagnosis when symptoms persist or shift; verify the original outcome,
+  relevant interactions, counterexamples, and preserved behavior. Review cards
+  support evidence-backed judgment rather than mechanical certification.
+- Preserve causal scope, evidence, counterevidence, and consequential unknowns
+  across long-task handoffs. Add five causal-coverage behavior scenarios and
+  update deterministic contracts; these are not measured performance claims.
+- Synchronize all eight package/plugin versions at `2.14.2`. Upgrade through
+  existing Git or host plugin routes and reload/restart as required. Both manual
+  global routing-prefix mirrors remain compatible and need no re-copy.
+  Published host limitations remain unchanged; Aegis remains a method pack
+  without authoritative runtime or completion authority.
+
+### 中文
+
+- 保留修复或优化方案前，要求范围明确的因果覆盖：追踪相关数据、控制与状态
+  影响，用证据排除其他路径，并解决可能改变方案的未知项。诊断实验可以先行；
+  小修改可简短回报，但保持相同的证据标准。
+- 检查被先前故障掩盖的充分失败路径、独立与联合原因，以及时序和反馈。
+  各个已证实原因在对应 owner 修复，不强行合并到单一 owner，也不把范围内
+  的其他失败路径降为可选的额外防护。
+- 区分原因确认、范围内因果闭环和结果验证。症状持续或变化时重新诊断，
+  验证原始目标、相关交互、反例及应保留行为；审查卡辅助证据判断，不是机械认证。
+- 长任务交接保留因果范围、证据、反证与重要未知项。新增五个因果覆盖行为
+  场景并更新确定性契约检查；不构成实测性能提升声明。
+- 同步八处 package/plugin 版本号至 `2.14.2`。沿用现有 Git 或宿主插件升级
+  方式，按需重启或重新加载；中英文手工全局路由前缀无需重新复制。
+  保留已有宿主限制；Aegis 仍是方法包，不具备权威运行时或最终完成权限。
+
+## v2.14.1 (2026-10-21)
+
+### English
+
+- Scope verification conclusions to the exact properties, objects, and conditions
+  checked. Preserve known counterexamples and material tool warnings; parsing
+  success alone does not establish schema compliance or answer accuracy.
+- Distinguish requested settings from effective behavior and descriptive results
+  from causal claims. A completed investigation may deliver negative findings
+  without implying that the investigated result passed acceptance.
+- Reuse sufficient current evidence, running fresh checks when evidence is
+  missing or invalidated. Keep simple read-only summaries concise and attribute
+  supplied observations without claiming to have executed their checks.
+- Add eight workflow-quality scenarios covering evidence scope, effective
+  settings, confounded comparisons, and cost/quality tradeoffs. These are test
+  fixtures, not measured performance-improvement claims.
+- Compact verification guidance to remain within the existing context budget.
+- Synchronize all eight package/plugin versions at `2.14.1`. Existing Git and
+  host plugin upgrade routes remain supported; reload/restart as required.
+  Manual global routing prefixes need no re-copy. Published host limitations
+  remain unchanged; Aegis retains its method-pack authority boundary.
+
+### 中文
+
+- 验证结论严格对应实际检查的属性、对象与条件，保留已知反例和工具的重要
+  警告；解析成功不等于字段合规或答案准确。
+- 区分请求设置与实际生效行为、观察结果与因果结论。调查完成可以交付负面
+  发现，不代表被调查对象通过验收。
+- 复用充分且仍有效的证据，在缺失或失效时重新检查；简单只读总结保持简短，
+  明确外部观察的来源，不声称执行过实际未执行的检查。
+- 新增八个工作流质量场景，覆盖证据范围、生效配置、混杂比较及成本与质量
+  的权衡。这些是测试样例，不构成实测性能提升声明。
+- 压缩验证技能表述，使其保持在现有上下文预算内。
+- 同步八处 package/plugin 版本号至 `2.14.1`。沿用现有 Git 或宿主插件升级
+  方式，按需重启或重新加载；手工全局路由前缀无需重新复制。保留已有宿主
+  限制及方法包权限边界。
+
+## v2.14.0 (2026-10-20)
+
+### English
+
+- Integrate task fidelity into the existing process baseline and review methods:
+  preserve goals, meaning, evidence and uncertainty, authority boundaries,
+  truthful delivery, and legitimate behavior during repairs.
+- Check requirements and results in both directions for omissions and unsupported
+  additions. Trace observed meaning changes across understanding, expression,
+  execution, and delivery without mistaking the first divergence for a proven
+  root cause.
+- Update entry guidance, first-principles review, code review, debugging, and
+  completion verification. Authorized summaries and evidence-based corrections
+  remain valid; no extra approval, mandatory six-item report, separate runtime
+  gate, or exhaustive equivalence proof is introduced.
+- Add six workflow-quality scenarios and matrix validation rules covering valid
+  summaries, unsupported strengthening, updated evidence, reviewer authority,
+  first observed distortion, and bounded verification. Evaluate costs across
+  complete tasks; this release makes no measured performance-improvement claim.
+- Synchronize all eight package/plugin versions at `2.14.0`. Upgrade through the
+  existing Git or host plugin route and restart/reload as required. Both manual
+  global routing-prefix mirrors remain compatible and need no re-copy.
+- Retain published host limitations, including pending Antigravity live skill
+  loading, task routing, and session refresh. Aegis remains a method pack without
+  authoritative runtime or completion authority.
+
+### 中文
+
+- 将任务保真融入现有流程基线和审查方法，覆盖目标、语义、证据与不确定性、
+  权限责任、真实交付，以及修复时对合法行为的保护。
+- 双向检查需求与结果，既检查遗漏，也检查未经授权的新增要求。沿理解、表达、
+  执行和交付追踪首次观察到的语义偏差，不将偏差位置直接当成已证实的根因。
+- 更新入口、第一性原理审查、代码审查、系统调试和完成前验证。允许授权范围内
+  的摘要和有证据的纠正，不增加审批、强制六项报告、独立运行时门禁或穷尽证明。
+- 新增六个工作流质量场景及矩阵校验规则，覆盖合法摘要、语义强化、证据更新、
+  审查权限、首次偏差和有边界的验证。成本评估以完整任务为单位，本次不宣称
+  已实测获得性能提升。
+- 同步八处 package/plugin 版本号至 `2.14.0`。沿用现有 Git 或宿主插件方式升级，
+  按宿主要求重启或重新加载；中英文手工全局路由前缀兼容，无需重新复制。
+- 保留已公布的宿主限制，包括 Antigravity 真机技能加载、任务路由和会话刷新
+  仍待验证。Aegis 继续作为方法包，不取得权威运行时或最终完成裁决权。
+
+## v2.13.1 (2026-10-18)
+
+### English
+
+- Keep Antigravity CLI live Aegis skill loading, task routing, and session
+  refresh explicitly pending verification across the READMEs, host guide,
+  compatibility matrix, known limitations, and skill reference. Installation,
+  plugin lifecycle, and structural discovery evidence do not establish live
+  task execution; retain the local account-eligibility blocker.
+- Document the structurally verified `agy 1.4.0` installation and the shared
+  updater's direct-child skill links. Keep the method-pack checkout canonical
+  and enable only one Aegis exposure route per host installation.
+- Strengthen Antigravity registration tests with isolated configuration,
+  per-skill link resolution, and doctor state checks. Add a shared host
+  closeout recipe that distinguishes structural checks from live routing.
+- Include the changes landed since v2.13.0: restore early README installation
+  guidance, check benchmark rendering and comparison boundaries in CI, publish
+  the v2.13.0 standard benchmark snapshot, and update security contacts and
+  code ownership. The snapshot is scoped evidence, not a new performance claim.
+- Update DeepSeek Harness guidance for Hub v2.0.0's marketplace channel change.
+  Keep the documented Git installation route and the distinction between
+  official Git releases and third-party npm artifacts; live marketplace and
+  Desktop behavior remain subject to the published limitations.
+- Synchronize all eight package/plugin versions at `2.13.1`. Upgrade through
+  the existing Git or host plugin route and restart/reload as required. The
+  manual global routing prefixes remain compatible and need no re-copy.
+
+### 中文
+
+- 在中英文 README、宿主指南、兼容矩阵、已知限制和 skill 参考中，统一将
+  Antigravity CLI 的真机 Aegis skill 加载、任务路由及会话刷新标为待验证。
+  安装、插件生命周期和结构性发现证据不能替代实际任务执行验证；保留本机
+  账号资格检查阻塞的记录。
+- 明确 `agy 1.4.0` 已有结构性验证的安装方式，以及共享 updater 为每个 skill
+  创建直接链接的路径。方法包 checkout 保持唯一来源，同一宿主安装只启用
+  一种 Aegis 暴露方式。
+- 加强 Antigravity 注册测试，使用隔离配置，逐项核对 skill 链接和 doctor
+  状态；增加通用宿主验收流程，区分结构检查与真实任务路由验证。
+- 纳入 v2.13.0 后已合并的改动：恢复 README 靠前的安装说明，将 benchmark
+  渲染和比较边界检查接入 CI，发布 v2.13.0 标准 benchmark 快照，并更新安全
+  联系方式及代码负责人。该快照仅提供限定范围的证据，不构成新的性能承诺。
+- 更新 DeepSeek Harness 对 Hub v2.0.0 市场分发渠道变化的说明，保留文档中的
+  Git 安装路径，区分官方 Git 发布与第三方 npm 制品；市场和 Desktop 的真实
+  行为仍受已记录限制约束。
+- 同步八处 package/plugin 版本号至 `2.13.1`。沿用现有 Git 或宿主插件方式
+  升级，并按宿主要求重启或重新加载；手工全局路由前缀兼容，无需重新复制。
+
+## v2.13.0 (2026-10-11)
+
+### Task outcomes guide decisions
+
+- Define three shared principles inside the process baseline: preserve intent
+  and boundaries, distinguish task and project goals, and deliver a complete,
+  usable result supported by evidence. Their abstraction does not grant higher
+  instruction priority or override concrete acceptance criteria.
+- Carry the relevant checks into entry routing, design, planning, debugging,
+  delegation, continuation, review, and completion. Preserve the requested
+  object, authorized scope, actions, and deliverables across each stage.
+- Separate successful internal steps from completed user delivery. Keep missing
+  data and blocked actions visible, distinguish task completion from product
+  capability acceptance, and reject hardcoded single-case repairs.
+
+### Focused baselines with clear ownership
+
+- Reduce the two main baselines from 2,734 to 467 lines, about 74% fewer UTF-8
+  bytes. The current-doc index routes readers to the relevant owner and section
+  instead of making the whole baseline tree a default reading bundle.
+- Define shared principles once in the process baseline. Keep engineering rules
+  in execution guidance, observable acceptance criteria in the quality baseline,
+  and operational actions and output contracts in their skills.
+- Preserve necessary entry summaries for skill-copy installations. Raise the
+  entry warning target to 4,500 bytes and hard ceiling to 6,000 bytes; the current
+  entry uses 3,805 bytes. Other skill and route-bundle limits are unchanged.
+- Check canonical owners and references instead of duplicated paragraphs. Add
+  representative outcome cases to the workflow matrix, now containing 110 samples.
+
+### Upgrading and evidence limits
+
+- Synchronize all eight package and plugin version fields at `2.13.0`. Update
+  through the existing Git or host plugin installation route, then restart or
+  reload the host as required. Both manual global routing-prefix mirrors remain
+  compatible; no manual re-copy is needed. When upgrading a `copy-skills`
+  installation from before v2.12.3, follow the updater precaution in v2.12.3 below.
+- Five paired native Codex scenarios passed on the previous and skill-changing
+  candidate versions, covering selected-result reporting with an unseen variant,
+  read-only diagnosis, partial-data delivery, a tiny rename, and focused baseline
+  retrieval. Those runs predate the final documentation ownership refinement;
+  they do not establish general behavioral or performance improvements.
+- Byte reductions describe maintained documentation, not measured model
+  attention, latency, token cost, or cross-host reliability. Existing host
+  compatibility limits remain explicit. Aegis remains a Method Pack with no
+  new runtime authority, universal goal-framing step, or official npm channel.
+
+## v2.12.3 (2026-10-11)
+
+### Safer copied-skill updates
+
+- Replace name-based pruning with scoped file ownership recorded in the
+  existing installation registry. Preserve unrelated skills, private files,
+  user additions, and local modifications in shared discovery directories.
+- Check collisions before changing the discovery view, replace files
+  atomically, and save copy provenance before doctor verification so a failed
+  verification can be retried safely. Retire only unchanged, tracked files.
+- Reject ambiguous Unicode/case mappings and prevent copies through links or
+  overlapping source/destination trees. Identical legacy copies can be adopted;
+  unknown stale copies and conflicting local files require reconciliation.
+
+### Clearer workflow decisions
+
+- Correct conjunctive-cause reasoning: necessary incident conditions are not
+  automatically defective components that all need changing.
+- Keep incomplete subagent work in `NEEDS_CONTEXT` or `BLOCKED`, and validate
+  inherited TDD routes before implementation. Preserve existing code and user
+  edits when a newly written strict-TDD test already passes.
+- Align continuation records with the approved medium/high or actual-handoff
+  rule, document trusted managed-detached closeout, and distinguish ordinary
+  read-only questions from authorized baseline bootstrap.
+- Clarify host instruction priority and live tool-schema adaptation. XML tags
+  organize instructions without granting additional authority.
+
+### More reliable diagnostics
+
+- Make the polluter helper distinguish observed pollution, no observed pollution,
+  and inconclusive runs. Handle empty matches, unavailable runners, pre-existing
+  pollution, failing invocations, and filenames containing spaces.
+- Propagate polling callback failures as Promise rejections and correct the
+  temporary-directory example's descendant checks, including linked paths.
+- Add executable regressions and Windows/Linux coverage. Node.js 22.13+ is
+  required for the TypeScript example tests, not for installing Aegis skills.
+
+### Upgrading and limits
+
+- **Existing `copy-skills` installations:** refresh the canonical method-pack
+  checkout through its Git or plugin installation route **before starting the
+  updated updater process**. Do not use an older copy-mode updater for this
+  first upgrade: its already-loaded synchronization code can still prune
+  unrelated discovery entries even after it fetches the new checkout.
+- A case-only rename combined with changed contents may require preserving the
+  conflicting file in a backup outside the discovery root or choosing a separate
+  root. Native macOS and all-host live loading remain outside the verified scope.
+- Update through the existing host installation route and restart/reload as
+  required. Both manual global routing-prefix mirrors remain compatible;
+  no manual re-copy is needed. Aegis remains a Method Pack, without new runtime
+  authority or an official npm publication channel.
+- Include the DSH Desktop installation-owner clarification and corrected badge
+  links landed since v2.12.2; existing host compatibility limits remain explicit.
+
+## v2.12.2 (2026-10-08)
+
+### Official installation source
+
+- Clarify that DSH installs Aegis from the official Git repository, with
+  dependency name `aegis` and stable Cordis row ID `aegis-method-pack`.
+  The row ID does not identify an official npm registry distribution.
+- Document that the public npm `aegis-method-pack` package is published by
+  an external account. Its stale `2.9.2` artifact is separate from official
+  Git releases and retains the old peer ceiling. Marketplace installation
+  must preserve the requested Git source and pinned revision.
+- Keep `private: true` on the canonical manifest to prevent accidental npm
+  publication and add a guard to the existing DSH boundary check. Git and
+  existing host plugin installations retain their identities and current
+  optional `>=0.1.0-rc.6` peers.
+- Retire the proposed npm builder, artifact test, publication workflow, and
+  npm installation instructions. No official npm registry channel is being
+  introduced. Existing third-party registry artifacts are unchanged.
+
+### Validation and limits
+
+- The full release check (`bash tests/e2e/run-all.sh --full --host-profile fast`)
+  passed in an isolated Linux filesystem, including both representative Codex
+  smokes, OpenCode base compatibility, and Codex plugin sync. The DSH
+  deterministic suite and four DSH updater tests also passed.
+- DSH `0.2.0-rc.2` with pnpm `11.7.0` installed the canonical source into an
+  isolated Windows Web profile with the private manifest guard. Actual profile
+  boot exposed 23 Aegis skills and loaded three representative canonical skill
+  bodies. The native host admission matrix passed without an exemption.
+  These checks made no DSH model request and do not cover Desktop startup.
+- Plugin Hub source selection remains tracked in upstream issue #120;
+  Aegis issue #81 still needs reporter confirmation. A GitHub release alone
+  does not resolve either marketplace selection or live DSH model routing.
+
+## v2.12.1 (2026-10-03)
+
+### Codex skill-read evidence
+
+- Reject failed Codex `SKILL.md` reads instead of treating the attempted command
+  as proof that a skill loaded.
+- Require a successful command result containing matching skill `name` and
+  `description` frontmatter before reporting a load event. Preserve the
+  original read-command line for ordering checks, including retries.
+- Add regression coverage for failed reads, parallel completion order,
+  mismatched frontmatter, and failed-then-successful retries. Historical
+  successful Codex logs remain recognized.
+
+### Product relationship and distribution
+
+- Introduce Autoloom in the English and Chinese public entrypoints and clarify
+  that it is the independent product carrying the runtime-core direction into
+  execution. Aegis remains an independently usable open-source method pack and
+  does not acquire runtime or completion authority.
+- Synchronize all eight package and plugin version fields at `2.12.1`. Update
+  through the existing host installation route and restart or reload as that
+  host requires. The manual global routing-prefix semantics are unchanged, so
+  no manual re-copy is needed.
+- Keep issues #67, #68, and #75 open under their documented evidence limits.
+  They remain bounded follow-up or environment-specific verification work and
+  are not represented as resolved by this release.
+
+### Validation
+
+- `bash tests/e2e/run-all.sh --full --host-profile fast` passed in an isolated
+  Linux filesystem: Layer 1 passed 43/0, the governance completion contract
+  passed, and Layer 2 and Layer 3 each passed 6/0.
+- Both representative Codex smokes passed on Codex CLI 0.146.0 with successful
+  skill-read command results. The parser unit suite passed all 20 cases.
+- Version drift and undeclared-version audits passed with all eight package and
+  plugin fields at `2.12.1`.
+
+## v2.12.0 (2026-10-01)
+
+### UI/UX governance on demand
+
+- Add `ui-ux-governance`, a compositional rule skill for user-facing interfaces,
+  interaction flows, and API changes that affect visible states or recovery.
+- Prefer lower total user effort under equivalent goals and accepted
+  requirements: understanding, decisions, operations, waiting, and recovery.
+  Preserve accessibility, informed control, and necessary safeguards.
+- Load only applicable experience and verification sections. Reuse the
+  project's design system and accepted references; keep tiny wording changes
+  scoped and exclude backend changes with no user-facing effect.
+- Carry applicable criteria through design, planning, execution, debugging,
+  review, and verification. Existing workflows retain their decision and
+  completion roles; the former inline UI checklist points to the shared owner.
+
+### Evidence and upgrading
+
+- Add positive, lifecycle, API-recovery, tiny-change, backend-negative,
+  explicit-mode, missing-evidence, and safeguard-pressure scenario contracts,
+  plus natural and explicit Codex skill-loading smoke prompts.
+- Keep missing browser/device and usability evidence explicit. Bounded skill
+  observations and loading checks do not establish measured product usability
+  or a new benchmark score. Other hosts retain their documented evidence scope.
+- The offline benchmark policy fixture has a limited target mapping and fails
+  with Windows Python's `AMD64` identifier. Windows validation can run the
+  unchanged checks in an isolated Linux container; this verification path does
+  not change host installation requirements.
+- Synchronize all eight package/plugin version fields at `2.12.0`. Update via
+  the existing host installation route and restart or reload as that host
+  requires. Both manual global routing-prefix mirrors remain compatible;
+  no manual re-copy is needed for this release.
+
+## v2.11.2 (2026-09-29)
+
+### DeepSeek Harness installation compatibility
+
+- Replace the stale `^0.1.0-rc.6` DSH peer ceiling with a `>=0.1.0-rc.6`
+  admission floor. This fixes the manifest conflict reported when installing
+  Aegis 2.11.1 on DSH `0.2.0-rc.1`, and avoids repeating that conflict solely
+  because a later host changes its minor or major version number.
+- Retain all three optional host peers and the existing thin bundle. Future
+  version admission does not establish API compatibility or live routing.
+  Previously published tags retain their original manifests.
+
+### Verification and upgrading
+
+- Add a regression that uses the host's native compatibility checker to
+  reproduce the old rejection, retain the minimum-version check, and admit
+  current prereleases and synthetic future version numbers.
+- Verify installation and native skill loading on DSH `0.1.7-rc.2` and
+  `0.2.0-rc.1` in isolated Linux profiles. Windows desktop installation and
+  live model routing remain outside that evidence.
+- Synchronize all eight package and plugin version fields at `2.11.2`.
+  Update through the existing host installation route; DSH users can now
+  select this release instead of the incompatible `v2.11.1` tag.
+- Clarify that configuration readback alone does not prove runtime plugin
+  loading. Skill behavior and published benchmark scores are unchanged.
+
+## v2.11.1 (2026-09-28)
+
+### Semantic correction and disagreement handling
+
+- Clarify subject, scope and resume-time state in continuation and completion
+  guidance; allow one accurate explanation to correct related claims.
+- Check record correction and final disclosure separately, including surrounding
+  text that denies, withdraws or re-scopes the correction.
+- In the optional Codex candidate, retain quoted disputes of the initial
+  assessment and stop further correction requests with `needs-verification`.
+  A dispute does not establish which interpretation is right.
+- Keep the observed skill-only omission explicit: the new wording alone still
+  missed record correction and final disclosure in a three-bullet diagnostic.
+
+### Optional Codex record reconciliation
+
+Experimental, opt-in and advisory: the current frozen S1–S4 diagnostic passed
+three fresh repetitions per case with independent semantic review. Earlier
+candidates produced false positives; operator review remains required.
+
+- Add an explicitly selected Codex profile that captures chosen inherited records
+  before work and checks their correction and specific final disclosure through
+  native hooks, with at most two corrective continuations.
+- Keep installed code and turn evidence outside the working project, bind profiles
+  to code/configuration fingerprints, and handle invalid state, incomplete capture,
+  bounded reviewer output, timeouts and cancellation without a success claim.
+- Document separate hook trust, model usage, single-task workspace scope and the
+  CLI JSON warning limitation. This optional intervention does not resolve the
+  default skill-only #67 limitation or change the published benchmark scores.
+- Preserve earlier failures and the distinction between selected-case diagnostic
+  acceptance and general automatic-fix reliability. Both global routing-prefix
+  language mirrors remain compatible; no manual re-copy is needed.
+
+### Distribution and upgrading
+
+- Synchronize all eight package and plugin version fields at `2.11.1`.
+- Update through the existing host installation route. The optional Codex profile
+  requires separate installation and hook trust; it is not enabled by updating
+  the method pack. Reinstall a previously evaluated profile to select the current
+  code/configuration fingerprint, and review its new hook definitions.
+
+## v2.11.0 (2026-09-28)
+
+### DeepSeek Harness lifecycle compatibility
+
+- Fix automatic bootstrap arming on current DeepSeek Harness previews by
+  subscribing to `agent/created`. Retain `agent/session-start` for older
+  preview hosts, with duplicate-event coverage and cleanup of both
+  subscriptions. Injection still waits for the first durable promotion signal,
+  skips subagents, and respects explicit activation mode.
+- Expand lifecycle regression coverage for startup, resume, clear, compact,
+  duplicate notifications, pending-delivery cancellation, and teardown.
+- Align activation and release documentation with the two supported lifecycle
+  events. Record the contributor's bounded startup/resume readback on DSH
+  `0.1.7-rc.2`; it does not establish first-step routing attribution or full
+  live host coverage.
+
+### Benchmark evidence and known limitations
+
+- Record repeated native-skill evidence showing that #67 remains unresolved:
+  recognizing an inherited false claim during work does not reliably correct
+  the active record and disclose the specific error in the final answer.
+- Record three maintainer diagnostic attempts for #68 that requested scoped
+  confirmation and left the original workspaces unchanged. This small,
+  non-blind sample does not establish elimination of intermittent failures.
+- Keep the published matrix-v7 results attributed to Aegis 2.10.8. No new
+  held-out score is published, and the relevant Codex skills are unchanged from
+  2.10.9. The independent reconciliation experiment is outside this release.
+
+### Distribution and upgrading
+
+- Synchronize all eight package and plugin manifests at `2.11.0` so installed
+  builds can be distinguished from the earlier `2.10.9` tag.
+- DeepSeek Harness bundle users should update Aegis through their profile's
+  plugin manager and restart that profile before checking automatic entry.
+- Both language mirrors of the optional global routing prefix were reviewed;
+  their text and projected semantics are unchanged, so manual copies need no
+  re-copy. Aegis remains `Aegis Method Pack (runtime-ready)` with advisory
+  outputs and no runtime or completion authority.
+
+## v2.10.9 (2026-09-27)
+
+### Benchmark evidence and tooling
+
+- Publish the matrix-v7 `standard-held-out` snapshot for Aegis 2.10.8: 44
+  valid outcomes across 22 cases, with one observation per case and arm. Its
+  59.09% → 86.36% contract-pass and 18.18% → 4.55% unsafe-outcome figures are
+  advisory results for that frozen 2.10.8 build, not a 2.10.9 result or a
+  cross-version improvement claim. The review flag was accepted under the
+  documented non-blind standard-profile exception; raw outputs were not
+  independently reviewed by the maintainer.
+- Reject main-track benchmark retry opt-ins before a batch starts, preserve
+  their frozen settings in the report, and reject such batches as standard or
+  extended publication evidence. Relax the fake-runner process-cleanup test's
+  timing bound for loaded CI machines without changing its termination check.
+- Add future-only checks for an actual confirmation request, correction of the
+  active handoff record as well as the final answer, and a concrete pre-edit
+  rationale. The committed matrix-v7 contracts and published scores are not
+  recalculated.
+
+### Method-pack and host fixes
+
+- Refresh managed OpenCode skill copies when supporting files change, while
+  leaving foreign copies untouched.
+- Let the Pi and OMP automatic routing guards recognize an assistant's
+  `Route: fast-path` declaration before the first write; explicit activation
+  remains outside the automatic guard.
+- Require resumed tasks to correct inherited false completion claims in the
+  active handoff and final report. For distributed code with unobservable
+  consumers, a generic deletion request still requires a direct, scoped
+  confirmation; a user instruction that already accepts the concrete risk and
+  authorizes the exact retirement scope can satisfy that requirement.
+
+### Release scope and remaining evidence
+
+- Synchronize all eight package and plugin manifest versions at `2.10.9`.
+  Aegis remains `Aegis Method Pack (runtime-ready)` and gains no runtime or
+  completion authority.
+- Issues #67 and #68 remain open for broader behavioral validation. Isolated
+  non-benchmark tasks exercised the revised guidance, but no held-out batch on
+  2.10.9 has been published. The 2.10.8 failure cases informed the changes;
+  rerunning them is diagnostic, not independent evidence that the failures have
+  disappeared.
+- Both language mirrors of the optional global routing prefix were reviewed.
+  Its projected semantics and text did not change, so existing manual copies
+  need no re-copy; installed Aegis skills must be updated to receive these
+  task-specific changes.
+
 ## v2.10.8 (2026-09-24)
 
 ### Benchmark publication and scoring

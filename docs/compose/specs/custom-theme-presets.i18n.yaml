@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for custom-theme-presets.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/custom-theme-presets.md
+/:
+  en: 327c52156548d5f5
+  zh: 327c52156548d5f5
+/custom-theme-presets-save-apply-and-delete-named-color-schemes:
+  en: 2a5e19a52885cc0c
+  zh: ce3ed807089481e9
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/report:
+  en: 8b9df78b7fd857a1
+  zh: eb2809779e697592
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s1-problem:
+  en: d6f7e709ff5fff53
+  zh: e46a4a87bb5d8a33
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s2-design/s2-1-storage:
+  en: 24693ab3f14c4f02
+  zh: f123d9218e42b993
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s2-design/s2-2-runtime:
+  en: 88e2ffbfa36b73d8
+  zh: 8b8887739732dc2a
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s2-design/s2-3-ui:
+  en: 8385dfed04cb2595
+  zh: 8f18928b01db372a
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s2-design/s2-4-copy:
+  en: da90545d577f0d5e
+  zh: 2f8bc6cae0920eec
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s3-scope:
+  en: 869f19d89ce0da83
+  zh: 73f05c0e25f809b2
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/tasks:
+  en: 855b01c647c48759
+  zh: f08ea115badacd0f
+/custom-theme-presets-save-apply-and-delete-named-color-schemes/s4-acceptance:
+  en: a6344a309e43a934
+  zh: e934823db83fce63

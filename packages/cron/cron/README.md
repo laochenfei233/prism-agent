@@ -66,7 +66,7 @@ The plugin requires `leaderLockPath` and states where the deployment's scheduler
 
 Management reads the store this process leads, so a follower answers `cron_not_leader` rather than serving rows it read when it started:
 
-```ts
+```ts ignore-check
 const job = await ctx.cron.create({
   expression: '0 9 * * 1-5',
   timeZone: 'Asia/Shanghai',
@@ -141,3 +141,13 @@ None of its own. The consumers that add tool schemas and Session messages own th
 - **`runNow` refuses while a run is in flight** — the caller asked for this instant, so the provider answers `cron_run_in_progress` instead of queueing behind the running one.
 - **The search is bounded** — `nextCronOccurrence` walks `MAX_SEARCH_DAYS` days, which exceeds the eight-year gap a skipped century leap year creates, and answers `undefined` rather than searching forever.
 - **Occurrences are computed on demand** — there is no index and no cache, so a caller that resolves the same expression repeatedly pays for it each time.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

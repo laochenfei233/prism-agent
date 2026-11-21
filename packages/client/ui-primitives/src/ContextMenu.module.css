@@ -1,0 +1,4 @@
+/* No box of its own: the wrapper must not become a flex/grid item or claim a gap. */
+.root {
+  display: contents;
+}

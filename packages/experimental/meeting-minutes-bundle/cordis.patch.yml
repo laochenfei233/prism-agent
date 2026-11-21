@@ -1,0 +1,18 @@
+# The meeting-minutes composition: the speech registry, its DashScope recognizer, and
+# the model-facing meeting_minutes tool.
+#
+# The recognizer reads its key from the `DASHSCOPE_API_KEY` credential reference;
+# set `apiKey` on the row below to pin a literal key instead. A deployment replacing
+# the recognizer replaces the `speech-to-text-dashscope` row and keeps the tool.
+- insert:
+    - id: speech-to-text
+      name: '@deepseek-ai/dsh-experimental-speech-to-text'
+      config:
+        defaultProvider: dashscope-funasr
+        language: zh
+    - id: speech-to-text-dashscope
+      name: '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
+      config:
+        providerId: dashscope-funasr
+    - id: tool-meeting-minutes
+      name: '@deepseek-ai/dsh-experimental-tool-meeting-minutes'

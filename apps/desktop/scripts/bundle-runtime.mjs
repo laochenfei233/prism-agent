@@ -3,7 +3,7 @@
 //
 //   apps/desktop/runtime/
 //     node/                         Node executable (node.exe / node)
-//     dsh/                          pnpm-deploy closure of @deepseek-ai/dsh
+//     prism/                        pnpm-deploy closure of prism-agent
 //                                   (+ @deepseek-ai/dsh-web-frontend/dist, pnpm)
 //     plugins/dsh-win-terminal-inspector/   local Windows-only plugin
 //
@@ -19,13 +19,13 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync, openSync, readSync, closeSync } from 'node:fs';
 import { createWriteStream } from 'node:fs';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync, statSync, realpathSync } from 'node:fs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RUNTIME = join(ROOT, 'runtime');
 const NODE_DIR = join(RUNTIME, 'node');
-const DSH_DIR = join(RUNTIME, 'dsh');
+const DSH_DIR = join(RUNTIME, 'prism');
 const PLUGINS_DIR = join(RUNTIME, 'plugins');
 
 const args = process.argv.slice(2);
@@ -44,7 +44,9 @@ const PLATFORM = argValue('--platform') ?? hostPlatform();
 // platforms are x64 only.
 const ARCH = argValue('--arch') ?? (PLATFORM === 'mac' ? 'arm64' : 'x64');
 const nodeArg = argValue('--node-version');
-const DSH = '@deepseek-ai/dsh';
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
+// Deploy the fork's CLI package (`prism-agent`), not upstream's `@deepseek-ai/dsh`.
+const DSH = 'prism-agent';
 
 function hostPlatform() {
   if (process.platform === 'win32') return 'win';
@@ -134,15 +136,24 @@ async function download(url, dest) {
   });
 }
 
+function tarBinary() {
+  // A bare `tar` on win32 can resolve to MSYS GNU tar, which reads the
+  // drive-letter colon of `C:\...` as a remote host ("Cannot connect to C:")
+  // and refuses zip archives. System32's bsdtar handles both.
+  if (PLATFORM !== 'win') return 'tar';
+  return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+}
+
 function extract(archive, dest) {
   mkdirSync(dest, { recursive: true });
   step(`extract ${archive}`);
+  const tar = tarBinary();
   if (archive.endsWith('.zip')) {
-    // Windows ships bsdtar which reads zip archives; PowerShell's
-    // Expand-Archive is not available in every environment.
-    execFileSync('tar', ['-xf', archive, '-C', dest], { stdio: 'inherit' });
+    // bsdtar reads zip archives; PowerShell's Expand-Archive is not
+    // available in every environment.
+    execFileSync(tar, ['-xf', archive, '-C', dest], { stdio: 'inherit' });
   } else {
-    execFileSync('tar', ['-xJf', archive, '-C', dest], { stdio: 'inherit' });
+    execFileSync(tar, ['-xJf', archive, '-C', dest], { stdio: 'inherit' });
   }
 }
 
@@ -217,12 +228,12 @@ async function deployDsh() {
   cpSync(distSrc, distDest, { recursive: true });
   step('web frontend dist copied into deployed closure');
 
-  // deploy used --ignore-scripts (the repo root postinstall needs lefthook);
-  // run the native installs we actually need inside the closure. node-pty's
-  // prebuild.js downloads its prebuilt binary; koffi/better-sqlite3 ship
-  // per-platform prebuilt npm packages.
-  step('rebuild native modules in closure');
-  runPnpm(['rebuild', 'node-pty'], { cwd: DSH_DIR });
+  // The closure needs no separate native rebuild: the deploy install runs the
+  // scripts that matter (koffi's prebuilt fetch, subprocess-local's spawn
+  // helper), and node-pty loads a per-platform prebuilt binding — on Windows
+  // that is conpty.node, not pty.node. `pnpm rebuild` cannot run here anyway:
+  // pnpm 11 refuses without a lockfile, and a deployed closure has none.
+  step('native modules resolved by the deploy install scripts');
 
   // Ship pnpm so `dsh plugin` and the market can install/update plugins
   // inside the desktop's web profile. Pin the same major as the deploy step
@@ -259,6 +270,7 @@ async function deployDsh() {
   patchBrokenLinks(repo);
   patchMissingPeers(repo);
   patchDesktopBrowserAuth();
+  buildLocalPlugins(repo);
   copyLocalPlugins(repo);
   if (PLATFORM === 'linux') pruneForeignLinuxPlatformPackages();
   if (PLATFORM === 'mac' || PLATFORM === 'linux') pruneForeignNativeModules();
@@ -267,18 +279,59 @@ async function deployDsh() {
   injectDesktopHostBridge(distDest);
 }
 
+// The entry file a package declares: `main`, else Node's own `index.js`.
+function packageEntry(dir) {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  return join(dir, typeof manifest.main === 'string' ? manifest.main : 'index.js');
+}
+
 // Keep every local bundle under the repository's `plugins/` directory in the
 // desktop runtime. The shell copies these into the profile on first launch and
 // selects their package names as profile bundle layers.
-function copyLocalPlugins(repo) {
+//
+// The packages under `plugins/` are outside the pnpm workspace, so the
+// repository build never builds them and their `lib/` output is gitignored. An
+// unbuilt package has nothing its `main` names, and a profile seeded from it
+// cannot load, so each one is built here and a build that produces no entry
+// fails packaging instead of shipping.
+export function buildLocalPlugins(repo) {
+  const sourceRoot = join(repo, 'plugins');
+  if (!existsSync(sourceRoot)) return;
+  const tsdown = join(repo, 'node_modules', 'tsdown', 'dist', 'run.mjs');
+  if (!existsSync(tsdown)) {
+    throw new Error(`tsdown is missing at ${tsdown}; run pnpm install in the checkout`);
+  }
+  for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const source = join(sourceRoot, entry.name);
+    if (!existsSync(join(source, 'tsdown.config.ts'))) continue;
+    execFileSync(process.execPath, [tsdown, '--config', 'tsdown.config.ts'], { cwd: source, stdio: 'inherit' });
+    const built = packageEntry(source);
+    if (!existsSync(built)) {
+      throw new Error(`local plugin ${entry.name} built without ${built}`);
+    }
+    step(`local plugin ${entry.name} built`);
+  }
+}
+
+export function copyLocalPlugins(repo) {
   const sourceRoot = join(repo, 'plugins');
   if (!existsSync(sourceRoot)) return;
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const source = join(sourceRoot, entry.name);
     if (!existsSync(join(source, 'package.json'))) continue;
+    // The destination is cleared first, so a package skipped below cannot keep
+    // the copy an earlier bundling run left in the runtime.
     const destination = join(PLUGINS_DIR, entry.name);
     rmSync(destination, { recursive: true, force: true });
+    const built = packageEntry(source);
+    if (!existsSync(built)) {
+      // A package whose sources this checkout does not hold cannot be built from
+      // it; shipping the metadata alone would seed a copy nothing can import.
+      step(`WARN: local plugin ${entry.name} has no ${built}; not copied`);
+      continue;
+    }
     cpSync(source, destination, {
       recursive: true,
       filter: (path) => {
@@ -331,15 +384,21 @@ function patchDesktopBrowserAuth() {
 // The served entry document carries the bridge a shell-embedded dsh UI talks
 // to its host through. Two of its jobs answer WebView2 limits that break the
 // plain web UI inside the iframe: wry answers only the clipboard
-// PermissionRequested, so web notification plugins never fire, and
-// NewWindowRequested is not raised for target=_blank clicks, so external
-// links die. The bridge routes both to the shell — native toasts through
-// tauri-plugin-notification, and external links through the opener plugin. Its
-// third job reports that the interface finished mounting, which is what the
-// shell's splash waits for; the frame's own load event fires while client
-// plugins are still activating. Plain-browser `dsh web` users stay untouched:
-// the bridge activates only when a parent frame exists.
-function injectDesktopHostBridge(distDest) {
+// PermissionRequested, so web notification plugins never fire, and wry
+// cancels every new-window request (SetHandled) when no handler is attached,
+// so target=_blank links die. The bridge routes both to the shell — native
+// toasts through tauri-plugin-notification, and external links through the
+// opener plugin.
+// Its third job reports that the interface finished mounting, which is what
+// the shell's splash waits for; the frame's own load event fires while client
+// plugins are still activating. Its fourth job is the desktop update carrier:
+// `window.dshDesktop` exposes the presentation-only API the settings UI
+// already consumes (`protocolVersion: 1` with the optional `updates` bridge),
+// with calls relayed to the shell's allow-listed updater commands and
+// `prism://update-state` pushes fanned out to subscribers. Plain-browser
+// `dsh web` users stay untouched: the bridge activates only when a parent
+// frame exists.
+export function injectDesktopHostBridge(distDest) {
   const entry = join(distDest, 'index.html');
   if (!existsSync(entry)) return;
   let html = readFileSync(entry, 'utf8');
@@ -366,9 +425,17 @@ function injectDesktopHostBridge(distDest) {
   }
   Object.defineProperty(window, "Notification", { configurable: true, value: DshNotification })
 
+  // The bubble listener opens only anchors the page did not claim: a page
+  // handler that preventDefaults before this listener runs (React links open
+  // in-app or through the window.open override below) suppresses the
+  // system-browser open. Unclaimed anchors are prevented and routed here,
+  // ahead of the opener plugin's own click listener, which would otherwise
+  // preventDefault and then throw on the frame's missing Tauri IPC and leave
+  // the link dead. A handler that stops propagation before the document never
+  // reaches this listener and falls to the shell's new-window route instead.
   document.addEventListener("click", (event) => {
     const anchor = event.target.closest?.("a")
-    if (!anchor) return
+    if (!anchor || event.defaultPrevented) return
     const href = anchor.getAttribute("href")
     if (!href) return
     let url
@@ -378,7 +445,7 @@ function injectDesktopHostBridge(distDest) {
       event.preventDefault()
       post({ kind: "open", url: url.href })
     }
-  }, true)
+  })
 
   const nativeOpen = window.open
   window.open = (url, ...rest) => {
@@ -390,6 +457,59 @@ function injectDesktopHostBridge(distDest) {
       }
     } catch {}
     return nativeOpen(url, ...rest)
+  }
+
+  // The update carrier. Calls are a promise RPC over the same postMessage
+  // channel (the shell page invokes only its allow-listed updater commands);
+  // state changes arrive as prism://update-state pushes fanned out to
+  // subscribers. status/check get a timeout because the shell page can be
+  // gone; open does not, because a successful install ends with the shell
+  // process exiting and the reply never arriving — progress reaches the
+  // subscriber through events until the installer takes over.
+  const pendingCalls = new Map()
+  let rpcSeq = 0
+  const updateListeners = new Set()
+  window.addEventListener("message", (event) => {
+    const data = event.data
+    if (!data || data.source !== "dsh-desktop-host") return
+    if (data.kind === "rpc-result") {
+      const entry = pendingCalls.get(data.id)
+      if (!entry) return
+      pendingCalls.delete(data.id)
+      clearTimeout(entry.timer)
+      if (data.ok) entry.resolve(data.value)
+      else entry.reject(new Error(data.error ?? "desktop host call failed"))
+    } else if (data.kind === "event" && data.event === "prism://update-state") {
+      for (const listener of updateListeners) {
+        try { listener(data.payload) } catch (error) {
+          console.error("dsh-desktop-host: update-state listener failed:", error)
+        }
+      }
+    }
+  })
+  const callHost = (cmd, timeoutMs) => new Promise((resolve, reject) => {
+    const id = ++rpcSeq
+    const entry = { resolve, reject, timer: 0 }
+    pendingCalls.set(id, entry)
+    if (timeoutMs > 0) {
+      entry.timer = setTimeout(() => {
+        pendingCalls.delete(id)
+        reject(new Error("desktop host call timed out: " + cmd))
+      }, timeoutMs)
+    }
+    post({ kind: "call", id, cmd })
+  })
+  window.dshDesktop = {
+    protocolVersion: 1,
+    updates: {
+      status: () => callHost("prism_update_state", 30000),
+      check: () => callHost("prism_check_update", 30000),
+      open: () => callHost("prism_install_update", 0),
+      subscribe(listener) {
+        updateListeners.add(listener)
+        return () => updateListeners.delete(listener)
+      },
+    },
   }
 
   // The shell covers the frame with its own splash until the interface is
@@ -796,7 +916,7 @@ async function installWinTerminalInspector() {
   const tmp = join(PLUGINS_DIR, '.wti-tmp');
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
-  execFileSync('tar', ['-xzf', archive, '-C', tmp], { stdio: 'inherit' });
+  execFileSync(tarBinary(), ['-xzf', archive, '-C', tmp], { stdio: 'inherit' });
   const top = readdirSync(tmp).find((name) => name.startsWith('dsh-win-terminal-inspector-'));
   if (!top) throw new Error(`unexpected tarball layout in ${tmp}`);
   cpSync(join(tmp, top), dest, { recursive: true });
@@ -863,7 +983,13 @@ async function prepareDefaultPluginDshPlugin() {
   step('dsh-plugin closure installed');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Exported helpers (smoke tests import them) share this module with the
+// bundling pipeline, which must only run when the script itself is invoked.
+const invokedDirectly = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

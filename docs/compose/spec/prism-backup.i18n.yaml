@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for prism-backup.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-backup.md
+/:
+  en: c4b09406a214ff57
+  zh: ad5112b27ec5ca75
+/prism-backup:
+  en: 746ff6b7941b5661
+  zh: 71df2526e969b736
+/prism-backup/report:
+  en: facfd0b6d5b15ff8
+  zh: b83493722057c4dd
+/prism-backup/s1-problem:
+  en: e28afbf32ef979f4
+  zh: 03179a5faa60aea8
+/prism-backup/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-backup/s2-design/s2-1-package-and-composition:
+  en: 399fe324d219001a
+  zh: 596bd81b269275aa
+/prism-backup/s2-design/s2-2-configuration:
+  en: c6f5ba6f5bf45508
+  zh: 9e28247bff54d187
+/prism-backup/s2-design/s2-3-secrets:
+  en: 86e2abff5d1d2007
+  zh: ad91763eca4b70c1
+/prism-backup/s2-design/s2-4-archive-layout:
+  en: 6f7704eeca659652
+  zh: f71de523a3df0be9
+/prism-backup/s2-design/s2-5-transports:
+  en: 73371cdb27c4b13d
+  zh: 6627392ab2411b55
+/prism-backup/s2-design/s2-6-run-orchestration:
+  en: 9f5d6c127f561087
+  zh: f41dc0e4e207ad5b
+/prism-backup/s2-design/s2-7-host-route:
+  en: 45a687e557603577
+  zh: 9388a095aba6d959
+/prism-backup/s2-design/s2-8-settings-page:
+  en: a81136ff6c1d2e80
+  zh: 5f8452d8a708245b
+/prism-backup/s3-scope:
+  en: 0df170407c058087
+  zh: 829e9cf990f32847
+/prism-backup/tasks:
+  en: 792c8c8d60cbc80e
+  zh: 4175459220e26aed
+/prism-backup/s4-acceptance:
+  en: f57af02606858cdf
+  zh: 6386c128b4ce076f

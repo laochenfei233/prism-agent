@@ -4,7 +4,7 @@
  * text-storage mechanics — resolve, stat, read/stream, list, the atomic
  * write and the read-match-write edit critical section — are the local
  * implementation's, verbatim; this package adds only the per-call POLICY fence
- * on the two mutations. Reads pass through untouched: every mode permits
+ * on all five mutations. Reads pass through untouched: every mode permits
  * reading.
  *
  * The fence is a policy check in TRUSTED code over a MODEL-CONTROLLED path,
@@ -19,9 +19,10 @@
  *
  * Per-call policy: `read-only` denies every mutation; `workspace-write` allows
  * a mutation only when the target canonicalizes under the policy's workspace
- * root or a platform temp area from the shared `writableRoots` policy;
- * `danger-full-access` delegates unfenced. A denial throws the structured
- * `FS_SANDBOX_DENIED`.
+ * root, an explicit additional writable root, or a platform temp area from the
+ * shared `writableRoots` policy, and never under the harness home;
+ * `danger-full-access` delegates unfenced. A
+ * denial throws the structured `FS_SANDBOX_DENIED`.
  *
  * @module @deepseek-ai/dsh-fs-sandbox
  */
@@ -30,8 +31,9 @@ import { Context } from '@deepseek-ai/cordis'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import type { Config as LocalConfig } from '@deepseek-ai/dsh-fs-local'
 import { FsError } from '@deepseek-ai/dsh-fs'
-import type { FsEditOutcome, FsEditRequest, FsTarget, FsVersion, FsWriteIntent, FsWriteOutcome } from '@deepseek-ai/dsh-fs'
-import { writableRoots } from '@deepseek-ai/dsh-sandbox'
+import type { FsDeleteOutcome, FsMoveOutcome, FsEditOutcome, FsEditRequest, FsTarget, FsVersion, FsWriteIntent, FsWriteOutcome } from '@deepseek-ai/dsh-fs'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { canonicalPath, writableRoots } from '@deepseek-ai/dsh-sandbox'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { isPathUnder } from './containment.ts'
@@ -56,9 +58,19 @@ export class SandboxedFileSystem extends LocalFileSystem {
   static inject = ['sandboxPolicy']
 
   private readonly defaultMode: SandboxMode
+  /**
+   * Canonical harness home. It holds composition the host consumes — the home
+   * patch, profile patches, installed bundle sources — and the loader executes
+   * that composition as host-process JavaScript, so a model write there is code
+   * execution rather than a workspace edit. Resolved once from `$DSH_HOME`/
+   * `~/.prism`, the environment source the shipped composition resolves; a store
+   * configured with an explicit home can differ.
+   */
+  private readonly harnessHome: string
   constructor(ctx: Context, config: Config) {
     super(ctx, config)
     this.defaultMode = ctx.sandboxPolicy.defaultMode
+    this.harnessHome = canonicalPath(resolveDshHome())
   }
 
   /** The deployment default mode — the capability fact the tool layer reads to advertise escalation. */
@@ -109,15 +121,49 @@ export class SandboxedFileSystem extends LocalFileSystem {
   }
 
   /**
+   * Fence the mutation before delegating to the local provider.
+   * @param sandboxPolicy - per-call mode and workspace root; omit for the deployment fallback.
+   */
+  override async patchText(
+    target: FsTarget, hunks: Parameters<LocalFileSystem['patchText']>[1], expected?: { version: FsVersion },
+    signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy,
+  ): Promise<FsEditOutcome> {
+    return super.patchText(await this.checkedTarget(target, sandboxPolicy), hunks, expected, signal)
+  }
+
+  /**
+   * Fence the mutation before delegating to the local provider.
+   * @param sandboxPolicy - per-call mode and workspace root; omit for the deployment fallback.
+   */
+  override async deleteFile(
+    target: FsTarget, expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy,
+  ): Promise<FsDeleteOutcome> {
+    return super.deleteFile(await this.checkedTarget(target, sandboxPolicy), expected, signal)
+  }
+
+  /**
+   * Fence the mutation before delegating to the local provider.
+   * @param sandboxPolicy - per-call mode and workspace root; omit for the deployment fallback.
+   */
+  override async moveFile(
+    source: FsTarget, destination: FsTarget, options: Parameters<LocalFileSystem['moveFile']>[2],
+    signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy,
+  ): Promise<FsMoveOutcome> {
+    const checkedSource = await this.checkedTarget(source, sandboxPolicy)
+    const checkedDestination = await this.checkedTarget(destination, sandboxPolicy)
+    return super.moveFile(checkedSource, checkedDestination, options, signal)
+  }
+
+  /**
    * Enforce the per-call policy against `target` and return the EXACT target the
    * mutation must use, so the checked identity is the mutated one (no
    * check-here-write-there TOCTOU). `read-only` denies; `workspace-write`
    * re-canonicalizes NOW (`resolve` realpaths the deepest existing ancestor,
-   * reflecting a concurrently swapped symlink), requires containment under a
-   * writable root, and returns THAT fresh target; `danger-full-access` returns
-   * the caller's target unfenced. Throws the structured `FS_SANDBOX_DENIED` on
-   * refusal — the tool layer maps it to the model-facing `[sandbox: …]` marker
-   * and the escalation hint.
+   * reflecting a concurrently swapped symlink), refuses the harness home,
+   * requires containment under a writable root, and returns THAT fresh target;
+   * `danger-full-access` returns the caller's target unfenced. Throws the
+   * structured `FS_SANDBOX_DENIED` on refusal — the tool layer maps it to the
+   * model-facing `[sandbox: …]` marker and the escalation hint.
    */
   private async checkedTarget(target: FsTarget, sandboxPolicy?: SandboxExecutionPolicy): Promise<FsTarget> {
     const policy = sandboxPolicy ?? this.ctx.sandboxPolicy.resolve()
@@ -130,6 +176,12 @@ export class SandboxedFileSystem extends LocalFileSystem {
     // symlink ancestor swapped since the tool resolved this target), and the
     // mutation delegates with THIS fresh target — never the stale one.
     const fresh = await this.resolve(target.displayPath)
+    if (await isPathUnder(fresh.targetKey, this.harnessHome)) {
+      throw new FsError(
+        `cannot write "${target.displayPath}": the harness home is reserved for the owner under workspace-write mode`,
+        'FS_SANDBOX_DENIED',
+      )
+    }
     let contained = false
     for (const root of writableRoots(policy)) {
       if (await isPathUnder(fresh.targetKey, root)) {

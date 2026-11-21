@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联同一套安装产生的遥测、反馈与 DeepSeek 请求，同时不识别用户身份。该随机 UUID 存储在 `$DSH_HOME/.anonymous-user-id`（`$DSH_HOME` 默认为 `~/.dsh`）中，可跨重启保留，并在你删除文件后重新生成。不同 harness home 使用不同的标识符，且该值不包含机器或账户数据。内置功能会自动创建并附加该值；包消费方可以复用同一个值进行安装范围的关联，但无法跨 home 关联记录。
+DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联同一套安装产生的遥测、反馈与 DeepSeek 请求，同时不识别用户身份。该随机 UUID 存储在 `$DSH_HOME/.anonymous-user-id`（`$DSH_HOME` 默认为 `~/.prism`）中，可跨重启保留，并在你删除文件后重新生成。不同 harness home 使用不同的标识符，且该值不包含机器或账户数据。内置功能会自动创建并附加该值；包消费方可以复用同一个值进行安装范围的关联，但无法跨 home 关联记录。
 
 ## 目录
 
@@ -37,7 +37,7 @@ DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联�
 
 ### 查看与重置 id
 
-该 id 存放在 `$DSH_HOME/.anonymous-user-id`（`$DSH_HOME` 默认为 `~/.dsh`）中，是一个纯 UUID 文本文件。删除该文件即可在下次启动时获得全新 id；正在运行的进程在退出前会一直保留当前 id。不同 harness home 各自保留独立 id，值中永远不会包含任何机器或账户信息。
+该 id 存放在 `$DSH_HOME/.anonymous-user-id`（`$DSH_HOME` 默认为 `~/.prism`）中，是一个纯 UUID 文本文件。删除该文件即可在下次启动时获得全新 id；正在运行的进程在退出前会一直保留当前 id。不同 harness home 各自保留独立 id，值中永远不会包含任何机器或账户信息。
 
 ### 在自己的包中使用
 
@@ -66,14 +66,13 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 - **随机生成，绝不派生。** id 来自 `crypto.randomUUID()`；绝不从 hostname、网络地址、git remote 或任何其他可识别来源派生，因此匿名性是生成过程的属性。
 - **同步且记忆化。** 一个进程对每个解析后的文件路径只触碰一次磁盘：读写都是同步的，结果按解析后的文件路径记忆化。
 - **Best-effort 持久化。** 写入失败仍会为本次运行返回可用 id，遥测与反馈因此不会因 home 不可写而阻塞。
-- **库而非插件。** 没有 Cordis 插件入口或配置。不发布不变式伴生入口，因为本包不拥有任何事件流或公开可变关系，无法在不产生创建 id 这一副作用的情况下比较。
+- **库而非插件。** 没有 Cordis 插件入口或配置。
 
 ### 源码地图
 
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 库入口：`getOrCreateAnonymousUserId`、文件持久化、按路径记忆化 |
-| — | 不发布运行时不变式伴生入口；该 API 仅拥有一个私有记忆化值和一个 best-effort 文件，不存在独立事件流或公开可变关系可供伴生入口在不产生创建身份这一副作用的情况下比较。 |
 | [`tests/anonymous-user-id.spec.ts`](tests/anonymous-user-id.spec.ts) | 测试覆盖的行为：生成、持久化、损坏、并发、记忆化 |
 
 ### API
@@ -94,7 +93,7 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 当包级约定不够用时阅读以下页面。它们从 identity 组映射逐步进入本包所依赖的 home 路径解析，以及使用该 id 的功能。
 
 - [identity 组映射](../README.zh.md)——兄弟包与组范围。
-- [dsh-home-paths](../../util/home-paths/README.zh.md)——负责 `$DSH_HOME` 与 `~/.dsh` 的解析。
+- [dsh-home-paths](../../util/home-paths/README.zh.md)——负责 `$DSH_HOME` 与 `~/.prism` 的解析。
 - [dsh-session-telemetry-otel](../../session/session-telemetry-otel/README.zh.md)——将该 id 作为 OTel Resource `user.id` 上报。
 - [dsh-command-feedback](../../feedback/command-feedback/README.zh.md)——将 id 嵌入反馈确认。
 - [dsh-llm-deepseek](../../llm/llm-deepseek/README.zh.md)——在提供方请求中发送 `x-deepseek-harness-user-id`。
@@ -135,9 +134,5 @@ const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
 #### 开放：文件格式演进
 
 持久化约定是没有任何版本标记的裸 UUID 行。在 id 旁边增加第二个值，或用容器包裹该行，对现有文件都没有迁移方案；带版本的行格式是让此类变更安全的一种方式。
-
-#### 开放：不变式观测点
-
-不发布不变式伴生入口，因为任何关系都无法在不产生创建 id 这一副作用的情况下检查。未来若有安全的观测点，可以把重新读取的持久化文件与记忆化的 id 进行比较。
 
 </details>

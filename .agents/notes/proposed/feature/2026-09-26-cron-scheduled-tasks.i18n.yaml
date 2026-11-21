@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-26-cron-scheduled-tasks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-09-26-cron-scheduled-tasks.md
-2026-09-26-cron-scheduled-tasks.md: d93ee6f443f07d0b9c53d6d0ab3ae300380388bb
-2026-09-26-cron-scheduled-tasks.zh.md: b575636e920f12b1cdd8905e7d941b7c90f37eab
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler:
+  en: cde2e52f474ba152
+  zh: d6c1322384c94bab
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/problem:
+  en: 4cdb9bf09dd8507a
+  zh: 2cae6830b3003119
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal:
+  en: d4eaf07243b90362
+  zh: d9843d2bf066930e
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/plugin-topology-and-owning-verbs:
+  en: 0b7fcaa2cae7652e
+  zh: 21eb6405f7399483
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/cron-expressions-and-calendar-semantics:
+  en: 940f5e14251340dd
+  zh: fad34b786c78a0fb
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/durable-store-and-single-instance-ownership:
+  en: 40fce85014477ce8
+  zh: 7e1af6a2cbd5b64b
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/trigger-delivery-and-unattended-authority:
+  en: 40989d71ead5c761
+  zh: b8eb116b3f11db41
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/human-and-model-management-surfaces:
+  en: 3ffc14153c237b77
+  zh: 8e4fbfc695f9632d
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/boundary-with-existing-owners:
+  en: 95103d7f3eaa45e6
+  zh: 05c87c9c038d54ad
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/implementation-plan:
+  en: 49302f64e9fd2ea8
+  zh: 86e9a711987c1d5e
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/alternatives-considered:
+  en: 3824605171c4ba54
+  zh: b481c715fb388ee3
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/acceptance-criteria:
+  en: 7d988885dd71cc0c
+  zh: 41434f3a166d3ce2
+/agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/risks:
+  en: bc7b54a76279c998
+  zh: 9fa19a22450d5073

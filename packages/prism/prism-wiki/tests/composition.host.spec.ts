@@ -19,7 +19,9 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
+import WebServer from '@deepseek-ai/dsh-host-webserver'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
 import {
@@ -84,6 +86,8 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
     "  name: '@deepseek-ai/dsh-tools'",
     '- id: commands',
     "  name: '@deepseek-ai/dsh-commands'",
+    '- id: tool-executor',
+    "  name: '@deepseek-ai/dsh-tool-executor-native'",
     '- id: prism-wiki',
     "  name: '@prism/prism-wiki'",
     '  config:',
@@ -95,6 +99,11 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
   ]
   if (options.web === true) {
     rows.push(
+      '- id: web-server',
+      "  name: '@deepseek-ai/dsh-host-webserver'",
+      '  config:',
+      "    host: '127.0.0.1'",
+      '    port: 0',
       '- id: connection',
       "  name: '@deepseek-ai/dsh-client-connection'",
       '- id: web-prism-wiki',
@@ -107,16 +116,14 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
   owned.add(ctx)
   ctx.baseUrl = pathToFileURL(root).href + '/'
   if (options.web === true) {
-    // Connection mounts its `/api` route on the Web server and signs browser
-    // sessions from the credential provider; dispatch through the exact Fetch
-    // registry this suite uses touches neither beyond the shape below.
+    // Connection signs browser sessions from the credential provider, and the
+    // Web server row binds a real (ephemeral) port.
     ctx.provide('credentials', {
       modifyRecord: async () => ({
         kind: 'grant',
         payload: { version: 1, secret: Buffer.alloc(32, 7).toString('base64url') },
       }),
     })
-    ctx.provide('webServer', { register: () => () => {} })
   }
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
@@ -124,6 +131,8 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['@deepseek-ai/dsh-commands', CommandRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
+    ['@deepseek-ai/dsh-host-webserver', WebServer],
     ['@deepseek-ai/dsh-client-connection', Connection],
     ['@prism/prism-wiki', PrismWiki],
     ['@prism/prism-wiki/tools', WikiTools],
@@ -200,7 +209,14 @@ describe('prism-wiki real Loader composition', () => {
     const vaultRoot = await scratch('web')
     const ctx = await boot(vaultRoot, { web: true })
     const agent = createAgent('composition-web')
-    const shared = ctx.connection.createSharedFetchHandler('/api')
+    // Exact routes carry an owner principal; the browser peer is Connection's own owner.
+    const connection = ctx.connection as unknown as {
+      createSharedFetchHandler: (channel: '/api') => {
+        fetch: (request: Request, peer: unknown) => Promise<Response>
+      }
+      browserPeer: unknown
+    }
+    const shared = connection.createSharedFetchHandler('/api')
     /** Send one browser request to a wiki route and read its envelope. */
     const post = async (
       endpoint: string,
@@ -210,7 +226,7 @@ describe('prism-wiki real Loader composition', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
-      }))
+      }), connection.browserPeer)
       return { status: response.status, body: await response.json() as Record<string, unknown> }
     }
 

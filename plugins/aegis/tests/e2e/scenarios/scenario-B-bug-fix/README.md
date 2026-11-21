@@ -1,5 +1,7 @@
 # Scenario B: Bug Fix
 
+English | [中文](README.zh.md)
+
 Goal:
 
 - cover systematic debugging plus dual-track governance expectations

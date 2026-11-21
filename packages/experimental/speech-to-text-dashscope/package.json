@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-speech-to-text-dashscope",
   "description": "DashScope realtime duplex transcription provider for the DeepSeek Harness speech capability seam (ctx.speechToText)",
-  "version": "0.1.7-rc.1",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },
@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-experimental-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@types/ws": "^8.18.1",
     "ws": "^8.21.0"
   }
 }

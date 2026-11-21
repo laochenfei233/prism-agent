@@ -64,7 +64,7 @@ default-src 'self'; frame-src http://127.0.0.1:*; connect-src http://127.0.0.1:*
 
 ## [S3] Out of Scope
 
-- No HTTP probe distinguishes "occupied by dsh" from "occupied by something else" at startup: a non-3081 port is selected whenever 3081 is busy, and the occupied 3081 is logged in `desktop-startup.log`. A double-instance scenario (the shell's new hub plus an external one) is diagnosable from that log and out of scope to arbitrate automatically.
+- No HTTP probe distinguishes "occupied by dsh" from "occupied by something else" at startup: a non-3081 port is selected whenever 3081 is busy, and the occupied 3081 is logged in `desktop-startup.log`. The shell ends its own rival hubs before adopting or spawning ([desktop-single-hub-sweep.zh.md](desktop-single-hub-sweep.zh.md)); a foreign listener still only moves the shell to a fallback port.
 - The external port occupier is never probed or probed for identity; `dsh_status` reports only the shell's own port.
 - No port is persisted across restarts: selection is re-evaluated per spawn (3081 returns as soon as it is free).
 

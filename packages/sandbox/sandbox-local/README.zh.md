@@ -56,6 +56,8 @@ kind: "package-reference"
 
 不受支持的平台或不可用的 runner 会拒绝执行：`confine()` 以 `SANDBOX_UNAVAILABLE` 拒绝 并列出该平台的 runner 选项，消费方会呈现该错误，而不是让命令不受限制地运行。启动后拒绝自身 profile 的 runner 由其致命 stderr 签名与退出码识别，因此损坏的沙箱不会被误认为被拒绝的命令。`runnerCommand` 覆盖是操作方断言：它跳过功能探测，并假定配置的 runner 诚实实现与 bwrap 兼容的 profile。
 
+Seatbelt、bwrap 和 Landlock 在 `workspace-write` 下包含策略显式指定的 `additionalWritableRoots`。只读模式忽略这些授权。无效的额外目录会在命令启动前触发 `SANDBOX_INVALID_ROOT`。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,13 +74,17 @@ kind: "package-reference"
 
 ### 平台 profile
 
-bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与可写工作区绑定挂载。[私有 PID 笔记](../../../.agents/notes/implemented/bug-fix/2026-08-06-bwrap-private-pid-namespace.zh.md)记录该边界。
+bwrap profile 组合只读宿主根目录、全新 `/dev` 与私有 PID 命名空间中的 `/proc`——命令可管理其后代，但看不到宿主进程，因此 procfs 魔法链接无法绕过挂载；`workspace-write` 另加临时的 `/tmp` 与工作区与每个显式额外根目录的可写绑定挂载。[历史私有 PID 笔记](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md)记录该边界。
 
 `@deepseek-ai/node-addon-system/landlock-run` API 提供平台 launcher、功能探测与授权词汇；此提供方只做模式到授权的映射，把路径解析与探测解析保留在带版本的 binary 中。
 
 Seatbelt profile 默认允许，带 `(deny file-write*)` 与来自共享 `writableRoots` 辅助函数的写入 allow-list，因此恰好管辖模式承诺的文件操作；每个根目录都经过规范化，因为 Seatbelt 匹配解析后的路径（`/tmp` 就是 `/private/tmp`）。
 
 Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同时为每个活跃的会话/工作区对分配一个随机私有临时目录，以及不同的 SID 和可撤销 ACE——共享工作区的会话共享其预期写权限，却不会继承彼此的临时目录权限。新的提供方总会选择新的临时路径和 SID，因此崩溃残留既无法阻止恢复的会话，也无法向其授权。该档报告 `partial` 强制执行，因为 NTFS 硬链接会把同一文件对象别名为多个路径、读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。
+
+当可写根包含 harness home（`$DSH_HOME`，默认 `~/.prism`）时，每个 profile 都会拒绝它：bwrap 在工作区绑定之后把 home 重新绑定为只读，Seatbelt 追加一条优先于允许规则的拒绝子路径规则，Windows 档为工作区能力 SID 添加 Deny ACE，而 Landlock——无法排除子路径的允许列表——以 `SANDBOX_UNAVAILABLE` 拒绝该策略，而不是授予该目录树。
+
+当内置 Windows runner 与技能注册表同时可用时，此提供方会注册 [ACL 诊断技能](../sandbox-windows-acl/README.zh.md#failures-and-recovery)。自定义 `runnerCommand` 不注册该技能；提供方释放时移除技能及其提取的资源。
 
 构建后的 ACL runner 缺失时，源码启动将 `tsx/esm/api` 加载器和 TypeScript 路径映射固定到本安装目录。命令的工作目录和环境中的 `TSX_TSCONFIG_PATH` 无法选择 runner 的源码依赖。
 
@@ -90,9 +96,8 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：runner 链选择、功能探测、逐调用包装、ACL 授权生命周期 |
+| [`src/index.ts`](src/index.ts) | 插件入口：runner 链选择、功能探测、逐调用包装、ACL 授权生命周期（委托给 `grant-runner` 辅助子进程） |
 | [`src/profiles.ts`](src/profiles.ts) | 各平台 profile 构建器：bwrap 挂载、Landlock 授权、Seatbelt SBPL |
-| — | 不发布运行时不变式伴生入口；除所属 seam 强制执行的约定外，本包不公开独立的事件序列或可变数据关系。 |
 
 </details>
 
@@ -107,7 +112,7 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 - [沙箱 seam 包](../sandbox/README.zh.md)——本提供方实现的服务约定。
 - [Bash 沙箱执行器](../../shell/bash-sandbox/README.zh.md)——受限的 bash 消费方。
 - [Windows ACL 受限令牌档](../sandbox-windows-acl/README.zh.md)——本提供方挂载的 win32 后端。
-- [子进程沙箱决策](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)——能力边界与 runner 选择语义。
+- [历史子进程沙箱决策](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)——能力边界与 runner 选择语义。
 
 -----
 
@@ -127,9 +132,11 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 
 这些限制说明提供方何时不合适，或何时需要特别运维。它们是当前包约束，不是通用平台对比或任务积压。
 
+- **Windows 额外根目录**——Windows ACL 在授权或创建子进程前，以 `SANDBOX_UNSUPPORTED_POLICY` 拒绝所有携带额外目录的 workspace-write 子进程。文件系统工具可独立执行这些授权。运行进程操作前，请移除额外授权或使用支持此功能的主机。
 - **Windows ACL 只能实现部分强制执行**——NTFS 硬链接会使工作区路径与外部路径指向同一个文件对象，读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。提供方报告 `enforcement: 'partial'`，而不会把该边界夸大为完整强制执行。
-- **Landlock 可能只实现部分强制执行**——较旧且受支持的内核 ABI 只能限制自身公开的访问类别，因此报告 `enforcement: 'partial'`，不会夸大为完整强制执行。
+- **Landlock 可能只实现部分强制执行**——较旧且受支持的内核 ABI 只能限制自身公开的访问类别，因此报告 `enforcement: 'partial'`，不会夸大为完整强制执行。它还会拒绝工作区包含 harness home 的 `workspace-write` 策略，因为允许列表无法排除该子路径。
 - **Seatbelt 依赖已弃用的 `sandbox-exec`**——macOS 仍会提供它，但若 Apple 移除该私有策略引擎，该提供方无法替换或探测。
+- **Windows ACL 的 home 拒绝是常驻的**——它与所收窄的工作区授权一样长于提供方，因此把 `$DSH_HOME` 移出工作区后，该目录对旧工作区 SID 仍保持拒绝，直到工作区 ACL 被重置。
 - **runner 选择在提供方生命周期内缓存**——安装、移除或修复 runner 后，必须重载插件才能改变选择。
 - **`runnerCommand` 是操作方断言**——配置的自定义 runner 会跳过功能探测，并假定它诚实实现与 bwrap 兼容的 profile；如果它本身是 Bash 脚本，其解释器启动发生在该脚本施加约束之前。
 
@@ -143,6 +150,6 @@ Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，同
 
 #### 未来：环境一致的能力组
 
-[沙箱决策](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)把环境一致的能力组示例（例如 bash 加 fs 针对同一个容器）列为延期阶段；该方向尚未决定。
+环境一致的能力组示例（例如 bash 加 fs 针对同一个容器）仍未决定。
 
 </details>

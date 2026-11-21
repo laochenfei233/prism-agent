@@ -13,6 +13,8 @@ import CommandRuntime, { type CommandResult } from '@deepseek-ai/dsh-commands'
 import { ToolCallId, type ToolSchema } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import WikiVaultService from '../../src/index.ts'
 import * as WikiTools from '../../src/tools.ts'
@@ -50,6 +52,9 @@ export interface WikiMountOptions extends VaultMountOptions {
 export async function mountVault(ctx: Context, options: VaultMountOptions): Promise<void> {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  // `ctx.tools.execute` dispatches through the composed executor seam; without
+  // one it refuses every call before a tool runs.
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(WikiVaultService, { vaultRoot: options.vaultRoot, ...options.config })
 }
@@ -124,7 +129,7 @@ export async function callTool(
   agent?: Agent,
 ): Promise<ToolExecutionResult> {
   callSequence += 1
-  return await ctx.tools.execute({
+  return await executeModelToolFixture(ctx, {
     signal: new AbortController().signal,
     callId: ToolCallId(`prism-wiki-${String(callSequence)}`),
     name,

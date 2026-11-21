@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for security-audit-residuals.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/security-audit-residuals.md
+/:
+  en: 09d30bd415ea6db3
+  zh: 09d30bd415ea6db3
+/security-audit-residuals:
+  en: bb545ec7c225e2fc
+  zh: 6b1772f21247afff
+/security-audit-residuals/report:
+  en: 62ca6b0d5a7a404c
+  zh: f91d8e4ce197a178
+/security-audit-residuals/s1-problem:
+  en: a483c59b05d9707d
+  zh: e765db85b74f8f13
+/security-audit-residuals/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/security-audit-residuals/s2-design/s2-1-harness-home-exclusion-in-every-shell-profile:
+  en: 108f324b8c49ad16
+  zh: 10e9c5e1b14b8004
+/security-audit-residuals/s2-design/s2-2-read-only-publication-of-imported-attachments:
+  en: c1d914ec4bc32eb6
+  zh: 5659ccfbe49a1518
+/security-audit-residuals/s2-design/s2-3-updater-manifest-ownership:
+  en: f54b304058eb44e7
+  zh: 30ec2b8a15dc62ce
+/security-audit-residuals/s2-design/s2-4-deferred-imported-content-marker:
+  en: 265633be64a5eac4
+  zh: 9cba88556076dd7c
+/security-audit-residuals/s3-scope:
+  en: 4528d7447b8b135d
+  zh: 191cee2815a0a0df
+/security-audit-residuals/tasks:
+  en: 77e879a98a548400
+  zh: 1ff32d97133be6a6
+/security-audit-residuals/s4-acceptance:
+  en: 10f285f2150a9249
+  zh: ed36796b2a983c49

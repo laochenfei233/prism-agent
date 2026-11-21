@@ -1,13 +1,15 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "Desktop shell for DeepSeek Harness: Tauri 2 window + bundled Node runtime. Never touches upstream packages.",
-  "version": "0.1.1-rc.2",
+  "version": "0.2.2-rc.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
     "tauri": "npx --yes @tauri-apps/cli@2.11.4",
     "dev": "npx --yes @tauri-apps/cli@2.11.4 dev",
     "build": "npx --yes @tauri-apps/cli@2.11.4 build",
-    "bundle:runtime": "node scripts/bundle-runtime.mjs"
+    "bundle:runtime": "node scripts/bundle-runtime.mjs",
+    "smoke:bridge": "node scripts/smoke-bridge.mjs"
   }
 }

@@ -3,15 +3,25 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  AGENTS_HOME_DIR_NAME,
+  DATA_HOME_POINTER_FILE_NAME,
+  DEFAULT_AGENTS_HOME_DISPLAY,
   DEFAULT_DSH_HOME_DISPLAY,
   DSH_HOME_DIR_NAME,
+  agentsHomeDisplay,
   canonicalizeWatchPath,
+  clearDataHomePointer,
+  dataHomePointerPath,
+  defaultAgentsHome,
   defaultDshHome,
   dshCachePath,
   dshHomeDisplay,
   dshHomePath,
   expandHomePath,
+  readDataHomePointer,
+  resolveAgentsHome,
   resolveDshHome,
+  writeDataHomePointer,
 } from '@deepseek-ai/dsh-home-paths'
 
 afterEach(() => {
@@ -20,9 +30,9 @@ afterEach(() => {
 
 describe('dsh path helpers', () => {
   it('owns the shared default DSH home directory name', () => {
-    expect(DSH_HOME_DIR_NAME).toBe('.dsh')
-    expect(DEFAULT_DSH_HOME_DISPLAY).toBe('~/.dsh')
-    expect(defaultDshHome()).toBe(join(homedir(), '.dsh'))
+    expect(DSH_HOME_DIR_NAME).toBe('.prism')
+    expect(DEFAULT_DSH_HOME_DISPLAY).toBe('~/.prism')
+    expect(defaultDshHome()).toBe(join(homedir(), '.prism'))
   })
 
   it('expands tilde paths without changing non-tilde paths', () => {
@@ -53,14 +63,38 @@ describe('dsh path helpers', () => {
   })
 
   it('labels a resolved home by whether it is the default root', () => {
-    expect(dshHomeDisplay(resolve(defaultDshHome()))).toBe('~/.dsh')
+    expect(dshHomeDisplay(resolve(defaultDshHome()))).toBe('~/.prism')
     expect(dshHomeDisplay('/some/other/root')).toBe('$DSH_HOME')
   })
 
+  it('owns the shared default agents home directory name', () => {
+    expect(AGENTS_HOME_DIR_NAME).toBe('.agents')
+    expect(DEFAULT_AGENTS_HOME_DISPLAY).toBe('~/.agents')
+    expect(defaultAgentsHome()).toBe(join(homedir(), '.agents'))
+  })
+
+  it('resolves an explicit agents home before DSH_AGENTS_HOME and the default', () => {
+    const envHome = join(homedir(), 'env-agents')
+
+    expect(resolveAgentsHome('/tmp/explicit-agents', { DSH_AGENTS_HOME: '~/env-agents' })).toBe(resolve('/tmp/explicit-agents'))
+    expect(resolveAgentsHome(undefined, { DSH_AGENTS_HOME: '~/env-agents' })).toBe(envHome)
+    expect(resolveAgentsHome(undefined, {})).toBe(defaultAgentsHome())
+  })
+
+  it('treats an empty or whitespace-only DSH_AGENTS_HOME as unset', () => {
+    expect(resolveAgentsHome(undefined, { DSH_AGENTS_HOME: '' })).toBe(defaultAgentsHome())
+    expect(resolveAgentsHome(undefined, { DSH_AGENTS_HOME: '   ' })).toBe(defaultAgentsHome())
+  })
+
+  it('labels a resolved agents home by whether it is the default root', () => {
+    expect(agentsHomeDisplay(resolve(defaultAgentsHome()))).toBe('~/.agents')
+    expect(agentsHomeDisplay('/some/other/root')).toBe('$DSH_AGENTS_HOME')
+  })
+
   it.each([
-    [undefined, join(homedir(), '.dsh')],
-    ['', join(homedir(), '.dsh')],
-    ['   ', join(homedir(), '.dsh')],
+    [undefined, join(homedir(), '.prism')],
+    ['', join(homedir(), '.prism')],
+    ['   ', join(homedir(), '.prism')],
     ['~/env-dsh', join(homedir(), 'env-dsh')],
     ['./relative-dsh', resolve('./relative-dsh')],
   ] as const)('resolves cache paths with DSH_HOME=%j', (home, expectedHome) => {
@@ -101,6 +135,55 @@ describe('dsh path helpers', () => {
       await expect(canonicalizeWatchPath(join(file, 'child'))).rejects.toMatchObject({ code: 'ENOTDIR' })
     } finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('data home launch pointer', () => {
+  it('sits beside the default home and stays absent until one is written', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      expect(dataHomePointerPath(home)).toBe(join(home, DATA_HOME_POINTER_FILE_NAME))
+      expect(DATA_HOME_POINTER_FILE_NAME).toBe('.prism-data-home')
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('round-trips an absolute root and clears it again', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    const root = join(home, 'elsewhere', 'prism')
+    try {
+      writeDataHomePointer(root, home)
+      expect(readDataHomePointer(home)).toBe(root)
+      clearDataHomePointer(home)
+      expect(readDataHomePointer(home)).toBeUndefined()
+      clearDataHomePointer(home)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('ignores a relative or blank recorded path instead of following it', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      await writeFile(dataHomePointerPath(home), '  relative/prism  \n')
+      expect(readDataHomePointer(home)).toBeUndefined()
+      await writeFile(dataHomePointerPath(home), '   \n')
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to record a relative root', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-pointer-'))
+    try {
+      expect(() => { writeDataHomePointer('relative/prism', home) }).toThrow(/absolute/)
+      expect(readDataHomePointer(home)).toBeUndefined()
+    } finally {
+      await rm(home, { recursive: true, force: true })
     }
   })
 })

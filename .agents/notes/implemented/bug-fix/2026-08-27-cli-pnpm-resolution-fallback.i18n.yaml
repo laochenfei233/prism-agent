@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-cli-pnpm-resolution-fallback.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-cli-pnpm-resolution-fallback.md
-2026-08-27-cli-pnpm-resolution-fallback.md: dc9d48921b19505405bee8f0690b103eb6560de4
-2026-08-27-cli-pnpm-resolution-fallback.zh.md: 7060fcf5ec9012572b14300ec936a97e57350a44
+/agent-note-cli-pnpm-resolution-fallback:
+  en: 9ceb8f763ea2f47b
+  zh: 1cb600d3f124d657
+/agent-note-cli-pnpm-resolution-fallback/problem:
+  en: e6b9b75ce6f87e0e
+  zh: 9d7e1ee00e27c4c5
+/agent-note-cli-pnpm-resolution-fallback/decision:
+  en: ee025eb27fe1b7a2
+  zh: 2daf32cb1f8df987
+/agent-note-cli-pnpm-resolution-fallback/alternatives-considered:
+  en: cc432060c1693ded
+  zh: fef7d99e763b7826
+/agent-note-cli-pnpm-resolution-fallback/verification:
+  en: b30de57dcb31ebdd
+  zh: ea9990167557910d
+/agent-note-cli-pnpm-resolution-fallback/consequences:
+  en: 92189f46a7c7f7ff
+  zh: a1f4b5e8e4b5ad92

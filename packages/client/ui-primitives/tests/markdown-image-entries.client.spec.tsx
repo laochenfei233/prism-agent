@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { fileMediaUrl } from '@deepseek-ai/dsh-util-workspace-path'
 import { MarkdownDelegateProvider } from '../src/markdown/MarkdownDelegate.tsx'
 import { MarkdownText } from './markdown-test-components.tsx'
 import { parseGfm, parseGfmWithMath } from '../src/markdown/parse.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
-const labels = { open: 'View full image', dialog: 'Image preview', close: 'Close preview', loading: 'Loading image', failed: 'Image unavailable' }
-const fileImages = { resolve: (path: string) => `https://example.com/api/file?path=${encodeURIComponent('/workspace/' + path)}`, labels }
+const fileDrag = { prepare: vi.fn(async () => ({ start: () => true, release: () => {} })), reportFailure: vi.fn() }
+const labels = { dragFailed: 'Image drag failed', open: 'View full image', dialog: 'Image preview', close: 'Close preview', loading: 'Loading image', failed: 'Image unavailable' }
+const fileImages = { fileDrag, resolve: (path: string) => `https://example.com/api/file?path=${encodeURIComponent('/workspace/' + path)}`, labels }
 function mount(text: string, streaming = false) {
   const openFile = vi.fn()
   const view = render(<MarkdownDelegateProvider openFile={openFile} fileImages={fileImages}>
@@ -15,6 +17,38 @@ function mount(text: string, streaming = false) {
   </MarkdownDelegateProvider>)
   return { ...view, openFile }
 }
+
+it('loads Desktop inline and hover previews through the file route after streaming settles', () => {
+  vi.useFakeTimers()
+  const path = '/work/测试 图片#100%.png'
+  const src = fileMediaUrl('dsh-app://app/', path)!
+  const images = { fileDrag, resolve: (value: string) => fileMediaUrl('dsh-app://app/', value), labels }
+  const text = `![图片](<${encodeURI(path).replace('#', '%23')}>)\n\n[打开图片](<${encodeURI(path).replace('#', '%23')}>)`
+  const openFile = vi.fn()
+  const content = (streaming: boolean) => <MarkdownDelegateProvider fileImages={images} openFile={openFile}>
+    <MarkdownText text={text} streaming={streaming} />
+  </MarkdownDelegateProvider>
+  const view = render(content(true))
+  expect(view.container.querySelector('img')).toBeNull()
+  view.rerender(content(false))
+  const inline = screen.getByRole('img').getAttribute('src')
+  expect(inline?.replace(/&load=\d+$/u, '')).toBe(src)
+  const trigger = screen.getByRole('button', { name: 'View full image: 图片' })
+  trigger.focus()
+  fireEvent.click(trigger)
+  expect(screen.getByRole('dialog').querySelector('img')?.getAttribute('src')).toBe(inline)
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+  const link = screen.getByRole('button', { name: '打开图片' })
+  fireEvent.pointerEnter(link.parentElement!)
+  act(() => { vi.advanceTimersByTime(500) })
+  expect(screen.getByAltText(path).getAttribute('src')?.replace(/&load=\d+$/u, '')).toBe(src)
+  fireEvent.error(screen.getByAltText(path))
+  expect(screen.getByText(labels.failed)).toBeTruthy()
+  fireEvent.click(link)
+  expect(openFile).toHaveBeenCalledWith(path, undefined)
+})
 
 it('opens inline images in the shared lightbox, restores focus, and never opens the sidebar', () => {
   const { openFile } = mount('![Compare](<.artifacts/对比 image.png>)')
@@ -29,6 +63,17 @@ it('opens inline images in the shared lightbox, restores focus, and never opens 
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(document.activeElement).toBe(trigger)
   expect(openFile).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['assets/my%20photo.png', 'my photo.png'],
+  ['assets/%E5%9B%BE%E7%89%87.png', '图片.png'],
+  ['C:%5Cassets%5Cmy%20photo.png', 'my photo.png'],
+])('prepares the decoded basename for %s', async (destination, name) => {
+  fileDrag.prepare.mockClear()
+  mount(`![source](${destination})`)
+  await act(async () => { fireEvent.pointerEnter(screen.getByRole('img')) })
+  expect(fileDrag.prepare).toHaveBeenCalledWith(expect.objectContaining({ name }), expect.any(AbortSignal))
 })
 
 it('loads a link preview only after hover dwell and keeps its existing sidebar activation', () => {
@@ -100,6 +145,13 @@ it('keeps an unavailable image link navigable without showing a hover preview', 
   expect(openFile).toHaveBeenCalledWith('relative.png', undefined)
 })
 
+it('emits an unparsable file image URL unchanged', () => {
+  render(<MarkdownDelegateProvider openFile={vi.fn()} fileImages={{ ...fileImages, resolve: () => 'relative.png' }}>
+    <MarkdownText text="![Compare](image.png)" />
+  </MarkdownDelegateProvider>)
+  expect(screen.getByRole('img').getAttribute('src')).toBe('relative.png')
+})
+
 it('labels empty-alt image activation and retains a localized failure description', () => {
   mount('![](image.png)')
   expect(screen.getByRole('button', { name: 'View full image' })).toBeTruthy()
@@ -114,4 +166,9 @@ it.each([parseGfm, parseGfmWithMath])('uses the shared image categories for bare
       .toMatchObject({ children: [{ type: 'image', url: `/work/test dir/photo.${extension}` }] })
   }
   expect(JSON.stringify(parse('![report](/work/test dir/report.pdf)'))).not.toContain('"type":"image"')
+})
+
+it('uses the fallback filename for an external image URL without a path', () => {
+  mount('![Remote](https://example.com/)')
+  expect(screen.getByRole('img').getAttribute('src')).toBe('https://example.com/')
 })

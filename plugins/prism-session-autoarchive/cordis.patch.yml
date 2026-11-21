@@ -1,0 +1,18 @@
+# The prism-session-autoarchive bundle patch: one row over the profile root.
+#
+# `name` is the bundle's package name — the form a profile resolves once the
+# bundle is installed or published. A checkout that has not installed it points
+# the row at the built entry instead:
+#   name: 'file:///absolute/path/to/plugins/prism-session-autoarchive/lib/index.js'
+#
+# The defaults below are the shipped values: keep every top-level conversation
+# that was used within the last 30 days, and sweep once a day. A deployment that
+# wants a longer window raises `idleDays`; `enabled: false` keeps the plugin
+# mounted with no sweep at all.
+- insert:
+    - id: prism-session-autoarchive
+      name: 'prism-session-autoarchive'
+      config:
+        enabled: true
+        idleDays: 30
+        sweepIntervalMinutes: 1440

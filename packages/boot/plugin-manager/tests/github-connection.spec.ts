@@ -8,14 +8,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import * as subprocess from 'execa'
-import { expect, it, onTestFinished, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it, onTestFinished, vi } from 'vitest'
 import { checkGithubConnection } from '../src/github-connection.ts'
 import { parseInstallSpec } from '../src/install-spec.ts'
+import { isolateGitCommandLineConfig } from './git-environment.ts'
 
 vi.mock('execa', async (original) => {
   const module = await original<typeof import('execa')>()
   return { ...module, execa: vi.fn(module.execa) }
 })
+
+// These cases spawn real Git, so the host's command-line configuration group must not reach its children.
+let restoreGitCommandLineConfig: () => void
+beforeAll(() => { restoreGitCommandLineConfig = isolateGitCommandLineConfig() })
+afterAll(() => { restoreGitCommandLineConfig() })
 
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-github-check-'))
@@ -36,6 +42,9 @@ async function fixture() {
   }
   return { dir, config, controller, check, env }
 }
+
+/** The exact command line a check runs for one repository URL. */
+const checkArgv = (repository: string): string[] => ['git', '-c', 'credential.helper=', 'ls-remote', '--', repository, 'HEAD']
 
 async function proxy(config: string, fail: boolean) {
   const sockets = new Set<Socket>()
@@ -87,7 +96,9 @@ it('reports an immediate transport failure without waiting for the deadline', as
   const transport = await proxy(config, true)
   const result = await check('https://github.com/acme/plugin.git')
   await transport.connected
-  expect(result).toMatchObject({ exitCode: 128, kind: 'network', truncated: false })
+  expect(result).toMatchObject({
+    exitCode: 128, kind: 'network', truncated: false, argv: checkArgv('https://github.com/acme/plugin.git'),
+  })
   expect(await readFile(result!.logPath, 'utf8')).toBe(result!.output)
   await transport.disconnected
   expect(transport.sockets.size).toBe(0)
@@ -100,6 +111,8 @@ it('ends a silent proxy connection and its Git child at the connection deadline'
   await transport.connected
   const result = await running
   expect(result?.kind).toBe('timeout')
+  // The result records the status the terminated Git is read as; only the streamed run reports no exit code.
+  expect(result).toMatchObject({ exitCode: 1, timedOut: true, argv: checkArgv('https://github.com/acme/plugin.git') })
   expect(result!.output).toContain('connection to github.com timed out after 3000ms')
   await transport.disconnected
   expect(transport.sockets.size).toBe(0)
@@ -122,12 +135,15 @@ it.each([undefined, 'Git could not start'])('retains a diagnostic when Git write
   const run = vi.spyOn(subprocess, 'execa').mockResolvedValue({ failed: true, shortMessage } as Awaited<ReturnType<typeof subprocess.execa>>)
   onTestFinished(() => { run.mockRestore() })
   const result = await check('github:acme/plugin')
-  expect(result).toMatchObject({ exitCode: 1, kind: 'unknown', output: shortMessage ?? 'GitHub connection check failed' })
+  expect(result).toMatchObject({
+    exitCode: 1, kind: 'unknown', output: shortMessage ?? 'GitHub connection check failed',
+    argv: checkArgv('https://github.com/acme/plugin'),
+  })
   expect(await readFile(result!.logPath, 'utf8')).toBe(result!.output)
 })
 
 it('bounds returned diagnostics while retaining Git stderr in the operation log', async () => {
-  const { check } = await fixture()
+  const { check, dir } = await fixture()
   const run = vi.spyOn(subprocess, 'execa').mockImplementation((...args: unknown[]) => {
     const options = args[2] as { stderr: { file: string } }
     appendFileSync(options.stderr.file, '0123456789')
@@ -135,8 +151,22 @@ it('bounds returned diagnostics while retaining Git stderr in the operation log'
   })
   onTestFinished(() => { run.mockRestore() })
   const result = await check('github:acme/plugin', 3000, 4)
-  expect(result).toMatchObject({ output: '6789', truncated: true })
+  expect(result).toMatchObject({ output: '6789', truncated: true, argv: checkArgv('https://github.com/acme/plugin') })
+  // The recorded command line is the one Git actually ran.
+  expect(run).toHaveBeenCalledWith('git', checkArgv('https://github.com/acme/plugin').slice(1), expect.objectContaining({ cwd: dir }))
   expect(await readFile(result!.logPath, 'utf8')).toBe('0123456789')
+})
+
+it('keeps URL user information out of the recorded command line', async () => {
+  const { check } = await fixture()
+  const run = vi.spyOn(subprocess, 'execa').mockResolvedValue({
+    failed: true, exitCode: 128, shortMessage: 'fatal: unable to access the repository',
+  } as Awaited<ReturnType<typeof subprocess.execa>>)
+  onTestFinished(() => { run.mockRestore() })
+  const result = await check('https://user:token@github.com/acme/plugin.git')
+  // Git runs the address as typed so its own credentials keep working, while the recorded line is safe to display.
+  expect(run).toHaveBeenCalledWith('git', checkArgv('https://user:token@github.com/acme/plugin.git').slice(1), expect.anything())
+  expect(result?.argv).toEqual(checkArgv('https://github.com/acme/plugin.git'))
 })
 
 it('reports a missing Git executable without classifying it as a network failure', async () => {

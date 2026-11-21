@@ -1,5 +1,7 @@
 # Scenario A: New Feature
 
+English | [中文](README.zh.md)
+
 Goal:
 
 - cover the full path from design discussion to implementation planning and review

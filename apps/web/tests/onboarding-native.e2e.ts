@@ -1,3 +1,4 @@
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A13.
 // The Host's native-onboarding setting must reach the assembled browser before its dialogs register.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -27,6 +28,8 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
     })
     browser = await chromium.launch()
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
+    // The shared menu golden uses the Linux shortcut profile on every test host.
+    await page.addInitScript(() => { Object.defineProperty(navigator, 'platform', { value: 'Linux x86_64' }) })
     if (desktop) await page.addInitScript(() => { Object.defineProperty(globalThis, 'dshDesktop', { value: { protocolVersion: 1 } }) })
     tripwire = watchConsole(page)
   })
@@ -42,9 +45,11 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
     const credentials = await readFile(credentialPath, 'utf8')
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title })
-    await welcome.waitFor()
-    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
-    await welcome.waitFor({ state: 'detached' })
+    if (!desktop) {
+      await welcome.waitFor()
+      await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
+      await welcome.waitFor({ state: 'detached' })
+    }
 
     for (const reload of [false, true]) {
       if (reload) {
@@ -52,18 +57,17 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
         await page.reload({ waitUntil: 'load' })
         acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
       }
-      const accountMenu = page.getByRole('button', { name: '账号菜单', exact: true })
-      if (desktop) await accountMenu.waitFor()
-      else {
-        await page.getByRole('button', { name: '设置', exact: true }).waitFor()
-        expect(await accountMenu.count()).toBe(0)
-        expect(await page.getByRole('dialog', { name: '开始你的创作' }).count()).toBe(0)
-      }
+      // The signed-out launcher is the plain Settings button: it opens the
+      // settings dialog directly, with no account menu to fall through.
+      const launcher = page.getByRole('button', { name: '设置', exact: true })
+      await launcher.waitFor()
+      expect(await page.getByRole('menu').count()).toBe(0)
       await openSettings(page, 'zh')
       const settings = page.getByRole('dialog', { name: '设置', exact: true })
       await settings.getByRole('button', { name: '模型', exact: true }).click()
       await settings.getByLabel('API 密钥', { exact: true }).waitFor()
       expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
+      expect(await page.getByRole('dialog', { name: '开始使用', exact: true }).count()).toBe(0)
       expect(await welcome.count()).toBe(0)
       expect(await readFile(credentialPath, 'utf8')).toBe(credentials)
       const aria = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)

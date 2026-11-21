@@ -1,0 +1,17 @@
+diff --git a/lib/main.js b/lib/main.js
+index 87aa87b00cf9eb27dcad88b11b2570298cc8c422..b50f084aed4ea95a042b5b2e2ac340c1c13fc96b 100644
+--- a/lib/main.js
++++ b/lib/main.js
+@@ -771,7 +771,11 @@ function createChannel(streamIn) {
+         });
+       }
+     };
+-    if ((typeof input === "string" || input instanceof Uint8Array) && input.length > 1024 * 1024) {
++    // Local patch: the writeFile shim makes esbuild 0.25.12 route inputs larger
++    // than 1 MiB through a temp file that its own process then fails to remove on
++    // Windows ("remove <temp>: Access is denied"), failing the whole transform.
++    // Inputs at or below the threshold already travel inline, so send all inline.
++    if (false) {
+       let next = start;
+       start = () => fs3.writeFile(input, next);
+     }

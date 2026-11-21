@@ -18,7 +18,7 @@
   min-height: 28px;
   padding: 3px 2px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
@@ -64,19 +64,34 @@
   height: 14px;
 }
 
-.trigger:hover,
 .trigger:focus-visible {
   color: var(--dsw-alias-label-primary);
 }
 
-.switcherTrigger:hover,
+@media (hover: hover) {
+  .trigger:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
 .switcherTrigger:focus-visible {
   color: var(--dsw-alias-label-primary);
 }
 
-.ancestorSwitcherTrigger:hover,
+@media (hover: hover) {
+  .switcherTrigger:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
 .ancestorSwitcherTrigger:focus-visible {
   color: var(--dsw-alias-label-tertiary);
+}
+
+@media (hover: hover) {
+  .ancestorSwitcherTrigger:hover {
+    color: var(--dsw-alias-label-tertiary);
+  }
 }
 
 .trigger svg,
@@ -97,9 +112,9 @@
   width: 336px;
   max-width: min(400px, calc(100vw - 32px));
   max-height: min(560px, calc(100vh - 140px));
-  padding: 3px;
+  padding: 4px;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--dsw-radius-lg);
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
@@ -115,7 +130,7 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  border-radius: 16px;
+  border-radius: inherit;
   background: var(--dsw-specific-menu);
   backdrop-filter: var(--dsw-menu-backdrop-filter);
 }
@@ -146,7 +161,7 @@
   min-height: 44px;
   padding: 6px 7px 6px 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
@@ -156,9 +171,14 @@
   outline: none;
 }
 
-.row:hover > .clickarea,
 .row:focus-visible > .clickarea {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (hover: hover) {
+  .row:hover > .clickarea {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .clickarea {
@@ -171,7 +191,7 @@
   min-width: 0;
   margin: -6px -7px -6px;
   padding: 6px 7px;
-  border-radius: 7px;
+  border-radius: var(--dsw-radius-md);
 }
 
 .rowActivitySlot {
@@ -207,8 +227,10 @@
   height: 12px;
 }
 
-.disclosure:hover {
-  color: var(--dsw-alias-label-primary);
+@media (hover: hover) {
+  .disclosure:hover {
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .disclosureOpen {
@@ -263,27 +285,37 @@
   grid-row: 2;
 }
 
-.sidebarButton {
-  display: inline-flex;
+.sidebarButton,
+.sidebarSpace {
+  box-sizing: border-box;
   flex: none;
-  align-items: center;
-  justify-content: center;
   width: 28px;
   height: 28px;
   margin: 4px 0;
+}
+
+.sidebarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px;
   border: 0;
-  border-radius: 50%;
-  corner-shape: round;
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
 }
 
-.sidebarButton:hover,
 .sidebarButton:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+}
+
+@media (hover: hover) {
+  .sidebarButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .children {
@@ -352,7 +384,7 @@
   gap: 3px;
   padding: 3px 5px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -363,6 +395,8 @@
   height: 12px;
 }
 
-.refresh:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .refresh:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }

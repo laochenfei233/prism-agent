@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-05-cron-message-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-05-cron-message-source.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-05-cron-message-source:
+  en: 1b5ac918e0e3279d
+  zh: 7fa8fd8c8b0ed158
+/2026-11-05-cron-message-source/summary:
+  en: 7b19d60988cedcf1
+  zh: 799e34efe7770a80
+/2026-11-05-cron-message-source/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-05-cron-message-source/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-05-cron-message-source/compatibility:
+  en: 2603d6701fd1d6ba
+  zh: e6b7d9c4e1226ff2
+/2026-11-05-cron-message-source/verification:
+  en: deb6be8f7c67a356
+  zh: 820b346e44c90b98
+/2026-11-05-cron-message-source/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

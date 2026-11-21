@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for approval-panel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/approval-panel.md
+/:
+  en: 027ef89eb964e681
+  zh: 027ef89eb964e681
+/approval-surfaces:
+  en: f5973805360ceef4
+  zh: 4770aca70a681d59
+/approval-surfaces/report:
+  en: 54777c4b4d03cafb
+  zh: 395a07506aeae42a
+/approval-surfaces/s1-problem:
+  en: 4eb9521087e21f16
+  zh: d770486636c492ee
+/approval-surfaces/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/approval-surfaces/s2-design/s2-1-where-the-value-comes-from:
+  en: d8a00c13d22646c1
+  zh: a2b4324cb3298e4a
+/approval-surfaces/s2-design/s2-2-the-two-surfaces:
+  en: 4620684d3a5d342a
+  zh: 227dc193d9009674
+/approval-surfaces/s2-design/s2-3-the-placement-preference:
+  en: 30c4df93be548e72
+  zh: e302234e23d621d9
+/approval-surfaces/s2-design/s2-4-answering:
+  en: bcdfad86aa5298f1
+  zh: 3a306bcbed6efec5
+/approval-surfaces/s2-design/s2-5-limits:
+  en: 1d6d30769882c04a
+  zh: 564c919acc4af2ac
+/approval-surfaces/s2-design/s2-6-tests:
+  en: 1244b1ec625b4cfb
+  zh: b4505e6f077ab475
+/approval-surfaces/s3-scope:
+  en: d0067aaa4728dae7
+  zh: 1f0c97dfe0274a52
+/approval-surfaces/tasks:
+  en: 1abea1bfd0278372
+  zh: a77e6ad547dbc90e
+/approval-surfaces/s4-acceptance:
+  en: fb469cad9a40eaf8
+  zh: eca694f5d76c70c9
+/approval-surfaces/s5-upstream-divergence:
+  en: dc39f6c1f5fd8186
+  zh: e9041b07f3d09499

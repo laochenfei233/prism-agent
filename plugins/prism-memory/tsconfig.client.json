@@ -1,0 +1,14 @@
+{
+  // The browser face: the same checkout declarations, plus the DOM library and
+  // the JSX transform the page needs. Kept apart from the Host face so browser
+  // globals cannot leak into Host code, and so `document` here is a compile
+  // error there.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  },
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx", "tests/client/**/*.ts"],
+  "exclude": []
+}

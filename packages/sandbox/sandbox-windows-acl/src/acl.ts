@@ -327,6 +327,18 @@ function hasExactDeny(oldAcl: NativePtr, worldSidPtr: NativePtr): boolean {
 }
 
 /**
+ * True when the explicit DACL already carries the EXACT subtree deny this
+ * module would add: the inherited Deny ACE for {@link abi.GRANT_MASK} naming
+ * the capability SID.
+ * @param oldAcl - the current explicit DACL pointer (from {@link readCurrentSecurity}).
+ * @param sidPtr - the capability SID to match.
+ * @returns whether the exact subtree deny is already present.
+ */
+function hasExactSidDeny(oldAcl: NativePtr, sidPtr: NativePtr): boolean {
+  return hasExactEntry(oldAcl, abi.ACCESS_DENIED_ACE_TYPE, abi.SUB_CONTAINERS_AND_OBJECTS_INHERIT, abi.GRANT_MASK, sidPtr)
+}
+
+/**
  * True when a capability grant for a SID OTHER than `sidPtr` stands on this
  * DACL — the condition under which a revoke must leave the shared Low label in
  * place, or the remaining grant's child would lose its write authority.
@@ -442,6 +454,41 @@ export function revokeWrite(api: Win32Bindings, path: string, sidPtr: NativePtr)
       api, path, buildExplicitAccess(sidPtr, abi.REVOKE_ACCESS, 0), oldAcl,
       hasForeignGrant(oldAcl, sidPtr) ? { kind: 'keep' } : { kind: 'clear' },
       descriptor, 'revokeWrite',
+    )
+    return true
+  })
+}
+
+/**
+ * Deny the capability SID every right its write grant confers at `path`,
+ * inheriting to the subtree. Windows evaluates deny ACEs before allow ACEs, so
+ * this pins a directory the workspace grant would otherwise reach — the
+ * harness home inside a granted workspace. The deny is standing: it stays for
+ * the workspace identity's lifetime like the grant it narrows, and a later
+ * provision reuses it through the exact-entry skip. The mandatory label is
+ * left untouched (a deny needs no integrity grant).
+ *
+ * Runs under the per-path lock; the descriptor/ACL allocation contract lives
+ * on {@link readCurrentSecurity}.
+ * @param api - the binding table.
+ * @param path - the directory to pin.
+ * @param sidPtr - the capability SID the deny names.
+ * @returns whether a DACL edit was applied (false when the exact deny already stands).
+ */
+export function denyWrite(api: Win32Bindings, path: string, sidPtr: NativePtr): boolean {
+  return withPathLock(api, path, () => {
+    const { oldAcl, descriptor } = readCurrentSecurity(api, path)
+    if (oldAcl !== null && hasExactSidDeny(oldAcl, sidPtr)) {
+      if (descriptor !== null) {
+        const freed = api.localFree(descriptor)
+        if (!isNullPtr(freed)) throwLastError(api, 'LocalFree', `denyWrite(${path}) descriptor`)
+      }
+      return false
+    }
+    mergeAndApply(
+      api, path,
+      buildExplicitAccess(sidPtr, abi.DENY_ACCESS, abi.GRANT_MASK),
+      oldAcl, { kind: 'keep' }, descriptor, 'denyWrite',
     )
     return true
   })

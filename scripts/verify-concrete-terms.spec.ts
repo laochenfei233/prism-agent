@@ -52,8 +52,9 @@ describe('concrete terminology policy', () => {
     )).toEqual([])
   })
 
-  it('excludes vendored sources and frozen Agent Notes', () => {
+  it('excludes vendored sources, the imported aegis pack, and frozen Agent Notes', () => {
     expect(findConcreteTermViolations(`vendor/example/${blockedTerm}.ts`, blockedTerm)).toEqual([])
+    expect(findConcreteTermViolations(`plugins/aegis/skills/${blockedTerm}.md`, blockedTerm)).toEqual([])
     expect(findConcreteTermViolations(
       `.agents/notes/archived/process/${blockedTerm}.md`,
       blockedTerm,
@@ -89,12 +90,17 @@ describe('concrete terminology policy', () => {
     expect(findConcreteTermViolations(`docs/persistence-changes/historical-formats/v${version}.schema.json`, blockedTerm)).toEqual([])
   })
 
+  it('preserves historical identifiers in section keys of a canonical historical-format pairing record', () => {
+    expect(findConcreteTermViolations('docs/persistence-changes/historical-formats/v1.i18n.yaml', blockedTerm)).toEqual([])
+  })
+
   it.each([
     'docs/persistence-changes/historical-formats/v00.schema.json',
     'docs/persistence-changes/historical-formats/v01.schema.json',
     'docs/persistence-changes/historical-formats/v-1.schema.json',
     'docs/persistence-changes/historical-formats/v1.zh.schema.json',
     'docs/persistence-changes/historical-formats/v1.schema.json.backup',
+    'docs/persistence-changes/historical-formats/v1.zh.i18n.yaml',
     'docs/persistence-changes/historical-formats/V1.schema.json',
     'docs/persistence-changes/historical-formats/versions/v1.schema.json',
     'docs/persistence-changes/historical-formats-extra/v1.schema.json',

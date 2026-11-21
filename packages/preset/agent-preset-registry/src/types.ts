@@ -22,8 +22,6 @@ export interface AgentPresetRow {
 export interface AgentPresetRoster {
   /** Every current declaration, including activation failures. */
   readonly presets: readonly AgentPresetRow[]
-  /** Whether visible mode selection is enabled for unnamed new sessions. */
-  readonly modeSelectionEnabled: boolean
 }
 
 /** One preset's declared composition, rendered for reading. */
@@ -50,9 +48,6 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    agentPreset: string | null
-  }
   interface SessionProjectionMap {
     /** Preset the Session runs, or null when the deployment composes none. */
     agentPreset: string | null

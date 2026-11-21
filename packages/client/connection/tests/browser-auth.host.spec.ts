@@ -3,6 +3,7 @@
 import { createHmac } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
+import type { PeerId } from '@deepseek-ai/dsh-typert-protocol'
 import { BrowserAuth } from '../src/browser-auth.ts'
 import type { ConnectionIndexRequest, ConnectionIndexResponse } from '../src/rpc.ts'
 import { RecordCredentials } from './browser-credentials.ts'
@@ -27,7 +28,7 @@ function signedBodyCookie(store: RecordCredentials, name: string, body: string):
 
 interface ResponseState {
   status?: number
-  headers?: Readonly<Record<string, string>>
+  headers?: Readonly<Record<string, string | readonly string[] | undefined>>
   body?: string
 }
 
@@ -47,6 +48,20 @@ function response(): { value: ConnectionIndexResponse; state: ResponseState } {
   }
 }
 
+/** Every Set-Cookie value of a mint response: the mint cookie first, prune cookies after. */
+function setCookies(state: ResponseState): string[] {
+  const setCookie = state.headers?.['set-cookie']
+  if (setCookie === undefined) return []
+  return [...Array.isArray(setCookie) ? setCookie : [setCookie]]
+}
+
+/** The mint Set-Cookie value, which always leads the array. */
+function mintCookie(state: ResponseState): string {
+  const mint = setCookies(state)[0]
+  if (mint === undefined) throw new Error('token exchange did not set a cookie')
+  return mint
+}
+
 function credentials(store: RecordCredentials): CredentialProvider {
   return store as unknown as CredentialProvider
 }
@@ -60,7 +75,7 @@ function createAuth(
 }
 
 function request(url: string, authority = '127.0.0.1:3080', init?: {
-  cookie?: string
+  cookie?: string | undefined
   method?: string
 }): ConnectionIndexRequest {
   return {
@@ -76,18 +91,85 @@ function request(url: string, authority = '127.0.0.1:3080', init?: {
 function exchange(
   auth: BrowserAuth,
   authority = '127.0.0.1:3080',
+  secure = false,
+  cookie?: string,
 ): { cookie: string; launchUrl: string; state: ResponseState } {
   const launchUrl = auth.authenticatedUrl(`http://${authority}`)
   const target = new URL(launchUrl)
   const res = response()
-  expect(auth.authorizeIndex(request(`${target.pathname}${target.search}`, authority), res.value)).toBe(false)
-  const setCookie = res.state.headers?.['set-cookie']
-  if (setCookie === undefined) throw new Error('token exchange did not set a cookie')
-  return { cookie: setCookie.split(';', 1)[0]!, launchUrl, state: res.state }
+  expect(auth.authorizeIndex(request(`${target.pathname}${target.search}`, authority, { cookie }), res.value, secure)).toBe(false)
+  return { cookie: mintCookie(res.state).split(';', 1)[0]!, launchUrl, state: res.state }
 }
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('API credentials', () => {
+  it('refuses a request without a URL before publishing an API operator', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const publish = vi.fn(() => 'api-operator' as PeerId)
+    const res = response()
+
+    auth.authorizeConnect({ method: 'GET', headers: { host: 'localhost' } }, res.value, false, publish)
+
+    expect(res.state).toEqual({
+      status: 401,
+      headers: { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' },
+      body: 'dsh web authentication required; reopen the URL printed by dsh web.\n',
+    })
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('signs the published id and rejects browser confusion, tampering, audience mismatch, and expiry', async () => {
+    vi.useFakeTimers()
+    const store = new RecordCredentials()
+    const auth = await createAuth(store)
+    const authority = '127.0.0.1:3080'
+    const id = 'api-operator' as PeerId
+    const issuedAt = Date.now()
+    const publish = vi.fn(() => id)
+    const res = response()
+    auth.authorizeConnect(request(auth.authenticatedUrl(`http://${authority}/connect`)), {
+      ...res.value,
+      writeHead(status, headers) {
+        expect(publish).toHaveBeenCalledExactlyOnceWith('none')
+        return res.value.writeHead(status, headers)
+      },
+    }, false, publish)
+    const cookie = mintCookie(res.state).split(';', 1)[0]
+    if (cookie === undefined) throw new Error('API connect did not set a cookie')
+    const [name, value] = cookie.split('=') as [string, string]
+    const payload = { version: 2, authority, id, issuedAt, expiresAt: issuedAt + 30 * 86_400_000 }
+    expect(JSON.parse(Buffer.from(value.split('.')[1]!, 'base64url').toString('utf8'))).toEqual(payload)
+    expect(auth.authenticateApi(request('/', authority, { cookie }))).toBe(id)
+    expect(auth.isAuthenticated(request('/', authority, { cookie }))).toBe(false)
+    expect(auth.authenticateApi(request('/', authority, { cookie: exchange(auth).cookie }))).toBeUndefined()
+    expect(auth.isAuthenticated(request('/', authority, { cookie: cookie.replace('=v2.', '=v1.') }))).toBe(false)
+    expect(auth.authenticateApi(request('/', authority, { cookie: `${cookie.slice(0, -1)}!` }))).toBeUndefined()
+    expect(auth.authenticateApi(request('/', 'localhost:3080', { cookie }))).toBeUndefined()
+    expect(auth.authenticateApi(request('/', '127.0.0.1:3081', { cookie }))).toBeUndefined()
+    expect(auth.authenticateApi(request('/', authority, { cookie }), true)).toBeUndefined()
+    for (const invalid of [
+      { ...payload, version: 3 },
+      { ...payload, authority: 'localhost:3080' },
+      { ...payload, id: '' },
+      { ...payload, id: 42 },
+      { ...payload, id: undefined },
+      { ...payload, issuedAt: issuedAt + 1 },
+      { ...payload, issuedAt: 0.5 },
+      { ...payload, expiresAt: 'later' },
+      { ...payload, expiresAt: issuedAt - 1 },
+    ]) {
+      const invalidCookie = signedCookie(store, name, invalid).replace('=v1.', '=v2.')
+      expect(auth.authenticateApi(request('/', authority, { cookie: invalidCookie }))).toBeUndefined()
+      expect(auth.isAuthenticated(request('/', authority, { cookie: invalidCookie }))).toBe(false)
+    }
+    const shorter = await createAuth(store, 1)
+    expect(shorter.authenticateApi(request('/', authority, { cookie }))).toBeUndefined()
+    vi.setSystemTime(payload.expiresAt)
+    expect(auth.authenticateApi(request('/', authority, { cookie }))).toBeUndefined()
+  })
 })
 
 describe('BrowserAuth', () => {
@@ -105,8 +187,8 @@ describe('BrowserAuth', () => {
         'referrer-policy': 'no-referrer',
       },
     })
-    expect(login.state.headers?.['set-cookie']).toMatch(/; Max-Age=2592000; Path=\/; Expires=.*; HttpOnly; SameSite=Strict$/u)
-    expect(login.state.headers?.['set-cookie']).not.toContain('Secure')
+    expect(mintCookie(login.state)).toMatch(/; Max-Age=2592000; Path=\/; Expires=.*; HttpOnly; SameSite=Strict$/u)
+    expect(mintCookie(login.state)).not.toContain('Secure')
     expect(first.isAuthenticated(request('/', '127.0.0.1:3080', { cookie: login.cookie }))).toBe(true)
     expect(first.isAuthenticated({
       headers: new Headers({ host: '127.0.0.1:3080', cookie: login.cookie }),
@@ -140,6 +222,39 @@ describe('BrowserAuth', () => {
     })
   })
 
+  it('keeps HTTPS port 443 distinct from HTTP port 80 with one signing secret', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const plain = exchange(auth, 'harness.example')
+    const tls = exchange(auth, 'harness.example', true)
+    expect(auth.isAuthenticated(request('/', 'harness.example', { cookie: plain.cookie }), true)).toBe(false)
+    expect(auth.isAuthenticated(request('/', 'harness.example', { cookie: tls.cookie }), true)).toBe(true)
+    expect(auth.isAuthenticated(request('/', 'harness.example:443', { cookie: tls.cookie }), true)).toBe(true)
+    expect(auth.isAuthenticated(request('/', 'harness.example', { cookie: tls.cookie }))).toBe(false)
+  })
+
+  it('rejects HTTP cookie replay after enabling TLS on the same authority', async () => {
+    const store = new RecordCredentials()
+    const authority = 'harness.example:3080'
+    const plain = exchange(await createAuth(store), authority)
+    const restarted = await createAuth(store)
+    const denied = response()
+    expect(restarted.authorizeIndex(request('/', authority, { cookie: plain.cookie }), denied.value, true)).toBe(false)
+    expect(denied.state.status).toBe(401)
+
+    const tls = exchange(restarted, authority, true, 'dsh-auth-earlier-port=v1.legacy.legacy')
+    expect(mintCookie(tls.state)).toContain('; Secure')
+    // Deletion covers both secure variants: the Secure one clears a cookie
+    // minted under TLS, the plain one a cookie minted over HTTP.
+    expect(setCookies(tls.state)[1]).toContain('dsh-auth-earlier-port=; Max-Age=0')
+    expect(setCookies(tls.state)[1]!.endsWith('; Secure')).toBe(true)
+    expect(setCookies(tls.state)[2]).toBe('dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
+    expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }), true)).toBe(true)
+    expect(restarted.isAuthenticated(request('/', authority, { cookie: tls.cookie }))).toBe(false)
+    const tlsName = tls.cookie.slice(0, tls.cookie.indexOf('='))
+    const plainValue = plain.cookie.slice(plain.cookie.indexOf('=') + 1)
+    expect(restarted.isAuthenticated(request('/', authority, { cookie: `${tlsName}=${plainValue}` }), true)).toBe(false)
+  })
+
   it('preserves the caller authority and mount while adding only this process token', async () => {
     const auth = await createAuth(new RecordCredentials())
     const mounted = new URL(auth.authenticatedUrl('https://gateway.example/tools/dsh/'))
@@ -156,11 +271,66 @@ describe('BrowserAuth', () => {
     const token = mounted.searchParams.get('token')
     const exchanged = response()
     expect(auth.authorizeIndex(request(`/?token=${String(token)}`, 'gateway.example'), exchanged.value)).toBe(false)
-    const setCookie = exchanged.state.headers?.['set-cookie']
-    if (setCookie === undefined) throw new Error('mount exchange did not set a cookie')
     expect(auth.isAuthenticated(request(
-      '/', 'gateway.example', { cookie: setCookie.split(';', 1)[0]! },
+      '/', 'gateway.example', { cookie: mintCookie(exchanged.state).split(';', 1)[0]! },
     ))).toBe(true)
+  })
+
+  it('expires the stale session cookies a port-churned request still carries when minting', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const authority = '127.0.0.1:3081'
+    const res = response()
+    const url = new URL(auth.authenticatedUrl(`http://${authority}`))
+    expect(auth.authorizeIndex(request(
+      `${url.pathname}${url.search}`,
+      authority,
+      { cookie: 'dsh-auth-earlier-port=v1.legacy.legacy; other=keep; dsh-auth-oldest-port=v1.legacy.legacy' },
+    ), res.value)).toBe(false)
+    // Cookies ignore ports, so every past loopback authority leaves a same-domain
+    // cookie the mint must expire; unrelated cookies and the mint itself stay.
+    expect(setCookies(res.state)).toEqual([
+      expect.stringMatching(/^dsh-auth-[A-Za-z0-9_-]+=v1\./u),
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
+      'dsh-auth-oldest-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-oldest-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
+    ])
+    expect(auth.isAuthenticated(request(
+      '/', authority, { cookie: mintCookie(res.state).split(';', 1)[0]! },
+    ))).toBe(true)
+  })
+
+  it('deletes a Secure-attributed stale cookie from an HTTP listener with both secure variants', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const res = response()
+    const url = new URL(auth.authenticatedUrl('http://127.0.0.1:3080'))
+    expect(auth.authorizeIndex(request(
+      `${url.pathname}${url.search}`,
+      '127.0.0.1:3080',
+      { cookie: 'dsh-auth-tls-era=v1.legacy.legacy' },
+    ), res.value)).toBe(false)
+    // A non-secure Set-Cookie cannot delete a Secure-only cookie
+    // (RFC 6265bis), so the plain listener must also emit the Secure variant.
+    expect(setCookies(res.state).slice(1)).toEqual([
+      'dsh-auth-tls-era=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-tls-era=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
+    ])
+  })
+
+  it('expires stale session cookies when exchanging the API credential', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const res = response()
+    const url = new URL(auth.authenticatedUrl('http://127.0.0.1:3080/connect'))
+    auth.authorizeConnect(request(
+      `${url.pathname}${url.search}`,
+      '127.0.0.1:3080',
+      { cookie: 'dsh-auth-earlier-port=v1.legacy.legacy' },
+    ), res.value, false, vi.fn(() => 'api-operator' as PeerId))
+    expect(setCookies(res.state)).toEqual([
+      expect.stringMatching(/^dsh-auth-[A-Za-z0-9_-]+=v2\./u),
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict',
+      'dsh-auth-earlier-port=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict; Secure',
+    ])
   })
 
   it('accepts the cookie for index serving and gives every unauthenticated request one response', async () => {

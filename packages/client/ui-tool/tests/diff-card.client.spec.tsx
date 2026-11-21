@@ -3,17 +3,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useDisclosure } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/use-disclosure.ts'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { contextMenuHook, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { StartedToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import { toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { CHAT_DIFF_MAX_LINES, diffCardModel } from '../src/client/tool/models/diff-card-model.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { FileMutationRow, fileMutationToolview } from '../src/client/tool/toolviews/file-mutation-row.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 
 afterEach(cleanup)
 
@@ -27,20 +29,42 @@ const ARGS = '{"file_path":"notes/demo.txt","old_string":"hello","new_string":"h
 
 const DIFFS = [{ path: 'notes/demo.txt', oldText: 'hello', newText: 'hello fixture' }]
 
-const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
-  phase: 'start' as const, callId: 'c1', name: 'edit', argsRaw: ARGS,
-  turn: 1, step: 1, time: 1_000, subCalls: [], ...over,
-})
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => {
+  const argsRaw = over?.argsRaw ?? ARGS
+  return {
+    phase: 'start' as const, args: PartialArguments.fromText(argsRaw), callId: 'c1', name: 'edit', argsRaw,
+    turn: 1, step: 1, time: 1_000, subCalls: [], ...over,
+  }
+}
 
-const settled = (over?: Partial<ToolResultNode>): ToolResultNode => ({
-  kind: 'tool-result', seq: 10, time: 2_000, callId: 'c1',
-  call: { name: 'edit', argsRaw: ARGS },
-  callTime: 1_000,
-  content: [{ type: 'text', text: 'The file notes/demo.txt has been updated successfully.' }], isError: false,
-  meta: { diffs: DIFFS }, subCalls: [], ...over,
-})
+const settled = (over?: Partial<ToolResultNode>): ToolResultNode => {
+  const call = over?.call === undefined ? { name: 'edit', argsRaw: ARGS } : over.call
+  return {
+    kind: 'tool-result', seq: 10, time: 2_000, callId: 'c1',
+    name: call?.name ?? '', args: call === null ? PartialArguments.EMPTY : PartialArguments.fromText(call.argsRaw),
+    call,
+    callTime: 1_000,
+    content: [{ type: 'text', text: 'The file notes/demo.txt has been updated successfully.' }], isError: false,
+    meta: { diffs: DIFFS }, subCalls: [], ...over,
+  }
+}
 
 describe('diffCardModel', () => {
+  it('derives applied diffs from settled metadata when the arguments carry no single intended diff', () => {
+    const call = { name: 'apply_patch', argsRaw: '{"input":"invalid"}' }
+    expect(diffCardModel(running(call))).toBeNull()
+    expect(diffCardModel(settled({ call }))).toEqual({ card: { diffs: DIFFS } })
+    expect(diffCardModel(settled({ call: null }))).toEqual({ card: { diffs: DIFFS } })
+    expect(diffCardModel(settled({ call, isError: true }))).toBeNull()
+    expect(diffCardModel(settled({ call, meta: {} }))).toBeNull()
+    expect(diffCardModel(settled({ call, meta: { diffs: [] } }))).toBeNull()
+  })
+
+  it('retains the authored file label when navigation metadata identifies an absolute target', () => {
+    expect(diffCardModel(settled({
+      meta: { path: '/b/notes/demo.txt', diffs: [{ ...DIFFS[0]!, path: '/b/notes/demo.txt' }] },
+    }))).toEqual({ card: { diffs: DIFFS } })
+  })
   it('derives a running card from raw edit arguments', () => {
     expect(diffCardModel(running())).toEqual({
       card: { diffs: [{ path: 'notes/demo.txt', oldText: 'hello', newText: 'hello fixture' }] },
@@ -114,8 +138,8 @@ describe('diffCardModel', () => {
     })
   })
 
-  it('returns null for missing calls, errors, malformed args, unrelated tools, and child dispatches', () => {
-    expect(diffCardModel(settled({ call: null }))).toBeNull()
+  it('returns null for errors, malformed args, unrelated tools, and child dispatches', () => {
+    expect(diffCardModel(settled({ call: null, meta: {} }))).toBeNull()
     expect(diffCardModel(settled({ isError: true }))).toBeNull()
     expect(diffCardModel(running({ argsRaw: '{' }))).toBeNull()
     expect(diffCardModel(running({ name: 'read' }))).toBeNull()
@@ -148,18 +172,18 @@ describe('diffCardModel', () => {
     })
   })
 
-  it('validates mutation escalation fields but accepts unrelated open-root fields', () => {
+  it('leaves escalation fields to the Host and accepts unrelated open-root fields', () => {
     const args = (fields: Record<string, unknown>) => JSON.stringify({
       file_path: 'notes/demo.txt', old_string: 'hello', new_string: 'hello fixture', ...fields,
     })
-    expect(diffCardModel(running({ argsRaw: args({ sandbox_permissions: 7, justification: 'Need access' }) }))).toBeNull()
-    expect(diffCardModel(running({ argsRaw: args({ sandbox_permissions: 'workspace-write' }) }))).toBeNull()
+    expect(diffCardModel(running({ argsRaw: args({ sandbox_permissions: 'workspace-write', justification: '' }) }))).not.toBeNull()
     expect(diffCardModel(running({ argsRaw: args({ extension: { version: 1 } }) }))).not.toBeNull()
   })
 })
 
 describe('chat row diff body', () => {
   const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    getFileTriggerProps: () => ({}),
     loadImage: vi.fn(() => Promise.reject(new Error('not used'))),
     useDisclosure, callId: 'c1', toolName: 'edit', ...('kind' in block ? { phase: 'result' as const, block: block } : { phase: block.phase, block: block }), openFile: vi.fn(), t,
   })
@@ -191,7 +215,8 @@ describe('chat row diff body', () => {
         call: { name: 'some_tool', argsRaw: '{"foo":"bar"}' },
         meta: undefined,
       }),
-    }} />)
+    }}
+    getFileTriggerProps={() => ({})} />)
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(view.container.querySelector('[data-diff]')).toBeNull()
     expect(view.getByText(/"foo"/)).toBeTruthy()
@@ -207,8 +232,8 @@ describe('FileMutationRow diff card', () => {
   })
 
   const rowProps = (block: StartedToolCall | ToolResultNode, toolName = 'edit'): FileMutationRowProps => ({
-    useToolCallArgumentsPartial: () => { throw new Error('dispatched calls must not subscribe to preparing arguments') },
     useDisclosure, callId: 'c1', toolName, ...('kind' in block ? { phase: 'result' as const, block: block } : { phase: block.phase, block: block }), openFile: vi.fn(), cwd: '/w/app',
+    useContextMenu: contextMenuHook(), resolveFilePath: path => path,
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
     t,
   } as FileMutationRowProps)
@@ -217,6 +242,28 @@ describe('FileMutationRow diff card', () => {
   const toggleRow = (view: { container: HTMLElement }) => {
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
   }
+
+  it('shows patch titles, applied multi-file diffs, and stopped reasons together', () => {
+    const output = 'Patch stopped after 1 of 3 operations.\nFailed:\nsource removal denied\n  destination b was written; source a remains'
+    const block = settled({ call: { name: 'apply_patch', argsRaw: JSON.stringify({ input: '*** Begin Patch' }) },
+      content: [{ type: 'text', text: output }], meta: { stopped: true, diffs: [
+        { path: 'first', oldText: null, newText: 'created' }, { path: 'b', oldText: 'before', newText: 'after' },
+      ] } })
+    const model = toolRowModel('apply_patch', block)
+    expect(model.variant).toBe('edit')
+    expect(model.titleKey).toBe('tool.title.applyPatch')
+    expect(model.summary).toBe('')
+    expect(model.filePath).toBeUndefined()
+    expect(model.state).toBe('error')
+    expect(model.errorSummary).toBe('Patch stopped after 1 of 3 operations.')
+    const view = render(<FileMutationRow {...rowProps(block, 'apply_patch')} />)
+    expect(view.getByText('应用补丁')).toBeTruthy()
+    toggleRow(view)
+    expect(view.container.querySelectorAll('[data-diff]').length).toBeGreaterThan(0)
+    expect(view.getByText('created')).toBeTruthy()
+    expect(view.getByText('after')).toBeTruthy()
+    expect(view.container.textContent).toContain(output)
+  })
 
   it('collapses to the summary row; expanding reveals the applied diff card', () => {
     const view = render(<FileMutationRow {...rowProps(settled())} />)
@@ -246,9 +293,10 @@ describe('FileMutationRow diff card', () => {
       meta: { diffs: [] },
     }), 'write')} />)
     // The collapsed row already carries the card's +/- totals beside the path.
-    expect(view.getByText('+1 -0')).toBeTruthy()
+    expect(view.container.querySelector('[data-disclosure-row]')?.textContent).toContain('+1 -0')
     toggleRow(view)
-    expect(view.getAllByText('+1 -0')).toHaveLength(1)
+    expect(view.getAllByText('+1')).toHaveLength(1)
+    expect(view.getAllByText('-0')).toHaveLength(1)
     expect(view.getByText('hello fixture')).toBeTruthy()
   })
 
@@ -318,7 +366,7 @@ describe('FileMutationRow diff card', () => {
 })
 
 describe('fileMutationToolview registration', () => {
-  it('registers one component under both edit and write, and each disposes', () => {
+  it('registers one component under all file mutation tools, and each disposes', () => {
     const registered: { key: string; locale: unknown; disposed: boolean }[] = []
     const disposers: (() => void)[] = []
     let disposeInjection = (): void => {}
@@ -339,10 +387,10 @@ describe('fileMutationToolview registration', () => {
       },
     }
     fileMutationToolview.apply(ctx as never)
-    expect(registered.map(r => r.key).sort()).toEqual(['edit', 'write'])
-    // Both keys claim the conversation locale seat ToolRow's body copy needs.
-    expect(registered.map(r => r.locale)).toEqual(['conversation', 'conversation'])
-    expect(fileMutationToolview.inject).toEqual(['slots'])
+    expect(registered.map(r => r.key).sort()).toEqual(['apply_patch', 'edit', 'write'])
+    // All keys claim the conversation locale seat ToolRow's body copy needs.
+    expect(registered.map(r => r.locale)).toEqual(['conversation', 'conversation', 'conversation'])
+    expect(fileMutationToolview.inject).toEqual(['slots', 'sessions'])
     // Disposal removes each contribution (packages/AGENTS.md registry contract).
     disposeInjection()
     expect(registered.every(r => r.disposed)).toBe(true)

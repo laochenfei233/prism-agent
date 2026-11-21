@@ -7,8 +7,11 @@
 //! keeps the app resident when the window closes.
 
 mod dsh_runner;
+mod proxy;
+mod quit;
 mod setup;
 mod tray;
+mod update;
 
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::Manager;
@@ -16,11 +19,14 @@ use tauri_plugin_opener::OpenerExt;
 
 use dsh_runner::DshHandle;
 
-/// Default port the bundled `dsh web` process listens on. When occupied, the
-/// shell scans upward for a free port and delivers the actual port to the
-/// frontend through the `dsh://ready` event. CLI users who run their own
-/// `dsh web` keep the default 3080.
-pub const INTERNAL_PORT: u16 = 3081;
+/// Default loopback port for the bundled `dsh web` process. When occupied, the
+/// shell scans upward for a free port and delivers the authenticated launch
+/// URL through `dsh://ready`. Sibling dsh-fork desktop shells share the
+/// upstream 3081 default, and the port is part of the browser session's
+/// authority, so losing that race moves every launch to a fallback port and
+/// 401s every existing session cookie; this private default leaves 3081 to
+/// them. CLI users who run their own `dsh web` keep the default 3080.
+pub const INTERNAL_PORT: u16 = 38081;
 
 /// The main window is declared in `tauri.conf.json` with `"create": false`
 /// and built here instead: the `on_new_window` handler that routes popup
@@ -141,6 +147,18 @@ fn open_new_window_externally(
     NewWindowResponse::Deny
 }
 
+/// Whether `cmd /C start` may receive this URL. The URL comes from web content
+/// and cmd.exe parses the rest of its command line as text, so a metacharacter
+/// would end the `start` command and run the remainder as a second command.
+#[cfg(windows)]
+fn is_cmd_startable(url: &str) -> bool {
+    !url.is_empty()
+        && url.chars().all(|c| {
+            c.is_ascii_graphic()
+                && !matches!(c, '&' | '|' | '<' | '>' | '^' | '%' | '"' | '(' | ')' | '!')
+        })
+}
+
 /// OS-level fallback for the opener plugin: the shell runs without a console,
 /// so an opener failure is invisible; `cmd start` / `open` / `xdg-open` are
 /// the same calls the plugin wraps.
@@ -149,6 +167,12 @@ fn open_with_os(url: &str) -> std::io::Result<()> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        if !is_cmd_startable(url) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "URL contains characters cmd.exe would read as command text",
+            ));
+        }
         std::process::Command::new("cmd")
             .args(["/C", "start", "", url])
             .creation_flags(CREATE_NO_WINDOW)
@@ -215,15 +239,36 @@ fn hide_child_consoles() {
 fn hide_child_consoles() {}
 
 pub fn run() {
+    // The installer runs this executable with `--quit` to remove the tray icon
+    // through the same path as the tray menu. Never start a second shell.
+    if quit::requested() {
+        quit::request_running_instance_to_exit();
+        return;
+    }
     dsh_runner::start_startup_clock();
     hide_child_consoles();
-    tauri::Builder::default()
+
+    let builder = tauri::Builder::default();
+    // A second launch must focus the running window instead of spawning
+    // another shell, tray icon, and hub — in dev builds too, so a stray
+    // `tauri dev` cannot open a second agent against the running app.
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        dsh_runner::append_startup_log("single-instance: focus window");
+        tray::show_main_window(app);
+    }));
+
+    builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Register the quit signal before the child and tray exist, so an
+            // installer that signals during startup still exits through the
+            // cleanup path.
+            quit::install(app.handle());
             // Spawn the dsh child before the window exists. WebView2 environment
             // creation costs seconds on a cold start and the child's Node boot
             // costs seconds more; running them in sequence spent both. The child
@@ -234,6 +279,10 @@ pub fn run() {
             // aborting the launch, so the window still opens to report it.
             let handle = DshHandle::spawn(app.handle());
             app.manage(handle);
+            // The updater state must exist before any page script can invoke
+            // its commands; the delayed auto-check rides on the same state.
+            app.manage(update::UpdateState::new(app.handle()));
+            update::schedule_auto_check(app.handle());
             build_main_window(app.handle())?;
             dsh_runner::append_startup_log("window ready");
             tray::build(app.handle())?;
@@ -249,16 +298,65 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             dsh_runner::dsh_status,
+            dsh_runner::authenticate_webview,
             dsh_runner::restart_dsh,
             dsh_runner::open_ui,
+            update::prism_update_state,
+            update::prism_check_update,
+            update::prism_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit => {
                 if let Some(dsh) = app_handle.try_state::<DshHandle>() {
                     dsh.stop();
                 }
             }
+            // macOS delivers a Dock click or Finder relaunch as Reopen; without
+            // this arm the hidden window stays hidden and the running app looks
+            // unresponsive until it is fully quit.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } => tray::show_main_window(app_handle),
+            _ => {}
         });
+}
+
+#[cfg(all(test, windows))]
+mod cmd_start_tests {
+    use super::is_cmd_startable;
+
+    #[test]
+    fn accepts_plain_link_urls() {
+        assert!(is_cmd_startable("https://example.test/path?q=1#frag"));
+        assert!(is_cmd_startable("mailto:user@example.test"));
+        assert!(is_cmd_startable("tel:+10000000000"));
+    }
+
+    #[test]
+    fn refuses_every_cmd_metacharacter() {
+        for url in [
+            "https://example.test/?a=1&calc",
+            "mailto:user@example.test|calc",
+            "https://example.test/<calc>",
+            "https://example.test/^calc",
+            "https://example.test/%PATH%",
+            "https://example.test/\"calc\"",
+            "https://example.test/(calc)",
+            "https://example.test/!calc",
+            "https://example.test/a b",
+        ] {
+            assert!(!is_cmd_startable(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn open_with_os_refuses_a_metacharacter_url() {
+        let error = super::open_with_os("https://example.test/?a=1&calc")
+            .expect_err("the cmd fallback must refuse a metacharacter URL");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
 }

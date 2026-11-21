@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-10-07-prism-wiki-knowledge-vault.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-07-prism-wiki-knowledge-vault.md
-2026-10-07-prism-wiki-knowledge-vault.md: c4ccfa633d620835fc095357bc336637ef918dd4
-2026-10-07-prism-wiki-knowledge-vault.zh.md: 06316706f782fa4731d04a7e602d0139bc0264b7
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages:
+  en: 55f5ef77b8a50622
+  zh: 03af466ba7e9ebf5
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages/problem:
+  en: 40cdae066c8f8abf
+  zh: 825af826ffa4f474
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages/decision:
+  en: d7c7c6eb272c0bac
+  zh: 4de2501152b4eddf
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages/the-vault-layout-and-page-format:
+  en: ae1463530e95c08e
+  zh: acd492e689781fc3
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages/alternatives-considered:
+  en: 83371cc861c37479
+  zh: d124d63ea50b70ff
+/agent-note-a-persistent-knowledge-vault-of-compiled-markdown-pages/consequences:
+  en: 7556c56ee7d5f1c2
+  zh: be0869ca01816a6d
