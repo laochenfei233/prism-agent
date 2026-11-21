@@ -21,103 +21,6 @@ html.prism-active {
   -webkit-text-size-adjust: 100%;
 }
 
-/* Single column: the collapsed sidebar rail costs a sixth of a phone screen to
-   show icons and steals it from the conversation. The drawer is the way in, so
-   the rail column leaves the flow while the drawer is closed. The :has() parent
-   selector reaches the column because the slot wrapper renders display:contents
-   and owns no box of its own.
-   The shell has its own narrow-viewport drawer ("data-sidebar-drawer" on the
-   frame, opened by the header toggle): while that drawer is open the column
-   must stay visible in the shell's own overlay presentation, so this rule
-   yields there — hiding it anyway is what made the header toggle look dead.
-   The root-level :not(:has(...)) is the state test: a descendant combinator
-   would let html itself match the :not() and the rule would never yield.
-   When the shell drawer is closed (or the viewport is outside drawer mode)
-   the rail stays hidden exactly as before. */
-html.prism-active.prism-rail-hidden:not(:has([data-sidebar-drawer]:not([data-sidebar-collapsed]))) div:has(> [data-slot="sidebar"]) {
-  display: none;
-}
-
-/* Settings on a phone: the desktop dialog insets a 342px panel by 24px and
-   keeps a 188px section column beside a 154px content column, which wraps
-   Chinese into one character per line. Go full-bleed and lay the section list
-   across the top instead, so the content keeps the full width. Anchored on
-   the shell's stable dsh-settings-dialog classes; the panel mounts only while
-   the dialog is open, so no script has to track it. */
-html.prism-active .dsh-settings-dialog-overlay {
-  padding: 0;
-}
-html.prism-active .dsh-settings-dialog {
-  flex-direction: column;
-  width: 100vw;
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
-  border-radius: 0;
-}
-/* The section list becomes a horizontal strip above the content. */
-html.prism-active .dsh-settings-dialog > :first-child {
-  flex: none;
-  width: 100%;
-  height: auto;
-}
-html.prism-active .dsh-settings-dialog > :first-child > :last-child {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-html.prism-active .dsh-settings-dialog > :first-child > :last-child > * {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-html.prism-active .dsh-settings-dialog > :last-child {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* The frame is a two-track grid (rail + content). With the rail out of the flow
-   the content column would take the rail's 56px track and leave the rest empty,
-   so it spans every track instead. */
-html.prism-active div:has(> [data-slot="main"]) {
-  grid-column: 1 / -1;
-  min-width: 0;
-}
-
-/* The drawer: the whole sidebar column leaves the flow and covers the viewport,
-   with the app's own expanded sidebar inside it. */
-html.prism-active.prism-drawer-open div:has(> [data-slot="sidebar"]) {
-  display: block;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: min(86vw, 340px);
-  height: 100dvh;
-  z-index: 100;
-  overflow-y: auto;
-  background: var(--dsw-alias-bg-layer-1);
-  box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.prism-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgb(0 0 0 / 0.45);
-  opacity: 0;
-  transition: opacity 0.22s ease;
-  pointer-events: none;
-}
-html.prism-active.prism-drawer-open .prism-backdrop {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* The soft keyboard: the header yields, the dock stays. */
 html.prism-active.prism-keyboard [data-slot="conversation.session.header"],
 html.prism-active.prism-keyboard [data-slot="conversation.header"] {
@@ -531,6 +434,5 @@ select.prism-input { height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prism-card { animation: none; }
-  .prism-backdrop { transition: none; }
 }
 `

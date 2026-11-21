@@ -1,51 +1,36 @@
 /**
- * The mobile adaptation: stylesheet, edge-swipe drawer with a popstate guard,
- * soft-keyboard tracking, and touch typing.
+ * The mobile adaptation: stylesheet, soft-keyboard tracking, and touch typing.
  *
- * The drawer reuses the app's own sidebar toggle (`layout.toggleSidebar()`)
- * and renders the expanded sidebar as a fixed overlay sheet through CSS. The
- * keyboard listener watches `visualViewport` and toggles the `prism-keyboard`
- * class the stylesheet keys off. Typing intercepts plain `Enter` on coarse
- * pointers before the editor keymap sees it and inserts a line break instead.
+ * The sidebar is the shell's own narrow-viewport drawer (below
+ * SIDEBAR_DRAWER_BREAKPOINT the frame presents the sidebar column as an
+ * overlay with a mask, and the header's sidebar toggle drives it); this
+ * adaptation adds nothing to that seam. The keyboard listener watches
+ * `visualViewport` and toggles the `prism-keyboard` class the stylesheet keys
+ * off. Typing intercepts plain `Enter` on coarse pointers before the editor
+ * keymap sees it and inserts a line break instead.
  *
  * @module @prism/prism-pocket/client/adapter
  */
 
 import { POCKET_ADAPTATION_CSS } from './css.ts'
-import { edgeSwipeAction } from './pure.ts'
-
-/** The layout seam the drawer drives. */
-export interface LayoutLike {
-  toggleSidebar(): void
-}
 
 /** Minimum height loss that counts as "the soft keyboard is open". */
 const KEYBOARD_THRESHOLD_PX = 140
 
 /** Install every adaptation; the returned disposer removes all of it. */
-export function installAdapter(layout: LayoutLike): () => void {
+export function installAdapter(): () => void {
   const style = document.createElement('style')
   style.dataset.plugin = 'prism-pocket'
   style.textContent = POCKET_ADAPTATION_CSS
   document.head.append(style)
-  const backdrop = document.createElement('div')
-  backdrop.className = 'prism-backdrop'
-  document.body.append(backdrop)
 
   const disposeKeyboard = installKeyboard()
-  const disposeDrawer = installDrawer(layout, backdrop)
   const disposeTyping = installTyping()
-  // The rail is the collapsed desktop sidebar; on a phone the drawer replaces it.
-  document.documentElement.classList.add('prism-rail-hidden')
 
   return () => {
-    closeDrawerState(layout)
     disposeKeyboard()
-    disposeDrawer()
     disposeTyping()
-    document.documentElement.classList.remove('prism-rail-hidden')
     style.remove()
-    backdrop.remove()
   }
 }
 
@@ -64,106 +49,6 @@ function installKeyboard(): () => void {
     viewport.removeEventListener('scroll', onResize)
     document.documentElement.classList.remove('prism-keyboard')
   }
-}
-
-/**
- * The edge-swipe drawer: swipe from the left edge opens the sidebar; the
- * browser back gesture closes it before it leaves the page.
- */
-function installDrawer(layout: LayoutLike, backdrop: HTMLElement): () => void {
-  let touchStart: { x: number; y: number; t: number } | null = null
-  const onTouchStart = (event: TouchEvent): void => {
-    const touch = event.touches[0]
-    touchStart = touch === undefined ? null : { x: touch.clientX, y: touch.clientY, t: Date.now() }
-  }
-  const onTouchEnd = (event: TouchEvent): void => {
-    const start = touchStart
-    touchStart = null
-    const touch = event.changedTouches[0]
-    if (start === null || touch === undefined) return
-    if (drawerOpen()) return
-    if (edgeSwipeAction(start.x, start.y, touch.clientX, touch.clientY, Date.now() - start.t) === null) return
-    openDrawer(layout)
-  }
-  document.addEventListener('touchstart', onTouchStart, { passive: true })
-  document.addEventListener('touchend', onTouchEnd, { passive: true })
-
-  const onBackdropClick = (): void => { closeDrawer(layout) }
-  backdrop.addEventListener('click', onBackdropClick)
-
-  const onSidebarClick = (event: MouseEvent): void => {
-    // Any navigation from inside the drawer (session row, new chat, settings)
-    // dismisses it; the drawer only ever opens over the conversation.
-    if (!drawerOpen()) return
-    if (!(event.target instanceof Element)) return
-    if (event.target.closest('[data-slot="sidebar"]') === null) return
-    window.setTimeout(() => { if (drawerOpen()) closeDrawer(layout) }, 120)
-  }
-  document.addEventListener('click', onSidebarClick, true)
-
-  const onPopstate = (): void => {
-    if (drawerOpen()) closeDrawer(layout)
-  }
-  window.addEventListener('popstate', onPopstate)
-
-  return () => {
-    document.removeEventListener('touchstart', onTouchStart)
-    document.removeEventListener('touchend', onTouchEnd)
-    backdrop.removeEventListener('click', onBackdropClick)
-    document.removeEventListener('click', onSidebarClick, true)
-    window.removeEventListener('popstate', onPopstate)
-  }
-}
-
-/** Whether the drawer overlay is currently presented. */
-function drawerOpen(): boolean {
-  return document.documentElement.classList.contains('prism-drawer-open')
-}
-
-/** Open the drawer: expand the sidebar, present the overlay, arm the back gesture. */
-function openDrawer(layout: LayoutLike): void {
-  if (drawerOpen()) return
-  const sidebar = sidebarElement()
-  if (sidebar === null) {
-    // The app renamed the sidebar seam; degrade instead of toggling blind.
-    console.info('[prism-pocket] sidebar [data-slot] anchor not found; drawer unavailable')
-    return
-  }
-  // The column is hidden while the drawer is closed, so it has to rejoin the
-  // flow before it can be measured — otherwise an expanded sidebar also reads
-  // zero and the toggle below would collapse the very panel being opened.
-  document.documentElement.classList.remove('prism-rail-hidden')
-  if (sidebar.getBoundingClientRect().width < 100) layout.toggleSidebar()
-  document.documentElement.classList.add('prism-drawer-open')
-  window.history.pushState({ 'prism-pocket-drawer': true }, '')
-}
-
-/** Close the drawer and unwind the history sentinel. */
-function closeDrawer(layout: LayoutLike): void {
-  if (!drawerOpen()) return
-  closeDrawerState(layout)
-  if (typeof window.history.state?.['prism-pocket-drawer'] === 'boolean') {
-    window.history.back()
-  }
-}
-
-/** The shared teardown path: collapse the sidebar and drop the overlay class. */
-function closeDrawerState(layout: LayoutLike): void {
-  if (!document.documentElement.classList.contains('prism-drawer-open')) return
-  document.documentElement.classList.remove('prism-drawer-open')
-  const sidebar = sidebarElement()
-  if (sidebar !== null && sidebar.getBoundingClientRect().width >= 100) layout.toggleSidebar()
-  document.documentElement.classList.add('prism-rail-hidden')
-}
-
-/**
- * The sidebar's rendered root. The `[data-slot]` anchor itself is a
- * `display: contents` marker with no box, so layout must be read from the
- * element it renders.
- */
-function sidebarElement(): HTMLElement | null {
-  const rendered = document.querySelector<HTMLElement>('[data-slot="sidebar"]')?.firstElementChild
-  return rendered instanceof HTMLElement ? rendered : null
 }
 
 /**
