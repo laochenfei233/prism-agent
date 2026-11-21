@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for prism-wiki-coverage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-wiki-coverage.md
+/:
+  en: f661a532c110256a
+  zh: 17294f0b72cfbd67
+/prism-wiki-coverage:
+  en: cb8f1ec95f4faa6e
+  zh: 28d153bc75da8577
+/prism-wiki-coverage/report:
+  en: 89cb24c30cd4ef9d
+  zh: 1c1c9244a4e743e8
+/prism-wiki-coverage/s1-problem:
+  en: 3592afac707d0d28
+  zh: 1b4eb818442b6ff4
+/prism-wiki-coverage/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/prism-wiki-coverage/s2-design/the-rules-this-plan-holds-to:
+  en: 0e386b04cabfe73b
+  zh: 635562506b80710a
+/prism-wiki-coverage/s2-design/what-each-file-s-missing-tests-drive:
+  en: 56d7b4de3d0f8db4
+  zh: 2791650814a2f89f
+/prism-wiki-coverage/s2-design/order:
+  en: dc56e6b1a1c9a622
+  zh: 5ad79eb94ba63425
+/prism-wiki-coverage/s3-scope:
+  en: 5f3bbbba8cc1712e
+  zh: f93cec46f9edaa8c
+/prism-wiki-coverage/tasks:
+  en: fda69981317abba5
+  zh: ccc5b6e0425dc478
+/prism-wiki-coverage/s4-acceptance:
+  en: c805169d42949767
+  zh: c034237883b402c4
