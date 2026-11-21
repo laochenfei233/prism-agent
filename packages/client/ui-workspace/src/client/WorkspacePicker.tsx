@@ -75,7 +75,10 @@ export function WorkspacePickFlow({
   selectedId,
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
-  const workspaces = workspaceSnapshot.items
+  // Archived Workspaces are absent from every grouping surface, the picker included.
+  const workspaces = workspaceSnapshot.items.filter(
+    workspace => !workspaceSnapshot.archivedWorkspaceIds.includes(workspace.workspaceId),
+  )
   const getAnchorRect = useCallback(
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
     [anchorRef],

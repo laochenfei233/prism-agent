@@ -91,11 +91,13 @@ function workspaceState(
   items: WorkspaceSnapshot['items'] = [],
   archivedSessionIds: readonly SessionId[] = [],
   phase: WorkspaceSnapshot['phase'] = 'ready',
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
 ): WorkspaceSnapshot {
   return {
     items,
     archivedSessionIds,
     pinnedSessionIds: [],
+    archivedWorkspaceIds,
     phase,
     state: phase === 'ready' ? 'idle' : 'loading',
     error: null,
@@ -180,6 +182,7 @@ class FakeWorkspaces implements IWorkspaces {
   readonly list: MutableSource<WorkspaceSnapshot>
   readonly archiveCalls: SessionId[] = []
   readonly unarchiveCalls: SessionId[] = []
+  readonly workspaceUnarchiveCalls: WorkspaceId[] = []
   onArchive: IWorkspaces['archiveSession'] = async (sessionId) => {
     this.list.update(state => ({
       ...state,
@@ -220,6 +223,17 @@ class FakeWorkspaces implements IWorkspaces {
   unarchiveSession(sessionId: SessionId): Promise<void> {
     this.unarchiveCalls.push(sessionId)
     return this.onUnarchive(sessionId)
+  }
+
+  async archiveWorkspace(_workspaceId: WorkspaceId): Promise<void> {}
+
+  unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    this.workspaceUnarchiveCalls.push(workspaceId)
+    this.list.update(state => ({
+      ...state,
+      archivedWorkspaceIds: state.archivedWorkspaceIds.filter(id => id !== workspaceId),
+    }))
+    return Promise.resolve()
   }
 
   pinSession(sessionId: SessionId): Promise<void> {
@@ -744,6 +758,27 @@ describe('UiWorkspaceService', () => {
     await expect(b.uiWorkspace.openWorkspace(wid('a'))).rejects.toBe('rejected without an Error')
     expect(b.notify).toHaveBeenLastCalledWith({ kind: 'createFailed', message: 'rejected without an Error' })
     expect(b.notify).toHaveBeenCalledTimes(3)
+  })
+
+  it('resolves new Sessions away from an archived Workspace and restores it on request', async () => {
+    const current = summary('current', { cwd: '/w/current-home', updatedAt: 1 })
+    const recent = summary('recent', { cwd: '/w/recent-home', updatedAt: 2 })
+    const b = bench({
+      sessions: sessionState([current, recent]),
+      workspaces: workspaceState([
+        workspace('current-home', [current.id]),
+        workspace('recent-home', [recent.id]),
+      ], [], 'ready', [wid('recent-home')]),
+    })
+    // The newest activity lives in the archived Workspace; the policy still
+    // lands in the newest visible one.
+    b.uiWorkspace.startSession()
+    await vi.waitFor(() => {
+      expect(b.sessions.retain).toHaveBeenLastCalledWith(sid('created-current-home'), { source: 'mainView' })
+    })
+    await b.uiWorkspace.unarchiveWorkspace(wid('recent-home'))
+    expect(b.workspaces.workspaceUnarchiveCalls).toEqual([wid('recent-home')])
+    expect(b.workspaces.list.getSnapshot().archivedWorkspaceIds).toEqual([])
   })
 
   it('uses only an explicit Workspace or the recent-Workspace policy for new Sessions', async () => {

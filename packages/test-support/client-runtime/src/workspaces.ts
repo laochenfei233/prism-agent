@@ -172,6 +172,24 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Restore an archived Workspace (recorded). The default mirrors the
+   * production face's observable effect: the id leaves the list state's
+   * Workspace archive set.
+   * @param workspaceId - Workspace to restore.
+   */
+  async unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    this.calls.push({ method: 'unarchiveWorkspace', args: [workspaceId] })
+    const stub = this.stubs.get('unarchiveWorkspace')
+    if (stub !== undefined) {
+      await (stub(workspaceId) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.archivedWorkspaceIds = draft.archivedWorkspaceIds.filter(id => id !== workspaceId)
+    })
+  }
+
+  /**
    * Pin a session (recorded). The default mirrors the production face's
    * observable effect: the id leads the list state's pin set.
    * @param sessionId - session to pin.
