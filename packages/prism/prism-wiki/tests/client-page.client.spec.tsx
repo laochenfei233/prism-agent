@@ -135,6 +135,10 @@ function standardSeats() {
     useSessionStatus: unused,
     useSessionRetainInfo: unused,
     useResource: unused,
+    useRemoteAccess: unused,
+    useSessionAccess: unused,
+    useContextMenu: unused,
+    useWorkspaceAccess: unused,
   }
 }
 

@@ -84,6 +84,10 @@ export function createAgent(id: string): Agent {
     id: sessionId,
     options: {},
     session: Session.create(sessionId),
+    model: {
+      current: () => undefined,
+      select: () => {},
+    },
     inbox: unsupportedInbox(),
     status: 'idle',
     ctx: new Context(),
@@ -261,7 +265,13 @@ export async function proposeStep(
   const proposed = [...messages]
   return await agentEvents(ctx, agent).waterfall(
     'agent/pre-step',
-    { messages: proposed, turn: 1, step: 1, signal: new AbortController().signal },
+    {
+      messages: proposed,
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+      modelSelection: { provider: 'prism-wiki-test', model: 'prism-wiki-test' },
+    },
     () => Promise.resolve({ kind: 'enter' as const, messages: proposed }),
   )
 }
