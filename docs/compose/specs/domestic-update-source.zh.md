@@ -8,6 +8,8 @@ commits: 205657d63d..
 
 # 国内更新源
 
+[English](domestic-update-source.md) | 中文
+
 ## Report
 
 ## [S1] 问题
