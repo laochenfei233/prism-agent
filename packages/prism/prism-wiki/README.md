@@ -3,7 +3,7 @@ description: "The Prism knowledge vault bundle: an LLM-maintained set of interli
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-wiki
+# @prism/prism-wiki
 
 English | [中文](README.zh.md)
 
@@ -118,9 +118,9 @@ The tokenizer is `trigram` (`tokenize = 'trigram'`), which indexes every three-c
 <a id="web-knowledge-page"></a>
 ## The Web Knowledge page
 
-`./web` and `./client` add the Knowledge entry to the sidebar panel rail, the `wiki-vault` main panel it opens, and a frame-wide host for the page's transient notices. The page reads and writes the same vault the tools do, through this plugin's own `POST` routes under `/api/prism-wiki`: `list`, `read`, `search`, `save`, and `lint`. Every answer is one envelope, `{ ok: true, value }` or `{ ok: false, error: { code, message } }` with HTTP 400, and the page branches on `prism-wiki/revision-conflict` and `prism-wiki/not-found`.
+`./web` and `./client` add the Knowledge entry to the sidebar panel rail, the `wiki-vault` main panel it opens, and a frame-wide host for the page's transient notices. The page reads and writes the same vault the tools do, through this plugin's own `POST` routes under `/api/prism-wiki`: `list`, `read`, `search`, `save`, `source`, and `lint`. Every answer is one envelope, `{ ok: true, value }` or `{ ok: false, error: { code, message } }` with HTTP 400, and the page branches on `prism-wiki/revision-conflict` and `prism-wiki/not-found`.
 
-The page has three tabs. **Page** shows the vault tree grouped by kind with type and status filters, renders the selected page as markdown with clickable wikilinks, lists its backlinks and cited sources, and edits its frontmatter and body; a save echoes the revision it loaded, and a conflicting save keeps the draft beside an in-place notice. **Search** ranks literal hits, 20 by default. **Health** runs the lint pass and lists every finding under its localized kind label.
+The page has three tabs. **Page** shows the vault tree grouped by kind with type and status filters, renders the selected page as markdown with clickable wikilinks, lists its backlinks, opens any cited raw source in place, and edits its frontmatter and body. A save echoes the revision it loaded; a conflicting save keeps the draft, reports the conflict in place, and shows the stored body beside it; and a save that carries no revision is refused once the vault already holds that path, so a draft can only create a page rather than replace one it never read. Following a wikilink that resolves to no page opens a draft for the name it asked for. A new page's path follows its title and kind until the reader types one, `overview.md` opens on first load when the vault has it, and a narrowed viewport folds the catalog behind its own toggle. **Search** ranks literal hits, 20 by default. **Health** runs the lint pass and lists every finding under its localized kind label.
 
 The row injects `wikiVault`, `connection`, and `webServer`, so a profile that composes the Connection without a web server leaves the row pending instead of failing it.
 
@@ -138,12 +138,12 @@ pnpm run test:docs
 pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md
 ```
 
-- `pnpm run test` runs the unit suite, including `tests/vault.spec.ts` against real temporary vault directories and `tests/search.spec.ts` against a real FTS5 database file.
+- `pnpm run test` runs the unit suite: `tests/vault.spec.ts` against real temporary vault directories, `tests/search.spec.ts` against a real FTS5 database file, `tests/tools.spec.ts` and `tests/commands.spec.ts` through the real registries, `tests/web.spec.ts` through the real Connection Fetch registry, `tests/client-api.client.spec.ts` over the browser client, `tests/client-page.client.spec.tsx` over the page in jsdom, and `tests/composition.host.spec.ts` booting the shipped rows through the vendored Loader.
 - `pnpm run typecheck` compiles the host and client programs against the checkout.
 - `pnpm run test:docs` runs the documentation gates: pairing, wrap, links, budgets, and the package-README checks.
 - `pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` checks this README pair alone.
 
-The tool, command, route, and browser halves of the package have no direct specs.
+The package does not yet meet the repository's per-file coverage gate: `test:coverage` still reports uncovered branches, most in `src/client/WikiPage.tsx`, `src/vault.ts`, and `src/search.ts`.
 
 -----
 
@@ -153,9 +153,9 @@ The tool, command, route, and browser halves of the package have no direct specs
 The package declares `dsh.bundle.patch`, so `dsh plugin` reconciles it as a profile layer instead of mounting one plugin. Install the tarball into a profile, then restart that profile.
 
 ```sh
-dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-wiki-0.1.0.tgz
+dsh plugin --profile <profile> add /absolute/path/to/prism-prism-wiki-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-wiki
+dsh plugin --profile <profile> remove @prism/prism-wiki
 ```
 
 The patch inserts four rows, and each row's package owns its behavior.
@@ -181,7 +181,7 @@ One fixed section named `prism-wiki` at prompt order 2550, inside the tool-guida
 ##### Shipped protocol text
 
 ```markdown
-A wiki vault is a persistent, interlinked body of markdown pages that is compiled once and kept current, instead of being re-derived per question. Three layers: `raw/` holds immutable sources; `wiki/` holds the pages you own; `AGENTS.md` holds this vault's conventions. Read the vault schema with `wiki_read` before authoring anything, because it carries the conventions this deployment expects. Ingest: read a source with `wiki_source`, then write or revise every page it changes with `wiki_write`. One source commonly touches several pages. Query: find pages with `wiki_search`, read them with `wiki_read`, and answer from them. A good answer is worth filing back as a page. Lint: run `wiki_lint` periodically and act on what it reports.
+A wiki vault is a persistent, interlinked body of markdown pages that is compiled once and kept current, instead of being re-derived per question. Three layers: `raw/` holds immutable sources; `wiki/` holds the pages you own; `AGENTS.md` holds this vault's conventions. This vault's conventions are handed to you the first time you touch the vault in a session; follow them for every page you write. Ingest: read a source with `wiki_source`, then write or revise every page it changes with `wiki_write`. One source commonly touches several pages. Query: find pages with `wiki_search`, read them with `wiki_read`, and answer from them. A good answer is worth filing back as a page. Lint: run `wiki_lint` periodically and act on what it reports.
 ```
 
 #### Token effect
@@ -196,7 +196,7 @@ Prefix-stable while `protocolSection` and the sections ordered above it stay unc
 
 #### What the model sees
 
-After any `wiki_*` tool call, the next step of that session carries one extra user message: it opens with `<prism-wiki-schema>`, carries the vault's `AGENTS.md` text, and closes with "These are this vault's conventions. Follow them for every page you write." The debt is cleared when the frame is delivered, and `schemaDeliveryEnabled: false` suppresses the frame entirely.
+After any `wiki_*` tool call, the next step of that session carries one extra user message: it opens with `<prism-wiki-schema>`, carries the vault's `AGENTS.md` text, and closes with "These are this vault's conventions. Follow them for every page you write." The debt is cleared when the frame is delivered, and `schemaDeliveryEnabled: false` suppresses the frame entirely. A vault that cannot supply the schema — no `AGENTS.md`, no configured root — settles the debt without a frame instead of failing the step; any other read failure still propagates.
 
 #### Token effect
 

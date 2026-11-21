@@ -1,10 +1,10 @@
 /**
- * Browser half of `@prism-ai/prism-wiki`: the Knowledge entry in the sidebar
+ * Browser half of `@prism/prism-wiki`: the Knowledge entry in the sidebar
  * panel rail, the keyed main panel it opens, and the frame-wide host for the
  * page's transient notices. Every operation reaches the host through this
  * plugin's own routes under `/api`, so the page reads and writes the same vault
  * the wiki tools maintain rather than a second copy of it.
- * @module @prism-ai/prism-wiki/src/client
+ * @module @prism/prism-wiki/src/client
  */
 
 import type { ReactNode } from 'react'
@@ -134,6 +134,7 @@ export function apply(ctx: ClientContext): void {
     read: (path, signal) => api.read({ path }, signal),
     search: (request, signal) => api.search(request, signal),
     save: (request, signal) => api.save(request, signal),
+    source: (request, signal) => api.source(request, signal),
     lint: signal => api.lint(signal),
     notify: (text, tone) => {
       noticeSeq += 1

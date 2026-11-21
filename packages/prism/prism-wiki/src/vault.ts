@@ -8,7 +8,7 @@
  * code; the sandbox around the model's own file tools does not apply here. The
  * module has no Cordis dependency and calls no model.
  *
- * @module @prism-ai/prism-wiki/vault
+ * @module @prism/prism-wiki/vault
  */
 
 import { createHash, randomUUID } from 'node:crypto'

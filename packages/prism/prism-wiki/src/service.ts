@@ -6,7 +6,7 @@
  *
  * The service owns no model call. Reading, synthesis, and page authoring belong
  * to the model; everything here is mechanical and checkable.
- * @module @prism-ai/prism-wiki
+ * @module @prism/prism-wiki
  */
 
 import { join } from 'node:path'
@@ -165,14 +165,24 @@ export class WikiVaultService extends Service {
 
   /**
    * Read the vault schema for one session and clear the debt.
-   * @param agent - The session whose step is starting.
+   *
+   * A vault that cannot answer this call — no `AGENTS.md`, no configured root —
+   * already answered the tool call that created the debt, so the frame is
+   * skipped rather than failing the step it was going to join.
+   * @param agent - the session whose step is starting.
    * @returns The frame text, or an empty string when nothing is owed.
    */
   private async takeSchemaFrame(agent: Agent): Promise<string> {
     if (!this.schemaPending.has(agent)) return ''
     this.schemaPending.delete(agent)
     this.schemaDelivered.add(agent)
-    const schema = await (await this.ready()).readSchema()
+    let schema: string
+    try {
+      schema = await (await this.ready()).readSchema()
+    } catch (error: unknown) {
+      if (error instanceof WikiVaultError || error instanceof WikiError) return ''
+      throw error
+    }
     return `<prism-wiki-schema>\n${schema.trim()}\n</prism-wiki-schema>\nThese are this vault's conventions. Follow them for every page you write.`
   }
 

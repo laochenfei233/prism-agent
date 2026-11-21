@@ -11,7 +11,7 @@
  * refusal comes back as a result the model can act on rather than as an
  * unhandled tool error.
  *
- * @module @prism-ai/prism-wiki/tools
+ * @module @prism/prism-wiki/tools
  */
 
 import type { Context } from '@deepseek-ai/cordis'

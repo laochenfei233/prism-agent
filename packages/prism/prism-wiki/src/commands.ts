@@ -6,11 +6,12 @@
  * tool schema, so the cached request prefix is unchanged by it, and the model
  * has no way to invoke it.
  *
- * @module @prism-ai/prism-wiki/commands
+ * @module @prism/prism-wiki/commands
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { WikiError, WikiVaultError, brandPagePath } from './service.ts'
 import type { WikiVaultService } from './service.ts'
@@ -193,7 +194,9 @@ export function apply(ctx: Context): void {
     // invocation can enter while already-started handler promises quiesce.
     yield async () => { await Promise.allSettled(active) }
     yield ctx.commands.register({
-      definitionId: CommandDefinitionId('@prism-ai/prism-wiki'),
+      // The id is the compile-time brand over a plain string; the shared brand
+      // helper produces the same value without importing the provider's runtime.
+      definitionId: brandString<CommandDefinitionId>('@prism/prism-wiki'),
       name: 'wiki',
       description: 'Inspect and maintain the knowledge vault',
       handler,

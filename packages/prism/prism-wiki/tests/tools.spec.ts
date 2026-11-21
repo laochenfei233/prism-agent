@@ -7,7 +7,7 @@
  * registry contribution that outlives its fiber breaks reloads.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -305,5 +305,45 @@ describe('the vault schema debt', () => {
     await callTool(ctx, 'wiki_lint', {}, agent)
 
     expect(schemaFrames(await proposeStep(ctx, agent)).join('\n')).toContain('Keep pages short.')
+  })
+
+  it('skips the frame instead of failing the step when the schema file is gone', async () => {
+    const root = await scratchVault()
+    const ctx = await mountWiki({ vaultRoot: root })
+    owned.add(ctx)
+    const agent = createAgent('tools-missing-schema')
+
+    await callTool(ctx, 'wiki_lint', {}, agent)
+    await rm(join(root, 'AGENTS.md'), { force: true })
+
+    const decision = await proposeStep(ctx, agent)
+    expect(decision.kind).toBe('enter')
+    expect(schemaFrames(decision)).toEqual([])
+    // The debt is settled: a repaired vault does not replay the frame.
+    expect(schemaFrames(await proposeStep(ctx, agent))).toEqual([])
+  })
+
+  it('skips the frame when the deployment configured no vault root', async () => {
+    const ctx = new Context()
+    owned.add(ctx)
+    await mountVault(ctx, { vaultRoot: '' })
+    const agent = createAgent('tools-no-root')
+
+    ctx.wikiVault.noteSchemaDue(agent)
+
+    expect(schemaFrames(await proposeStep(ctx, agent))).toEqual([])
+  })
+
+  it('fails the step when the schema read fails for a reason the vault does not own', async () => {
+    const root = await scratchVault()
+    const ctx = await mountWiki({ vaultRoot: root })
+    owned.add(ctx)
+    const agent = createAgent('tools-broken-schema')
+
+    await callTool(ctx, 'wiki_lint', {}, agent)
+    await rm(join(root, 'AGENTS.md'), { force: true })
+    await mkdir(join(root, 'AGENTS.md'))
+
+    await expect(proposeStep(ctx, agent)).rejects.toThrow(/EISDIR|directory/iu)
   })
 })

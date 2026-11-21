@@ -5,7 +5,7 @@
  * editor, and the vault health report. Every read and write crosses the
  * injected wiki face, so the component reaches no context and owns no
  * subscription machinery.
- * @module @prism-ai/prism-wiki/src/client/WikiPage
+ * @module @prism/prism-wiki/src/client/WikiPage
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -19,7 +19,7 @@ import type {
 } from '../types.ts'
 import type {
   WikiLintValue, WikiListValue, WikiPageSummary, WikiReadValue, WikiSaveRequest, WikiSaveValue,
-  WikiSearchRequest, WikiSearchValue,
+  WikiSearchRequest, WikiSearchValue, WikiSourceRequest, WikiSourceValue,
 } from '../web-contract.ts'
 import { WikiRequestError } from './api.ts'
 import type { WikiLocaleKey } from './locales.ts'
@@ -53,6 +53,8 @@ interface WikiDraft {
   readonly body: string
   /** Revision the editor loaded; null while creating a page that has none yet. */
   readonly revision: string | null
+  /** The unresolved link target this draft was opened from, or null for a drafted edit. */
+  readonly origin: string | null
   /** In-place notice shown beside the retained draft; null when the last save did not conflict. */
   readonly conflict: string | null
   /** The stored page body, present when the last save conflicted, so the reader can compare the two. */
@@ -86,6 +88,8 @@ export interface WikiPageFace {
   readonly search: (request: WikiSearchRequest, signal?: AbortSignal) => Promise<WikiSearchValue>
   /** Create or replace one page. */
   readonly save: (request: WikiSaveRequest, signal?: AbortSignal) => Promise<WikiSaveValue>
+  /** Read a bounded slice of one raw source. */
+  readonly source: (request: WikiSourceRequest, signal?: AbortSignal) => Promise<WikiSourceValue>
   /** Run the vault health pass. */
   readonly lint: (signal?: AbortSignal) => Promise<WikiLintValue>
   /** Report one transient outcome to the frame-wide toast host. */
@@ -111,6 +115,24 @@ const PAGE_TYPES: readonly WikiPageType[] = [
 
 /** Every page state, in dispute order. */
 const PAGE_STATUSES: readonly WikiPageStatus[] = ['current', 'stub', 'superseded', 'disputed']
+
+/** The directory each non-overview page kind is filed in, relative to `wiki/`. */
+const TYPE_DIRECTORIES: Readonly<Record<Exclude<WikiPageType, 'overview'>, string>> = {
+  entity: 'entities',
+  concept: 'concepts',
+  source: 'sources',
+  comparison: 'comparisons',
+  synthesis: 'syntheses',
+}
+
+/** The page kind one wiki directory files; mirrors {@link TYPE_DIRECTORIES}. */
+const DIRECTORY_TYPES: Readonly<Record<string, WikiPageType>> = {
+  entities: 'entity',
+  concepts: 'concept',
+  sources: 'source',
+  comparisons: 'comparison',
+  syntheses: 'synthesis',
+}
 
 /** Locale key of one page kind's label. */
 const TYPE_KEYS: Record<WikiPageType, WikiLocaleKey> = {
@@ -196,6 +218,7 @@ function draftOf(view: WikiReadValue): WikiDraft {
     updated: frontmatter.updated,
     body,
     revision,
+    origin: null,
     conflict: null,
   }
 }
@@ -215,7 +238,70 @@ function emptyDraft(type: WikiPageType, updated: string): WikiDraft {
     updated,
     body: '',
     revision: null,
+    origin: null,
     conflict: null,
+  }
+}
+
+/**
+ * The lowercase hyphenated form of one page name. Letters and digits of any
+ * script survive, so a Chinese title keeps its own characters.
+ * @param value - the page name as typed.
+ * @returns the slug, or an empty string when the name carries no letters or digits.
+ */
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+}
+
+/**
+ * The path a new page of one kind and title takes.
+ * @param title - the page title as typed.
+ * @param type - the page kind, which selects the directory.
+ * @returns the vault-relative path, or an empty string while the title has no usable name.
+ */
+function derivePath(title: string, type: WikiPageType): string {
+  if (type === 'overview') return 'overview.md'
+  const slug = slugify(title)
+  return slug === '' ? '' : `${TYPE_DIRECTORIES[type]}/${slug}.md`
+}
+
+/**
+ * Whether one draft path is still the one its title and kind derive, so typing a
+ * title may keep it in step. A path the reader typed is never overwritten.
+ * @param path - the path currently in the draft.
+ * @param title - the title currently in the draft.
+ * @param type - the kind currently in the draft.
+ * @returns true when the path is empty or still derived.
+ */
+function isDerivedPath(path: string, title: string, type: WikiPageType): boolean {
+  return path === '' || path === derivePath(title, type)
+}
+
+/**
+ * One new draft for a wikilink target that resolves to no page: the vault's
+ * conventions say such a link is a request for the page it names.
+ * @param target - the link target as written in the body.
+ * @returns the draft, with its title and path filled in where they can be derived.
+ */
+function draftFromTarget(target: string): WikiDraft {
+  const withoutSuffix = target.trim().replace(/\\/gu, '/').replace(/\.md$/iu, '')
+  const slash = withoutSuffix.lastIndexOf('/')
+  const directory = slash < 0 ? '' : withoutSuffix.slice(0, slash)
+  const stem = slash < 0 ? withoutSuffix : withoutSuffix.slice(slash + 1)
+  const known = DIRECTORY_TYPES[directory]
+  const type = known ?? 'concept'
+  const slug = slugify(stem)
+  // A target under a directory this vault does not own is filed as a concept,
+  // because the page's kind fixes the directory it may live in.
+  const base = known === undefined ? TYPE_DIRECTORIES.concept : directory
+  return {
+    ...emptyDraft(type, todayText()),
+    path: slug === '' ? '' : `${base}/${slug}.md`,
+    title: stem,
+    origin: withoutSuffix,
   }
 }
 
@@ -250,7 +336,7 @@ function kindTone(kind: WikiLintKind): TagTone {
 
 /** A wiki path without its `.md` suffix. */
 function stripMarkdownSuffix(path: string): string {
-  const trimmed = path.toLocaleLowerCase()
+  const trimmed = path.toLowerCase()
   return trimmed.endsWith('.md') ? trimmed.slice(0, -3) : trimmed
 }
 
@@ -262,14 +348,14 @@ function stripMarkdownSuffix(path: string): string {
  * @returns the stored path, or undefined when no page answers to that name.
  */
 function resolvePagePath(target: string, pages: readonly WikiPageSummary[]): string | undefined {
-  const needle = target.trim().toLocaleLowerCase()
+  const needle = target.trim().toLowerCase()
   if (needle.length === 0) return undefined
   const bare = stripMarkdownSuffix(needle)
   const found = pages.find((entry) => {
-    const path = entry.path.toLocaleLowerCase()
+    const path = entry.path.toLowerCase()
     const entryBare = stripMarkdownSuffix(entry.path)
     const name = entryBare.slice(entryBare.lastIndexOf('/') + 1)
-    const title = entry.title.toLocaleLowerCase()
+    const title = entry.title.toLowerCase()
     return path === needle || entryBare === bare || name === bare || title === bare || title === needle
   })
   return found?.path
@@ -277,14 +363,15 @@ function resolvePagePath(target: string, pages: readonly WikiPageSummary[]): str
 
 /**
  * Percent-encode one wikilink target into a Markdown destination the renderer's
- * file delegate decodes back verbatim.
+ * file delegate decodes back verbatim. The written case is kept, so a target
+ * that resolves to no page still names the page the author asked for.
  * @param target - the target as written, with any heading or block anchor.
  * @returns the local `.md` destination.
  */
 function wikilinkDestination(target: string): string {
   const bare = target.split(/[#^]/u)[0] ?? ''
   const trimmed = bare.trim()
-  const path = trimmed.toLocaleLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`
+  const path = trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/')
 }
 
@@ -412,7 +499,7 @@ function groupPages(pages: readonly WikiPageSummary[]): WikiGroup[] {
  * @returns the page element tree.
  */
 export function WikiPage(props: WikiPageProps): ReactNode {
-  const { t, list, read, search, save, lint, notify } = props
+  const { t, list, read, search, save, source, lint, notify } = props
   const [pages, setPages] = useState<readonly WikiPageSummary[]>([])
   const [listState, setListState] = useState<LoadState>('loading')
   const [filter, setFilter] = useState('')
@@ -431,6 +518,10 @@ export function WikiPage(props: WikiPageProps): ReactNode {
   const [hits, setHits] = useState<readonly WikiSearchHit[] | null>(null)
   const [lintState, setLintState] = useState<LoadState>('idle')
   const [report, setReport] = useState<WikiLintReport | null>(null)
+  const [sourceView, setSourceView] = useState<WikiSourceValue | null>(null)
+  const [sourceLoading, setSourceLoading] = useState<string | null>(null)
+  const [treeOpen, setTreeOpen] = useState(false)
+  const [autoOpened, setAutoOpened] = useState(false)
 
   /** Re-read the whole vault tree. */
   const refresh = useCallback(async (): Promise<void> => {
@@ -452,6 +543,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
     setTab('page')
     setDraft(null)
     setPage(null)
+    setSourceView(null)
     setPageState('loading')
     setFailure(null)
     try {
@@ -463,20 +555,37 @@ export function WikiPage(props: WikiPageProps): ReactNode {
     }
   }, [read, t])
 
-  /** Follow one wikilink, or report the name no page answers to. */
+  /**
+   * Follow one wikilink. A target that resolves to no page opens the editor on
+   * a draft for it, because in this vault such a link is a request for the page.
+   * @param target - the link target as written.
+   */
   const openTarget = useCallback((target: string | null): void => {
     if (target === null) return
     const resolved = resolvePagePath(target, pages)
-    if (resolved === undefined) {
-      setFailure(t('pageMissing', { target }))
+    if (resolved !== undefined) {
+      void openPage(resolved)
       return
     }
-    void openPage(resolved)
-  }, [openPage, pages, t])
+    setSelected(null)
+    setPage(null)
+    setTab('page')
+    setSourceView(null)
+    setFailure(null)
+    setDraft(draftFromTarget(target))
+  }, [openPage, pages])
 
   // The rewritten wikilinks are local Markdown destinations, so the renderer's
   // file delegate is the one click path into this vault.
   const openFile = useCallback((path: string): void => { openTarget(path) }, [openTarget])
+
+  // The catalog's front door is `overview.md`: opening it makes the first look
+  // at the vault show what the vault is for, instead of an empty center column.
+  useEffect(() => {
+    if (autoOpened || listState !== 'ready') return
+    setAutoOpened(true)
+    if (pages.some(entry => entry.path === 'overview.md')) void openPage('overview.md')
+  }, [autoOpened, listState, openPage, pages])
 
   /** Rank the pages the current query matches. */
   const runSearch = useCallback(async (): Promise<void> => {
@@ -512,6 +621,19 @@ export function WikiPage(props: WikiPageProps): ReactNode {
     void runLint()
   }, [lintState, runLint, tab])
 
+  /** Read one raw source the open page cites, into the panel beside its list. */
+  const openSource = useCallback(async (path: string): Promise<void> => {
+    setSourceLoading(path)
+    setFailure(null)
+    try {
+      setSourceView(await source({ path }))
+    } catch (error) {
+      setFailure(t('sourceFailed', { reason: reasonOf(error) }))
+    } finally {
+      setSourceLoading(null)
+    }
+  }, [source, t])
+
   /** Update the open draft through its latest value. */
   const patchDraft = useCallback((patch: (current: WikiDraft) => WikiDraft): void => {
     setDraft(current => (current === null ? current : patch(current)))
@@ -534,6 +656,12 @@ export function WikiPage(props: WikiPageProps): ReactNode {
     }
     if (draft.title.trim().length === 0) {
       setFailure(t('invalidTitle'))
+      return
+    }
+    // A new draft carries no revision to echo, so an existing path would be
+    // replaced without the editor ever seeing what it overwrote.
+    if (draft.revision === null && pages.some(entry => entry.path === path)) {
+      setFailure(t('pageExists', { path }))
       return
     }
     setSaving(true)
@@ -561,7 +689,32 @@ export function WikiPage(props: WikiPageProps): ReactNode {
     } finally {
       setSaving(false)
     }
-  }, [draft, notify, openPage, patchDraft, refresh, save, t])
+  }, [draft, notify, openPage, pages, patchDraft, refresh, save, t])
+
+  /**
+   * Retitle the open draft. A new page's path follows the title while the path
+   * is still the one the title derives; a path the reader typed stays put.
+   * @param title - the title as typed.
+   */
+  const onTitleChange = useCallback((title: string): void => {
+    patchDraft((current) => {
+      if (current.revision !== null) return { ...current, title }
+      const derived = isDerivedPath(current.path, current.title, current.type)
+      return derived ? { ...current, title, path: derivePath(title, current.type) } : { ...current, title }
+    })
+  }, [patchDraft])
+
+  /**
+   * Refile the open draft under another kind, moving a derived path with it.
+   * @param type - the kind the reader selected.
+   */
+  const onTypeChange = useCallback((type: WikiPageType): void => {
+    patchDraft((current) => {
+      if (current.revision !== null) return { ...current, type }
+      const derived = isDerivedPath(current.path, current.title, current.type)
+      return derived ? { ...current, type, path: derivePath(current.title, type) } : { ...current, type }
+    })
+  }, [patchDraft])
 
   const markdownLabels = useMemo<MarkdownLabels>(() => ({
     code: {
@@ -593,6 +746,17 @@ export function WikiPage(props: WikiPageProps): ReactNode {
           <p className={css.intro}>{t('intro')}</p>
         </div>
         <div className={css.toolbar}>
+          {/* The catalog column folds away under the narrow breakpoint; this
+              toggle is the only way back to it there. */}
+          <Button
+            variant="outline"
+            className={css.treeToggle}
+            aria-expanded={treeOpen}
+            aria-controls="wiki-vault-tree"
+            onClick={() => { setTreeOpen(open => !open) }}
+          >
+            {t('tree')}
+          </Button>
           <Input
             type="search"
             className={css.search as string}
@@ -630,7 +794,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
       )}
 
       <div className={css.body}>
-        <nav className={css.tree} aria-label={t('tree')}>
+        <nav id="wiki-vault-tree" className={css.tree} data-open={treeOpen ? 'true' : undefined} aria-label={t('tree')}>
           <Input
             type="search"
             className={css.filter as string}
@@ -750,7 +914,9 @@ export function WikiPage(props: WikiPageProps): ReactNode {
             {tab === 'page' && draft !== null && (
               <div className={css.editor}>
                 <h2 className={css.sectionTitle}>
-                  {draft.revision === null ? t('editorNew') : t('editorEdit')}
+                  {draft.revision !== null
+                    ? t('editorEdit')
+                    : draft.origin === null ? t('editorNew') : t('editorNewFrom', { target: draft.origin })}
                 </h2>
                 {draft.conflict !== null && (
                   <p className={css.conflict} role="alert">
@@ -764,19 +930,13 @@ export function WikiPage(props: WikiPageProps): ReactNode {
                     </button>
                   </p>
                 )}
-                {draft.conflictStored != null && (
-                  <pre className={css.conflictStored}>{draft.conflictStored}</pre>
-                )}
                 <div className={css.fieldRow}>
                   <label className={css.field}>
                     <span className={css.fieldLabel}>{t('fieldTitle')}</span>
                     <Input
                       value={draft.title}
                       placeholder={t('fieldTitlePlaceholder')}
-                      onChange={(event) => {
-                        const title = event.target.value
-                        patchDraft(current => ({ ...current, title }))
-                      }}
+                      onChange={(event) => { onTitleChange(event.target.value) }}
                     />
                   </label>
                   <label className={css.field}>
@@ -798,10 +958,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
                     <select
                       className={css.select}
                       value={draft.type}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        patchDraft(current => ({ ...current, type: pageTypeOf(value, current.type) }))
-                      }}
+                      onChange={(event) => { onTypeChange(pageTypeOf(event.target.value, draft.type)) }}
                     >
                       {PAGE_TYPES.map(type => (
                         <option key={type} value={type}>{t(TYPE_KEYS[type])}</option>
@@ -893,19 +1050,40 @@ export function WikiPage(props: WikiPageProps): ReactNode {
                     />
                   </label>
                 </div>
-                <label className={css.field}>
+                <div className={css.field}>
                   <span className={css.fieldLabel}>{t('fieldBody')}</span>
-                  <textarea
-                    className={css.textarea}
-                    aria-label={t('fieldBody')}
-                    placeholder={t('fieldBodyPlaceholder')}
-                    value={draft.body}
-                    onChange={(event) => {
-                      const next = event.target.value
-                      patchDraft(current => ({ ...current, body: next }))
-                    }}
-                  />
-                </label>
+                  {draft.conflictStored == null ? (
+                    <textarea
+                      className={css.textarea}
+                      aria-label={t('fieldBody')}
+                      placeholder={t('fieldBodyPlaceholder')}
+                      value={draft.body}
+                      onChange={(event) => {
+                        const next = event.target.value
+                        patchDraft(current => ({ ...current, body: next }))
+                      }}
+                    />
+                  ) : (
+                    <div className={css.compare}>
+                      <label className={css.compareColumn}>
+                        <span className={css.fieldLabel}>{t('conflictDraft')}</span>
+                        <textarea
+                          className={css.textarea}
+                          aria-label={t('fieldBody')}
+                          value={draft.body}
+                          onChange={(event) => {
+                            const next = event.target.value
+                            patchDraft(current => ({ ...current, body: next }))
+                          }}
+                        />
+                      </label>
+                      <div className={css.compareColumn}>
+                        <span className={css.fieldLabel}>{t('conflictStored')}</span>
+                        <pre className={css.conflictStored}>{draft.conflictStored}</pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className={css.actions}>
                   <Button variant="primary" disabled={saving} onClick={() => { void onSave() }}>
                     {saving ? t('saving') : t('save')}
@@ -970,11 +1148,33 @@ export function WikiPage(props: WikiPageProps): ReactNode {
                     ? <p className={css.placeholder}>{t('noSources')}</p>
                     : (
                       <ul className={css.chips}>
-                        {page.sources.map(source => (
-                          <li key={source}><span className={css.chipText}>{source}</span></li>
+                        {page.sources.map(rawPath => (
+                          <li key={rawPath}>
+                            <button
+                              type="button"
+                              className={css.chip}
+                              aria-pressed={sourceView?.path === rawPath}
+                              disabled={sourceLoading === rawPath}
+                              onClick={() => { void openSource(rawPath) }}
+                            >
+                              {sourceLoading === rawPath ? t('sourceLoading') : rawPath}
+                            </button>
+                          </li>
                         ))}
                       </ul>
                     )}
+                  {sourceView !== null && (
+                    <div className={css.sourcePanel}>
+                      <div className={css.sourceHead}>
+                        <PathLabel path={`raw/${sourceView.path}`} className={css.sourcePath} />
+                        {sourceView.truncated && <span className={css.hint}>{t('sourceTruncated')}</span>}
+                        <button type="button" className={css.dismiss} onClick={() => { setSourceView(null) }}>
+                          {t('dismiss')}
+                        </button>
+                      </div>
+                      <pre className={css.sourceText}>{sourceView.text}</pre>
+                    </div>
+                  )}
                 </section>
               </article>
             )}

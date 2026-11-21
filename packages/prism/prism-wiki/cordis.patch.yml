@@ -9,7 +9,7 @@
 
 - insert:
     - id: prism-wiki
-      name: '@prism-ai/prism-wiki'
+      name: '@prism/prism-wiki'
       config:
         vaultRoot: !!js dshHomePath('knowledge')
         maxSearchResults: 6
@@ -17,15 +17,15 @@
         maxPageChars: 200000
 
     - id: tool-prism-wiki
-      name: '@prism-ai/prism-wiki/tools'
+      name: '@prism/prism-wiki/tools'
 
     # Vault entry points a model does not drive on its own: they run from a
     # human command instead, so they cost no tool schema.
     - id: command-prism-wiki
-      name: '@prism-ai/prism-wiki/commands'
+      name: '@prism/prism-wiki/commands'
 
     # Browser channel and Knowledge page: needs the Web Connection and its web
     # server, so a profile that composes either without the other leaves this
     # row pending instead of failing it.
     - id: web-prism-wiki
-      name: '@prism-ai/prism-wiki/web'
+      name: '@prism/prism-wiki/web'

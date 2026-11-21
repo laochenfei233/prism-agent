@@ -1,7 +1,7 @@
 /**
  * Shared vocabulary of the wiki vault: page identity, the frontmatter every
  * page carries, what a search returns, and what the lint report is made of.
- * @module @prism-ai/prism-wiki/types
+ * @module @prism/prism-wiki/types
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'

@@ -3,7 +3,7 @@
  * types describe JSON that crosses the Connection fetch registry, so every
  * field is plain JSON: no functions, no class instances, no branded values
  * leaking into the browser bundle.
- * @module @prism-ai/prism-wiki/web-contract
+ * @module @prism/prism-wiki/web-contract
  */
 
 import type {
@@ -113,6 +113,24 @@ export interface WikiSaveRequest {
 export interface WikiSaveValue {
   /** The stored page, carrying its new revision. */
   readonly page: WikiPagePayload
+}
+
+/** The body of a raw-source read request. */
+export interface WikiSourceRequest {
+  /** Source identity relative to `raw/`. */
+  readonly path: string
+  /** Requested character bound; the deployment cap still applies. */
+  readonly maxChars?: number
+}
+
+/** The answer to a raw-source read request. */
+export interface WikiSourceValue {
+  /** Source identity relative to `raw/`. */
+  readonly path: string
+  /** The source text, bounded by the character cap. */
+  readonly text: string
+  /** Whether the bound cut the text short. */
+  readonly truncated: boolean
 }
 
 /** The answer to a lint request. */

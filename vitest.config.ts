@@ -331,6 +331,10 @@ export default defineConfig({
         'packages/client/ui-sidebar/src/client/index.ts',
         'packages/client/ui-skill/src/client/index.ts',
         'packages/client/ui-workspace/src/client/index.ts',
+        // The Knowledge page's browser entry registers three slots and the
+        // frame-wide notice host; the jsdom lane drives WikiPage itself, and no
+        // harness mounts the slot and locale services it registers into.
+        'packages/prism/prism-wiki/src/client/index.tsx',
         'packages/test-support/client-runtime/src/translate.ts',
         'packages/client/ui-primitives/src/JsonTree.tsx',
         'packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx',

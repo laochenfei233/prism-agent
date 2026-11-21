@@ -8,7 +8,7 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import { WikiRequestError, createWikiApi, type WikiApi } from '../src/client/api.ts'
 import type { WikiFrontmatter, WikiLintReport, WikiPagePath, WikiSearchHit } from '../src/types.ts'
 import type {
-  WikiPagePayload, WikiPageSummary, WikiReadRequest, WikiSaveRequest, WikiSearchRequest,
+  WikiPagePayload, WikiPageSummary, WikiReadRequest, WikiSaveRequest, WikiSearchRequest, WikiSourceRequest,
 } from '../src/web-contract.ts'
 
 /** Frontmatter as the host answers it. */
@@ -64,6 +64,9 @@ const searchRequest: WikiSearchRequest = { query: 'needle', limit: 5 }
 /** The save request every save case sends. */
 const saveRequest: WikiSaveRequest = { path: 'concepts/alpha.md', frontmatter, body: 'Alpha body.\n' }
 
+/** The raw-source request every source case sends. */
+const sourceRequest: WikiSourceRequest = { path: 'notes/paper.md', maxChars: 20 }
+
 /** One recorded request. */
 interface Call {
   readonly url: string
@@ -102,6 +105,9 @@ describe('wiki api', () => {
       }],
       ['search', async api => await api.search(searchRequest), { hits: [hit] }],
       ['save', async api => await api.save(saveRequest), { page: stored }],
+      ['source', async api => await api.source(sourceRequest), {
+        path: 'notes/paper.md', text: 'The source text.', truncated: false,
+      }],
       ['lint', async api => await api.lint(), { report }],
     ]
 
@@ -119,6 +125,9 @@ describe('wiki api', () => {
       }, JSON.stringify(readRequest)],
       ['search', async api => await api.search(searchRequest), { hits: [hit] }, JSON.stringify(searchRequest)],
       ['save', async api => await api.save(saveRequest), { page: stored }, JSON.stringify(saveRequest)],
+      ['source', async api => await api.source(sourceRequest), {
+        path: 'notes/paper.md', text: 'The source text.', truncated: false,
+      }, JSON.stringify(sourceRequest)],
       ['lint', async api => await api.lint(), { report }, '{}'],
     ]
 
@@ -194,6 +203,12 @@ describe('wiki api', () => {
       ['a hit list that is not a list', async api => await api.search(searchRequest), { hits: 'none' }],
       ['a hit with an unknown status', async api => await api.search(searchRequest), { hits: [{ ...hit, status: 'maybe' }] }],
       ['a stored page whose revision is not text', async api => await api.save(saveRequest), { page: { ...stored, revision: 7 } }],
+      ['a source whose truncated flag is not a boolean', async api => await api.source(sourceRequest), {
+        path: 'notes/paper.md', text: 'x', truncated: 'no',
+      }],
+      ['a source missing its text', async api => await api.source(sourceRequest), {
+        path: 'notes/paper.md', truncated: false,
+      }],
       ['a report whose findings are not a list', async api => await api.lint(), { report: { ...report, findings: 'none' } }],
       ['a finding without its kind', async api => await api.lint(), {
         report: { ...report, findings: [{ page: null, detail: 'x' }] },

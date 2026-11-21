@@ -1,5 +1,5 @@
 {
-  "name": "@prism-ai/prism-meeting",
+  "name": "@prism/prism-meeting",
   "description": "Prism meeting-minutes plugin: durable records, transcribed audio, configured summaries, persisted answers, model-facing tools, and the Web meeting page",
   "version": "0.1.0",
   "publishConfig": {

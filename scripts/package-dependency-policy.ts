@@ -47,9 +47,12 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
   '@deepseek-ai/dsh-credentials': ['credentialKey'],
   '@deepseek-ai/dsh-deque': ['Deque'],
-  '@deepseek-ai/dsh-llm': ['callConfigEquals'],
+  // Both build a plain, frozen value with no module-local identity: a message
+  // record and a tool definition cross package copies unchanged.
+  '@deepseek-ai/dsh-llm': ['callConfigEquals', 'createUserMessage'],
   '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
+  '@deepseek-ai/dsh-tools': ['defineTool'],
   '@deepseek-ai/schemastery': ['default'],
 } as const satisfies HostDependencyExports
 

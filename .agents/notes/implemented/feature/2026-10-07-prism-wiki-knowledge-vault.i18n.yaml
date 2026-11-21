@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-07-prism-wiki-knowledge-vault.md
-2026-10-07-prism-wiki-knowledge-vault.md: 8a8fbbbf28e90b9b6752d458983bd179fb7c8a68
-2026-10-07-prism-wiki-knowledge-vault.zh.md: 29f1e409fdb02c46bc8f380814a679578c1b9173
+2026-10-07-prism-wiki-knowledge-vault.md: c4ccfa633d620835fc095357bc336637ef918dd4
+2026-10-07-prism-wiki-knowledge-vault.zh.md: 06316706f782fa4731d04a7e602d0139bc0264b7

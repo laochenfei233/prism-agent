@@ -2,7 +2,7 @@
  * Prism wiki: a persistent, interlinked markdown knowledge vault that the model
  * compiles from raw sources and keeps current, with the vault service, the
  * operator command, the Web Knowledge page, and full-text retrieval.
- * @module @prism-ai/prism-wiki
+ * @module @prism/prism-wiki
  */
 
 export { WikiVaultService as default, WikiVaultService, WikiError, DEFAULT_PROTOCOL } from './service.ts'

@@ -21,6 +21,7 @@ import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as Connection from '@deepseek-ai/dsh-client-connection'
 import {
   WIKI_TOOL_NAMES,
   callTool,
@@ -34,6 +35,7 @@ import {
 import * as PrismWiki from '../src/index.ts'
 import * as WikiTools from '../src/tools.ts'
 import * as WikiCommands from '../src/commands.ts'
+import * as WikiWeb from '../src/web.ts'
 
 const owned = new Set<Context>()
 const directories = new Set<string>()
@@ -68,12 +70,14 @@ function sourceModuleLoader(importModule: (specifier: string) => Promise<unknown
 /**
  * Boot the shipped rows from a test-only `cordis.yml` through the real Loader.
  * @param vaultRoot - the vault directory the service row is configured with.
+ * @param options - `web` adds the browser row over a real Connection, the way a
+ * profile with a web client composes it.
  * @returns the booted context, owned by the caller.
  */
-async function boot(vaultRoot: string): Promise<Context> {
+async function boot(vaultRoot: string, options: { readonly web?: boolean } = {}): Promise<Context> {
   const root = await scratch('composition')
   const configPath = join(root, 'cordis.yml')
-  await writeFile(configPath, [
+  const rows = [
     '- id: prompt',
     "  name: '@deepseek-ai/dsh-system-prompt'",
     '- id: tools',
@@ -81,28 +85,50 @@ async function boot(vaultRoot: string): Promise<Context> {
     '- id: commands',
     "  name: '@deepseek-ai/dsh-commands'",
     '- id: prism-wiki',
-    "  name: '@prism-ai/prism-wiki'",
+    "  name: '@prism/prism-wiki'",
     '  config:',
     `    vaultRoot: ${JSON.stringify(vaultRoot)}`,
     '- id: tool-prism-wiki',
-    "  name: '@prism-ai/prism-wiki/tools'",
+    "  name: '@prism/prism-wiki/tools'",
     '- id: command-prism-wiki',
-    "  name: '@prism-ai/prism-wiki/commands'",
-    '',
-  ].join('\n'))
+    "  name: '@prism/prism-wiki/commands'",
+  ]
+  if (options.web === true) {
+    rows.push(
+      '- id: connection',
+      "  name: '@deepseek-ai/dsh-client-connection'",
+      '- id: web-prism-wiki',
+      "  name: '@prism/prism-wiki/web'",
+    )
+  }
+  await writeFile(configPath, [...rows, ''].join('\n'))
 
   const ctx = new Context()
   owned.add(ctx)
   ctx.baseUrl = pathToFileURL(root).href + '/'
+  if (options.web === true) {
+    // Connection mounts its `/api` route on the Web server and signs browser
+    // sessions from the credential provider; dispatch through the exact Fetch
+    // registry this suite uses touches neither beyond the shape below.
+    ctx.provide('credentials', {
+      modifyRecord: async () => ({
+        kind: 'grant',
+        payload: { version: 1, secret: Buffer.alloc(32, 7).toString('base64url') },
+      }),
+    })
+    ctx.provide('webServer', { register: () => () => {} })
+  }
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['@deepseek-ai/dsh-commands', CommandRuntime],
-    ['@prism-ai/prism-wiki', PrismWiki],
-    ['@prism-ai/prism-wiki/tools', WikiTools],
-    ['@prism-ai/prism-wiki/commands', WikiCommands],
+    ['@deepseek-ai/dsh-client-connection', Connection],
+    ['@prism/prism-wiki', PrismWiki],
+    ['@prism/prism-wiki/tools', WikiTools],
+    ['@prism/prism-wiki/commands', WikiCommands],
+    ['@prism/prism-wiki/web', WikiWeb],
   ])
   ctx.loader.internal = sourceModuleLoader(async (specifier) => {
     if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
@@ -168,5 +194,74 @@ describe('prism-wiki real Loader composition', () => {
     expect(protocol).toBe(PrismWiki.DEFAULT_PROTOCOL)
     expect(assembly.tools.map(tool => tool.name).filter(name => name.startsWith('wiki_')).sort())
       .toEqual([...WIKI_TOOL_NAMES])
+  })
+
+  it('serves every browser route from the shipped rows over the real Connection', async () => {
+    const vaultRoot = await scratch('web')
+    const ctx = await boot(vaultRoot, { web: true })
+    const agent = createAgent('composition-web')
+    const shared = ctx.connection.createSharedFetchHandler('/api')
+    /** Send one browser request to a wiki route and read its envelope. */
+    const post = async (
+      endpoint: string,
+      body: unknown,
+    ): Promise<{ readonly status: number; readonly body: Record<string, unknown> }> => {
+      const response = await shared.fetch(new Request(`http://127.0.0.1/api/prism-wiki/${endpoint}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }))
+      return { status: response.status, body: await response.json() as Record<string, unknown> }
+    }
+
+    // One page and one raw source, written the way the model writes them.
+    const written = await callTool(ctx, 'wiki_write', {
+      path: 'concepts/route.md',
+      title: 'Route page',
+      type: 'concept',
+      body: 'Route body about routers.',
+      tags: ['route'],
+      sources: ['notes/router.md'],
+    }, agent)
+    expect(written.isError).toBe(false)
+    const added = await callTool(ctx, 'wiki_source', {
+      action: 'add',
+      path: 'notes/router.md',
+      text: 'The raw router note.',
+    }, agent)
+    expect(added.isError).toBe(false)
+
+    // Every route the page calls answers over the composed Connection.
+    expect(JSON.stringify((await post('list', {})).body)).toContain('concepts/route.md')
+    expect(JSON.stringify((await post('read', { path: 'concepts/route.md' })).body))
+      .toContain('Route body about routers.')
+    expect(JSON.stringify((await post('search', { query: 'routers' })).body)).toContain('concepts/route.md')
+    const source = await post('source', { path: 'notes/router.md' })
+    expect(source.status).toBe(200)
+    expect(JSON.stringify(source.body)).toContain('The raw router note.')
+
+    // A browser save is visible to the model-facing read: one vault, not two.
+    const read = await post('read', { path: 'concepts/route.md' })
+    const revision = (read.body['value'] as { page: { revision: string } }).page.revision
+    const saved = await post('save', {
+      path: 'concepts/route.md',
+      frontmatter: {
+        title: 'Route page',
+        type: 'concept',
+        tags: ['route'],
+        updated: '2026-11-21',
+        status: 'current',
+        sources: ['notes/router.md'],
+      },
+      body: 'Rewritten from the browser.',
+      expectedRevision: revision,
+    })
+    expect(saved.status).toBe(200)
+    expect(toolText(await callTool(ctx, 'wiki_read', { path: 'concepts/route.md' }, agent)))
+      .toContain('Rewritten from the browser.')
+
+    const lint = await post('lint', {})
+    expect(lint.status).toBe(200)
+    expect(JSON.stringify(lint.body)).toContain('"pages":1')
   })
 })

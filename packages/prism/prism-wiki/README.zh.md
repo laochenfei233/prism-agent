@@ -3,7 +3,7 @@ description: "Prism 知识库 bundle：由模型维护、相互链接的 Markdow
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-wiki
+# @prism/prism-wiki
 
 [English](README.md) | 中文
 
@@ -118,9 +118,9 @@ kind: "package-bundle"
 <a id="web-knowledge-page"></a>
 ## Web 知识库页面
 
-`./web` 和 `./client` 把知识库入口加入侧边栏面板栏、它打开的 `wiki-vault` 主面板，以及承载页面临时通知的整帧宿主。页面通过本插件在 `/api/prism-wiki` 下自己的 `POST` 路由读写模型工具所用的同一个知识库：`list`、`read`、`search`、`save`、`lint`。每个应答都是同一个信封——`{ ok: true, value }` 或 HTTP 400 的 `{ ok: false, error: { code, message } }`——页面据 `prism-wiki/revision-conflict` 和 `prism-wiki/not-found` 分支。
+`./web` 和 `./client` 把知识库入口加入侧边栏面板栏、它打开的 `wiki-vault` 主面板，以及承载页面临时通知的整帧宿主。页面通过本插件在 `/api/prism-wiki` 下自己的 `POST` 路由读写模型工具所用的同一个知识库：`list`、`read`、`search`、`save`、`source`、`lint`。每个应答都是同一个信封——`{ ok: true, value }` 或 HTTP 400 的 `{ ok: false, error: { code, message } }`——页面据 `prism-wiki/revision-conflict` 和 `prism-wiki/not-found` 分支。
 
-页面有三个标签页。**页面**按类型分组显示知识库树并带类型和状态筛选，把选中的页面渲染为带可点击 wikilink 的 Markdown，列出它的反向链接和引用的来源，并编辑它的前置数据和正文；保存会回传它加载时的修订号，冲突的保存会保留草稿并在原位提示。**搜索**按字面排序命中，默认 20 条。**健康**运行检查并以其本地化种类标签列出每条发现。
+页面有三个标签页。**页面**按类型分组显示知识库树并带类型和状态筛选，把选中的页面渲染为带可点击 wikilink 的 Markdown，列出它的反向链接，可就地打开它引用的任意原始来源，并编辑它的前置数据和正文。保存会回传它加载时的修订号；冲突时草稿保留、原位提示冲突，并把库中正文并排显示以便比对；不带修订号的保存一旦遇到库里已有的路径就会被拒绝，因此草稿只能新建页面，而不会替换它从未读过的页面。点击解析不到页面的 wikilink 会为它打开一份草稿。新页面的路径随标题和类型推导，直到读者自己填写；知识库有 `overview.md` 时首次进入即打开它；窄视口下目录折叠到自己的开关后面。**搜索**按字面排序命中，默认 20 条。**健康**运行检查并以其本地化种类标签列出每条发现。
 
 该行注入 `wikiVault`、`connection` 和 `webServer`，因此只组合了 Connection 而没有 web server 的 profile 会让这一行保持 pending 而不是失败。
 
@@ -138,12 +138,12 @@ pnpm run test:docs
 pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md
 ```
 
-- `pnpm run test` 运行单元测试套件，其中包括针对真实临时知识库目录的 `tests/vault.spec.ts`，以及针对真实 FTS5 数据库文件的 `tests/search.spec.ts`。
+- `pnpm run test` 运行单元测试套件：针对真实临时知识库目录的 `tests/vault.spec.ts`、针对真实 FTS5 数据库文件的 `tests/search.spec.ts`、经真实注册表的 `tests/tools.spec.ts` 与 `tests/commands.spec.ts`、经真实 Connection Fetch 注册表的 `tests/web.spec.ts`、覆盖浏览器客户端的 `tests/client-api.client.spec.ts`、在 jsdom 中覆盖页面的 `tests/client-page.client.spec.tsx`，以及经 vendored Loader 启动随包行的 `tests/composition.host.spec.ts`。
 - `pnpm run typecheck` 以当前检出编译 host 和 client 程序。
 - `pnpm run test:docs` 运行文档闸门：配对、换行、链接、字数预算和包 README 检查。
 - `pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` 只检查这一对 README。
 
-本包的工具、命令、路由和浏览器两半没有直接对应的 spec。
+本包尚未满足仓库的逐文件覆盖率闸门：`test:coverage` 仍报告未覆盖分支，其中最多的是 `src/client/WikiPage.tsx`、`src/vault.ts` 和 `src/search.ts`。
 
 -----
 
@@ -153,9 +153,9 @@ pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md
 本包声明了 `dsh.bundle.patch`，因此 `dsh plugin` 会把它作为 profile 层来协调，而不是挂载单个插件。把 tarball 安装到 profile，然后重启该 profile。
 
 ```sh
-dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-wiki-0.1.0.tgz
+dsh plugin --profile <profile> add /absolute/path/to/prism-prism-wiki-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-wiki
+dsh plugin --profile <profile> remove @prism/prism-wiki
 ```
 
 patch 插入四行，每一行的行为都由其包拥有。
@@ -181,7 +181,7 @@ patch 插入四行，每一行的行为都由其包拥有。
 ##### 随包协议文本
 
 ```markdown
-A wiki vault is a persistent, interlinked body of markdown pages that is compiled once and kept current, instead of being re-derived per question. Three layers: `raw/` holds immutable sources; `wiki/` holds the pages you own; `AGENTS.md` holds this vault's conventions. Read the vault schema with `wiki_read` before authoring anything, because it carries the conventions this deployment expects. Ingest: read a source with `wiki_source`, then write or revise every page it changes with `wiki_write`. One source commonly touches several pages. Query: find pages with `wiki_search`, read them with `wiki_read`, and answer from them. A good answer is worth filing back as a page. Lint: run `wiki_lint` periodically and act on what it reports.
+A wiki vault is a persistent, interlinked body of markdown pages that is compiled once and kept current, instead of being re-derived per question. Three layers: `raw/` holds immutable sources; `wiki/` holds the pages you own; `AGENTS.md` holds this vault's conventions. This vault's conventions are handed to you the first time you touch the vault in a session; follow them for every page you write. Ingest: read a source with `wiki_source`, then write or revise every page it changes with `wiki_write`. One source commonly touches several pages. Query: find pages with `wiki_search`, read them with `wiki_read`, and answer from them. A good answer is worth filing back as a page. Lint: run `wiki_lint` periodically and act on what it reports.
 ```
 
 #### Token 影响
@@ -196,7 +196,7 @@ A wiki vault is a persistent, interlinked body of markdown pages that is compile
 
 #### 模型看到的内容
 
-任何 `wiki_*` 工具调用之后，该会话的下一步会多带一条 user 消息：它以 `<prism-wiki-schema>` 开头，携带知识库的 `AGENTS.md` 文本，并以 "These are this vault's conventions. Follow them for every page you write." 结尾。帧送达后这笔欠账即被清除，`schemaDeliveryEnabled: false` 会完全抑制这一帧。
+任何 `wiki_*` 工具调用之后，该会话的下一步会多带一条 user 消息：它以 `<prism-wiki-schema>` 开头，携带知识库的 `AGENTS.md` 文本，并以 "These are this vault's conventions. Follow them for every page you write." 结尾。帧送达后这笔欠账即被清除，`schemaDeliveryEnabled: false` 会完全抑制这一帧。知识库无法提供 schema 时（没有 `AGENTS.md`，或没有配置根目录）只清除欠账而不发帧，不会让该步骤失败；其他读取失败仍会向上抛出。
 
 #### Token 影响
 

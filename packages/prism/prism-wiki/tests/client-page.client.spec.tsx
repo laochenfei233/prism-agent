@@ -18,7 +18,7 @@ import { en } from '../src/client/locales.ts'
 import type { WikiFrontmatter, WikiPagePath, WikiPageStatus, WikiSearchHit } from '../src/types.ts'
 import type {
   WikiLintValue, WikiListValue, WikiPageSummary, WikiReadValue, WikiSaveRequest, WikiSaveValue,
-  WikiSearchValue,
+  WikiSearchValue, WikiSourceRequest, WikiSourceValue,
 } from '../src/web-contract.ts'
 
 afterEach(cleanup)
@@ -111,6 +111,11 @@ function face(overrides: Partial<WikiPageFace> = {}): WikiPageFace {
         body: request.body,
         revision: 'rev-2',
       },
+    })),
+    source: vi.fn(async (request: WikiSourceRequest): Promise<WikiSourceValue> => ({
+      path: request.path,
+      text: 'The source text.',
+      truncated: false,
     })),
     lint: vi.fn(async (): Promise<WikiLintValue> => ({
       report: { pages: 2, sources: 0, findings: [] },
@@ -240,4 +245,162 @@ describe('knowledge page', () => {
     expect(draft.value).toBe('My kept draft.')
     expect(wikiFace.notify).not.toHaveBeenCalled()
   })
+
+  it('shows the stored page beside the retained draft after a conflict', async () => {
+    const wikiFace = face({
+      save: vi.fn(async (): Promise<WikiSaveValue> => {
+        throw new WikiRequestError('prism-wiki/revision-conflict', 'This page changed elsewhere.', {
+          path: 'concepts/alpha.md',
+          frontmatter: frontmatter('Alpha'),
+          body: 'The stored body.',
+          revision: 'rev-9',
+        })
+      }),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.change(screen.getByLabelText(en.fieldBody), { target: { value: 'My kept draft.' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    expect(await screen.findByText(en.conflictStored)).toBeTruthy()
+    expect(screen.getByText('The stored body.')).toBeTruthy()
+    const draft = screen.getByLabelText(en.fieldBody)
+    if (!(draft instanceof HTMLTextAreaElement)) throw new Error('the editor draft is not a textarea')
+    expect(draft.value).toBe('My kept draft.')
+  })
+
+  it('opens the overview page when the vault has one', async () => {
+    const wikiFace = face({
+      list: vi.fn(async (): Promise<WikiListValue> => ({
+        pages: [{ ...summary('concepts/alpha.md'), path: 'overview.md', title: 'Front door' }, summary('concepts/alpha.md')],
+      })),
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Front door'), body: 'What this vault covers.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    expect(await screen.findByText('What this vault covers.')).toBeTruthy()
+    expect(wikiFace.read).toHaveBeenCalledWith('overview.md')
+  })
+
+  it('opens a draft for a wikilink that resolves to no page', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: 'See [[Gamma Ray]].', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    const article = await openPage('Alpha')
+    fireEvent.click(within(article).getByRole('button', { name: 'Gamma Ray' }))
+
+    expect(await screen.findByRole('heading', { level: 2, name: en.editorNewFrom.replace('{target}', 'Gamma Ray') }))
+      .toBeTruthy()
+    expect(pathField().value).toBe('concepts/gamma-ray.md')
+    expect(titleField().value).toBe('Gamma Ray')
+  })
+
+  it.each([
+    ['entities/Acme Corp', 'entities/acme-corp.md'],
+    ['notes/loose end', 'concepts/loose-end.md'],
+  ])('files a draft for %s at %s', async (target, expected) => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: `See [[${target}]].`, revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    const article = await openPage('Alpha')
+    fireEvent.click(within(article).getByRole('button', { name: target }))
+
+    expect(pathField().value).toBe(expected)
+  })
+
+  it('derives a new page path from its title until the reader types one', async () => {
+    renderPage(face())
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.newPage }))
+    fireEvent.change(titleField(), { target: { value: 'Attention Span' } })
+    expect(pathField().value).toBe('concepts/attention-span.md')
+
+    fireEvent.change(screen.getByLabelText(en.fieldType), { target: { value: 'entity' } })
+    expect(pathField().value).toBe('entities/attention-span.md')
+
+    fireEvent.change(pathField(), { target: { value: 'entities/custom.md' } })
+    fireEvent.change(titleField(), { target: { value: 'Renamed Page' } })
+    expect(pathField().value).toBe('entities/custom.md')
+    fireEvent.change(screen.getByLabelText(en.fieldType), { target: { value: 'concept' } })
+    expect(pathField().value).toBe('entities/custom.md')
+  })
+
+  it('refuses a new page whose path the vault already holds', async () => {
+    const wikiFace = face()
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.newPage }))
+    fireEvent.change(titleField(), { target: { value: 'Alpha' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    const notice = await screen.findByRole('alert')
+    expect(notice.textContent).toContain(en.pageExists.replace('{path}', 'concepts/alpha.md'))
+    expect(wikiFace.save).not.toHaveBeenCalled()
+  })
+
+  it('reads one cited raw source into a panel beside the page', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: 'Alpha body.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: ['notes/paper.md'],
+      })),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: 'notes/paper.md' }))
+
+    expect(await screen.findByText('The source text.')).toBeTruthy()
+    expect(wikiFace.source).toHaveBeenCalledWith({ path: 'notes/paper.md' })
+  })
+
+  it('toggles the catalog column from the narrow-layout control', async () => {
+    renderPage(face())
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    const toggle = screen.getByRole('button', { name: en.tree })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
 })
+
+/** The editor's path field. */
+function pathField(): HTMLInputElement {
+  const field = screen.getByLabelText(en.fieldPath)
+  if (!(field instanceof HTMLInputElement)) throw new Error('the editor path field is not an input')
+  return field
+}
+
+/** The editor's title field. */
+function titleField(): HTMLInputElement {
+  const field = screen.getByLabelText(en.fieldTitle)
+  if (!(field instanceof HTMLInputElement)) throw new Error('the editor title field is not an input')
+  return field
+}

@@ -2,7 +2,7 @@
  * Browser client for the wiki routes: one typed request per operation, with
  * every response narrowed at this wire boundary before the page renders it.
  * Requests are document-relative so a host mount prefix keeps working.
- * @module @prism-ai/prism-wiki/src/client/api
+ * @module @prism/prism-wiki/src/client/api
  */
 
 import type {
@@ -11,7 +11,7 @@ import type {
 } from '../types.ts'
 import type {
   WikiLintValue, WikiListValue, WikiPagePayload, WikiPageSummary, WikiReadRequest, WikiReadValue, WikiResponse,
-  WikiSaveRequest, WikiSaveValue, WikiSearchRequest, WikiSearchValue,
+  WikiSaveRequest, WikiSaveValue, WikiSearchRequest, WikiSearchValue, WikiSourceRequest, WikiSourceValue,
 } from '../web-contract.ts'
 
 /** Path prefix below `/api` every request of this client addresses. */
@@ -54,6 +54,8 @@ export interface WikiApi {
   readonly search: (request: WikiSearchRequest, signal?: AbortSignal) => Promise<WikiSearchValue>
   /** Create or replace one page, refusing a stale `expectedRevision`. */
   readonly save: (request: WikiSaveRequest, signal?: AbortSignal) => Promise<WikiSaveValue>
+  /** Read a bounded slice of one raw source. */
+  readonly source: (request: WikiSourceRequest, signal?: AbortSignal) => Promise<WikiSourceValue>
   /** Run the vault health pass. */
   readonly lint: (signal?: AbortSignal) => Promise<WikiLintValue>
 }
@@ -131,6 +133,18 @@ function numberField(value: unknown, field: string): number {
 function stringListField(value: unknown, field: string): readonly string[] {
   const read = readField(value, field)
   if (!Array.isArray(read) || !read.every(entry => typeof entry === 'string')) throw invalidResponse(field)
+  return read
+}
+
+/**
+ * Read one required boolean field.
+ * @param value - decoded host value.
+ * @param field - field the operation's value carries.
+ * @returns the field value.
+ */
+function booleanField(value: unknown, field: string): boolean {
+  const read = readField(value, field)
+  if (typeof read !== 'boolean') throw invalidResponse(field)
   return read
 }
 
@@ -334,6 +348,14 @@ export function createWikiApi(doFetch: typeof fetch = (input, init) => globalThi
     async save(request, signal) {
       const value = await postJson('save', request, signal)
       return { page: readPayload(readField(value, 'page')) }
+    },
+    async source(request, signal) {
+      const value = await postJson('source', request, signal)
+      return {
+        path: stringField(value, 'path'),
+        text: stringField(value, 'text'),
+        truncated: booleanField(value, 'truncated'),
+      }
     },
     async lint(signal) {
       const value = await postJson('lint', {}, signal)

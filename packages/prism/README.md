@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The prism group owns product packages that extend DeepSeek Harness without taking the upstream DSH package namespace. `@prism-ai/prism-wiki` maintains a persistent knowledge vault of interlinked markdown pages, where the model reads raw sources and writes pages while the package performs only the mechanical work, and it contributes the Knowledge page to the [Web Client](../../docs/subsystems/web-client.md) through its `./web` and `./client` halves.
+The prism group owns product packages that extend DeepSeek Harness without taking the upstream DSH package namespace. `@prism/prism-wiki` maintains a persistent knowledge vault of interlinked markdown pages, where the model reads raw sources and writes pages while the package performs only the mechanical work, and it contributes the Knowledge page to the [Web Client](../../docs/subsystems/web-client.md) through its `./web` and `./client` halves.
 
 ## Table of Contents
 
@@ -33,6 +33,6 @@ The prism group owns product packages that extend DeepSeek Harness without takin
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-Prism owns packages in this group. Their package scope is `@prism-ai`; they may depend on DSH capabilities but do not claim the DSH package namespace.
+Prism owns packages in this group. A Prism package claims the `@prism` scope and may depend on DSH capabilities without taking the DSH package namespace.
 
 </details>

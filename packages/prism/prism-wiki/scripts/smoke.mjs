@@ -73,7 +73,7 @@ const patch = read('cordis.patch.yml')
 for (const id of ['prism-wiki', 'tool-prism-wiki', 'command-prism-wiki', 'web-prism-wiki']) {
   assert.match(patch, new RegExp(`id: ${id}\\b`, 'u'), `cordis.patch.yml must insert the ${id} row`)
 }
-assert.match(patch, /name: '@prism-ai\/prism-wiki'/u, 'the service row must name the package')
+assert.match(patch, /name: '@prism\/prism-wiki'/u, 'the service row must name the package')
 assert.doesNotMatch(patch, /(?<!!)!js\b/u, 'only !!js is legal under plugin config')
 
 console.log('prism-wiki smoke: ok')

@@ -9,7 +9,7 @@ kind: "package-group"
 
 ## Summary
 
-prism 组拥有扩展 DeepSeek Harness 的产品包，但不占用上游 DSH 包命名空间。`@prism-ai/prism-wiki` 维护一个由互链 Markdown 页面构成的持久知识库：模型负责读原始来源、写页面，而该包只承担机械性的工作；它通过 `./web` 与 `./client` 两个半侧向[Web 客户端](../../docs/subsystems/web-client.zh.md)贡献知识库页面。
+prism 组拥有扩展 DeepSeek Harness 的产品包，但不占用上游 DSH 包命名空间。`@prism/prism-wiki` 维护一个由互链 Markdown 页面构成的持久知识库：模型负责读原始来源、写页面，而该包只承担机械性的工作；它通过 `./web` 与 `./client` 两个半侧向[Web 客户端](../../docs/subsystems/web-client.zh.md)贡献知识库页面。
 
 ## Table of Contents
 
@@ -33,6 +33,6 @@ prism 组拥有扩展 DeepSeek Harness 的产品包，但不占用上游 DSH 包
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-Prism 拥有该组中的包。它们使用 `@prism-ai` 包作用域，可以依赖 DSH 能力，但不占用 DSH 包命名空间。
+Prism 拥有该组中的包。Prism 包使用 `@prism` 作用域，可以依赖 DSH 能力，但不占用 DSH 包命名空间。
 
 </details>

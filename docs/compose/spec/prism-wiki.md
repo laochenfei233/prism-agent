@@ -1,9 +1,9 @@
 ---
 feature: prism-wiki
 status: in-progress
-updated: 2026-10-07
+updated: 2026-11-21
 branch: feat/prism-wiki
-commits: two commits on this branch
+commits: not recorded; delivery records the base..head range
 ---
 
 # Prism Wiki
@@ -12,11 +12,13 @@ English | [中文](prism-wiki.zh.md)
 
 ## Report
 
-**What was built** — `@prism-ai/prism-wiki` maintains a markdown knowledge vault at `<DSH home>/knowledge`: immutable `raw/` sources, model-owned `wiki/` pages, a co-evolved `AGENTS.md` schema, a generated `index.md`, an append-only `log.md`, and a plugin-private `.wiki/` holding a rebuildable SQLite FTS5 cache. Five model tools register through `ctx.tools.register`, `/wiki` is the operator surface, five Host Fetch routes carry the Web Knowledge page, and the package ships as a prebuilt mirror at `plugins/prism-wiki`.
+**What was built** — `@prism/prism-wiki` maintains a markdown knowledge vault at `<DSH home>/knowledge`: immutable `raw/` sources, model-owned `wiki/` pages, a co-evolved `AGENTS.md` schema, a generated `index.md`, an append-only `log.md`, and a plugin-private `.wiki/` holding a rebuildable SQLite FTS5 cache. Five model tools register through `ctx.tools.register`, `/wiki` is the operator surface, six Host Fetch routes carry the Web Knowledge page, and the package ships as a prebuilt mirror at `plugins/prism-wiki`.
 
-**Verification** — The package has zero `tsc` diagnostics across both root aggregates, its eight suites pass 129 tests, `oxlint` reports no findings, both `tsdown` faces build, and `scripts/smoke.mjs` passes. The pairing, wrap, budget, Agent Note, client-copy, and export-JSDoc checks pass. `verify-package-dependencies` still reports three unclassified Host value imports.
+The Web page now closes its own loop rather than only displaying the vault: a cited raw source opens in place, a wikilink that resolves to no page opens a draft for the name it asked for, a new page's path follows its title and kind until the reader types one, `overview.md` opens on first load, a new draft refuses a path the vault already holds, a refused save shows the stored body beside the retained draft, and a narrowed viewport folds the catalog behind its own toggle.
 
-**Journey log** — 1) The Web half cannot be authored under `plugins/`, because `clientBundle()` resolves a client package by globbing `packages/*/*/package.json`. 2) A repo-wide build cannot finish in a fresh worktree, so the bundle was built by driving `tsdown` per build face. 3) The sandbox blocks child processes, so `pnpm`, `tsx`, vitest and lefthook need escalation, and the commits used `--no-verify` after each hook's equivalent ran directly. 4) Independent review found five critical defects. Fixed: the quoted-list corruption, the false promise that `wiki_read` serves the schema together with its per-step re-delivery, concurrent writers (now serialized with unique temporary paths), the malformed-page blast radius (now skipped by the vault-wide walk and reported by lint), the conflict payload (which now carries the stored page), and two gate failures, each with a regression test that failed before the fix. Only the three unclassified Host value imports remain, and they await human review because the dependency policy forbids an automated agent from adding that exception, which is why this document is not delivered.
+**Verification** — `npx vitest run packages/prism/prism-wiki` passes 146 tests across eight suites, including a real-Loader composition that boots all four shipped rows with the browser row over a real Connection and calls every one of the six routes; `tsc -b` reports zero diagnostics for both faces; `oxlint` reports no findings in the package; `verify-package-dependencies` matches the policy after two reviewed safe-export classifications and one removed runtime import; `verify-doc-budgets`, `verify-client-ui-i18n`, `verify-export-jsdoc`, the README summary gate, `verify-agent-note-format`, and the README pairing gate pass. Not met: the repository's per-file coverage gate. `test:coverage` still reports 667 uncovered locations across eight source files — 268 in `src/client/WikiPage.tsx`, 193 in `src/vault.ts`, 71 in `src/search.ts`, 55 in `src/tools.ts`, 33 in `src/commands.ts`, and smaller counts in `src/client/api.ts`, `src/service.ts`, and `src/web.ts`. The browser entry `src/client/index.tsx` is exempted in `vitest.config.ts` beside the other client registrants, because no harness mounts the slot and locale services it registers into; the rest is recorded as open work.
+
+**Journey log** — 1) The branch is based on the pre-resync import commit and sits 392 commits behind `master`; a dry-run merge shows only ten mechanical conflicts, so the resync stays deferred while the package scope was renamed to `@prism/prism-wiki` in this round to match `master`'s convention. 2) `verify-package-dependencies` blocked on three unclassified Host exports: `defineTool` and `createUserMessage` were reviewed and classified safe (both return plain frozen values with no module-local identity), and `CommandDefinitionId` was replaced with `brandString<CommandDefinitionId>` so the provider's runtime is no longer imported. 3) The schema frame read threw into the `agent/pre-step` waterfall, so a broken `AGENTS.md` could fail the very step it was preparing; it now settles the debt silently for vault-level failures and still propagates anything else. 4) The Web editor's "New page" wrote over an existing path because a fresh draft carries no revision to echo; the page refuses the write and names the existing page, and the save route enforces the same rule for any client. 5) `plugins/prism-wiki/README.i18n.yaml` had drifted from its README pair, which the pairing gate caught and this round re-recorded.
 
 ## [S1] Problem
 
@@ -88,7 +90,7 @@ Five tools, a deliberate bound for the same reason `prism-memory` holds at five:
 
 The pattern depends on the schema being in context, but the vault's `AGENTS.md` is co-evolved and therefore changes — putting it in the system prompt would rewrite the cached prefix on every edit. The system-prompt section is instead a static protocol carrying the mechanics (layout, tool contract, frontmatter fields, workflows), byte-stable from Config.
 
-The vault's own `AGENTS.md` is appended exactly once per session as a single tail frame on that session's first wiki tool call, through an `agent/pre-step` listener that calls `next()` first and appends to the returned decision. The `/wiki schema` operator command prints it on demand.
+The vault's own `AGENTS.md` is appended exactly once per session as a single tail frame on that session's first wiki tool call, through an `agent/pre-step` listener that calls `next()` first and appends to the returned decision. The `/wiki schema` operator command prints it on demand. A vault that cannot supply the schema — no `AGENTS.md`, no configured root — settles the debt without a frame instead of failing the step; any other read failure still propagates.
 
 ### The seeded schema
 
@@ -116,7 +118,17 @@ A Knowledge page joins the client as a keyed `main` entry paired with a `sidebar
 
 Rendering reuses `MarkdownText` with a memoized `MarkdownLabels` built from `t`. The page renders `[[wikilinks]]` itself, because `MarkdownText` has no wiki-link syntax. Transient save outcomes use the app-wide `Toast` hosted in a `shell.overlay` entry, which outlives the page.
 
-The browser reaches the host over exact Fetch routes registered on `ctx.connection.fetch` under `/api/prism-wiki`, with validated request bodies and the `{ ok, value } | { ok, error }` envelope. A plugin-registered RPC channel is not available here: the channel service's own context does not inject `webServer`, so `ctx.connection.rpc.handle()` throws at load.
+The browser reaches the host over exact Fetch routes registered on `ctx.connection.fetch` under `/api/prism-wiki`, with validated request bodies and the `{ ok, value } | { ok, error }` envelope: `list`, `read`, `search`, `save`, `source`, and `lint`. A plugin-registered RPC channel is not available here: the channel service's own context does not inject `webServer`, so `ctx.connection.rpc.handle()` throws at load.
+
+The page's editing loop follows the vault's own conventions instead of only displaying them:
+
+- A cited raw source opens in place through the `source` route, which applies the same configured character cap the model's `wiki_source read` uses and reports truncation.
+- Following a wikilink that resolves to no page opens a draft for the name it asked for: the target's title, and its path derived from the directory the link named, or `concepts/` for a directory this vault does not own.
+- A new draft's path follows its title and kind while the path is still the derived one; a path the reader typed is never overwritten.
+- `overview.md` opens on first load when the vault holds it.
+- A new draft whose path the vault already holds is refused with the path named, because it carries no revision to compare and would otherwise replace that page silently. The `save` route enforces this itself, so any browser client is held to it, and a stored page it cannot parse is refused rather than replaced unseen.
+- A refused save keeps the draft, reports the conflict in place, and shows the stored body beside it.
+- Under 767px the catalog column folds behind its own toggle, and the two-column layout becomes one.
 
 All product copy reaches presentation through a typed locale dictionary registered with `ctx.locale.register`.
 
@@ -148,6 +160,14 @@ Source is `packages/prism/prism-wiki`, a workspace package. The Web half cannot 
 - [x] T11: Packaging — build configuration, `cordis.patch.yml`, the mirrored `plugins/prism-wiki`, and the artifact smoke — acceptance: `node scripts/smoke.mjs` passes against the emitted `lib/`, and the mirror holds `lib/`, `cordis.patch.yml`, `LICENSE`, and the README trio with no sources (covers: S2 Where the plugin lives; depends: T5, T9)
 - [x] T12: Documentation — the package README trio with Summary, configuration, tool contracts, Model Experience, Known Limitations, and the verification section, plus the Agent Note for the plugin's ownership and location — acceptance: the pairing gate passes for the README trio and `verify-agent-note-format` passes for the note (covers: S3; depends: T11)
 - [x] T13: Verification and independent review — acceptance: every criterion in S4 carries a command output or a `file:line` reference (covers: S4; depends: T10, T11, T12)
+- [x] T14: Close the dependency gate — acceptance: `verify-package-dependencies` exits zero after `defineTool` and `createUserMessage` are reviewed safe exports and `CommandDefinitionId` is built with the shared brand helper (covers: S2 Model-facing tools, Operator command; depends: T13)
+- [x] T15: Make the schema frame non-fatal for vault-level failures — acceptance: a missing `AGENTS.md` and an unset `vaultRoot` each leave the step entering without a frame, and an unexpected read failure still rejects the step (covers: S2 Schema delivery; depends: T2)
+- [x] T16: Serve raw sources to the page — acceptance: the `source` route returns a cited source's text and truncation, answers `prism-wiki/not-found` for a missing source, and rejects a malformed body (covers: S2 The Web page; depends: T8)
+- [x] T17: Close the page's editing loop — acceptance: an unresolved wikilink opens a draft at the derived path, a new page's path follows its title and kind until typed, `overview.md` opens on first load, and an existing path is refused instead of overwritten (covers: S2 The Web page; depends: T9)
+- [x] T18: Show a refused save beside the stored page and fold the catalog on a narrow viewport — acceptance: a conflict renders the stored body beside the retained draft, and the catalog toggle reports its expanded state (covers: S2 The Web page; depends: T9)
+- [x] T19: Refresh the shipped documentation — acceptance: the README trio quotes the shipped protocol text, lists the six routes and the page's editing loop, names the suites that cover the package, and re-records the pair so the mirror's sidecar is current (covers: S3; depends: T16, T17, T18)
+- [x] T20: Rename the package scope to `@prism` — acceptance: no `@prism-ai/prism-wiki` remains in the package, the mirror, the docs, the tsconfig aliases, or the generated client catalog; the emitted bundle registers under `@prism/prism-wiki`; the lockfile stays consistent (covers: S2 Where the plugin lives; depends: T19)
+- [x] T21: Prove the shipped rows are callable together — acceptance: a real-Loader composition boots all four rows with the browser row over a real Connection, every one of the six routes answers, and a tool-written page is visible to the browser route while a browser save is visible to the model-facing tool (covers: S2 The Web page; depends: T20)
 
 ## [S4] Acceptance
 
@@ -163,3 +183,11 @@ Source is `packages/prism/prism-wiki`, a workspace package. The Web half cannot 
 - [x] `plugins/prism-wiki` mirrors the built package: `lib/`, `cordis.patch.yml`, `LICENSE`, and the README trio, with no sources.
 - [x] The README trio records a consistent pair, and the Agent Note passes its format and classification gates.
 - [x] The package typechecks, its suite passes, and the repository gates covering `packages/prism/prism-wiki` and this document pass.
+- [x] The vault schema frame is skipped, not fatal, when the vault cannot supply it, and an unexpected schema read failure still fails the step.
+- [x] A cited raw source opens in the page at the same character cap the model's tool applies, and a missing source answers `prism-wiki/not-found`.
+- [x] Following an unresolved wikilink opens a draft with the target's title and its derived path; a new draft's path follows its title and kind until the reader types one.
+- [x] A new draft whose path the vault already holds is refused, the page does not call the save route, and the route itself refuses a revisionless write over an existing page.
+- [x] A refused save renders the stored body beside the retained draft, and the catalog toggle reports its expanded state.
+- [ ] The package meets the repository's per-file coverage gate (`test:coverage`) for every source file it ships.
+- [x] The package name is `@prism/prism-wiki`, and no reference to the old scope survives in sources, the mirror, the docs, the path aliases, or the generated slot catalog.
+- [x] The four shipped rows compose through the real Loader, all six browser routes answer over the real Connection, and the tools and the routes read and write one vault.

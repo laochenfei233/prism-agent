@@ -1,5 +1,5 @@
 /**
- * Behaviour of the wiki browser routes: the five exact Fetch routes the
+ * Behaviour of the wiki browser routes: the six exact Fetch routes the
  * Knowledge page calls, dispatched through the real Connection registry against
  * a real vault on disk, together with the request validation each route owns.
  */
@@ -17,7 +17,7 @@ import * as web from '../src/web.ts'
 import type { WikiFrontmatter, WikiPagePath, WikiSourcePath } from '../src/types.ts'
 
 /** Every route this plugin owns, named as its endpoint below `/api/prism-wiki`. */
-const ROUTES = ['list', 'read', 'search', 'save', 'lint'] as const
+const ROUTES = ['list', 'read', 'search', 'save', 'source', 'lint'] as const
 
 /** The browser-session signing secret Connection stores on its first activation. */
 const BROWSER_SESSION_SECRET = Buffer.alloc(32, 7).toString('base64url')
@@ -240,6 +240,64 @@ describe('wiki browser routes', () => {
     expect(page.body).toContain('Rewritten body')
     expect(page.frontmatter).toMatchObject({ title: 'Alpha', updated: '2026-10-08' })
     expect(await readFile(join(root, 'wiki', 'concepts', 'alpha.md'), 'utf8')).toContain('Rewritten body')
+  })
+
+  it('reads a cited raw source and reports where the bound cut it', async () => {
+    const h = await webHarness(root)
+
+    const slice = value(await h.post('source', json({ path: 'notes/paper.md' })))
+    expect(slice).toEqual({ path: 'notes/paper.md', text: 'The source text.\n', truncated: false })
+
+    const bounded = value(await h.post('source', json({ path: 'raw/notes/paper.md', maxChars: 4 })))
+    expect(bounded).toEqual({ path: 'raw/notes/paper.md', text: 'The ', truncated: true })
+  })
+
+  it('reports a raw source that does not exist and one whose body fails the schema', async () => {
+    const h = await webHarness(root)
+
+    expect(failure(await h.post('source', json({ path: 'notes/ghost.md' })))).toBe('prism-wiki/not-found')
+    expect(failure(await h.post('source', json({ path: '' })))).toBe('prism-wiki/invalid-request')
+    expect(failure(await h.post('source', json({ path: 'notes/paper.md', maxChars: 0 }))))
+      .toBe('prism-wiki/invalid-request')
+  })
+
+  it('refuses a browser creation over an existing page and leaves it unchanged', async () => {
+    const h = await webHarness(root)
+    const before = await readFile(join(root, 'wiki', 'concepts', 'alpha.md'), 'utf8')
+
+    const refused = await h.post('save', json({
+      path: 'concepts/alpha.md',
+      frontmatter: { title: 'Replacement', type: 'concept', tags: [], updated: '2026-10-08', status: 'current' },
+      body: 'Replaced without a revision.\n',
+    }))
+
+    expect(refused.body).toMatchObject({
+      error: { code: 'prism-wiki/revision-conflict', current: { path: 'concepts/alpha.md' } },
+    })
+    expect(JSON.stringify(refused.body)).toContain('Alpha carries the needle')
+    expect(await readFile(join(root, 'wiki', 'concepts', 'alpha.md'), 'utf8')).toBe(before)
+  })
+
+  it('creates a page that does not exist yet without a revision, and refuses one whose stored copy cannot be parsed', async () => {
+    const h = await webHarness(root)
+
+    const created = value(await h.post('save', json({
+      path: 'concepts/gamma.md',
+      frontmatter: { title: 'Gamma', type: 'concept', tags: [], updated: '2026-10-08', status: 'current' },
+      body: 'Gamma body.\n',
+    })))
+    expect((created.page as { path: string }).path).toBe('concepts/gamma.md')
+
+    await writeFile(
+      join(root, 'wiki', 'concepts', 'broken.md'),
+      '---\ntitle: Broken\ntype: concept\ntags: [x]\n---\n\nBody.\n',
+      'utf8',
+    )
+    expect(failure(await h.post('save', json({
+      path: 'concepts/broken.md',
+      frontmatter: { title: 'Repaired', type: 'concept', tags: [], updated: '2026-10-08', status: 'current' },
+      body: 'Repaired body.\n',
+    })))).toBe('prism-wiki/revision-conflict')
   })
 
   it('answers the vault health report', async () => {

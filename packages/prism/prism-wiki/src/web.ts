@@ -21,7 +21,7 @@
  * it also keeps the row pending — rather than failing — in a profile that
  * composes no web server, which is the same profile that composes no browser
  * Connection.
- * @module @prism-ai/prism-wiki/web
+ * @module @prism/prism-wiki/web
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,11 +31,11 @@ import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-client-connection'
 // Type-only: activates the `ctx.webServer` Context merge this row declares.
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { WikiVaultError, brandPagePath } from './service.ts'
-import type { WikiPage, WikiPageDraft, WikiPageStatus, WikiPageType, WikiSearchFilter } from './types.ts'
+import { WikiVaultError, brandPagePath, brandSourcePath } from './service.ts'
+import type { WikiPage, WikiPageDraft, WikiPagePath, WikiPageStatus, WikiPageType, WikiSearchFilter } from './types.ts'
 import type {
   WikiLintValue, WikiListValue, WikiPagePayload, WikiPageSummary, WikiReadValue, WikiResponse,
-  WikiSaveValue, WikiSearchValue,
+  WikiSaveValue, WikiSearchValue, WikiSourceValue,
 } from './web-contract.ts'
 
 /** Plugin name the Cordis loader reports for this row. */
@@ -105,6 +105,45 @@ const searchBody = z.object({
   limit: z.number().int().min(1).optional(),
 })
 
+/** One JSON body carrying a raw-source read; the deployment's character cap still applies. */
+const sourceBody = z.object({
+  path: z.string().min(1),
+  maxChars: z.number().int().min(1).optional(),
+})
+
+/**
+ * Refuse a browser write that carries no revision while the vault already holds
+ * the page. A browser draft without a revision is a creation, so the page it
+ * would replace is reported back instead of overwritten; a stored page that
+ * cannot be parsed is still refused, with no page to compare.
+ * @param ctx - Registrant context carrying the vault service.
+ * @param path - The page the save addresses.
+ * @returns Nothing, when the path is free or the caller sent a revision.
+ * @throws WikiVaultError with code `WIKI_REVISION_CONFLICT` when the page exists.
+ */
+async function refuseOverwrite(ctx: Context, path: WikiPagePath): Promise<void> {
+  let stored: WikiPage
+  try {
+    stored = (await ctx.wikiVault.read(path)).page
+  } catch (error) {
+    if (error instanceof WikiVaultError && error.code === 'WIKI_PAGE_NOT_FOUND') return
+    // An unparsable stored page cannot be compared, but it must not be replaced
+    // by a write that never saw it.
+    if (error instanceof WikiVaultError && error.code === 'WIKI_FRONTMATTER_INVALID') {
+      throw new WikiVaultError(
+        `page "${path}" exists but its frontmatter cannot be parsed, so this save would replace it unseen`,
+        'WIKI_REVISION_CONFLICT',
+      )
+    }
+    throw error
+  }
+  throw new WikiVaultError(
+    `page "${path}" already exists: load it and save with its revision to replace it`,
+    'WIKI_REVISION_CONFLICT',
+    stored,
+  )
+}
+
 /**
  * Register every browser route on Connection's shared Fetch registry.
  * @param ctx - Registrant context carrying `ctx.wikiVault` and `ctx.connection`.
@@ -173,14 +212,23 @@ export function apply(ctx: Context): void {
 
   route('save', `${BASE}/save`, json(async (body) => {
     const parsed = saveBody.parse(body)
+    const path = brandPagePath(parsed.path)
+    if (parsed.expectedRevision === undefined) await refuseOverwrite(ctx, path)
     const draft: WikiPageDraft = {
-      path: brandPagePath(parsed.path),
+      path,
       frontmatter: parsed.frontmatter,
       body: parsed.body,
       ...(parsed.expectedRevision === undefined ? {} : { expectedRevision: parsed.expectedRevision }),
     }
     const page = await ctx.wikiVault.write(draft)
     const value: WikiSaveValue = { page: pagePayload(page) }
+    return ok(value)
+  }))
+
+  route('source', `${BASE}/source`, json(async (body) => {
+    const parsed = sourceBody.parse(body)
+    const slice = await ctx.wikiVault.readSource(brandSourcePath(parsed.path), parsed.maxChars)
+    const value: WikiSourceValue = { path: parsed.path, text: slice.text, truncated: slice.truncated }
     return ok(value)
   }))
 
@@ -240,7 +288,9 @@ function failureOf(error: unknown): Response {
         current === undefined ? undefined : pagePayload(current),
       )
     }
-    if (error.code === 'WIKI_PAGE_NOT_FOUND') return fail('prism-wiki/not-found', error.message)
+    if (error.code === 'WIKI_PAGE_NOT_FOUND' || error.code === 'WIKI_SOURCE_NOT_FOUND') {
+      return fail('prism-wiki/not-found', error.message)
+    }
     return fail('prism-wiki/failed', error.message)
   }
   return fail('prism-wiki/failed', reasonOf(error))

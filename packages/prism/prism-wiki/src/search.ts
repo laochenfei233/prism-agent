@@ -6,7 +6,7 @@
  * unusable is replaced instead of reported. `node:sqlite` is imported on first
  * use so a process that never searches never loads it.
  *
- * @module @prism-ai/prism-wiki/search
+ * @module @prism/prism-wiki/search
  */
 
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
