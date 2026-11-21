@@ -33,6 +33,20 @@ After the resync, `@prism/prism-wiki` reports **660 uncovered locations across e
 
 These are not missing features. Every suite drives its feature's main path; what is uncovered is the second and third branch of code that already ships: a parser's rejected spellings, an error class that only a hostile file produces, a route's unexpected-failure mapping, an optional argument's absent arm, and the page states a reader reaches by choosing another tab or clearing a filter. The package's README records the debt, and its earlier rounds even claimed the tool, command, route, and browser halves had no direct specs.
 
+### What the resync changed here
+
+The counts above are measured on the resynced branch (`a91055e561` and its follow-ups), not on the pre-resync tree:
+
+- `src/tools.ts` fell from 55 to 48 uncovered locations. Single-call execution now goes through the composed executor seam and the tool testkit, so every suite exercises the tool wrapper's dispatch path instead of only its handler.
+- `src/client/index.tsx` keeps its recorded exemption: the merge preserved the `vitest.config.ts` line, and no harness yet mounts the slot and locale services that entry registers into.
+- Three modules (`src/types.ts`, `src/web-contract.ts`, `src/index.ts`) appear in the report at 0% but carry no executable statements after erasure — type declarations and re-exports — so the threshold check does not name them. Only the eight files in the table are gated.
+
+### Repository state this plan does not own
+
+After the resync the repository carries failures this package did not cause, and they will stay red while the coverage work proceeds: `verify-package-dependencies` reports unclassified Host exports in `packages/transfer/prism-transfer`; several bilingual records still use the pre-resync two-hash format (`docs/compose/specs/http-asr-provider`, the `meeting-minutes-*` family, `docs/subsystems/meetings`), and `docs/tool-catalog.zh.md` trails its English headings. The evidence for this plan is therefore the package's own measurement plus "no `packages/prism/prism-wiki` file is named", not a green repository-wide run.
+
+Verification also starts from a clean tree: `pnpm run clean` must run first, because stale `lib/` output under orphan package directories made the repository-level typecheck fail before the resync and can make a suite read a built artifact instead of the source plane.
+
 ## [S2] Design
 
 ### The rules this plan holds to
@@ -41,6 +55,16 @@ These are not missing features. Every suite drives its feature's main path; what
 2. **Delete an unreachable branch instead of testing it.** A branch that cannot run for a reason the type system enforces (an impossible state behind a typed boundary) is removed. Validation at a trust boundary — queued input, model/tool JSON, files on disk, wire bodies — stays and gains a test.
 3. **An exemption carries a reason.** A file may leave the gate only with a comment in `vitest.config.ts` and a line in the package README. The one current exemption is the browser registrant `src/client/index.tsx`, because no harness mounts the slot and locale services it registers into.
 4. **No behaviour change.** Shipped code changes only by deleting a dead branch, or by fixing a defect a new test exposes; a fix lands as its own commit with a regression test.
+
+### The resynced harness every new test must use
+
+The resync rewrote the seams the suites drive. A new test that reaches for the pre-resync shape will not compile or will bypass the code it means to exercise:
+
+- **Tools dispatch as a batch through the composed executor.** The fixtures mount `@deepseek-ai/dsh-tool-executor-native` and send one call through `executeModelToolFixture` from `@deepseek-ai/dsh-tool-testkit`; a bare `ctx.tools.execute({ name, arguments, … })` is no longer the contract.
+- **An `Agent` carries its durable model choice.** The fixture agent supplies `model: { current, select }`, and the proposed step passes `modelSelection`, which `agent/pre-step` now requires.
+- **A root-scope client component receives four more standard seats** — `useRemoteAccess`, `useSessionAccess`, `useContextMenu`, and `useWorkspaceAccess` — alongside the seats the page fixture already stubs.
+- **Route suites use a recording connection registry** (`ctx.provide('connection', { fetch: { register } })` plus a `webServer` stub) and dispatch through the recorded route; only the real-composition suite composes a real WebServer and the real Connection, and it must pass `connection.browserPeer` because exact routes now require an owner peer.
+- **The browser build preset takes the package directory** (`clientBundle(import.meta.dirname, …)`). A test that reaches built output, or the third-party-notices scan, fails before the package loads if this regresses.
 
 ### What each file's missing tests drive
 
@@ -78,7 +102,8 @@ Cheapest first, so the gate's remaining surface shrinks with every commit: `clie
 ## [S4] Acceptance
 
 - [ ] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` exits zero, with every file at 100% statements, branches, functions, and lines except the recorded browser-registrant exemption.
-- [ ] `pnpm run check:ci:coverage` reports no `packages/prism/prism-wiki` file.
+- [ ] `pnpm run check:ci:coverage` reports no `packages/prism/prism-wiki` file. A red run caused by another package — the resynced tree already carries `prism-transfer` dependency-gate findings and stale bilingual records — is recorded as such, not treated as this plan's failure.
+- [ ] The measurement is taken after `pnpm run clean`, so no stale `lib/` output or orphan package residue can shadow the source plane.
 - [ ] No test-only production API was added and no new `as unknown` assertion appears.
 - [ ] Every existing test still passes unchanged, or its change is explained in the commit that changes it.
 - [ ] The package README's coverage note states the measured result instead of the debt.

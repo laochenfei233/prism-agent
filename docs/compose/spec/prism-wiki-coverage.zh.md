@@ -33,6 +33,20 @@ resync 之后，`@prism/prism-wiki` 报告 **八个源文件、660 处未覆盖*
 
 这些不是缺失的功能。每个套件都驱动了各自功能的主路径；未覆盖的是已经在发布的代码里的第二、第三条分支：解析器拒绝的写法、只有异常文件才会产生的错误类、路由对意外失败的映射、可选参数缺失的那一侧，以及读者切换标签页或清空筛选后才会到达的页面状态。包的 README 记录了这笔欠账，早先版本甚至声称工具、命令、路由与浏览器四半没有直接 spec。
 
+### resync 带来的变化
+
+上表是在 resync 后的分支（`a91055e561` 及其后续提交）上测得的，不是 resync 前那棵树：
+
+- `src/tools.ts` 从 55 处降到 48 处。单次调用现在经组合的执行器 seam 与工具 testkit 派发，因此每个套件都会走过工具包装器的派发路径，而不只是它的处理函数。
+- `src/client/index.tsx` 保留了已记录的豁免：合并保住了 `vitest.config.ts` 的豁免行，而目前仍没有 harness 挂载该入口注册所用的 slot 与 locale 服务。
+- 三个模块（`src/types.ts`、`src/web-contract.ts`、`src/index.ts`）在报告里显示 0%，但擦除后没有可执行语句——类型声明与 re-export——因此阈值检查不会点它们。真正被卡的只有表里的八个文件。
+
+### 本计划不负责的仓库状态
+
+resync 之后仓库里带着本包未曾造成的失败，它们会在覆盖率工作推进期间持续为红：`verify-package-dependencies` 在 `packages/transfer/prism-transfer` 报告未分类的宿主导出；多处双语文档记录仍是 resync 前的两哈希格式（`docs/compose/specs/http-asr-provider`、`meeting-minutes-*` 系列、`docs/subsystems/meetings`）；`docs/tool-catalog.zh.md` 的标题落后于英文版。因此本计划的证据是包自身的测量加「没有任何 `packages/prism/prism-wiki` 文件被点名」，而不是一次全仓库通过。
+
+验证还要从干净的树开始：必须先跑 `pnpm run clean`，因为孤儿包目录下的陈旧 `lib/` 产物在 resync 之前就让仓库级 typecheck 失败过，也可能让套件读到构建产物而不是源码面。
+
 ## [S2] Design
 
 ### 本计划遵守的规则
@@ -41,6 +55,16 @@ resync 之后，`@prism/prism-wiki` 报告 **八个源文件、660 处未覆盖*
 2. **删掉跑不到的分支，而不是为它写测试。** 类型系统已排除的状态（类型边界后的不可能状态）直接从代码里删除。信任边界上的校验——排队输入、模型/工具 JSON、磁盘文件、线上请求体——保留并补测试。
 3. **豁免必须带理由。** 文件要离开闸门，需在 `vitest.config.ts` 里写明理由，并在包 README 里记一行。目前唯一的豁免是浏览器入口 `src/client/index.tsx`，因为还没有 harness 挂载它注册所用的 slot 与 locale 服务。
 4. **不改变行为。** 已发布代码只因删除死分支而变，或因为新测试暴露的缺陷而修；修复独立成一次提交并带回归测试。
+
+### resync 之后每个新测试必须使用的夹具
+
+resync 重写了套件驱动的 seam。沿用 resync 前形状的新测试要么编译不过，要么绕过了它想覆盖的代码：
+
+- **工具经组合的执行器按 batch 派发。** 夹具挂 `@deepseek-ai/dsh-tool-executor-native`，单次调用经 `@deepseek-ai/dsh-tool-testkit` 的 `executeModelToolFixture` 发出；裸用 `ctx.tools.execute({ name, arguments, … })` 已不是契约。
+- **`Agent` 自带持久模型选择。** 夹具 agent 提供 `model: { current, select }`，提出的步骤带上 `modelSelection`——`agent/pre-step` 现在要求它。
+- **根级客户端组件多收到四个标准 seat**——`useRemoteAccess`、`useSessionAccess`、`useContextMenu`、`useWorkspaceAccess`——与页面夹具已有的那些并列。
+- **路由套件用 recording connection registry**（`ctx.provide('connection', { fetch: { register } })` 加 `webServer` 桩）并经记录下来的路由派发；只有真实组合套件组合真 WebServer 与真 Connection，且必须传 `connection.browserPeer`，因为 exact route 现在要求 owner peer。
+- **浏览器构建 preset 收的是包目录**（`clientBundle(import.meta.dirname, …)`）。让它回退会让读构建产物的测试或 third-party notices 扫描在加载包之前就失败。
 
 ### 每个文件缺的测试驱动什么
 
@@ -78,7 +102,8 @@ resync 之后，`@prism/prism-wiki` 报告 **八个源文件、660 处未覆盖*
 ## [S4] Acceptance
 
 - [ ] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出，除已记录的浏览器入口豁免外，每个文件的 statements、branches、functions、lines 均为 100%。
-- [ ] `pnpm run check:ci:coverage` 不再报告任何 `packages/prism/prism-wiki` 文件。
+- [ ] `pnpm run check:ci:coverage` 不再报告任何 `packages/prism/prism-wiki` 文件。由其他包导致的红——resync 后的树已带有 `prism-transfer` 的依赖门禁发现与过期的双语记录——只记为既有状态，不算本计划的失败。
+- [ ] 测量在 `pnpm run clean` 之后进行，陈旧 `lib/` 产物或孤儿包残骸不得遮蔽源码面。
 - [ ] 没有新增只给测试用的生产 API，也没有新增 `as unknown` 断言。
 - [ ] 所有既有测试保持不变并通过；若修改，改动在对应提交中说明。
 - [ ] 包 README 的覆盖率说明从欠账改为实测结果。
