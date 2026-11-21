@@ -101,6 +101,18 @@ export interface UiWorkspace {
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
   /**
+   * Archive a Workspace from grouping surfaces; its record, order, and
+   * accounting stay untouched.
+   * @param workspaceId - Workspace to archive.
+   */
+  archiveWorkspace(workspaceId: WorkspaceId): Promise<void>
+  /**
+   * Restore an archived Workspace to grouping surfaces with its recorded
+   * title, order, and Sessions.
+   * @param workspaceId - Workspace to restore.
+   */
+  unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void>
+  /**
    * Pin a Session on the Host, then lead it in its accounts' saved orders
    * (its Workspace group or Ungrouped, and the flat list). The order write
    * reads the memberships current at completion, so reorders that landed
@@ -386,6 +398,14 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   async unarchiveSession(sessionId: SessionId): Promise<void> {
     await this.workspaces.unarchiveSession(sessionId)
+  }
+
+  async archiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    await this.workspaces.archiveWorkspace(workspaceId)
+  }
+
+  async unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    await this.workspaces.unarchiveWorkspace(workspaceId)
   }
 
   async pinSession(sessionId: SessionId): Promise<void> {
