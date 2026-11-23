@@ -1,9 +1,9 @@
 ---
 feature: pocket-lan-bind
-status: designed
+status: delivered
 updated: 2026-11-24
 branch: feat/pocket-lan-bind (worktree .worktrees/pocket-lan-bind)
-commits: 26b7c472a5..
+commits: 26b7c472a5..daa351655c
 ---
 
 # Pocket LAN Bind Action
@@ -11,6 +11,17 @@ commits: 26b7c472a5..
 English | [中文](pocket-lan-bind.zh.md)
 
 ## Report
+
+**What was built** — The Pocket settings page can now put the hub's listener on the machine's LAN address itself, instead of only printing a CLI command. `WebServer.bindAdditionalHost(host)` binds one more concrete local address on the live listener after activation: the address joins `hosts` — the authority list the `/api` trust fence reads — and disposal closes the listener. Wildcard, non-literal, duplicate, port-0, and disposed-service requests throw; a failed listen throws with the OS reason and leaves the serving listeners untouched. `POST /api/pocket/lan/bind` detects the machine's preferred LAN address, binds it (idempotent when already bound), and answers the fresh status body; the status now reads the listener's live hosts and port, so a runtime bind clears the LAN blocker without a restart. While the LAN transport reports an unbound address, the page shows a primary "bind now" button; failures surface as a note beside the copyable CLI step, whose stale loopback wording is refreshed.
+
+**Verification** — `packages/host/webserver` vitest 32/32 (4 new runtime-bind tests covering success, duplicate/wildcard/non-literal, port 0, failed listen keeping the primary, and post-disposal refusal). `plugins/prism-pocket` vitest 156/156 (4 `applyLanBind` tests plus 4 route tests over the real stores: live `additionalHosts` and authenticated `phone.url` in the body, idempotent skip, 400 without a LAN address, 500 with the OS reason). Pocket `tsc` reports no error in the changed files (the 19 remaining are the fresh-worktree unresolved-module set). `verify-translation-pairing` passes for the three edited doc pairs. The repository coverage gate (`pnpm run test:coverage`) ran end to end: no failed test and no coverage violation touches the changed packages, and the typert catalog failures reproduce identically on the unmodified checkout, so they are pre-existing.
+
+**Journey log**
+
+- Moving the TLS material read out of the listen effect broke "closes the listener when disposal lands while the TLS material is still being read": the read must stay inside the effect so a disposal landing mid-read still waits for the listen it must close.
+- The frozen startup-flag surface could not see a runtime bind; reading `webserver.hosts`/`port` live makes the fence's authority list and the page's report the same truth.
+- Importing the plugin's `index.ts` under vitest loads the `@deepseek-ai/dsh-llm` facade, which is declarations-only; the bot specs' `createUserMessage` mock is required for any spec touching the plugin root.
+- Ad-hoc `vitest --coverage` runs with a file filter reported 0% for instrumented files; the per-file gate evidence comes from the full `test:coverage` run, whose failures outside the changed packages reproduce on the unmodified checkout.
 
 ## [S1] Problem
 
@@ -33,13 +44,13 @@ The Pocket settings page reports the LAN blocker ("服务只监听本机：需�
 
 ## Tasks
 
-- [ ] T1: webserver `bindAdditionalHost` — validation, shared listener construction, disposal, tests (depends: none)
-- [ ] T2: pocket bind route and live surface assembly, with route tests (depends: T1)
-- [ ] T3: client bind button, en/zh locales, hint refresh (depends: T2)
-- [ ] T4: focused verification — webserver and pocket suites, pocket typecheck, translation-pairing gate (depends: T2, T3)
+- [x] T1: webserver `bindAdditionalHost` — validation, shared listener construction, disposal, tests (depends: none)
+- [x] T2: pocket bind route and live surface assembly, with route tests (depends: T1)
+- [x] T3: client bind button, en/zh locales, hint refresh (depends: T2)
+- [x] T4: focused verification — webserver and pocket suites, pocket typecheck, translation-pairing gate (depends: T2, T3)
 
 ## [S4] Acceptance
 
-- [ ] A loopback-only hub, after `POST /api/pocket/lan/bind`, reports the LAN address in `server.additionalHosts`, offers a `phone.url` on that address, and the trust fence admits the authority.
-- [ ] Binding an already-bound address is idempotent; an invalid address answers 400; a failed listen answers an error and leaves the existing listeners serving.
-- [ ] The page shows the bind action only while the LAN transport is blocked, and the blocker clears on success.
+- [x] A loopback-only hub, after `POST /api/pocket/lan/bind`, reports the LAN address in `server.additionalHosts`, offers a `phone.url` on that address, and the trust fence admits the authority.
+- [x] Binding an already-bound address is idempotent; an invalid address answers 400; a failed listen answers an error and leaves the existing listeners serving.
+- [x] The page shows the bind action only while the LAN transport is blocked, and the blocker clears on success.

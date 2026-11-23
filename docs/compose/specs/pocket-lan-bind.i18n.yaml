@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/pocket-lan-bind.md
 /:
-  en: 069f156bcedcc79a
-  zh: 069f156bcedcc79a
+  en: 5b1807758f9a688a
+  zh: 5b1807758f9a688a
 /pocket-lan-bind-action:
   en: 2de6d45fa763fb27
   zh: aa7904f2bd77b202
 /pocket-lan-bind-action/report:
-  en: 355a41a8b4106d9f
-  zh: 355a41a8b4106d9f
+  en: 9dc85aecd1434c35
+  zh: 38f541c28bee8b8d
 /pocket-lan-bind-action/s1-problem:
   en: 5fbc59f7bdb7e33e
   zh: e0393da48e7d9407
@@ -21,8 +21,8 @@
   en: cb8e9fd3f4d94a00
   zh: 841f673d86ed3a9d
 /pocket-lan-bind-action/tasks:
-  en: 9f867e9df4a1ca68
-  zh: 7d57eb1575f56c07
+  en: cd2c8049476ac886
+  zh: a93e7deb3540e6dc
 /pocket-lan-bind-action/s4-acceptance:
-  en: 15153696c6c275a1
-  zh: c92ead7e376b7254
+  en: 867072efa28adb3e
+  zh: 0a379483ea80625a
