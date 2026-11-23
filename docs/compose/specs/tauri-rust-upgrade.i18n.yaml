@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/tauri-rust-upgrade.md
 /:
-  en: 97b330a7cbf200ae
-  zh: 97b330a7cbf200ae
+  en: f1555caad744ff37
+  zh: f1555caad744ff37
 /tauri-and-rust-upgrade-2-12-6-1-100-0:
   en: e1d4a5dff1216d7d
   zh: 18e2033735fa51fe
 /tauri-and-rust-upgrade-2-12-6-1-100-0/report:
-  en: f728b44c4a4b8aac
-  zh: 42537b11a1e21ee9
+  en: d855c5a132d134d1
+  zh: 0108aa9bb9a43721
 /tauri-and-rust-upgrade-2-12-6-1-100-0/s1-problem:
   en: e62b13138ed01b38
   zh: 316de1ef01201cad
@@ -45,8 +45,8 @@
   en: db185238dac424e9
   zh: 6055dcab4d210ff4
 /tauri-and-rust-upgrade-2-12-6-1-100-0/tasks:
-  en: 8c29e76f81eb4aaa
+  en: 6655bd17b8f8e545
   zh: abf9aff24031606e
 /tauri-and-rust-upgrade-2-12-6-1-100-0/s4-acceptance:
-  en: 73cc4a6ea35f3f61
-  zh: 1353dd8962f01cba
+  en: 7a16fff9c4d852bb
+  zh: 4c5d3b4423088396
