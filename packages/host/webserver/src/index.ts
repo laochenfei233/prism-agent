@@ -622,134 +622,64 @@ export class WebServer extends Service {
     }
   }
 
+  /** TLS material loaded at activation, shared by activation and runtime binds. */
+  private tlsMaterial: { cert: string; key: string; certFile: string; keyFile: string } | undefined
+  /** Set by disposal; a runtime bind after disposal would leak a listener no cleanup owns. */
+  private closed = false
+
+  /**
+   * Bind one more concrete local address on the configured port after
+   * activation — the phone-access page's remedy for a loopback-only launch.
+   * The address joins {@link hosts}, the authority list the `/api` trust
+   * fence reads, and disposal closes its listener. A wildcard, a non-literal,
+   * an already-bound address, a port-0 deployment, or a disposed service
+   * throws; a failed listen throws with the OS reason and leaves the serving
+   * listeners untouched.
+   * @param host - one concrete IPv4 or IPv6 literal of a local interface.
+   */
+  async bindAdditionalHost(host: string): Promise<void> {
+    if (this.closed) throw new Error('webserver: the service is disposed; no further address can bind')
+    if (isWildcardHost(host)) {
+      throw new Error(`webserver: host ${JSON.stringify(host)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
+    }
+    if (this.config.port === 0) throw new Error('webserver: a runtime bind requires an explicit port; port 0 binds a fresh OS port per listener')
+    const canonical = normalizeBindAddress(host)
+    if (this.hosts.some(bound => normalizeBindAddress(bound) === canonical)) {
+      throw new Error(`webserver: host ${JSON.stringify(host)} is already bound`)
+    }
+    const server = this.buildListener()
+    await this.listenOn(server, canonical)
+    this.servers.push(server)
+    this.boundAdditional.push(canonical)
+  }
+
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
-    const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-      /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
-      requests; the field is only optional on the client-side IncomingMessage type */
-      const target = new URL(req.url ?? '/', 'http://x')
-      const responder = this.responderFor(target.pathname)
-      if (responder === undefined) {
-        res.writeHead(404)
-        res.end()
-        return
-      }
-      if (typeof responder === 'function') await responder(req, res)
-      else if ('resource' in responder) await this.serveResource(req, res, target, responder.resource)
-      else await responder.handler(req, res)
-    }
-    // Last-resort guard: handle() rejecting would otherwise be an unhandled
-    // rejection killing the process on one malformed request (bad %-escape,
-    // client dropping mid-body). Per-request failures log and answer 400 —
-    // never a process exit.
-    const listener = (req: IncomingMessage, res: ServerResponse): void => {
-      const next = (): void => {
-        void handle(req, res).catch((err: unknown) => {
-          this.ctx.logger.warn(err instanceof Error ? err : new Error(String(err)))
-          if (res.headersSent) {
-            res.destroy()
-            return
-          }
-          res.writeHead(400)
-          res.end()
-        })
-      }
-      if (this.gzip === undefined) next()
-      else this.gzip(req, res, next)
-    }
-    const tls = this.tlsConfig
     // Disposal waits for in-flight acquisition and closes every listener it
-    // produced, one per bound address.
+    // produced, one per bound address. The material read stays inside the
+    // effect, so a disposal landing mid-read still waits for the listen it
+    // must close.
     await this.ctx.effect(async () => {
-      let tlsMaterial: { cert: string; key: string; certFile: string; keyFile: string } | undefined
-      if (tls !== undefined) {
-        const certFile = resolve(tls.certFile)
-        const keyFile = resolve(tls.keyFile)
+      if (this.tlsConfig !== undefined) {
+        const certFile = resolve(this.tlsConfig.certFile)
+        const keyFile = resolve(this.tlsConfig.keyFile)
         const [cert, key] = await Promise.all([
           readTlsFile('certFile', certFile),
           readTlsFile('keyFile', keyFile),
         ])
-        tlsMaterial = { cert, key, certFile, keyFile }
+        this.tlsMaterial = { cert, key, certFile, keyFile }
       }
-
-      // One server per address, all sharing the request listener, the upgrade
-      // dispatch, and the TLS connection table.
-      const buildServer = (): Server => {
-        let server: Server
-        if (tlsMaterial === undefined) {
-          server = createServer({ maxHeaderSize: this.maxRequestHeaderBytes }, listener)
-        } else {
-          try {
-            server = createSecureServer(
-              { cert: tlsMaterial.cert, key: tlsMaterial.key, maxHeaderSize: this.maxRequestHeaderBytes },
-              listener,
-            )
-          } catch (error) {
-            throw new Error(`webserver: tls.certFile ${tlsMaterial.certFile} and tls.keyFile ${tlsMaterial.keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
-          }
-          server.on('connection', (socket) => {
-            this.tlsConnections.add(socket)
-            socket.once('close', () => { this.tlsConnections.delete(socket) })
-          })
-        }
-        server.on('upgrade', (req, socket, head) => {
-          const onError = (error: Error): void => {
-            this.ctx.logger.warn(error)
-            socket.destroy()
-          }
-          socket.on('error', onError)
-          socket.once('close', () => {
-            socket.off('error', onError)
-            this.upgradedSockets.delete(socket)
-          })
-          let route: WebUpgradeRoute | undefined
-          try {
-            /* v8 ignore next -- node:http always sets url on server requests. */
-            route = this.upgrades.get(new URL(req.url ?? '/', 'http://x').pathname)
-          } catch (error) {
-            this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-            socket.destroy()
-            return
-          }
-          if (route === undefined) {
-            socket.destroy()
-            return
-          }
-          this.upgradedSockets.add(socket)
-          try {
-            Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
-              this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-              socket.destroy()
-            })
-          } catch (error) {
-            this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-            socket.destroy()
-          }
-        })
-        return server
-      }
-
-      const listenOne = (server: Server, bindHost: string): Promise<void> => new Promise((resolve, reject) => {
-        server.once('error', reject)
-        server.listen(this.config.port, bindHost, () => {
-          server.off('error', reject)
-          server.on('error', (err) => { this.ctx.logger.error(err) })
-          this.listenedPort = (server.address() as AddressInfo).port
-          resolve()
-        })
-      })
-
       // The primary bind is the deployment's own requirement: its failure
       // rejects activation. An additional address is an opportunistic
       // exposure — a vanished interface or a held port drops only that
       // address, with a warning, and the rest keep serving.
-      const primary = buildServer()
-      await listenOne(primary, this.config.host)
+      const primary = this.buildListener()
+      await this.listenOn(primary, this.config.host)
       this.servers.push(primary)
       for (const bindHost of this.additionalHosts) {
-        const server = buildServer()
+        const server = this.buildListener()
         try {
-          await listenOne(server, bindHost)
+          await this.listenOn(server, bindHost)
         } catch (error) {
           this.ctx.logger.warn(new Error(`webserver: additional bind ${JSON.stringify(bindHost)} did not take: ${error instanceof Error ? error.message : String(error)}`))
           continue
@@ -762,6 +692,7 @@ export class WebServer extends Service {
       // connection joins that table only after its handshake. The service owns both
       // kinds with the other connections, so it tracks and destroys them explicitly.
       return async () => {
+        this.closed = true
         const serverClosed = Promise.all(this.servers.map(server => new Promise<void>((resolve) => {
           server.close(() => { resolve() })
         })))
@@ -773,6 +704,108 @@ export class WebServer extends Service {
         await Promise.all([serverClosed, ...socketsClosed])
       }
     }, 'webServer.listen')
+  }
+
+  /** Answer one request; a handler rejection logs and answers 400 instead of exiting the process. */
+  private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
+    requests; the field is only optional on the client-side IncomingMessage type */
+    const target = new URL(req.url ?? '/', 'http://x')
+    const responder = this.responderFor(target.pathname)
+    if (responder === undefined) {
+      res.writeHead(404)
+      res.end()
+      return
+    }
+    if (typeof responder === 'function') await responder(req, res)
+    else if ('resource' in responder) await this.serveResource(req, res, target, responder.resource)
+    else await responder.handler(req, res)
+  }
+
+  /** The per-connection guard: {@link handleRequest} must never become an unhandled rejection. */
+  private requestListener(req: IncomingMessage, res: ServerResponse): void {
+    const next = (): void => {
+      void this.handleRequest(req, res).catch((err: unknown) => {
+        this.ctx.logger.warn(err instanceof Error ? err : new Error(String(err)))
+        if (res.headersSent) {
+          res.destroy()
+          return
+        }
+        res.writeHead(400)
+        res.end()
+      })
+    }
+    if (this.gzip === undefined) next()
+    else this.gzip(req, res, next)
+  }
+
+  /** One http/https server sharing the request listener, the upgrade dispatch, and the TLS connection table. */
+  private buildListener(): Server {
+    let server: Server
+    if (this.tlsMaterial === undefined) {
+      server = createServer({ maxHeaderSize: this.maxRequestHeaderBytes }, (req, res) => this.requestListener(req, res))
+    } else {
+      try {
+        server = createSecureServer(
+          { cert: this.tlsMaterial.cert, key: this.tlsMaterial.key, maxHeaderSize: this.maxRequestHeaderBytes },
+          (req, res) => this.requestListener(req, res),
+        )
+      } catch (error) {
+        throw new Error(`webserver: tls.certFile ${this.tlsMaterial.certFile} and tls.keyFile ${this.tlsMaterial.keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      server.on('connection', (socket) => {
+        this.tlsConnections.add(socket)
+        socket.once('close', () => { this.tlsConnections.delete(socket) })
+      })
+    }
+    server.on('upgrade', (req, socket, head) => {
+      const onError = (error: Error): void => {
+        this.ctx.logger.warn(error)
+        socket.destroy()
+      }
+      socket.on('error', onError)
+      socket.once('close', () => {
+        socket.off('error', onError)
+        this.upgradedSockets.delete(socket)
+      })
+      let route: WebUpgradeRoute | undefined
+      try {
+        /* v8 ignore next -- node:http always sets url on server requests. */
+        route = this.upgrades.get(new URL(req.url ?? '/', 'http://x').pathname)
+      } catch (error) {
+        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        socket.destroy()
+        return
+      }
+      if (route === undefined) {
+        socket.destroy()
+        return
+      }
+      this.upgradedSockets.add(socket)
+      try {
+        Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
+          this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+          socket.destroy()
+        })
+      } catch (error) {
+        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        socket.destroy()
+      }
+    })
+    return server
+  }
+
+  /** Listen one server on the configured port; resolves once the socket is bound. */
+  private listenOn(server: Server, bindHost: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(this.config.port, bindHost, () => {
+        server.off('error', reject)
+        server.on('error', (err) => { this.ctx.logger.error(err) })
+        this.listenedPort = (server.address() as AddressInfo).port
+        resolve()
+      })
+    })
   }
 
   /**
