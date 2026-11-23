@@ -35,7 +35,7 @@ const sessions: SessionListState = {
     updatedAt: 0, retainedBy: {} } },
 }
 const workspaces: WorkspaceSnapshot = {
-  items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  items: [], archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [], state: 'idle', phase: 'ready', error: null,
 }
 function workspace(path: string, title: string): WorkspaceSnapshot['items'][number] {
   return {

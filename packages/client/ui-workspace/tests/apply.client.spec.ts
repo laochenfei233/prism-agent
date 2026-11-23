@@ -58,8 +58,9 @@ const workspaceState = (
   items: readonly WorkspaceView[],
   archivedSessionIds: readonly SessionId[] = [],
   pinnedSessionIds: readonly SessionId[] = [],
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
 ): WorkspaceSnapshot => ({
-  items, archivedSessionIds, pinnedSessionIds, state: 'idle', phase: 'ready', error: null,
+  items, archivedSessionIds, pinnedSessionIds, archivedWorkspaceIds, state: 'idle', phase: 'ready', error: null,
 })
 
 const ALLOWED: HostObservable<boolean> = createSnapshotStore(true)

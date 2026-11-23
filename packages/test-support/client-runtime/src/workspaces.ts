@@ -172,6 +172,41 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Archive a Workspace (recorded). The default mirrors the production face's
+   * observable effect: the id joins the list state's Workspace archive set.
+   * @param workspaceId - Workspace to archive.
+   */
+  async archiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    this.calls.push({ method: 'archiveWorkspace', args: [workspaceId] })
+    const stub = this.stubs.get('archiveWorkspace')
+    if (stub !== undefined) {
+      await (stub(workspaceId) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.archivedWorkspaceIds = [...draft.archivedWorkspaceIds, workspaceId]
+    })
+  }
+
+  /**
+   * Restore an archived Workspace (recorded). The default mirrors the
+   * production face's observable effect: the id leaves the list state's
+   * Workspace archive set.
+   * @param workspaceId - Workspace to restore.
+   */
+  async unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    this.calls.push({ method: 'unarchiveWorkspace', args: [workspaceId] })
+    const stub = this.stubs.get('unarchiveWorkspace')
+    if (stub !== undefined) {
+      await (stub(workspaceId) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.archivedWorkspaceIds = draft.archivedWorkspaceIds.filter(id => id !== workspaceId)
+    })
+  }
+
+  /**
    * Pin a session (recorded). The default mirrors the production face's
    * observable effect: the id leads the list state's pin set.
    * @param sessionId - session to pin.

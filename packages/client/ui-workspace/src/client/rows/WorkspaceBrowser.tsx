@@ -1050,15 +1050,18 @@ export function WorkspaceBrowser({
   // Ordering remains live while the rail or search replaces the list body.
   const list = useSessions(state => state)
   const storedWorkspaces = useWorkspaces(state => state.items)
+  const archivedWorkspaceIds = useWorkspaces(state => state.archivedWorkspaceIds)
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
   const defaultWorkspaceName = t('workspace.defaultName')
   const workspaces = useMemo(
-    () => storedWorkspaces.map(workspace => ({
-      ...workspace,
-      title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
-    })),
-    [storedWorkspaces, defaultWorkspaceName],
+    () => storedWorkspaces
+      .filter(workspace => !archivedWorkspaceIds.includes(workspace.workspaceId))
+      .map(workspace => ({
+        ...workspace,
+        title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
+      })),
+    [storedWorkspaces, archivedWorkspaceIds, defaultWorkspaceName],
   )
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
@@ -1092,10 +1095,21 @@ export function WorkspaceBrowser({
   const currentBlank = mainSessionId !== undefined && list.byId[mainSessionId]?.blank === true
     ? mainSessionId
     : undefined
+  // Sessions an archived Workspace accounts render nowhere — not Ungrouped,
+  // not the flat list — until the project returns.
+  const hiddenSessionIds = useMemo(() => {
+    const hidden = new Set<SessionId>()
+    for (const workspace of storedWorkspaces) {
+      if (!archivedWorkspaceIds.includes(workspace.workspaceId)) continue
+      for (const id of workspace.sessionIds) hidden.add(id)
+    }
+    return hidden
+  }, [storedWorkspaces, archivedWorkspaceIds])
   const ungroupedMemberIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
-    return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
-  }, [list, workspaces])
+    return list.ids.filter(id => list.byId[id] !== undefined
+      && !accounted.has(id) && !hiddenSessionIds.has(id))
+  }, [list, workspaces, hiddenSessionIds])
   const orderState = useMemo(
     () => ({ pinnedSessionIds, archivedSessionIds }),
     [archivedSessionIds, pinnedSessionIds],
@@ -1104,7 +1118,10 @@ export function WorkspaceBrowser({
     () => ({ ...orderState, archivedFilter, annotations, annotationFilter }),
     [orderState, archivedFilter, annotations, annotationFilter],
   )
-  const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
+  const flatMemberIds = useMemo(
+    () => sessionMemberIds(list).filter(id => !hiddenSessionIds.has(id)),
+    [list, hiddenSessionIds],
+  )
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
     const memberIds = workspace.sessionIds
     const baseOrder = orderMembers(
@@ -1517,8 +1534,10 @@ export function WorkspaceBrowser({
           <BatchActionsToolbar
             count={selectedSessionIds.length}
             onSelectAll={() => {
-              // The provisional blank row is not an archive or marking target.
-              setSelectedSessionIds(filteredSessionIds(list, rowState).filter(id => list.byId[id]?.blank !== true))
+              // The provisional blank row is not an archive or marking target,
+              // and an archived Workspace's Sessions are not selectable rows.
+              setSelectedSessionIds(filteredSessionIds(list, rowState)
+                .filter(id => list.byId[id]?.blank !== true && !hiddenSessionIds.has(id)))
             }}
             onClear={() => { setSelectedSessionIds([]) }}
             onPick={runBatch}

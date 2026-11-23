@@ -39,8 +39,11 @@ const sessions: SessionListState = {
   ids: [], byId: {}, phase: 'ready', projectionsBySession: {},
 }
 const noPendingInteraction: SessionStatusSnapshot = new Map()
-const workspaceState = (items: readonly WorkspaceView[]): WorkspaceSnapshot => ({
-  items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+const workspaceState = (
+  items: readonly WorkspaceView[],
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
+): WorkspaceSnapshot => ({
+  items, archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds, state: 'idle', phase: 'ready', error: null,
 })
 function anchor(): { current: HTMLElement } {
   const element = document.createElement('button')
@@ -89,6 +92,7 @@ function mount(
   items: readonly WorkspaceView[] = [workspace('alpha', 'Alpha')],
   createWorkspace = vi.fn(),
   occupancy = occupancySource(),
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
 ) {
   const onPick = vi.fn()
   const onClose = vi.fn()
@@ -102,7 +106,7 @@ function mount(
       useSessionStatus={hook(noPendingInteraction)}
       useSessionRetainInfo={() => undefined}
       usePanelInfo={usePanelInfo} useContextMenu={contextMenuHook()} useResource={useResource}
-      useWorkspaces={hook(workspaceState(nextItems))}
+      useWorkspaces={hook(workspaceState(nextItems, archivedWorkspaceIds))}
       {...allowAllAccess}
       onPick={onPick}
       onClose={onClose}
@@ -139,6 +143,17 @@ describe('WorkspacePicker', () => {
     expect(screen.getByRole('menuitem', { name: 'Alone' }).querySelector('[title]')).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Shared two/a/Shared' }))
     expect(b.onPick).toHaveBeenCalledWith(wid('beta'))
+  })
+
+  it('lists no archived Workspace and keeps the add entry', () => {
+    const b = mount([
+      { ...workspace('hidden', 'Hidden'), path: '/one/Hidden' },
+      workspace('shown', 'Shown'),
+    ], undefined, undefined, [wid('hidden')])
+    expect(screen.getAllByRole('menuitem').map(entry => entry.textContent))
+      .toEqual(['Shown', '添加工作区…'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Shown' }))
+    expect(b.onPick).toHaveBeenCalledWith(wid('shown'))
   })
 
   it('opens the composed directory flow, adopts its picked path, and selects the returned Workspace', async () => {

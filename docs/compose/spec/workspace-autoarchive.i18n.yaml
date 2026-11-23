@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for workspace-autoarchive.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/workspace-autoarchive.md
+/:
+  en: da105e0d29878d7e
+  zh: da105e0d29878d7e
+/auto-archive-idle-workspaces:
+  en: 194e6e745adb6c57
+  zh: a0aaf8c353e616ea
+/auto-archive-idle-workspaces/report:
+  en: 2a80f34ae7e2240d
+  zh: 2a80f34ae7e2240d
+/auto-archive-idle-workspaces/s1-problem:
+  en: eea9014ed25f66f2
+  zh: 8fb2e68e0b9e279d
+/auto-archive-idle-workspaces/s2-design:
+  en: c64703a3afe2fc6b
+  zh: 35143fd8fdc859fa
+/auto-archive-idle-workspaces/s3-scope:
+  en: e60d980447c2b6cf
+  zh: f8f2a3a9b6bd9e90
+/auto-archive-idle-workspaces/tasks:
+  en: 6bae691b6f78e3ca
+  zh: 76c8fbd62de4bdf7
+/auto-archive-idle-workspaces/s4-acceptance:
+  en: f08b286d49e8e2bc
+  zh: b59f42d63f947001
