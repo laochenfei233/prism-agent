@@ -211,6 +211,13 @@
         answerSystemPrompt: You answer questions only from the supplied meeting transcript in the caller's language. Say what the transcript does not establish; do not invent facts.
         maxTranscriptChars: 50000
 
+    # The Meetings page's browser routes. The client module roster is scanned
+    # from loader entries, so the service row above also contributes the page;
+    # mounting one without the other shows a page whose every request answers
+    # 404. This row waits, rather than failing, in a profile with no web server.
+    - id: prism-meeting-web
+      name: '@prism/prism-meeting/web'
+
     # Persisted projection cache: throttled write-behind over the
     # session_projcache domain (per-record layout — one version-stamped
     # checkpoint document per session), serving the session listing's
