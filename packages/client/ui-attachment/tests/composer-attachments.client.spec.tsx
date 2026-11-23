@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type {
   ComposerAttachment, ComposerAttachmentsOwnerProps, ComposerAttachmentsProps,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { ComposerAttachments } from '../src/client/ComposerAttachments.tsx'
+import { ComposerAttachments, type ComposerAttachmentsInjected } from '../src/client/ComposerAttachments.tsx'
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class {
@@ -36,6 +36,18 @@ const t = ((key: string, params?: Readonly<Record<string, unknown>>): string => 
     'image.openOriginal': '查看原图',
     'attachment.dropBlocked': '当前无法添加文件或图片',
     'attachment.dropTitle': '文件或图片拖动到此处即可添加',
+    'attachment.folderProject.title': '创建独立项目',
+    'attachment.folderProject.create': '创建项目',
+    'attachment.folderProject.reference': '仅作为引用',
+    'attachment.folderProject.cancel': '取消',
+  }
+  if (key === 'attachment.folderProject.desc') {
+    const name = params?.name
+    return `将拖入的文件夹「${typeof name === 'string' ? name : ''}」注册为独立项目？`
+  }
+  if (key === 'attachment.folderProject.failed') {
+    const message = params?.message
+    return `创建项目失败：${typeof message === 'string' ? message : ''}`
   }
   if (key === 'file.remove') {
     const name = params?.name
@@ -74,7 +86,9 @@ function fileDraft(id: string, name = `${id}.pdf`): ComposerAttachment {
   }
 }
 
-function props(overrides: Partial<ComposerAttachmentsOwnerProps> = {}): Parameters<typeof ComposerAttachments>[0] {
+function props(
+  overrides: Partial<ComposerAttachmentsOwnerProps & ComposerAttachmentsInjected> = {},
+): Parameters<typeof ComposerAttachments>[0] {
   return {
     attachments: [],
     canAcceptDrop: true,
@@ -403,4 +417,106 @@ it('accepts internal file tokens only inside the composer without the full-page 
   data.set('application/x-dsh-file', 'foreign')
   fireEvent.drop(target, { dataTransfer: transfer })
   expect(onAddFiles).toHaveBeenCalledOnce()
+})
+
+describe('ComposerAttachments folder-to-project', () => {
+  const folder = new File([], 'project')
+  const dropFolder = (file: File = folder): void => {
+    fireEvent.drop(document.body, {
+      dataTransfer: {
+        types: ['Files'], files: [file], dropEffect: 'none',
+        items: [{ kind: 'file', getAsFile: () => new File([], file.name), webkitGetAsEntry: () => ({ isDirectory: true }) }],
+      },
+    })
+  }
+
+  it('asks to create an independent project for a dropped desktop folder and opens it on confirm', async () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    expect(view.getByRole('dialog', { name: '创建独立项目' })).toBeTruthy()
+    expect(view.getByText('将拖入的文件夹「project」注册为独立项目？')).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '创建项目' }))
+    await waitFor(() => { expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull() })
+    expect(createProjectFromDirectory).toHaveBeenCalledExactlyOnceWith('C:/host/project')
+    expect(onAddFiles).not.toHaveBeenCalled()
+  })
+
+  it('keeps the first pending folder and runs the legacy intake for a drop during the dialog', () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    const second = new File([], 'second')
+    dropFolder(second)
+    // The pending decision keeps its folder; the later drop takes the legacy intake.
+    expect(onAddFiles).toHaveBeenCalledExactlyOnceWith([second], new Set([second]))
+    expect(view.getByText('将拖入的文件夹「project」注册为独立项目？')).toBeTruthy()
+    expect(createProjectFromDirectory).not.toHaveBeenCalled()
+  })
+
+  it('adds a dropped folder as a reference when the user declines project creation', () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    expect(view.getByRole('dialog', { name: '创建独立项目' })).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '仅作为引用' }))
+    expect(onAddFiles).toHaveBeenCalledExactlyOnceWith([folder], new Set([folder]))
+    expect(createProjectFromDirectory).not.toHaveBeenCalled()
+    expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull()
+  })
+
+  it('cancels a folder pickup without any intake', () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    // The Modal's own close affordance shares the cancel label; the footer button is the last one.
+    const cancelButtons = view.getAllByRole('button', { name: '取消' })
+    const cancelButton = cancelButtons[cancelButtons.length - 1]
+    if (cancelButton === undefined) throw new Error('the dialog footer cancel button is missing')
+    fireEvent.click(cancelButton)
+    expect(onAddFiles).not.toHaveBeenCalled()
+    expect(createProjectFromDirectory).not.toHaveBeenCalled()
+    expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull()
+  })
+
+  it('keeps the legacy desktop-only intake when the browser has no host path', () => {
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    expect(onAddFiles).toHaveBeenCalledExactlyOnceWith([folder], new Set([folder]))
+    expect(createProjectFromDirectory).not.toHaveBeenCalled()
+    expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull()
+  })
+
+  it('ignores a folder drop while the view cannot accept drops', () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const onAddFiles = vi.fn()
+    const createProjectFromDirectory = vi.fn(async () => {})
+    const view = render(<ComposerAttachments {...props({ canAcceptDrop: false, onAddFiles, createProjectFromDirectory })} />)
+    dropFolder()
+    expect(onAddFiles).not.toHaveBeenCalled()
+    expect(createProjectFromDirectory).not.toHaveBeenCalled()
+    expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull()
+  })
+
+  it('keeps the dialog open and reports the workspace failure', async () => {
+    vi.stubGlobal('__DSH_HOST_PATHS__', { pathFor: (file: File) => `C:/host/${file.name}` })
+    const createProjectFromDirectory = vi.fn(async () => { throw new Error('denied') })
+    const view = render(<ComposerAttachments {...props({ createProjectFromDirectory })} />)
+    dropFolder()
+    fireEvent.click(view.getByRole('button', { name: '创建项目' }))
+    expect(await view.findByText('创建项目失败：denied')).toBeTruthy()
+    expect(view.getByRole('dialog', { name: '创建独立项目' })).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '仅作为引用' }))
+    expect(view.queryByRole('dialog', { name: '创建独立项目' })).toBeNull()
+  })
 })

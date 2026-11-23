@@ -3,7 +3,7 @@ import type {
   ComposerAttachment, ComposerAttachmentsProps, ComposerImageAttachment,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
-  IconCloseFillRegular, IconRefreshOutlineRegular, IconWarningOutlineRegular, Tooltip,
+  Button, IconCloseFillRegular, IconRefreshOutlineRegular, IconWarningOutlineRegular, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { AttachmentRail } from '../AttachmentRail.tsx'
 import type { AttachmentRailItem } from '../AttachmentRail.tsx'
@@ -11,7 +11,8 @@ import { DropOverlay } from '../DropOverlay.tsx'
 import { FileCard } from '../FileCard.tsx'
 import { ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import { attachmentRailLabels, dropOverlayLabels, fileCardLabels, lightboxLabels } from './labels.ts'
-import { installDocumentDropEvents } from './drop-events.ts'
+import { installDocumentDropEvents, type DirectoryDropHandler } from './drop-events.ts'
+import { fileHostPath, hostPathBridge } from './host-path.ts'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './ComposerAttachments.module.css'
 
@@ -20,9 +21,25 @@ interface ComposerRailItem extends AttachmentRailItem {
   attachment: ComposerAttachment
 }
 
-/** File transfer lookup injected by this attachment implementation. */
+/** A dropped directory awaiting the create-project decision. */
+interface FolderPickup {
+  /** Absolute harness-host path of the dropped directory. */
+  readonly path: string
+  /** Folder name shown in the dialog. */
+  readonly name: string
+  /** Legacy attachment intake for the whole dropped batch. */
+  readonly addAsReferences: () => void
+}
+
+/** File transfer lookup and workspace adoption injected by this attachment implementation. */
 export interface ComposerAttachmentsInjected {
   readonly readFileDrag: (transfer: DataTransfer) => File | undefined
+  /**
+   * Register one existing directory as an independent project and open it;
+   * rejects with the workspace failure. Optional: without it, a dropped
+   * directory keeps the legacy reference-chip intake.
+   */
+  readonly createProjectFromDirectory?: (path: string) => Promise<void>
 }
 
 /** The owner share and locale seat the attachment rail reads from its slot props. */
@@ -33,18 +50,62 @@ type ComposerAttachmentsInput = Pick<ComposerAttachmentsProps,
 /** Draft image previews, pending-file cards, drop target, and original-image preview. */
 export function ComposerAttachments({
   attachments, canAcceptDrop, onAddFiles, onRemoveAttachment, uploads, onRetryFile, uploadFailureText, dropLimits, t, readFileDrag,
+  createProjectFromDirectory,
 }: ComposerAttachmentsInput & InjectFace<ComposerAttachmentsInjected>) {
   const [preview, setPreview] = useState<ComposerImageAttachment | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [folderPickup, setFolderPickup] = useState<FolderPickup | null>(null)
+  const [creatingProject, setCreatingProject] = useState(false)
+  const [projectError, setProjectError] = useState<string | null>(null)
   const dragDepth = useRef(0)
   const closePreview = useCallback(() => { setPreview(null) }, [])
   useEffect(() => {
     if (preview !== null && !attachments.some(attachment => attachment.id === preview.id)) setPreview(null)
   }, [attachments, preview])
 
+  const handleDirectories = useCallback<DirectoryDropHandler>((_files, directories, addAsReferences) => {
+    // A pending decision or an in-flight creation keeps its folder: further
+    // drops fall back to the legacy intake instead of overwriting the pickup.
+    if (folderPickup !== null || creatingProject) { addAsReferences(); return }
+    const directory = directories.values().next().value
+    if (directory === undefined) { addAsReferences(); return }
+    const path = hostPathBridge()?.pathFor(directory) ?? fileHostPath(directory)
+    // A browser drop carries no host path: keep the legacy intake and its desktop-only guidance.
+    if (path === '' || createProjectFromDirectory === undefined) { addAsReferences(); return }
+    setProjectError(null)
+    setFolderPickup({ path, name: directory.name, addAsReferences })
+  }, [folderPickup, creatingProject, createProjectFromDirectory])
+
   useEffect(() => {
-    return installDocumentDropEvents(canAcceptDrop, onAddFiles, dragDepth, setDragActive, readFileDrag)
-  }, [canAcceptDrop, onAddFiles, readFileDrag])
+    return installDocumentDropEvents(canAcceptDrop, onAddFiles, dragDepth, setDragActive, readFileDrag, handleDirectories)
+  }, [canAcceptDrop, onAddFiles, readFileDrag, handleDirectories])
+
+  const closeFolderPickup = useCallback((): void => {
+    if (creatingProject) return
+    setFolderPickup(null)
+    setProjectError(null)
+  }, [creatingProject])
+
+  const createProject = useCallback((): void => {
+    if (folderPickup === null || createProjectFromDirectory === undefined || creatingProject) return
+    setCreatingProject(true)
+    setProjectError(null)
+    createProjectFromDirectory(folderPickup.path).then(() => {
+      setCreatingProject(false)
+      setFolderPickup(null)
+    }).catch((reason: unknown) => {
+      setCreatingProject(false)
+      setProjectError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }, [folderPickup, createProjectFromDirectory, creatingProject])
+
+  const useFolderAsReference = useCallback((): void => {
+    if (creatingProject) return
+    const addAsReferences = folderPickup?.addAsReferences
+    setFolderPickup(null)
+    setProjectError(null)
+    addAsReferences?.()
+  }, [folderPickup, creatingProject])
 
   const railItems = useMemo<ComposerRailItem[]>(() => attachments.map(attachment => ({
     id: attachment.id,
@@ -164,6 +225,31 @@ export function ComposerAttachments({
           onClose={closePreview}
         />
       )}
+      <Modal
+        open={folderPickup !== null}
+        onClose={closeFolderPickup}
+        closeLabel={t('attachment.folderProject.cancel')}
+        title={t('attachment.folderProject.title')}
+        {...folderPickup === null
+          ? {}
+          : { description: t('attachment.folderProject.desc', { name: folderPickup.name }) }}
+        footer={(
+          <>
+            <Button variant="outline" disabled={creatingProject} onClick={closeFolderPickup}>
+              {t('attachment.folderProject.cancel')}
+            </Button>
+            <Button variant="outline" disabled={creatingProject} onClick={useFolderAsReference}>
+              {t('attachment.folderProject.reference')}
+            </Button>
+            <Button variant="primary" disabled={creatingProject} onClick={createProject}>
+              {t('attachment.folderProject.create')}
+            </Button>
+          </>
+        )}
+      >
+        {projectError !== null
+          && <div role="alert">{t('attachment.folderProject.failed', { message: projectError })}</div>}
+      </Modal>
     </>
   )
 }

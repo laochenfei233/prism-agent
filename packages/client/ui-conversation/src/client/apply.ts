@@ -28,6 +28,7 @@ import type { ReferenceInsert } from './contract/draft-editor.ts'
 import { createConversationStore, readConversationViewPreference } from './stores.ts'
 import { formatFileMention } from '@deepseek-ai/dsh-file-reference/grammar'
 import { relativizeToCwd, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
+import { fileHostPath, hostPathBridge } from './host-path.ts'
 import { ConversationController, UnsupportedImageMediaTypeError, isImageMediaType } from './service.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
@@ -96,29 +97,6 @@ const EMPTY_FILE_UPLOADS: DraftFileUploads = {}
 const ABSENT_FILE_UPLOADS = {
   getSnapshot: () => EMPTY_FILE_UPLOADS,
   subscribe: () => () => {},
-}
-
-/**
- * Browser-shell bridge reporting the harness-host path of a picked file. A
- * shell may install it on the application document (`__DSH_HOST_PATHS__`);
- * otherwise the WebView2 Desktop shell is detected through the file itself,
- * which carries its host path on the non-standard `path` property. A served
- * Web page's `File` has no path, so every non-image file uploads there.
- */
-interface HostPathBridge {
-  /** Absolute harness-host path of one picked file, or empty when the shell has none for it. */
-  pathFor(file: File): string
-}
-
-/** The path each `File` reports about itself, empty when the runtime provides none. */
-function fileHostPath(file: File): string {
-  const path = (file as { path?: unknown }).path
-  return typeof path === 'string' ? path : ''
-}
-
-/** The shell-installed bridge, when this document runs inside the Desktop application. */
-function hostPathBridge(): HostPathBridge | undefined {
-  return (globalThis as { __DSH_HOST_PATHS__?: HostPathBridge }).__DSH_HOST_PATHS__
 }
 
 interface WorkspaceNavigation {
