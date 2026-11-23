@@ -236,7 +236,14 @@ export interface MeetingApi {
 export function createMeetingApi(doFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)): MeetingApi {
   /** Read one envelope, turning its failure arm into a request error. */
   const readEnvelope = async (response: Response, endpoint: string): Promise<unknown> => {
-    const body: unknown = await response.json()
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      // A body that is not JSON (a missing route answers plain text) carries no
+      // envelope; the status is the only fact left to report.
+      throw new MeetingRequestError('prism-meeting/http-failure', `the host answered HTTP ${response.status} for ${endpoint}`)
+    }
     if (!isEnvelope(body)) throw invalidResponse(endpoint)
     if (!body.ok) throw new MeetingRequestError(body.error.code, body.error.message)
     return body.value
