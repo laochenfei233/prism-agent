@@ -112,6 +112,20 @@ describe('meeting api', () => {
     })
   })
 
+  it('reports the HTTP status when the route answers no JSON envelope', async () => {
+    // A profile that composes the page without its browser routes answers a
+    // plain-text 404; the page must name that, not a JSON parser failure.
+    const missing: typeof fetch = async () => new Response('not found', {
+      status: 404,
+      headers: { 'content-type': 'text/plain;charset=UTF-8' },
+    })
+    await expect(createMeetingApi(missing).list()).rejects.toMatchObject({
+      name: 'MeetingRequestError',
+      code: 'prism-meeting/http-failure',
+      message: 'the host answered HTTP 404 for list',
+    })
+  })
+
   it.each([
     ['a meeting missing a field', { meeting: { id: 'm1' } }],
     ['a meeting of the wrong field type', { meeting: { ...stored, participants: 'Ada' } }],
