@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for auto-archive.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/user/guide/auto-archive.md
+/auto-archive:
+  en: 2f5e52d302160f19
+  zh: e9a50653fc49ba54
+/auto-archive/summary:
+  en: be21856456043a61
+  zh: 24b9ca6de38def03
+/auto-archive/table-of-contents:
+  en: 3cebc2bc9143f29d
+  zh: adefce5a61778c84
+/auto-archive/what-the-sweep-touches:
+  en: d0c2a62879208050
+  zh: 3fdb141e48edc939
+/auto-archive/projects-and-the-default-workspace:
+  en: caeba3bcb3f71880
+  zh: 70fa4dfd153e923f
+/auto-archive/restoring-conversations-and-projects:
+  en: 6f873157ff1c1b86
+  zh: 2569bdbe5961f1c9
+/auto-archive/configuration-reference:
+  en: 1d3da3a6f35ecaec
+  zh: 602d21a4727f7a84

@@ -51,7 +51,13 @@ function stored(
 function dependencies(
   snapshots: readonly SessionPersistenceSnapshot[],
   overrides: Partial<SweepDependencies> = {},
-): SweepDependencies & { readonly archived: string[]; readonly skipped: string[]; readonly warned: string[] } {
+): SweepDependencies & {
+  readonly archived: string[]
+  readonly skipped: string[]
+  readonly warned: string[]
+  readonly workspacesHidden: string[]
+  readonly workspacesRestored: string[]
+} {
   const archived: string[] = []
   const skipped: string[] = []
   const warned: string[] = []
@@ -66,6 +72,7 @@ function dependencies(
       return Promise.resolve()
     },
     listWorkspaces: () => [],
+    defaultWorkspaceId: () => undefined,
     archivedWorkspaceIds: () => [],
     archiveWorkspace: (workspaceId) => {
       workspacesHidden.push(workspaceId)
@@ -147,13 +154,13 @@ describe('sweep', () => {
       stored('second', { createdAt: NOW - 45 * DAY }),
       stored('fresh', { createdAt: NOW - 2 * DAY }),
     ])
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(2)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(2)
     expect(deps.archived).toEqual(['first', 'second'])
   })
 
   it('uses the configured window instead of the shipped default', async () => {
     const deps = dependencies([stored('ten-days', { createdAt: NOW - 10 * DAY })])
-    await expect(sweep(deps, resolveConfig({ idleDays: 7 }))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true, idleDays: 7 }))).resolves.toBe(1)
     expect(deps.archived).toEqual(['ten-days'])
   })
 
@@ -169,7 +176,7 @@ describe('sweep', () => {
         },
       },
     )
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(1)
     expect(deps.skipped).toEqual(["session 'busy' is still running"])
   })
 
@@ -185,7 +192,7 @@ describe('sweep', () => {
           : Promise.resolve(),
       },
     )
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(1)
     expect(warn).toHaveBeenCalledWith("session 'broken' could not be archived", failure)
   })
 
@@ -203,16 +210,21 @@ describe('config resolution', () => {
     // `{ get() }` references. Reading them as plain values would turn every
     // number below into NaN and the switch into a permanently true value.
     expect(resolveConfig(Config({}))).toEqual({
-      enabled: true, idleDays: 30, projectIdleDays: 14, sweepIntervalMinutes: 1_440,
+      enabled: false, idleDays: 30, projectIdleDays: 14, includeDefaultWorkspace: false,
+      sweepIntervalMinutes: 1_440,
     })
-    expect(resolveConfig(Config({ idleDays: 7, projectIdleDays: 21, sweepIntervalMinutes: 60 })))
-      .toEqual({ enabled: true, idleDays: 7, projectIdleDays: 21, sweepIntervalMinutes: 60 })
-    expect(resolveConfig(Config({ enabled: false })).enabled).toBe(false)
+    expect(resolveConfig(Config({
+      enabled: true, idleDays: 7, projectIdleDays: 21, includeDefaultWorkspace: true,
+      sweepIntervalMinutes: 60,
+    }))).toEqual({
+      enabled: true, idleDays: 7, projectIdleDays: 21, includeDefaultWorkspace: true,
+      sweepIntervalMinutes: 60,
+    })
   })
 
   it('archives against the window the schema carries', async () => {
     const deps = dependencies([stored('ten-days', { createdAt: NOW - 10 * DAY })])
-    await expect(sweep(deps, resolveConfig(Config({ idleDays: 7 })))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig(Config({ enabled: true, idleDays: 7 })))).resolves.toBe(1)
     expect(deps.archived).toEqual(['ten-days'])
   })
 })
@@ -230,6 +242,8 @@ describe('workspace selection', () => {
       new Set([SessionId('archived-old')]),
       new Set(),
       14,
+      undefined,
+      false,
       NOW,
     )
     expect(changes).toEqual({ hide: [wid('stale')], restore: [] })
@@ -242,6 +256,8 @@ describe('workspace selection', () => {
       new Set(),
       new Set(),
       14,
+      undefined,
+      false,
       NOW,
     )
     expect(changes).toEqual({ hide: [], restore: [] })
@@ -254,6 +270,8 @@ describe('workspace selection', () => {
       new Set(),
       new Set(),
       14,
+      undefined,
+      false,
       NOW,
     )
     expect(changes).toEqual({ hide: [wid('child-only')], restore: [] })
@@ -269,9 +287,27 @@ describe('workspace selection', () => {
       new Set([SessionId('archived-old')]),
       new Set(),
       14,
+      undefined,
+      false,
       NOW,
     )
     expect(changes).toEqual({ hide: [], restore: [] })
+  })
+
+  it('never hides the default Workspace unless the deployment includes it', () => {
+    // The default Workspace's only conversation is archived: with the
+    // exemption the Workspace stays visible no matter how idle it is.
+    const workspaces = [facts('default-ws', ['old-session'], '2026-09-01T00:00:00.000Z')]
+    const sessionFacts = new Map([[SessionId('old-session'), { activity: NOW - 60 * DAY, topLevel: true }]])
+    const archived = new Set([SessionId('old-session')])
+    const exempt = selectWorkspaceChanges(
+      workspaces, sessionFacts, archived, new Set(), 14, wid('default-ws'), false, NOW,
+    )
+    expect(exempt).toEqual({ hide: [], restore: [] })
+    const included = selectWorkspaceChanges(
+      workspaces, sessionFacts, archived, new Set(), 14, wid('default-ws'), true, NOW,
+    )
+    expect(included).toEqual({ hide: [wid('default-ws')], restore: [] })
   })
 
   it('restores a hidden project that regained a visible conversation', () => {
@@ -281,6 +317,8 @@ describe('workspace selection', () => {
       new Set(),
       new Set([wid('back')]),
       14,
+      undefined,
+      false,
       NOW,
     )
     expect(changes).toEqual({ hide: [], restore: [wid('back')] })
@@ -312,7 +350,7 @@ describe('sweep workspace pass', () => {
         unarchiveWorkspace: (workspaceId) => (restored.push(workspaceId), Promise.resolve()),
       },
     )
-    await expect(sweep(deps, resolveConfig(Config({ idleDays: 7, projectIdleDays: 14 }))))
+    await expect(sweep(deps, resolveConfig(Config({ enabled: true, idleDays: 7, projectIdleDays: 14 }))))
       .resolves.toBe(1)
     expect(deps.archived).toEqual([])
     expect(hidden).toEqual([wid('idle')])

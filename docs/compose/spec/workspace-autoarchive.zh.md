@@ -39,9 +39,11 @@ commits: f9433f3732..HEAD
 
 **D6 — 客户端投影过滤。** 快照保持权威 —— 隐藏项目仍在 `items` 里 —— 每个投影按集合过滤：侧栏树分组、对话首行的项目选择器、会话搜索。隐藏项目的会话无处渲染，与已归档会话完全一致。
 
-**D7 — 扫描评估。** 对话趟之后是一趟项目评估，遍历 `registry.list()`：可见指实体账目里存在顶层未归档会话（`origin` 非 `subagent`、无 `parentSession`，置顶也算可见）；活动取全部账目会话（含已归档与子代理）的 `max(header.createdAt, snapshot.updatedAt)` —— 保守锚点 —— 无账目会话的项目取 `Date.parse(record.createdAt)`。项目没有可见会话且活动至少 `projectIdleDays` 旧时隐藏；隐藏项目一旦出现可见会话当场恢复，这样计划任务、导入或 webhook 往隐藏项目里挂会话时，项目在一次扫描内自己回来，而不是把会话困在不可见的分组里。写入走注册表方法，每次写入都经 follow 帧到达客户端。
+**D7 — 扫描评估。** 对话趟之后是一趟项目评估，遍历 `registry.list()`：可见指实体账目里存在顶层未归档会话（`origin` 非 `subagent`、无 `parentSession`，置顶也算可见）；活动取全部账目会话（含已归档与子代理）的 `max(header.createdAt, snapshot.updatedAt)` —— 保守锚点 —— 无账目会话的项目取 `Date.parse(record.createdAt)`。项目没有可见会话且活动至少 `projectIdleDays` 旧时隐藏；隐藏项目一旦出现可见会话当场恢复，这样计划任务、导入或 webhook 往隐藏项目里挂会话时，项目在一次扫描内自己回来，而不是把会话困在不可见的分组里。默认工作区（`registry.defaultWorkspaceId`）豁免：除非 `includeDefaultWorkspace` 开启，该趟跳过它，首次使用的 Workspace 始终可见。写入走注册表方法，每次写入都经 follow 帧到达客户端。
 
-**D8 — 配置。** `projectIdleDays`（自然数，1–3650，默认 14，volatile）加入 `enabled`/`idleDays`/`sweepIntervalMinutes`；`resolveConfig` 显式陈述。没有每次扫描的配额：该趟幂等且以注册表大小为界。
+**D8 — 配置。** `projectIdleDays`（自然数，1–3650，默认 14）与 `includeDefaultWorkspace`（布尔，默认 `false`）加入既有字段；全部 volatile，`resolveConfig` 逐个显式陈述。没有每次扫描的配额：该趟幂等且以注册表大小为界。
+
+**D11 — 默认 opt-in（Grill，2026-11-22）。** 总开关 `enabled` 默认 `false`：用户不在插件生成的设置页打开开关、或不在部署行写 `enabled: true` 时，自动整理绝不运行。出厂 `cordis.patch.yml` 行显式陈述每个默认值。用户侧行为记录在插件 README 对与网站指南页 `docs/user/guide/auto-archive.md`（「自动化」一节）。
 
 **D9 — 设置节。** 插件浏览器半边（`prism-about` 打包配方：`dsh.client`、`./client` 导出、`window.__ModuleLoader__` CJS banner、壳 seat 结构化声明）注册 `settings.section` id `archived-projects`、order 45。它读取客户端 Workspace 快照，列出每个隐藏项目（标题、路径、最新活动距今），并经 `ctx.uiWorkspace.unarchiveWorkspace` 逐行恢复。不做全部恢复：全恢复等于推翻这一节存在的卫生意义。本地化：zh 与 en 词典。
 
@@ -65,6 +67,7 @@ commits: f9433f3732..HEAD
 
 - [ ] 无可见顶层会话且最新活动至少 `projectIdleDays` 旧的项目在扫描后进入 `archivedWorkspaceIds`；其记录、顺序、标题和 `sessionIds` 不变。
 - [ ] 有可见顶层未归档会话的项目绝不隐藏；隐藏项目一旦出现一个，下一趟扫描解除隐藏。
+- [ ] `includeDefaultWorkspace` 为 `false` 时默认工作区绝不隐藏，为 `true` 时与其他项目同规则；`enabled` 为 `false`（出厂默认）时扫描不做任何事。
 - [ ] 对隐藏项目的 canonical path 调 `registry.create(path)` 解除隐藏并返回既有实体；controller 报告 `created: false`；不存在第二条记录。
 - [ ] baseline 携带 `archivedWorkspaceIds`；一次变更发布新帧；侧栏、选择器、搜索排除隐藏项目，设置节列出它们且逐行恢复可用。
 - [ ] 删除项目时从集合移除；集合里的未知 id 不破坏任何东西。

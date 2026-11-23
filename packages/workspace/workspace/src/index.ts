@@ -295,6 +295,16 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * The first-use Workspace identity, retained after its registration is
+   * deleted. Hygiene features treat this Workspace as exempt unless a
+   * deployment explicitly includes it.
+   * @returns the default Workspace id, or `undefined` before first-use initialization.
+   */
+  get defaultWorkspaceId(): WorkspaceId | undefined {
+    return this.requireState().defaultWorkspaceId
+  }
+
+  /**
    * Synchronous workspace projection in durable registry order. Every
    * entity's `sessionIds` getter is already filtered by the startup/live
    * canonical-cwd header index; this method performs no persistence reads.

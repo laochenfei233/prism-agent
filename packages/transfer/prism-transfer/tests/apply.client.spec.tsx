@@ -23,7 +23,7 @@ function fakeWorkspaces(): TransferFace['workspaces'] {
       getSnapshot: () => ({
         items: [{ workspaceId: 'w1' as WorkspaceId, path: '/p', title: '项目', sessionIds: [], createdAt: '', updatedAt: '' }],
         archivedSessionIds: [],
-        pinnedSessionIds: [],
+        pinnedSessionIds: [], archivedWorkspaceIds: [],
         state: 'idle',
         phase: 'ready',
         error: null,
@@ -37,6 +37,8 @@ function fakeWorkspaces(): TransferFace['workspaces'] {
     insertBefore: vi.fn(),
     archiveSession: vi.fn(),
     unarchiveSession: vi.fn(),
+    archiveWorkspace: vi.fn(),
+    unarchiveWorkspace: vi.fn(),
     pinSession: vi.fn(),
     unpinSession: vi.fn(),
     insertSessionBefore: vi.fn(),

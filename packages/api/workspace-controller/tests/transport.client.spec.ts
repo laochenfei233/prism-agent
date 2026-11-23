@@ -59,6 +59,7 @@ function accepts(overrides: Partial<WorkspaceFollowSink> = {}): WorkspaceFollowS
     removeView: ignore,
     replaceOrder: ignore,
     replaceArchived: ignore,
+  replaceArchivedWorkspaces: ignore,
     replacePinned: ignore,
     ...overrides,
   }

@@ -70,6 +70,8 @@ export interface SweepDependencies {
   archive(sessionId: SessionId): Promise<void>
   /** Every registered Workspace with its accounting, canonical-cwd filtered. */
   listWorkspaces(): readonly WorkspaceFacts[]
+  /** The first-use Workspace identity, or undefined before first-use initialization. */
+  defaultWorkspaceId(): WorkspaceId | undefined
   /** Workspaces already in the durable Workspace archive set. */
   archivedWorkspaceIds(): readonly WorkspaceId[]
   /**
@@ -178,12 +180,17 @@ export function selectIdleSessions(
  * A hidden Workspace with a visible conversation restores on the spot, so a
  * scheduled follow-up, import, or webhook attaching into a hidden project
  * brings it back within one sweep instead of stranding Sessions in an
- * invisible section.
+ * invisible section. The default Workspace is exempt: a project an inclusion
+ * flag does not name is never hidden (and never needs restoring), so the
+ * first-use Workspace stays visible unless the deployment explicitly allows
+ * archiving it.
  * @param workspaces - every registered Workspace.
  * @param sessionFacts - activity and top-level facts per listed Session.
  * @param archived - the Session archive set.
  * @param archivedWorkspaces - the Workspace archive set.
  * @param projectIdleDays - days of total inactivity after which an idle project hides.
+ * @param defaultWorkspaceId - the exempt first-use Workspace, when initialized.
+ * @param includeDefaultWorkspace - whether the default Workspace may hide.
  * @param now - current time in Unix epoch milliseconds.
  * @returns the hides and restores to write, in listing order.
  */
@@ -193,12 +200,15 @@ export function selectWorkspaceChanges(
   archived: ReadonlySet<SessionId>,
   archivedWorkspaces: ReadonlySet<WorkspaceId>,
   projectIdleDays: number,
+  defaultWorkspaceId: WorkspaceId | undefined,
+  includeDefaultWorkspace: boolean,
   now: number,
 ): WorkspaceChanges {
   const cutoff = now - projectIdleDays * DAY_MS
   const hide: WorkspaceId[] = []
   const restore: WorkspaceId[] = []
   for (const workspace of workspaces) {
+    if (workspace.id === defaultWorkspaceId && !includeDefaultWorkspace) continue
     let newest = Date.parse(workspace.createdAt)
     let visible = false
     for (const sessionId of workspace.sessionIds) {
@@ -283,6 +293,8 @@ async function archiveIdleWorkspaces(
     new Set(dependencies.archivedSessionIds()),
     new Set(dependencies.archivedWorkspaceIds()),
     config.projectIdleDays,
+    dependencies.defaultWorkspaceId(),
+    config.includeDefaultWorkspace,
     dependencies.now(),
   )
   for (const workspaceId of changes.hide) {
@@ -331,6 +343,7 @@ export function apply(ctx: Context, config: Config): void {
           createdAt: workspace.createdAt,
           sessionIds: workspace.sessionIds,
         })),
+        defaultWorkspaceId: () => ctx.workspaceRegistry.defaultWorkspaceId,
         archivedWorkspaceIds: () => ctx.workspaceRegistry.archivedWorkspaceIds,
         archiveWorkspace: workspaceId => ctx.workspaceRegistry.archiveWorkspace(workspaceId),
         unarchiveWorkspace: workspaceId => ctx.workspaceRegistry.unarchiveWorkspace(workspaceId),

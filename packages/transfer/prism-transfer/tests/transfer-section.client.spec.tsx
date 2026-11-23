@@ -31,7 +31,7 @@ function project(id: string, title: string, sessions: number): WorkspaceView {
 function fakeWorkspaces(items: ReturnType<typeof project>[]): TransferFace['workspaces'] {
   return {
     list: {
-      getSnapshot: () => ({ items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null }),
+      getSnapshot: () => ({ items, archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [], state: 'idle', phase: 'ready', error: null }),
       subscribe: vi.fn(() => () => {}),
     },
     create: vi.fn(),
@@ -41,6 +41,8 @@ function fakeWorkspaces(items: ReturnType<typeof project>[]): TransferFace['work
     insertBefore: vi.fn(),
     archiveSession: vi.fn(),
     unarchiveSession: vi.fn(),
+    archiveWorkspace: vi.fn(),
+    unarchiveWorkspace: vi.fn(),
     pinSession: vi.fn(),
     unpinSession: vi.fn(),
     insertSessionBefore: vi.fn(),

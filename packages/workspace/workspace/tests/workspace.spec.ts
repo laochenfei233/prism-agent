@@ -1516,6 +1516,16 @@ describe('first-use Workspace preparation', () => {
     expect(h.open).not.toHaveBeenCalled()
   })
 
+  it('exposes the default Workspace identity for hygiene exemptions', async () => {
+    const h = await firstUse()
+    expect(h.registry.defaultWorkspaceId).toBeUndefined()
+    const workspace = (await h.registry.initializeDefault(h.resolveDirectory))!
+    expect(h.registry.defaultWorkspaceId).toBe(workspace.id)
+    await h.registry.delete(workspace.id)
+    // The identity is retained after its registration is deleted.
+    expect(h.registry.defaultWorkspaceId).toBe(workspace.id)
+  })
+
   it('reuses an existing directory without changing its contents', async () => {
     const h = await firstUse()
     const directory = join(h.directoryRoot, 'nested', 'Workspace')
