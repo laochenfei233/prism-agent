@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for pocket-lan-bind.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/pocket-lan-bind.md
+/:
+  en: 069f156bcedcc79a
+  zh: 069f156bcedcc79a
+/pocket-lan-bind-action:
+  en: 2de6d45fa763fb27
+  zh: aa7904f2bd77b202
+/pocket-lan-bind-action/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/pocket-lan-bind-action/s1-problem:
+  en: 5fbc59f7bdb7e33e
+  zh: e0393da48e7d9407
+/pocket-lan-bind-action/s2-design:
+  en: 7528139c0f62a498
+  zh: 8c9e3e11b8657380
+/pocket-lan-bind-action/s3-scope:
+  en: cb8e9fd3f4d94a00
+  zh: 841f673d86ed3a9d
+/pocket-lan-bind-action/tasks:
+  en: 9f867e9df4a1ca68
+  zh: 7d57eb1575f56c07
+/pocket-lan-bind-action/s4-acceptance:
+  en: 15153696c6c275a1
+  zh: c92ead7e376b7254
