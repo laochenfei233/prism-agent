@@ -23,7 +23,7 @@ autonomy 组承载权限预设的自主档。组内的包在 `autonomous-guarded
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`prism-autonomy`](prism-autonomy/README.md) | 审批应答器、预设映射与实时切换通知 | service `prism-autonomy` |
+| [`prism-autonomy`](prism-autonomy/README.zh.md) | 审批应答器、预设映射与实时切换通知 | service `prism-autonomy` |
 
 -----
 
@@ -31,4 +31,4 @@ autonomy 组承载权限预设的自主档。组内的包在 `autonomous-guarded
 ## Related documentation
 
 - [自主审批预设特性文档](../../docs/compose/spec/prism-autonomy.zh.md) —— 设计、边界与验收项。
-- [权限预设](../interaction/permission-presets/README.md) —— 触发预设所在的预设表。
+- [权限预设](../interaction/permission-presets/README.zh.md) —— 触发预设所在的预设表。
