@@ -288,14 +288,20 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
                       ) : (
                         <>
                           <p className="pm-row-text">{row.text}</p>
-                          <div className="pm-actions">
-                            <Button size="sm" variant="outline" disabled={busy} onClick={() => { setEditing({ id: row.id, text: row.text }) }}>
-                              {t('editAction')}
-                            </Button>
-                            <Button size="sm" variant="ghost" disabled={busy} onClick={() => { onRetire(row) }}>
-                              {t('retireAction')}
-                            </Button>
-                          </div>
+                          {/* Edit and retire are operator writes with no calling
+                              session, so only a global record is reachable; the
+                              host refuses the rest, and the buttons say so up
+                              front by not rendering. */}
+                          {row.scope === 'global' && (
+                            <div className="pm-actions">
+                              <Button size="sm" variant="outline" disabled={busy} onClick={() => { setEditing({ id: row.id, text: row.text }) }}>
+                                {t('editAction')}
+                              </Button>
+                              <Button size="sm" variant="ghost" disabled={busy} onClick={() => { onRetire(row) }}>
+                                {t('retireAction')}
+                              </Button>
+                            </div>
+                          )}
                         </>
                       )}
                     </li>

@@ -249,6 +249,9 @@ describe('the consolidation window', () => {
     const standing = ctx.prismMemory.all().find(record => record.id === newer.record.id)
     expect(standing?.status).toBe('active')
     expect(standing?.supersedes).toBe(older.record.id)
+    // The journal records the verdict, so the recency choice is auditable.
+    const journal = ctx.prismMemory.journal(agent, 10)
+    expect(journal.some(entry => entry.text.includes('Resolved by recency (newer supersedes older)'))).toBe(true)
     // A wrong recency choice is one command away from undone.
     await ctx.prismMemory.restore(older.record.id, 'recency was wrong here', agent)
     expect(ctx.prismMemory.all().find(record => record.id === older.record.id)?.status).toBe('active')
