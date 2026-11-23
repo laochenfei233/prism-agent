@@ -27,8 +27,8 @@ base bundle 的 permission-presets 预设表新增一个预设：`autonomous-gua
 新插件 `@prism/prism-autonomy`（`plugins/prism-autonomy`），像其他 prism 插件一样通过 bundle patch 行接入。其配置：
 
 ```ts
-preset: string // 默认 'autonomous-guarded'——触发自主模式的预设
-requireHuman: Array<{ tool?: string; reasonPrefix?: string }> // 默认 [{ reasonPrefix: 'escalate sandbox to' }]
+preset: string // default 'autonomous-guarded' — the preset that engages autonomy
+requireHuman: Array<{ tool?: string; reasonPrefix?: string }> // default [{ reasonPrefix: 'escalate sandbox to' }]
 ```
 
 会话当前预设读取自一个 session projection `autonomy`，它折叠持久化的 `permission/preset` 事件，因此在重载与重启后仍然成立（可重放）。其余任何预设都意味着 off。配置错误在加载时响亮失败：`preset` 必须存在于 permission-presets 目录中。

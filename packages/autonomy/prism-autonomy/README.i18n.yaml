@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/autonomy/prism-autonomy/README.md
+/:
+  en: 499d426491625329
+  zh: 8b2ef9d005e4444b
+/prism-autonomy:
+  en: 02d1579ca403ad52
+  zh: 2c16aa3a028fb63c
+/prism-autonomy/summary:
+  en: ae8872e9323a5857
+  zh: 360cb092a8373924
+/prism-autonomy/table-of-contents:
+  en: 56d8f5dffc62235b
+  zh: 56d8f5dffc62235b
+/prism-autonomy/use-this-package:
+  en: cd8fec6ee1d25233
+  zh: 8be525691e6a19a7
+/prism-autonomy/switching:
+  en: 67fe090db52ee287
+  zh: 3d4158e68c6a2276
+/prism-autonomy/model-experience:
+  en: f6bfa3ca977e9f57
+  zh: 680cc2c043ce6406
+/prism-autonomy/known-limitations-and-deferred-work:
+  en: b482b0c7227eef0d
+  zh: 121cf69c2737d4f7
+/prism-autonomy/dev-note:
+  en: 315e3ae04002a494
+  zh: bbbf2df2d2e5b513
