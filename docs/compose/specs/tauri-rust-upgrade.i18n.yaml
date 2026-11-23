@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for tauri-rust-upgrade.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/tauri-rust-upgrade.md
+/:
+  en: 97b330a7cbf200ae
+  zh: 97b330a7cbf200ae
+/tauri-and-rust-upgrade-2-12-6-1-100-0:
+  en: e1d4a5dff1216d7d
+  zh: 18e2033735fa51fe
+/tauri-and-rust-upgrade-2-12-6-1-100-0/report:
+  en: f728b44c4a4b8aac
+  zh: 42537b11a1e21ee9
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s1-problem:
+  en: e62b13138ed01b38
+  zh: 316de1ef01201cad
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-1-branch-and-provenance:
+  en: fabf06d0f72e8f52
+  zh: 72c32725a64d96d0
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-2-target-matrix:
+  en: 814ea64e1bea61b4
+  zh: 84ec4734bca9a7e5
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-3-manifest-changes:
+  en: beab40516abacf31
+  zh: 6af0a4c01730aad6
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-4-lockfile:
+  en: eb861954feead3c6
+  zh: bf9cc9462e627860
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-5-nsis-template:
+  en: afa91e2a8c3ce9b7
+  zh: 41a1fe9840f9a9c9
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-6-toolchain-contract:
+  en: b481eccfaf482ab5
+  zh: cb6dbdc81cab3afb
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-7-build-and-installer-verification:
+  en: 0a367de31d7aabbf
+  zh: 5c9db04874f89dd2
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s2-design/s2-8-risks-and-rollback:
+  en: 8fed2dc38d3452b6
+  zh: 4bf01e35d366c879
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s3-scope:
+  en: db185238dac424e9
+  zh: 6055dcab4d210ff4
+/tauri-and-rust-upgrade-2-12-6-1-100-0/tasks:
+  en: 8c29e76f81eb4aaa
+  zh: abf9aff24031606e
+/tauri-and-rust-upgrade-2-12-6-1-100-0/s4-acceptance:
+  en: 73cc4a6ea35f3f61
+  zh: 1353dd8962f01cba
