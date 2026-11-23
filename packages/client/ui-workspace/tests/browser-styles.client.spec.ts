@@ -182,6 +182,25 @@ describe('WorkspaceBrowser.module.css list', () => {
       .toBe('linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent)')
   })
 
+  it('grows a row for a pending interaction and collapses an unoccupied line', () => {
+    const grown = rowDeclarations('.sessionRow.withPending')
+    expect(grown?.get('flex-wrap')).toBe('wrap')
+    expect(grown?.get('height')).toBe('auto')
+    expect(grown?.get('min-height')).toBe('32px')
+    // A question or plan review — whose own interaction UI lives in the
+    // composer — leaves the seat's outlet anchor empty, so the line collapses
+    // instead of standing in as a blank second row.
+    expect(rowDeclarations(
+      ".pendingLine:has(> [data-slot='sidebar.workspaces.session.pending']:empty)",
+    )?.get('display')).toBe('none')
+    // border-box keeps the title-aligned indent inside the row instead of
+    // overflowing the list's scroll clip.
+    const line = rowDeclarations('.pendingLine')
+    expect(line?.get('box-sizing')).toBe('border-box')
+    expect(line?.get('flex')).toBe('0 0 100%')
+    expect(line?.get('padding-inline-start')).toBe('20px')
+  })
+
   it('pins both rail controls to the shared left anchor during the column slide', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
