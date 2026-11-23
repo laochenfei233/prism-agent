@@ -117,6 +117,13 @@
     - id: prism-data
       name: '@prism/prism-data'
 
+    # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+    # Autonomy: the autonomous-guarded preset auto-answers approval requests
+    # through the approval seam; sandbox escalations still ask. The engaging
+    # preset ships in the base patch's permission row.
+    - id: prism-autonomy
+      name: '@prism/prism-autonomy'
+
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application
     # renders no button). Two halves: the host routes and the browser surface.

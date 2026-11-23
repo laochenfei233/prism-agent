@@ -304,6 +304,16 @@
             sandbox: danger-full-access
             approval: never
 
+          # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
+          # Autonomous tier: keep the workspace sandbox and the deny rails,
+          # auto-answer every approval except sandbox escalations. Engaged by
+          # the prism-autonomy plugin (the web bundle's autonomy row).
+          autonomous-guarded:
+            sandbox: workspace-write
+            approval: ask
+            name: autonomous-guarded
+            description: 'Workspace writes under sandbox confinement; approval requests are answered automatically except sandbox escalations, which still ask.'
+
     - id: shell-env
       name: '@deepseek-ai/dsh-shell-env'
 
