@@ -14,7 +14,7 @@ import { en, NS, zh } from './locales.ts'
 export { NS }
 export { archivedWorkspaceRows } from './rows.ts'
 export type { ArchivedWorkspaceRow, ArchivedWorkspacesInput } from './rows.ts'
-export { when } from './ArchivedProjectsSection.tsx'
+export { when } from './rows.ts'
 export type { ArchivedProjectsSectionProps } from './ArchivedProjectsSection.tsx'
 
 /** Services required by the browser half. */

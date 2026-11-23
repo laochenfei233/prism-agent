@@ -6,7 +6,7 @@
  * project through the Workspace navigation; it owns no state the Host also owns.
  */
 import { useState, useSyncExternalStore } from 'react'
-import { archivedWorkspaceRows, type ArchivedWorkspaceRow } from './rows.ts'
+import { archivedWorkspaceRows, when, type ArchivedWorkspaceRow } from './rows.ts'
 import { ARCHIVED_CSS } from './styles.ts'
 
 /** Props bound by the settings renderer. */
@@ -45,23 +45,6 @@ export interface ArchivedProjectsSectionContext {
     }
   }
   uiWorkspace: { unarchiveWorkspace(workspaceId: string): Promise<void> }
-}
-
-/** Milliseconds in one hour. */
-const HOUR_MS = 3_600_000
-/** Milliseconds in one day. */
-const DAY_MS = 86_400_000
-
-/**
- * Format one last-activity time the way a person reads it.
- * @param at - epoch milliseconds; `0` when the time is unknown.
- * @returns a compact relative label.
- */
-export function when(at: number): string {
-  if (at <= 0) return '—'
-  const elapsed = Date.now() - at
-  if (elapsed < DAY_MS) return `${Math.max(1, Math.round(elapsed / HOUR_MS))}h`
-  return `${Math.round(elapsed / DAY_MS)}d`
 }
 
 /**
