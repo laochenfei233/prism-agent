@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for folder-to-project.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/folder-to-project.md
+/:
+  en: 1e8b9521a2cbcb1c
+  zh: 1e8b9521a2cbcb1c
+/folder-to-project-pull:
+  en: dc93ef1b8498e919
+  zh: cd309885eb48570f
+/folder-to-project-pull/report:
+  en: 67f5948807d0116c
+  zh: 968cc649b0b2406f
+/folder-to-project-pull/s1-problem:
+  en: a783705de6b721f2
+  zh: 1379602756966280
+/folder-to-project-pull/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/folder-to-project-pull/s2-design/s2-1-directory-drop-interception:
+  en: a4d9fd03c63143a5
+  zh: d396a8f0cccec6c6
+/folder-to-project-pull/s2-design/s2-2-create-project-dialog:
+  en: 42f8d223c873e5f1
+  zh: dfeb2e928d3d64dd
+/folder-to-project-pull/s2-design/s2-3-workspace-wiring:
+  en: d5efe88d990bf569
+  zh: c7baf46e9e169c77
+/folder-to-project-pull/s2-design/s2-4-copy-and-locales:
+  en: 2752108ea0107dc2
+  zh: 3670cb98ee0d17e9
+/folder-to-project-pull/scope:
+  en: 28c5c4786d39e5e2
+  zh: 9b52ec1ea7ab2a99
+/folder-to-project-pull/tasks:
+  en: 29f0948269a2d03d
+  zh: e12e6300deb6c619
+/folder-to-project-pull/s4-acceptance:
+  en: d7bb2f0ec6319c00
+  zh: 9147398ba01cce1c
