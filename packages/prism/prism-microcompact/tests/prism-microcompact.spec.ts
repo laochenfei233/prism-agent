@@ -149,6 +149,13 @@ describe('microcompact configuration', () => {
     expect(DEFAULTS.tools).toBeUndefined()
   })
 
+  it('treats an empty tools list as the documented omission', () => {
+    // Schemastery turns an omitted array field into []; the guard must keep
+    // clearing every tool's stale results in that shape.
+    const resolved = resolveConfig({ thresholdRatio: 0.5, headroomTokens: 0, keepRecentResults: 2, tools: [] })
+    expect(resolved.tools).toBeUndefined()
+  })
+
   it('rejects invalid configuration', () => {
     const bad = [
       [{ threshold: 10 }, /unknown key "threshold"/],
@@ -310,7 +317,7 @@ describe('microcompact surface pass', () => {
 describe('pre-step guard listener', () => {
   function preStep(ctx: Context, owner: Agent, signal = SIGNAL): Promise<PreStepDecision> {
     return agentEvents(ctx, owner).waterfall(
-      'agent/pre-step', { messages: [], turn: 1, step: 1, signal },
+      'agent/pre-step', { messages: [], turn: 1, step: 1, signal, modelSelection: { provider: MODEL, model: MODEL } },
       () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
     )
   }

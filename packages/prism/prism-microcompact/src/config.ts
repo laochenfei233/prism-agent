@@ -41,7 +41,9 @@ export function resolveConfig(config: PrismMicrocompactConfig = {}): ResolvedCon
     thresholdRatio: config.thresholdRatio ?? DEFAULTS.thresholdRatio,
     headroomTokens: config.headroomTokens ?? DEFAULTS.headroomTokens,
     keepRecentResults: config.keepRecentResults ?? DEFAULTS.keepRecentResults,
-    tools: config.tools === undefined ? undefined : deepFreeze([...config.tools]),
+    // Schemastery turns an omitted array field into `[]`; treat that like the
+    // documented omission so an unconfigured filter clears every tool's results.
+    tools: config.tools === undefined || config.tools.length === 0 ? undefined : deepFreeze([...config.tools]),
   }
   if (!Number.isFinite(resolved.thresholdRatio) || resolved.thresholdRatio <= 0 || resolved.thresholdRatio > 1) {
     throw new Error(`PrismMicrocompactConfig: thresholdRatio (${resolved.thresholdRatio}) must be within (0, 1]`)
