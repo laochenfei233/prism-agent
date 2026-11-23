@@ -45,7 +45,7 @@ Every tool result older than the most recent `keepRecentResults` results is repl
 
 ### Setting the thresholds
 
-All settings are optional. The generated [configuration catalog](../../../docs/config-catalog.md#prism-aiprism-microcompact) is the exhaustive source.
+All settings are optional. The generated [configuration catalog](../../../docs/config-catalog.md#prismprism-microcompact) is the exhaustive source.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -104,7 +104,7 @@ Read these pages when the package-level contract is not enough; they move from t
 - [Compaction seam](../../compaction/compaction/README.md) — the condensation contract whose replacement protocol the pass reuses.
 - [Tool-result pruner](../../compaction/compaction-tool-result-pruner/README.md) — the size-based sibling pass that runs inside compaction.
 - [Token meter](../../llm/token-meter/README.md) — the measurement service behind the arming decision.
-- [Generated configuration catalog](../../../docs/config-catalog.md#prism-aiprism-microcompact) — every accepted config field and its source declaration.
+- [Generated configuration catalog](../../../docs/config-catalog.md#prismprism-microcompact) — every accepted config field and its source declaration.
 
 -----
 

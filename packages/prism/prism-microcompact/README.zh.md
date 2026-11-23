@@ -45,7 +45,7 @@ kind: "package-reference"
 
 ### 设置阈值
 
-所有设置均可选。生成的[配置目录](../../../docs/config-catalog.zh.md#prism-aiprism-microcompact)是穷尽来源。
+所有设置均可选。生成的[配置目录](../../../docs/config-catalog.zh.md#prismprism-microcompact)是穷尽来源。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -104,7 +104,7 @@ kind: "package-reference"
 - [Compaction seam](../../compaction/compaction/README.zh.md) — 本插件复用其替换协议的压缩契约。
 - [Tool-result pruner](../../compaction/compaction-tool-result-pruner/README.zh.md) — 在压缩内部运行的按体积清理的姊妹流程。
 - [Token meter](../../llm/token-meter/README.zh.md) — 启动决策背后的计量服务。
-- [Generated configuration catalog](../../../docs/config-catalog.zh.md#prism-aiprism-microcompact) — 每个接受的配置字段及其来源声明。
+- [Generated configuration catalog](../../../docs/config-catalog.zh.md#prismprism-microcompact) — 每个接受的配置字段及其来源声明。
 
 -----
 
