@@ -2303,6 +2303,30 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'microcompact',
+    summary: 'Model-free context guard.',
+    description: 'Model-free context guard. Above its arming threshold it clears stale tool results in place (no model call), which can hold a conversation below `dsh-compaction-basic`\'s summarization threshold indefinitely. Guard failures log a warning and never block the step.',
+    methods: [
+      {
+        signature: 'readonly config: ResolvedConfig',
+        description: 'Resolved and immutable guard configuration.',
+        parameters: [],
+      },
+      {
+        signature: 'async microcompactIfNeeded( agent: MicrocompactAgent, signal: AbortSignal, ): Promise<MicrocompactResult | null>',
+        description: 'Run one microcompact pass when the routed conversation is at or above the configured arming threshold.',
+        parameters: [{ name: 'agent', description: 'agent owning the measured session surface.' }, { name: 'signal', description: 'live turn cancellation signal forwarded to route resolution.' }],
+        returns: 'the landed pass, or `null` when no durable routed request exists, the routed model declares no context capacity, or pressure is below threshold.',
+      },
+      {
+        signature: 'async pressure(agent: MicrocompactAgent): Promise<PressureSnapshot | null>',
+        description: 'Measure the routed conversation against the microcompact arming threshold.',
+        parameters: [{ name: 'agent', description: 'agent owning the measured session surface.' }],
+        returns: 'a detached snapshot, or `null` when no durable routed request exists yet or the routed model declares no context capacity.',
+      },
+    ],
+  },
+  {
     key: 'officeToPdf',
     summary: 'A provider lifetime owns all converters, queued calls, and temporary files.',
     description: 'A provider lifetime owns all converters, queued calls, and temporary files.',
@@ -4565,8 +4589,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'webServer',
-    summary: 'The browser HTTP carrier service.',
-    description: 'The browser HTTP carrier service. Activation loads any configured TLS material, then listens immediately; a material or listen failure rejects initialization, and the boot process reports the failed fiber. Route registration order does not affect requests because configured named routes must be distinct, and a request no named route matches is answered 404 until the fallback owner registers.',
+    summary: 'Serves the Web client at the configured local bind address over HTTP or TLS.',
+    description: 'Serves the Web client at the configured local bind address over HTTP or TLS.',
     methods: [
       {
         signature: 'getOrigin(): string',
@@ -6032,6 +6056,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ClaimOutcome',
     declaration: 'export interface ClaimOutcome {\n    readonly claimed: number;\n    readonly skipped: number;\n}',
+  },
+  {
+    name: 'ClearedEntry',
+    declaration: 'export interface ClearedEntry {\n    readonly originalSeq: SessionSeq;\n    readonly replacementSeq: SessionSeq;\n    readonly callId: ToolCallId;\n    readonly toolName: string;\n}',
   },
   {
     name: 'ClientArtifactBaseline',
@@ -7558,6 +7586,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface MessageSourceMap {\n    user: {\n        kind: \'user\';\n    };\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n    \'system-prompt\': SystemPromptMessageSource;\n}',
   },
   {
+    name: 'MicrocompactResult',
+    declaration: 'export interface MicrocompactResult {\n    readonly cleared: readonly ClearedEntry[];\n    readonly estimatedTokensFreed: number;\n}',
+  },
+  {
     name: 'ModDefinition',
     declaration: 'export interface ModDefinition {\n    readonly name: string;\n    readonly version?: string;\n    readonly root?: string;\n    readonly options?: PluginOptions;\n    readonly register: ModRegister;\n}',
   },
@@ -7904,6 +7936,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PresetSpec',
     declaration: 'export interface PresetSpec {\n    sandbox: SandboxMode;\n    approval: ApprovalPolicy;\n    name?: string;\n    description?: string;\n}',
+  },
+  {
+    name: 'PressureSnapshot',
+    declaration: 'export interface PressureSnapshot {\n    readonly totalTokens: number;\n    readonly contextWindow: number;\n    readonly thresholdTokens: number;\n    readonly willMicrocompact: boolean;\n}',
   },
   {
     name: 'PreStepDecision',

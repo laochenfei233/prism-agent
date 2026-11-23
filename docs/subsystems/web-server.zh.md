@@ -211,7 +211,7 @@ Source: [`packages/bundle/web-app/src/index.ts`](../../packages/bundle/web-app/s
 
 ### `ctx.webServer` — `WebServer`
 
-The browser HTTP carrier service. Activation loads any configured TLS material, then listens immediately; a material or listen failure rejects initialization, and the boot process reports the failed fiber. Route registration order does not affect requests because configured named routes must be distinct, and a request no named route matches is answered 404 until the fallback owner registers.
+Serves the Web client at the configured local bind address over HTTP or TLS.
 
 ```ts cordis-catalog
 /**

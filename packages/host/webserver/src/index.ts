@@ -427,6 +427,9 @@ const bindLiteral = z.transform(z.string(), (value) => {
   return value
 })
 
+/**
+ * Serves the Web client at the configured local bind address over HTTP or TLS.
+ */
 export class WebServer extends Service {
   static Config: z<Config> = z.object({
     host: bindLiteral.required(),

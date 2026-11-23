@@ -209,6 +209,34 @@ Types: [CommandId](commands.zh.md) · [SessionSeq](session.zh.md)
 
 Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
 
+<a id="ctxmicrocompact--prismmicrocompact"></a>
+
+### `ctx.microcompact` — `PrismMicrocompact`
+
+Model-free context guard. Above its arming threshold it clears stale tool results in place (no model call), which can hold a conversation below `dsh-compaction-basic`'s summarization threshold indefinitely. Guard failures log a warning and never block the step.
+
+```ts cordis-catalog
+/**
+ * Run one microcompact pass when the routed conversation is at or above the
+ * configured arming threshold.
+ * @param agent - agent owning the measured session surface.
+ * @param signal - live turn cancellation signal forwarded to route resolution.
+ * @returns the landed pass, or `null` when no durable routed request exists,
+ * the routed model declares no context capacity, or pressure is below threshold.
+ */
+async microcompactIfNeeded( agent: MicrocompactAgent, signal: AbortSignal, ): Promise<MicrocompactResult | null>
+
+/**
+ * Measure the routed conversation against the microcompact arming threshold.
+ * @param agent - agent owning the measured session surface.
+ * @returns a detached snapshot, or `null` when no durable routed request
+ * exists yet or the routed model declares no context capacity.
+ */
+async pressure(agent: MicrocompactAgent): Promise<PressureSnapshot | null>
+```
+
+Source: [`packages/prism/prism-microcompact/src/index.ts`](../../packages/prism/prism-microcompact/src/index.ts)
+
 <a id="ctxtoolresultpruner--toolresultpruner"></a>
 
 ### `ctx.toolResultPruner` — `ToolResultPruner`

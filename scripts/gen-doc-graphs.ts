@@ -333,6 +333,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction.',
   },
   {
+    key: 'microcompact',
+    pkg: 'prism-microcompact',
+    title: 'Model-free microcompact guard',
+    mode: 'core',
+    consumers: ['compaction-basic'],
+    note: 'Clears stale current tool results ahead of its lower arming threshold, holding conversations below the summarization arm point.',
+  },
+  {
     key: 'sessions',
     pkg: 'session',
     title: 'In-memory session store',

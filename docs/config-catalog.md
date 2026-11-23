@@ -2086,7 +2086,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:97`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:98`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -2101,6 +2101,20 @@ export interface Config {
    * load: it would expose the port on every interface at once.
    */
   host: string
+  /**
+   * Extra concrete addresses that bind the same port next to `host`: a phone
+   * on the machine's network reaches `additionalHosts` while the primary keeps
+   * serving its own audience. Each entry follows the `host` rules (concrete
+   * IPv4/IPv6 literal, wildcard rejected) and must not repeat `host` or another
+   * entry — duplicates fail the load. A listen on one entry can still fail
+   * after the load — the address left the machine between composition and
+   * listen (DHCP), or another socket holds the port — and that failure logs a
+   * warning and drops only that address: the primary listener and the entries
+   * that did bind keep serving. Requires an explicit `port`, because port 0
+   * asks the OS for a fresh port per listener and the addresses would then
+   * serve different ports.
+   */
+  additionalHosts?: string[]
   /** Listen port; zero requests an OS-assigned port. */
   port: number
   /**
@@ -5179,6 +5193,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@prism/prism-meeting -->
+
+<!-- BEGIN GENERATED config-catalog:@prism/prism-microcompact -->
+<a id="prismprism-microcompact"></a>
+
+## `@prism/prism-microcompact`
+
+- `inject`: `llm` · `tokenMeter`
+- `source`: [`packages/prism/prism-microcompact/src/types.ts:7`](../packages/prism/prism-microcompact/src/types.ts)
+
+```ts config-catalog
+/** Raw plugin configuration for the microcompact guard. */
+export interface PrismMicrocompactConfig {
+  /** Arm microcompact at this fraction of the routed context window (default `0.7`). */
+  thresholdRatio?: number
+  /**
+   * Capacity withheld after the output reservation before microcompact arms
+   * (default `131072`). Keeping this below `dsh-compaction-basic`'s `headroomTokens`
+   * is what lets the cheaper pass arm before summarization does.
+   */
+  headroomTokens?: number
+  /** Most recent tool results always retained (default `4`). */
+  keepRecentResults?: number
+  /** Tool names eligible for stale clearing; omission clears every tool's stale results. */
+  tools?: string[]
+}
+```
+<!-- END GENERATED config-catalog:@prism/prism-microcompact -->
 
 <!-- BEGIN GENERATED config-catalog:@prism/prism-session-import -->
 <a id="prismprism-session-import"></a>
