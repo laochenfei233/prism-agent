@@ -456,6 +456,10 @@ export class WebServer extends Service {
    */
   private readonly tlsConnections = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
+  /** TLS material loaded at activation, shared by activation and runtime binds. */
+  private tlsMaterial: { cert: string; key: string; certFile: string; keyFile: string } | undefined
+  /** Set by disposal; a runtime bind after disposal would leak a listener no cleanup owns. */
+  private closed = false
   private fallback: WebRoute['handler'] | Pick<WebResourceRoute, 'resource'> | undefined
   private servers: Server[] = []
   private readonly additionalHosts: readonly string[]
@@ -488,6 +492,32 @@ export class WebServer extends Service {
       throw new Error('webserver: additionalHosts requires an explicit port; port 0 binds a fresh OS port per listener')
     }
     this.additionalHosts = resolved.additionalHosts ?? []
+  }
+
+  /**
+   * Bind one more concrete local address on the configured port after
+   * activation — the phone-access page's remedy for a loopback-only launch.
+   * The address joins {@link hosts}, the authority list the `/api` trust
+   * fence reads, and disposal closes its listener. A wildcard, a non-literal,
+   * an already-bound address, a port-0 deployment, or a disposed service
+   * throws; a failed listen throws with the OS reason and leaves the serving
+   * listeners untouched.
+   * @param host - one concrete IPv4 or IPv6 literal of a local interface.
+   */
+  async bindAdditionalHost(host: string): Promise<void> {
+    if (this.closed) throw new Error('webserver: the service is disposed; no further address can bind')
+    if (isWildcardHost(host)) {
+      throw new Error(`webserver: host ${JSON.stringify(host)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
+    }
+    if (this.config.port === 0) throw new Error('webserver: a runtime bind requires an explicit port; port 0 binds a fresh OS port per listener')
+    const canonical = normalizeBindAddress(host)
+    if (this.hosts.some(bound => normalizeBindAddress(bound) === canonical)) {
+      throw new Error(`webserver: host ${JSON.stringify(host)} is already bound`)
+    }
+    const server = this.buildListener()
+    await this.listenOn(server, canonical)
+    this.servers.push(server)
+    this.boundAdditional.push(canonical)
   }
 
   /** The listening port (the OS-assigned value when config.port is 0), or `undefined` before `listen` binds. */
@@ -620,37 +650,6 @@ export class WebServer extends Service {
       const at = this.indexTaps.indexOf(transform)
       if (at !== -1) this.indexTaps.splice(at, 1)
     }
-  }
-
-  /** TLS material loaded at activation, shared by activation and runtime binds. */
-  private tlsMaterial: { cert: string; key: string; certFile: string; keyFile: string } | undefined
-  /** Set by disposal; a runtime bind after disposal would leak a listener no cleanup owns. */
-  private closed = false
-
-  /**
-   * Bind one more concrete local address on the configured port after
-   * activation — the phone-access page's remedy for a loopback-only launch.
-   * The address joins {@link hosts}, the authority list the `/api` trust
-   * fence reads, and disposal closes its listener. A wildcard, a non-literal,
-   * an already-bound address, a port-0 deployment, or a disposed service
-   * throws; a failed listen throws with the OS reason and leaves the serving
-   * listeners untouched.
-   * @param host - one concrete IPv4 or IPv6 literal of a local interface.
-   */
-  async bindAdditionalHost(host: string): Promise<void> {
-    if (this.closed) throw new Error('webserver: the service is disposed; no further address can bind')
-    if (isWildcardHost(host)) {
-      throw new Error(`webserver: host ${JSON.stringify(host)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
-    }
-    if (this.config.port === 0) throw new Error('webserver: a runtime bind requires an explicit port; port 0 binds a fresh OS port per listener')
-    const canonical = normalizeBindAddress(host)
-    if (this.hosts.some(bound => normalizeBindAddress(bound) === canonical)) {
-      throw new Error(`webserver: host ${JSON.stringify(host)} is already bound`)
-    }
-    const server = this.buildListener()
-    await this.listenOn(server, canonical)
-    this.servers.push(server)
-    this.boundAdditional.push(canonical)
   }
 
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */

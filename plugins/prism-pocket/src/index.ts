@@ -353,7 +353,7 @@ async function remoteResponse(request: Request, runtime: PocketRuntime): Promise
 }
 
 /** Answer one LAN bind request: bind the LAN address, then report the fresh status. */
-async function lanBindResponse(_request: Request, runtime: PocketRuntime): Promise<Response> {
+export async function lanBindResponse(_request: Request, runtime: PocketRuntime): Promise<Response> {
   const result = await applyLanBind(runtime.webserver)
   if (!result.ok) return jsonResponse({ error: result.error }, result.status)
   return jsonResponse(await statusOf(runtime))
