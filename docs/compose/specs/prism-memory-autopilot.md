@@ -3,7 +3,7 @@ feature: prism-memory-autopilot
 status: delivered
 updated: 2026-11-23
 branch: feat/prism-memory-autopilot
-commits: b99ebbb2bb..c328fe507c
+commits: b99ebbb2bb..13e5ff6bdf
 worktree: .worktrees/prism-memory-autopilot
 ---
 
@@ -33,6 +33,8 @@ Two follow-ups shipped in the same pass:
 
 - **Scheduled tidy.** The hygiene pass also runs on a wall clock — `scheduledMaintain` (default on) every `scheduledMaintainMinutes` (default 360) and once shortly after load — so a quiet workspace still gets expiry archiving, duplicate merging, and capacity eviction. Background failures are contained; the turn-path passes stay loud.
 - **Page edit and retire.** The memory page rewrites a claim through the supersede chain (inheriting layer, class, scope, tags; the old wording stays auditable and `/memory restore` rolls back) and retires one through the same path as `/memory forget`. Both are operator writes with no calling session, so session-scoped claims stay under their session's authority.
+
+The independent review returned **Approve**: every acceptance criterion and amendment claim verified with evidence, no critical findings. Its minor items were closed in the same pass — the consolidation journal's recency-verdict line is now asserted, the browser request client covers the edit/retire decodes, and the page renders the edit/retire buttons only for the global records the operator routes admit (231 specs green, both tsc faces clean, `build:check` 2/2).
 
 ## [S1] Problem
 
