@@ -1,15 +1,15 @@
 ---
-description: "Model-free context guardrails for Prism deployments: clearing stale tool results before summarization compaction and tracking the arming threshold."
+description: "Model-free context compaction for Prism deployments: clearing stale tool results before summarization compaction and tracking the arming threshold."
 kind: "package-reference"
 ---
 
-# @prism-ai/prism-guardrails
+# @prism-ai/prism-microcompact
 
 English | [中文](README.zh.md)
 
 ## Summary
 
-`prism-guardrails` holds a conversation below `dsh-compaction-basic`'s summarization threshold with a model-free microcompact pass. When estimated pressure crosses its lower arming threshold, it replaces stale tool results — everything older than the most recent few — with a short stub naming the tool, so recent detail survives and summarization runs later or never. Each replacement follows the shared shadow-price protocol, and the complete originals remain in the session log for exact replay. The service also exposes the current pressure against the arming threshold for consumers that report it.
+`prism-microcompact` holds a conversation below `dsh-compaction-basic`'s summarization threshold with a model-free microcompact pass. When estimated pressure crosses its lower arming threshold, it replaces stale tool results — everything older than the most recent few — with a short stub naming the tool, so recent detail survives and summarization runs later or never. Each replacement follows the shared shadow-price protocol, and the complete originals remain in the session log for exact replay. The service also exposes the current pressure against the arming threshold for consumers that report it.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ Mount token measurement, this package, and the backend in this order:
 
 ```yaml
 - name: '@deepseek-ai/dsh-token-meter'
-- name: '@prism-ai/prism-guardrails'
+- name: '@prism-ai/prism-microcompact'
 - name: '@deepseek-ai/dsh-compaction-basic'
 ```
 
@@ -45,7 +45,7 @@ Every tool result older than the most recent `keepRecentResults` results is repl
 
 ### Setting the thresholds
 
-All settings are optional. The generated [configuration catalog](../../../docs/config-catalog.md#prism-aiprism-guardrails) is the exhaustive source.
+All settings are optional. The generated [configuration catalog](../../../docs/config-catalog.md#prism-aiprism-microcompact) is the exhaustive source.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -68,13 +68,13 @@ Clearing runs between steps, before compaction-basic's own pressure check in the
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-This section explains the design decisions behind the guard; the observable behavior is fully covered in [Use this package](#use-this-package).
+This section explains the design decisions behind the pass; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy
 
-The guard is built on three commitments:
+The pass is built on three commitments:
 
-- **Own headroom, compaction's envelope shape.** The arming threshold mirrors `dsh-compaction-basic`'s `min` formula but with the guard's own `headroomTokens`; without it, compaction's headroom would clamp every ratio into the same threshold and the pass could never arm first.
+- **Own headroom, compaction's envelope shape.** The arming threshold mirrors `dsh-compaction-basic`'s `min` formula but with the pass's own `headroomTokens`; without it, compaction's headroom would clamp every ratio into the same threshold and the pass could never arm first.
 - **Replay-safe replacement.** The original event remains in the append-only log; the replacement cites it through `sourceEventSeqs`, so replay recovers the exact input that produced the stub.
 - **The shadow-price protocol.** `compaction/prune` immediately precedes each replacement, pricing the exact replaced range through the injected token meter so pure consumers subtract it without per-node state.
 
@@ -86,10 +86,10 @@ One pass folds the current surface into a `callId → toolName` map from assista
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `PrismGuardrails` service, pre-step listener, `microcompactIfNeeded` / `pressure` |
-| [`src/config.ts`](src/config.ts) | Defaults, validation, arming-threshold math, `GuardrailPressureConfigError` |
+| [`src/index.ts`](src/index.ts) | Plugin entry: `PrismMicrocompact` service, pre-step listener, `microcompactIfNeeded` / `pressure` |
+| [`src/config.ts`](src/config.ts) | Defaults, validation, arming-threshold math, `MicrocompactPressureConfigError` |
 | [`src/microcompact.ts`](src/microcompact.ts) | Stale selection, stub content, durable replacement protocol |
-| [`src/types.ts`](src/types.ts) | `PrismGuardrailsConfig`, `ResolvedConfig`, `ClearedEntry`, `MicrocompactResult`, `PressureSnapshot` |
+| [`src/types.ts`](src/types.ts) | `PrismMicrocompactConfig`, `ResolvedConfig`, `ClearedEntry`, `MicrocompactResult`, `PressureSnapshot` |
 
 </details>
 
@@ -98,13 +98,13 @@ One pass folds the current surface into a `callId → toolName` map from assista
 <a id="further-exploration"></a>
 ## Further Exploration
 
-Read these pages when the package-level contract is not enough; they move from this guard to the backend it delays and the pricing service it measures with.
+Read these pages when the package-level contract is not enough; they move from this pass to the backend it delays and the pricing service it measures with.
 
-- [Compaction basic backend](../../compaction/compaction-basic/README.md) — the summarization backend this guard delays.
-- [Compaction seam](../../compaction/compaction/README.md) — the condensation contract whose replacement protocol the guard reuses.
+- [Compaction basic backend](../../compaction/compaction-basic/README.md) — the summarization backend this pass delays.
+- [Compaction seam](../../compaction/compaction/README.md) — the condensation contract whose replacement protocol the pass reuses.
 - [Tool-result pruner](../../compaction/compaction-tool-result-pruner/README.md) — the size-based sibling pass that runs inside compaction.
 - [Token meter](../../llm/token-meter/README.md) — the measurement service behind the arming decision.
-- [Generated configuration catalog](../../../docs/config-catalog.md#prism-aiprism-guardrails) — every accepted config field and its source declaration.
+- [Generated configuration catalog](../../../docs/config-catalog.md#prism-aiprism-microcompact) — every accepted config field and its source declaration.
 
 -----
 
@@ -130,10 +130,10 @@ Replacing an earlier result invalidates reuse from the first changed token. Clea
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the guard is a poor fit or needs special care; they are the current package constraints.
+These limits define when the pass is a poor fit or needs special care; they are the current package constraints.
 
 - **Age is not importance** — the pass clears by recency only; a stale result holding the only copy of a fact is cleared like any other, and the model must re-run the tool to recover it.
-- **Threshold relationship is documented, not enforced** — the guard cannot read `dsh-compaction-basic`'s effective arm point, so a misconfigured deployment arms both passes at the same pressure and the guard pass becomes a no-op.
+- **Threshold relationship is documented, not enforced** — the pass cannot read `dsh-compaction-basic`'s effective arm point, so a misconfigured deployment arms both passes at the same pressure and the pass becomes a no-op.
 - **Estimated tokens, not exact** — `ctx.tokenMeter` heuristics decide arming; the provider's exact accounting can differ.
 
 <a id="dev-note"></a>

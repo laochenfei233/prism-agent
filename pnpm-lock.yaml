@@ -2455,9 +2455,9 @@ importers:
       '@deepseek-ai/dsh-working-directory':
         specifier: workspace:*
         version: link:../../session/working-directory
-      '@prism-ai/prism-guardrails':
+      '@prism-ai/prism-microcompact':
         specifier: workspace:*
-        version: link:../../prism/prism-guardrails
+        version: link:../../prism/prism-microcompact
       '@prism-ai/prism-meeting':
         specifier: workspace:*
         version: link:../../prism/prism-meeting
@@ -12161,7 +12161,7 @@ importers:
         specifier: workspace:*
         version: link:../../core/system-prompt
 
-  packages/prism/prism-guardrails:
+  packages/prism/prism-microcompact:
     dependencies:
       '@deepseek-ai/dsh-util-values':
         specifier: workspace:*

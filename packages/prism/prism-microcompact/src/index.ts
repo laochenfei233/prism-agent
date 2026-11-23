@@ -1,10 +1,10 @@
 /**
- * Prism guardrails service (`ctx.guardrails`): a model-free microcompact pass
+ * Prism microcompact service (`ctx.microcompact`): a model-free microcompact pass
  * that clears stale tool results when context pressure crosses its arming
  * threshold — delaying full summarization compaction — plus a pressure query
  * for threshold tracking. Composes beside `dsh-compaction-basic`, whose
  * pre-step listener must register after this one so the cheap pass runs first.
- * @module @prism-ai/prism-guardrails
+ * @module @prism-ai/prism-microcompact
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -16,29 +16,29 @@ import type {} from '@deepseek-ai/dsh-compaction'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { GuardrailPressureConfigError, resolveConfig, resolveThreshold } from './config.ts'
+import { MicrocompactPressureConfigError, resolveConfig, resolveThreshold } from './config.ts'
 import { microcompactSurface } from './microcompact.ts'
-import type { MicrocompactResult, PressureSnapshot, PrismGuardrailsConfig, ResolvedConfig } from './types.ts'
+import type { MicrocompactResult, PressureSnapshot, PrismMicrocompactConfig, ResolvedConfig } from './types.ts'
 
-export { DEFAULTS, GuardrailPressureConfigError, resolveConfig, resolveThreshold } from './config.ts'
+export { DEFAULTS, MicrocompactPressureConfigError, resolveConfig, resolveThreshold } from './config.ts'
 export { microcompactSurface, stubText } from './microcompact.ts'
 export type {
   ClearedEntry,
   MicrocompactResult,
   PressureSnapshot,
-  PrismGuardrailsConfig,
+  PrismMicrocompactConfig,
   ResolvedConfig,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Model-free microcompact guard and pressure tracking (one per host context). */
-    guardrails: PrismGuardrails
+    microcompact: PrismMicrocompact
   }
 }
 
 /** Minimal agent surface the guard needs, satisfied by the loop's `Agent`. */
-interface GuardrailAgent {
+interface MicrocompactAgent {
   /** Session whose surface is measured and rewritten. */
   session: Session
 }
@@ -73,10 +73,10 @@ function routedCapacity(
  * `dsh-compaction-basic`'s summarization threshold indefinitely. Guard
  * failures log a warning and never block the step.
  */
-export class PrismGuardrails extends Service {
+export class PrismMicrocompact extends Service {
   static inject = ['llm', 'tokenMeter']
 
-  static Config: z<PrismGuardrailsConfig> = z.object({
+  static Config: z<PrismMicrocompactConfig> = z.object({
     thresholdRatio: z.number(),
     headroomTokens: z.number().step(1).min(0),
     keepRecentResults: z.number().step(1).min(1),
@@ -88,8 +88,8 @@ export class PrismGuardrails extends Service {
 
   private readonly warnedThresholdTargets = new Set<string>()
 
-  constructor(ctx: Context, config: PrismGuardrailsConfig = {}) {
-    super(ctx, 'guardrails')
+  constructor(ctx: Context, config: PrismMicrocompactConfig = {}) {
+    super(ctx, 'microcompact')
     this.config = resolveConfig(config)
     this.registerPreStep()
   }
@@ -109,7 +109,7 @@ export class PrismGuardrails extends Service {
             )
           }
         } catch (error: unknown) {
-          if (error instanceof GuardrailPressureConfigError) {
+          if (error instanceof MicrocompactPressureConfigError) {
             if (!this.warnedThresholdTargets.has(error.targetKey)) {
               this.warnedThresholdTargets.add(error.targetKey)
               this.ctx.logger.warn(`microcompact failed: ${error.message}; continuing the turn`)
@@ -133,7 +133,7 @@ export class PrismGuardrails extends Service {
    * the routed model declares no context capacity, or pressure is below threshold.
    */
   async microcompactIfNeeded(
-    agent: GuardrailAgent,
+    agent: MicrocompactAgent,
     signal: AbortSignal,
   ): Promise<MicrocompactResult | null> {
     const envelope = await this.resolveEnvelope(agent, signal)
@@ -148,7 +148,7 @@ export class PrismGuardrails extends Service {
    * @returns a detached snapshot, or `null` when no durable routed request
    * exists yet or the routed model declares no context capacity.
    */
-  async pressure(agent: GuardrailAgent): Promise<PressureSnapshot | null> {
+  async pressure(agent: MicrocompactAgent): Promise<PressureSnapshot | null> {
     const envelope = await this.resolveEnvelope(agent, new AbortController().signal)
     if (envelope === null) return null
     return {
@@ -161,7 +161,7 @@ export class PrismGuardrails extends Service {
 
   /** Shared routed-target resolution for the arming check and tracking. */
   private async resolveEnvelope(
-    agent: GuardrailAgent,
+    agent: MicrocompactAgent,
     signal: AbortSignal,
   ): Promise<PressureEnvelope | null> {
     const routed = routedCapacity(agent.session)
@@ -183,4 +183,4 @@ export class PrismGuardrails extends Service {
   }
 }
 
-export default PrismGuardrails
+export default PrismMicrocompact

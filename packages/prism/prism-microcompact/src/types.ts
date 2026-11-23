@@ -1,10 +1,10 @@
-/** Configuration and result types for the prism-guardrails microcompact guard. */
+/** Configuration and result types for the microcompact pass. */
 
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
 
 /** Raw plugin configuration for the microcompact guard. */
-export interface PrismGuardrailsConfig {
+export interface PrismMicrocompactConfig {
   /** Arm microcompact at this fraction of the routed context window (default `0.7`). */
   thresholdRatio?: number
   /**

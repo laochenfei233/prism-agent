@@ -372,8 +372,8 @@
 
     # Model-free microcompact of stale tool results. Its pre-step listener must
     # register before compaction-basic's so the cheap pass arms first.
-    - id: prism-guardrails
-      name: '@prism-ai/prism-guardrails'
+    - id: prism-microcompact
+      name: '@prism-ai/prism-microcompact'
 
     - id: compaction-basic
       name: '@deepseek-ai/dsh-compaction-basic'

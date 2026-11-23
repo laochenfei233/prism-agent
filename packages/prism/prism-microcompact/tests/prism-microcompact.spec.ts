@@ -8,15 +8,15 @@ import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolResultMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
-import PrismGuardrails, {
+import PrismMicrocompact, {
   DEFAULTS,
-  GuardrailPressureConfigError,
+  MicrocompactPressureConfigError,
   microcompactSurface,
   resolveConfig,
   resolveThreshold,
   stubText,
-} from '@prism-ai/prism-guardrails'
-import type { PrismGuardrailsConfig } from '@prism-ai/prism-guardrails'
+} from '@prism-ai/prism-microcompact'
+import type { PrismMicrocompactConfig } from '@prism-ai/prism-microcompact'
 
 const MODEL = 'test-model'
 const SIGNAL = new AbortController().signal
@@ -61,8 +61,8 @@ function createContext(contextWindow?: number, reject = false): Context {
   return ctx
 }
 
-function service(ctx: Context, config: PrismGuardrailsConfig = { headroomTokens: 0, thresholdRatio: 0.5 }): PrismGuardrails {
-  return new PrismGuardrails(ctx, config)
+function service(ctx: Context, config: PrismMicrocompactConfig = { headroomTokens: 0, thresholdRatio: 0.5 }): PrismMicrocompact {
+  return new PrismMicrocompact(ctx, config)
 }
 
 function agent(session: Session): Agent {
@@ -137,9 +137,9 @@ function resultTexts(session: Session): string[] {
   return texts
 }
 
-describe('guardrails configuration', () => {
+describe('microcompact configuration', () => {
   it('resolves detached immutable defaults and partial overrides', () => {
-    const raw: PrismGuardrailsConfig = { thresholdRatio: 0.5, tools: ['read'] }
+    const raw: PrismMicrocompactConfig = { thresholdRatio: 0.5, tools: ['read'] }
     const resolved = resolveConfig(raw)
     raw.thresholdRatio = 0.9
     expect(resolved).toEqual({ thresholdRatio: 0.5, headroomTokens: DEFAULTS.headroomTokens, keepRecentResults: DEFAULTS.keepRecentResults, tools: ['read'] })
@@ -160,7 +160,7 @@ describe('guardrails configuration', () => {
       [{ tools: [''] }, /tools entries must be non-empty/],
     ] as Array<[unknown, RegExp]>
     for (const [config, pattern] of bad) {
-      expect(() => resolveConfig(config as PrismGuardrailsConfig)).toThrow(pattern)
+      expect(() => resolveConfig(config as PrismMicrocompactConfig)).toThrow(pattern)
     }
   })
 })
@@ -177,7 +177,7 @@ describe('arming threshold', () => {
 
   it('rejects unusable capacities', () => {
     const config = resolveConfig({ thresholdRatio: 0.5, headroomTokens: 0 })
-    expect(() => resolveThreshold(config, 'p/m', 0, 0)).toThrow(GuardrailPressureConfigError)
+    expect(() => resolveThreshold(config, 'p/m', 0, 0)).toThrow(MicrocompactPressureConfigError)
     expect(() => resolveThreshold(config, 'p/m', 1000, -1)).toThrow(/non-negative integer/)
     expect(() => resolveThreshold(config, 'p/m', 1000, 1000)).toThrow(/no message budget/)
     expect(() => resolveThreshold(DEFAULTS, 'p/m', 1000, 0)).toThrow(/no microcompact budget/)

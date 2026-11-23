@@ -1,15 +1,15 @@
 ---
-description: "Prism 部署的免模型上下文护栏：在摘要压缩触发前清理过期的工具结果，并追踪压缩启动阈值。"
+description: "Prism 部署的免模型上下文微压缩：在摘要压缩触发前清理过期的工具结果，并追踪压缩启动阈值。"
 kind: "package-reference"
 ---
 
-# @prism-ai/prism-guardrails
+# @prism-ai/prism-microcompact
 
 [English](README.md) | 中文
 
 ## 概述
 
-`prism-guardrails` 用一轮免模型的 microcompact 把会话压在 `dsh-compaction-basic` 的摘要阈值之下。当估计压力跨过更低的启动阈值时，它把过期的工具结果——除最近几条之外的全部——替换为一段点名工具的短存根，让近期细节得以保留，摘要压缩因此延后甚至不再发生。每次替换都遵循共享的 shadow-price 协议，完整原文保留在会话日志中以供精确重放。服务还暴露当前压力与启动阈值的对比，供上报方消费。
+`prism-microcompact` 用一轮免模型的 microcompact 把会话压在 `dsh-compaction-basic` 的摘要阈值之下。当估计压力跨过更低的启动阈值时，它把过期的工具结果——除最近几条之外的全部——替换为一段点名工具的短存根，让近期细节得以保留，摘要压缩因此延后甚至不再发生。每次替换都遵循共享的 shadow-price 协议，完整原文保留在会话日志中以供精确重放。服务还暴露当前压力与启动阈值的对比，供上报方消费。
 
 ## 目录
 
@@ -33,7 +33,7 @@ kind: "package-reference"
 
 ```yaml
 - name: '@deepseek-ai/dsh-token-meter'
-- name: '@prism-ai/prism-guardrails'
+- name: '@prism-ai/prism-microcompact'
 - name: '@deepseek-ai/dsh-compaction-basic'
 ```
 
@@ -45,7 +45,7 @@ kind: "package-reference"
 
 ### 设置阈值
 
-所有设置均可选。生成的[配置目录](../../../docs/config-catalog.zh.md#prism-aiprism-guardrails)是穷尽来源。
+所有设置均可选。生成的[配置目录](../../../docs/config-catalog.zh.md#prism-aiprism-microcompact)是穷尽来源。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
@@ -68,13 +68,13 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-本节解释护栏背后的设计决策；可观察行为已由 [Use this package](#use-this-package) 完整覆盖。
+本节解释 microcompact 背后的设计决策；可观察行为已由 [Use this package](#use-this-package) 完整覆盖。
 
 ### 设计理念
 
-护栏建立在三个承诺之上：
+本插件建立在三个承诺之上：
 
-- **自有 headroom，沿用压缩的包络形状。** 启动阈值沿用 `dsh-compaction-basic` 的 `min` 公式但使用护栏自己的 `headroomTokens`；否则压缩的 headroom 会把所有比例钳到同一阈值，本流程永远无法先行启动。
+- **自有 headroom，沿用压缩的包络形状。** 启动阈值沿用 `dsh-compaction-basic` 的 `min` 公式但使用 microcompact 自己的 `headroomTokens`；否则压缩的 headroom 会把所有比例钳到同一阈值，本流程永远无法先行启动。
 - **可重放的替换。** 原事件保留在追加式日志中；替换通过 `sourceEventSeqs` 引用它，重放因此能恢复产生存根的精确输入。
 - **shadow-price 协议。** `compaction/prune` 紧贴每次替换之前，用注入的 token meter 为被替换区间定价，纯消费方无需每节点状态即可扣除。
 
@@ -86,10 +86,10 @@ kind: "package-reference"
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：`PrismGuardrails` 服务、pre-step 监听器、`microcompactIfNeeded` / `pressure` |
-| [`src/config.ts`](src/config.ts) | 默认值、校验、启动阈值数学、`GuardrailPressureConfigError` |
+| [`src/index.ts`](src/index.ts) | 插件入口：`PrismMicrocompact` 服务、pre-step 监听器、`microcompactIfNeeded` / `pressure` |
+| [`src/config.ts`](src/config.ts) | 默认值、校验、启动阈值数学、`MicrocompactPressureConfigError` |
 | [`src/microcompact.ts`](src/microcompact.ts) | 过期选择、存根内容、持久替换协议 |
-| [`src/types.ts`](src/types.ts) | `PrismGuardrailsConfig`、`ResolvedConfig`、`ClearedEntry`、`MicrocompactResult`、`PressureSnapshot` |
+| [`src/types.ts`](src/types.ts) | `PrismMicrocompactConfig`、`ResolvedConfig`、`ClearedEntry`、`MicrocompactResult`、`PressureSnapshot` |
 
 </details>
 
@@ -98,13 +98,13 @@ kind: "package-reference"
 <a id="further-exploration"></a>
 ## 进一步探索
 
-当包级契约不够时阅读这些页面；它们从本护栏走向它延迟的后端与共同测量的计价服务。
+当包级契约不够时阅读这些页面；它们从本插件走向它延迟的后端与共同测量的计价服务。
 
-- [Compaction basic backend](../../compaction/compaction-basic/README.zh.md) — 本护栏延迟的摘要后端。
-- [Compaction seam](../../compaction/compaction/README.zh.md) — 本护栏复用其替换协议的压缩契约。
+- [Compaction basic backend](../../compaction/compaction-basic/README.zh.md) — 本插件延迟的摘要后端。
+- [Compaction seam](../../compaction/compaction/README.zh.md) — 本插件复用其替换协议的压缩契约。
 - [Tool-result pruner](../../compaction/compaction-tool-result-pruner/README.zh.md) — 在压缩内部运行的按体积清理的姊妹流程。
 - [Token meter](../../llm/token-meter/README.zh.md) — 启动决策背后的计量服务。
-- [Generated configuration catalog](../../../docs/config-catalog.zh.md#prism-aiprism-guardrails) — 每个接受的配置字段及其来源声明。
+- [Generated configuration catalog](../../../docs/config-catalog.zh.md#prism-aiprism-microcompact) — 每个接受的配置字段及其来源声明。
 
 -----
 
@@ -130,10 +130,10 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 
 
-这些限制界定了护栏何时不适配或需要特别小心；它们是当前的包约束。
+这些限制界定了 microcompact 何时不适配或需要特别小心；它们是当前的包约束。
 
 - **新旧不等于重要** —— 本流程只按新近度清理；一条持有某事实唯一副本的过期结果也会被同样清理，模型必须重跑工具取回。
-- **阈值关系靠文档而非强制** —— 护栏读不到 `dsh-compaction-basic` 的有效启动点，因此错误配置会让两个流程在同一压力启动，护栏流程成为空操作。
+- **阈值关系靠文档而非强制** —— 本插件读不到 `dsh-compaction-basic` 的有效启动点，因此错误配置会让两个流程在同一压力启动，microcompact 流程成为空操作。
 - **估计 token，而非精确值** —— `ctx.tokenMeter` 启发式决定启动；provider 的精确记账可能不同。
 
 <a id="dev-note"></a>

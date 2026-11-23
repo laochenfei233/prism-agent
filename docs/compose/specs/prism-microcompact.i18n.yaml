@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for prism-microcompact.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-microcompact.md
+/:
+  en: 8a0f4574af59a6e9
+  zh: 8a0f4574af59a6e9
+/prism-microcompact-salvage-of-the-stale-tool-result-pass:
+  en: a15816f0726dede0
+  zh: f3d21c06a4ac093f
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/report:
+  en: 1d920cac116c27dd
+  zh: 4ac74f86cba516c1
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s1-problem:
+  en: eb6f070a4a1735e1
+  zh: cfd3b1e6d12347a0
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design/s2-1-rename-map:
+  en: c72449de758a786b
+  zh: 89591ba7bf010bea
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design/s2-2-behavior:
+  en: 98dbf788756d46a9
+  zh: cca462baaa78bd2b
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design/s2-3-relationship-to-the-two-neighbors:
+  en: 6e9450405430382a
+  zh: 8f25868d8c822a6a
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design/s2-4-salvage-port:
+  en: ae6b83ec3470f69d
+  zh: 35a4255df7609fc2
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s2-design/s2-5-open-decisions:
+  en: b536506badf54bd2
+  zh: 7c46b4f029cfc7fb
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s3-scope:
+  en: 54128b713427b89b
+  zh: e4b6435dcdb979bc
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/tasks:
+  en: 1edac99ef3331c06
+  zh: a06606b270da72e5
+/prism-microcompact-salvage-of-the-stale-tool-result-pass/s4-acceptance:
+  en: 37ee74ea4b8bed94
+  zh: 9d0ffac225c2e29c

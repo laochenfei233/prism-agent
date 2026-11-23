@@ -272,8 +272,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction.',
   },
   {
-    key: 'guardrails',
-    pkg: 'prism-guardrails',
+    key: 'microcompact',
+    pkg: 'prism-microcompact',
     title: 'Model-free microcompact guard',
     mode: 'core',
     consumers: ['compaction-basic'],

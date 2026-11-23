@@ -1,7 +1,7 @@
 /** Configuration resolution and threshold math for the microcompact guard. */
 
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
-import type { PrismGuardrailsConfig, ResolvedConfig } from './types.ts'
+import type { PrismMicrocompactConfig, ResolvedConfig } from './types.ts'
 
 /**
  * Low-friction defaults. On the default 1,000,000-token window with 256,000
@@ -27,11 +27,11 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
  * @param config - raw plugin configuration.
  * @returns a detached deeply immutable configuration.
  */
-export function resolveConfig(config: PrismGuardrailsConfig = {}): ResolvedConfig {
+export function resolveConfig(config: PrismMicrocompactConfig = {}): ResolvedConfig {
   for (const key of Object.keys(config)) {
     if (!CONFIG_KEYS.has(key)) {
       throw new Error(
-        `PrismGuardrailsConfig: unknown key "${key}" `
+        `PrismMicrocompactConfig: unknown key "${key}" `
         + '(allowed: thresholdRatio, headroomTokens, keepRecentResults, tools)',
       )
     }
@@ -44,14 +44,14 @@ export function resolveConfig(config: PrismGuardrailsConfig = {}): ResolvedConfi
     tools: config.tools === undefined ? undefined : deepFreeze([...config.tools]),
   }
   if (!Number.isFinite(resolved.thresholdRatio) || resolved.thresholdRatio <= 0 || resolved.thresholdRatio > 1) {
-    throw new Error(`PrismGuardrailsConfig: thresholdRatio (${resolved.thresholdRatio}) must be within (0, 1]`)
+    throw new Error(`PrismMicrocompactConfig: thresholdRatio (${resolved.thresholdRatio}) must be within (0, 1]`)
   }
   assertNonNegativeInteger('headroomTokens', resolved.headroomTokens)
   assertPositiveInteger('keepRecentResults', resolved.keepRecentResults)
   if (resolved.tools !== undefined) {
     for (const tool of resolved.tools) {
       if (tool.length === 0) {
-        throw new Error('PrismGuardrailsConfig: tools entries must be non-empty strings')
+        throw new Error('PrismMicrocompactConfig: tools entries must be non-empty strings')
       }
     }
   }
@@ -69,7 +69,7 @@ export function resolveConfig(config: PrismGuardrailsConfig = {}): ResolvedConfi
  * @param contextWindow - positive adapter-owned capacity for the routed model.
  * @param reservedCompletionTokens - output tokens one routed request reserves.
  * @returns the arming threshold in estimated tokens.
- * @throws {@link GuardrailPressureConfigError} when the capacity leaves no usable budget.
+ * @throws {@link MicrocompactPressureConfigError} when the capacity leaves no usable budget.
  */
 export function resolveThreshold(
   config: ResolvedConfig,
@@ -78,32 +78,32 @@ export function resolveThreshold(
   reservedCompletionTokens: number,
 ): number {
   if (!Number.isInteger(contextWindow) || contextWindow <= 0) {
-    throw new GuardrailPressureConfigError(
+    throw new MicrocompactPressureConfigError(
       targetKey,
-      `prism-guardrails: contextWindow (${contextWindow}) for ${targetKey} must be a positive integer`,
+      `prism-microcompact: contextWindow (${contextWindow}) for ${targetKey} must be a positive integer`,
     )
   }
   if (!Number.isInteger(reservedCompletionTokens) || reservedCompletionTokens < 0) {
-    throw new GuardrailPressureConfigError(
+    throw new MicrocompactPressureConfigError(
       targetKey,
-      `prism-guardrails: reservedCompletionTokens (${reservedCompletionTokens}) for ${targetKey} `
+      `prism-microcompact: reservedCompletionTokens (${reservedCompletionTokens}) for ${targetKey} `
       + 'must be a non-negative integer',
     )
   }
   const messageBudgetTokens = contextWindow - reservedCompletionTokens
   if (messageBudgetTokens <= 0) {
-    throw new GuardrailPressureConfigError(
+    throw new MicrocompactPressureConfigError(
       targetKey,
-      `prism-guardrails: ${targetKey} reserves ${reservedCompletionTokens} completion tokens `
+      `prism-microcompact: ${targetKey} reserves ${reservedCompletionTokens} completion tokens `
       + `of its ${contextWindow}-token context window, leaving no message budget; configure `
       + "the adapter model's contextWindow above the effective request maxTokens",
     )
   }
   const pressureBudgetTokens = messageBudgetTokens - config.headroomTokens
   if (pressureBudgetTokens <= 0) {
-    throw new GuardrailPressureConfigError(
+    throw new MicrocompactPressureConfigError(
       targetKey,
-      `prism-guardrails: ${targetKey} reserves ${reservedCompletionTokens} completion tokens `
+      `prism-microcompact: ${targetKey} reserves ${reservedCompletionTokens} completion tokens `
       + `and ${config.headroomTokens} headroom tokens of its ${contextWindow}-token context `
       + 'window, leaving no microcompact budget; reduce the effective request maxTokens or '
       + "the guard's headroomTokens, or configure a larger adapter model contextWindow",
@@ -111,9 +111,9 @@ export function resolveThreshold(
   }
   const threshold = Math.floor(Math.min(contextWindow * config.thresholdRatio, pressureBudgetTokens))
   if (threshold <= 0) {
-    throw new GuardrailPressureConfigError(
+    throw new MicrocompactPressureConfigError(
       targetKey,
-      `prism-guardrails: arming threshold computed for ${targetKey} is ${threshold}; `
+      `prism-microcompact: arming threshold computed for ${targetKey} is ${threshold}; `
       + 'raise thresholdRatio or lower headroomTokens',
     )
   }
@@ -124,8 +124,8 @@ export function resolveThreshold(
  * Expected configuration failure for one routed capacity. The pre-step listener
  * warns once per target instead of failing the turn.
  */
-export class GuardrailPressureConfigError extends Error {
-  override readonly name = 'GuardrailPressureConfigError'
+export class MicrocompactPressureConfigError extends Error {
+  override readonly name = 'MicrocompactPressureConfigError'
 
   /**
    * Create one classified guard threshold failure.
@@ -142,12 +142,12 @@ export class GuardrailPressureConfigError extends Error {
 
 function assertNonNegativeInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`PrismGuardrailsConfig: ${name} (${value}) must be a non-negative integer`)
+    throw new Error(`PrismMicrocompactConfig: ${name} (${value}) must be a non-negative integer`)
   }
 }
 
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`PrismGuardrailsConfig: ${name} (${value}) must be a positive integer`)
+    throw new Error(`PrismMicrocompactConfig: ${name} (${value}) must be a positive integer`)
   }
 }
