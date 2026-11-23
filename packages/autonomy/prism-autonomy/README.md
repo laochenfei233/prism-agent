@@ -35,9 +35,20 @@ Switching uses the existing permission surfaces: the `/permission autonomous-gua
 <a id="model-experience"></a>
 ## Model Experience
 
-The model sees no approval cards and no new tools. Under the engaging preset, a request that would have waited for the user settles immediately as granted, so the tool result reads like any other success; a require-human match (shipped default: sandbox escalations) still produces the normal ask. The one new model-visible input is the switch notice, which states that approvals are granted automatically except sandbox escalations and that denial rules still apply — the model should not request sandbox escalation without evidence of a denial.
+### Autonomous approvals
 
-<a id="known-limitations-and-deferred-work"></a>
+#### What the model sees
+
+Under the engaging preset (`autonomous-guarded`), an approval request that would have waited for the user settles immediately as granted, so the tool result reads like any other success; a require-human match (shipped default: sandbox escalations) still produces the normal ask. The one added model-visible input is the switch notice — a user message stating that approvals are granted automatically except sandbox escalations and that denial rules still apply.
+
+#### Token effect
+
+One notice message per live switch into or out of the preset. Auto-answered requests skip the denial-and-retry tool text a manual rejection would have produced.
+
+#### KV Cache effect
+
+The switch notice appends after retained history like any user message; no prompt prefix is rewritten, and auto-answers change no cached prefix.
+
 ## Known Limitations and Deferred Work
 
 - An ACP-owned session switched to the autonomous preset is auto-answered too; the ACP permission channel is bypassed for it. The default is off, so this needs an explicit switch.
@@ -45,7 +56,6 @@ The model sees no approval cards and no new tools. Under the engaging preset, a 
 - No client UI: the mode rides the existing permission picker and `/permission`.
 - Only one tier ships (`autonomous-guarded`); finer tiers (edit-only, full yolo) were deferred.
 
-<a id="dev-note"></a>
-## Dev Note
+### Dev Note
 
 The answerer registers with `prepend` on the `approval/request` waterfall, ahead of the remote client bridge, so an auto-answered request never renders a card. The unit tests cover the ladder, the matchers, fail-loud validation, the live notice, and restore; a recorded-session snapshot covers the switch notice (model-visible).

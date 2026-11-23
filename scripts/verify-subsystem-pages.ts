@@ -23,6 +23,7 @@ export const GROUPS_WITHOUT_SUBSYSTEM_PAGE: Readonly<Record<string, string>> = {
   backup: 'Product backup feature group; docs/compose/spec/prism-backup.md owns its feature contract and the group archives existing harness state instead of defining a subsystem.',
   data: 'Product settings-page feature group; docs/compose/spec/data-settings.md owns its feature contract and the group relocates the existing home instead of defining a subsystem.',
   transfer: 'Product archive feature group; docs/compose/spec/prism-transfer.md owns its feature contract and the group moves existing sessions and settings instead of defining a subsystem.',
+  autonomy: 'Product permission feature group; docs/compose/spec/prism-autonomy.md owns its feature contract and the group auto-answers existing approval asks instead of defining a subsystem.',
 }
 
 /** Result of auditing package-group subsystem documentation. */

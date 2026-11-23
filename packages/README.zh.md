@@ -24,7 +24,7 @@ harness 由 `packages/` 下的 npm 包组装而成，按能力系列分组：会
 <a id="package-groups"></a>
 ## 包分组
 
-每个包只属于一个组；新包加入现有组，新组则更新其自身 README 与本表。
+新包加入现有组，新组则更新其自身 README 与本表。
 
 | 组 | 职责 |
 |---|---|
@@ -75,7 +75,7 @@ harness 由 `packages/` 下的 npm 包组装而成，按能力系列分组：会
 | [`backup/`](backup/README.zh.md) | 把配置、记忆与项目文件夹归档到 WebDAV、SMB 或 S3 |
 | [`transfer/`](transfer/README.zh.md) | 以归档文件在安装之间搬运项目与设置 |
 | [`data/`](data/README.zh.md) | 承载「数据」设置页，并把 harness 主目录搬到另一个目录 |
-| [`autonomy/`](autonomy/README.zh.md) | 自主审批：`autonomous-guarded` 预设自动应答审批请求，沙箱升级除外 |
+| [`autonomy/`](autonomy/README.zh.md) | 自主审批 |
 | [`workspace/`](workspace/README.zh.md) | Workspace 实体 |
 | [`sdk/`](sdk/README.zh.md) | 进程外 SDK：JSON-RPC 协议与 TypeScript 客户端／服务器 |
 | [`acp/`](acp/README.zh.md) | 仅面向自动化的 ACP（Agent Client Protocol）服务器 |

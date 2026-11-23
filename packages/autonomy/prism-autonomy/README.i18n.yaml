@@ -10,22 +10,34 @@
   zh: 2c16aa3a028fb63c
 /prism-autonomy/summary:
   en: ae8872e9323a5857
-  zh: 360cb092a8373924
+  zh: 4cc08b1287260ae3
 /prism-autonomy/table-of-contents:
   en: 56d8f5dffc62235b
-  zh: 56d8f5dffc62235b
+  zh: 0067d1db1f6c8b92
 /prism-autonomy/use-this-package:
   en: cd8fec6ee1d25233
-  zh: 8be525691e6a19a7
+  zh: 8595f0521c6081e9
 /prism-autonomy/switching:
   en: 67fe090db52ee287
-  zh: 3d4158e68c6a2276
+  zh: cb1aed0704d36a4e
 /prism-autonomy/model-experience:
-  en: f6bfa3ca977e9f57
-  zh: 680cc2c043ce6406
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/prism-autonomy/model-experience/autonomous-approvals:
+  en: 9dd50ab3feb570e9
+  zh: 90a00df634b0687c
+/prism-autonomy/model-experience/autonomous-approvals/what-the-model-sees:
+  en: def164824f9a6aa5
+  zh: e0add143c7982b54
+/prism-autonomy/model-experience/autonomous-approvals/token-effect:
+  en: 4080fd207eef63a6
+  zh: 8b656f144653bfd7
+/prism-autonomy/model-experience/autonomous-approvals/kv-cache-effect:
+  en: a29ddeca023d2bca
+  zh: cee2890e3455904a
 /prism-autonomy/known-limitations-and-deferred-work:
-  en: b482b0c7227eef0d
-  zh: 121cf69c2737d4f7
-/prism-autonomy/dev-note:
-  en: 315e3ae04002a494
-  zh: bbbf2df2d2e5b513
+  en: dbb7621b75e41e4a
+  zh: 5748b7b1f8d28cd7
+/prism-autonomy/known-limitations-and-deferred-work/dev-note:
+  en: 134155fc0f1bc029
+  zh: 5ecd1cf2f9f5371b

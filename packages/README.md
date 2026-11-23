@@ -24,7 +24,7 @@ The harness is assembled from npm packages under `packages/`, grouped by capabil
 <a id="package-groups"></a>
 ## Package groups
 
-Every package lives in exactly one group; new packages join existing groups, and a new group updates its own README and this table.
+New packages join existing groups, and a new group updates its own README and this table.
 
 | Group | Role |
 |---|---|
@@ -75,7 +75,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 | [`backup/`](backup/README.md) | Archives configuration, memory, and project folders to WebDAV, SMB, or S3 |
 | [`transfer/`](transfer/README.md) | Moves projects and settings between installs as archive files |
 | [`data/`](data/README.md) | 数据 settings page and harness-home relocation |
-| [`autonomy/`](autonomy/README.md) | Autonomous approvals: the `autonomous-guarded` preset auto-answers approval requests except sandbox escalations |
+| [`autonomy/`](autonomy/README.md) | Autonomous approvals |
 | [`workspace/`](workspace/README.md) | Workspace entity |
 | [`sdk/`](sdk/README.md) | Out-of-process SDK: JSON-RPC protocol and TypeScript client/server |
 | [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server |
