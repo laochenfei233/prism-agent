@@ -76,4 +76,3 @@ None; no request is assembled or sent by this package.
 The workbench is one tab type registered against the Right Sidebar's tab-type table; the panel renders from a single snapshot store the tab refreshes on demand, and every git operation shells out through the harness process boundary rather than holding a long-lived git process.
 
 </details>
-

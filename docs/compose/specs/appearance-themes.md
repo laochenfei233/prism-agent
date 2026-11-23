@@ -106,4 +106,3 @@ All new copy lives in the `settings.theme` namespace dictionaries (`packages/cli
 - Old settings documents load unchanged (additive defaults); zh/en dictionaries stay complete (compile-enforced).
 - Focused unit specs, `typecheck`, `build:check` after `build:artifacts`, `duplication`, and the settings web e2e pass locally with updated expected markdown.
 - Review subagent returns pass on spec compliance, correctness, and codebase consistency.
-

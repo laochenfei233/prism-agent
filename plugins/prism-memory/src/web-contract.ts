@@ -107,6 +107,22 @@ export interface MemoryReviewValue {
   readonly row: MemoryRow
 }
 
+/** Body of `edit`: one operator rewrite of a stored claim. */
+export interface MemoryEditBody {
+  /** The record to rewrite. */
+  readonly id: string
+  /** The new claim wording. */
+  readonly text: string
+}
+
+/** Body of `retire`: one operator retirement of a stored claim. */
+export interface MemoryRetireBody {
+  /** The record to retire. */
+  readonly id: string
+  /** Operator note recorded on the record. */
+  readonly reason?: string
+}
+
 /** One browser-facing failure, shaped like a Connection RPC failure. */
 export interface MemoryFailure {
   /** Stable code naming the failing layer. */

@@ -11,10 +11,16 @@
  *
  * Everything here is protocol: it renders, parses, and dispatches. It assigns
  * no confidence, status, scope, or tags — a caller owns those, and the shipped
- * callers route every candidate through the review inbox.
+ * callers admit candidates through the deployment's trust tiers.
  *
  * @module @prism/prism-memory/assisted
  */
+
+declare module '@deepseek-ai/dsh-llm/types' {
+  interface LlmRequestPurposeMap {
+    'memory-distill': true
+  }
+}
 
 import { BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
@@ -191,6 +197,7 @@ export async function runAssistedCall(
     system: ASSISTED_SYSTEM,
     messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
     maxTokens,
+    purpose: 'memory-distill',
     ...signal === undefined ? {} : { signal },
   }
   for await (const chunk of llm.stream(options)) assembler.push(chunk)

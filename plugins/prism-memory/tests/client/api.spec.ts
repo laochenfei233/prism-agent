@@ -95,6 +95,22 @@ describe('the browser request client', () => {
     expect(settled.status).toBe('active')
   })
 
+  it('answers the rewritten row of an edit', async () => {
+    const sent: Sent[] = []
+    stubFetch({ ok: true, value: { row: { ...row, text: 'the deploy window is wednesday' } } }, sent)
+    const rewritten = await createMemoryApi().edit(row.id, 'the deploy window is wednesday')
+    expect(sent[0]?.body).toEqual({ id: row.id, text: 'the deploy window is wednesday' })
+    expect(rewritten.text).toBe('the deploy window is wednesday')
+  })
+
+  it('answers the archived row of a retirement', async () => {
+    const sent: Sent[] = []
+    stubFetch({ ok: true, value: { row: { ...row, status: 'archived' } } }, sent)
+    const retired = await createMemoryApi().retire(row.id)
+    expect(sent[0]?.body).toEqual({ id: row.id })
+    expect(retired.status).toBe('archived')
+  })
+
   it('surfaces the host failure code and message', async () => {
     stubFetch({ ok: false, error: { code: 'PRISM_MEMORY_NOT_FOUND', message: 'unknown memory id: mem_1' } }, [])
     const error = await errorOf(createMemoryApi().review('mem_1', 'approve'))

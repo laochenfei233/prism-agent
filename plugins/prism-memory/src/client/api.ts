@@ -9,8 +9,10 @@
  */
 
 import {
+  MEMORY_EDIT_PATH,
   MEMORY_OVERVIEW_PATH,
   MEMORY_REMEMBER_PATH,
+  MEMORY_RETIRE_PATH,
   MEMORY_REVIEW_PATH,
   MEMORY_SEARCH_PATH,
 } from '../routes.ts'
@@ -32,6 +34,10 @@ export interface MemoryPanelFace {
   readonly remember: (text: string, layer: string) => Promise<MemoryRememberValue>
   /** Settle one pending claim. */
   readonly review: (id: string, decision: 'approve' | 'reject') => Promise<MemoryRow>
+  /** Rewrite one stored claim; the old wording stays on the supersede chain. */
+  readonly edit: (id: string, text: string) => Promise<MemoryRow>
+  /** Retire one stored claim so it stops being recalled. */
+  readonly retire: (id: string) => Promise<MemoryRow>
 }
 
 /** One memory operation failed; `code` names the failing layer. */
@@ -159,6 +165,14 @@ export function createMemoryApi(): MemoryPanelFace {
     review: async (id, decision) => {
       const settled = await post(MEMORY_REVIEW_PATH, { id, decision }, value => isReviewValue(value) ? value : null)
       return settled.row
+    },
+    edit: async (id, text) => {
+      const rewritten = await post(MEMORY_EDIT_PATH, { id, text }, value => isReviewValue(value) ? value : null)
+      return rewritten.row
+    },
+    retire: async (id) => {
+      const retired = await post(MEMORY_RETIRE_PATH, { id }, value => isReviewValue(value) ? value : null)
+      return retired.row
     },
   }
 }
