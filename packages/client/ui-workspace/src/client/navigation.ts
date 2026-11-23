@@ -101,6 +101,12 @@ export interface UiWorkspace {
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
   /**
+   * Restore an archived Workspace to grouping surfaces with its recorded
+   * title, order, and Sessions.
+   * @param workspaceId - Workspace to restore.
+   */
+  unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void>
+  /**
    * Pin a Session on the Host, then lead it in its accounts' saved orders
    * (its Workspace group or Ungrouped, and the flat list). The order write
    * reads the memberships current at completion, so reorders that landed
@@ -341,12 +347,17 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       || (draftOptions.whenDraftExists ?? (draftOptions.clearPreviousDraft === true ? 'replace' : 'keep')) === 'replace')
     const workspace = this.workspaces.list.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
+    // An archived Workspace is no session target: current and recent resolve
+    // over visible rows only, so a hidden project never receives a new Session.
+    const visibleItems = workspace.items.filter(
+      item => !workspace.archivedWorkspaceIds.includes(item.workspaceId),
+    )
     const current = this.mainReference?.sessionId
     const currentWorkspaceId = current === undefined
       ? undefined
-      : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
+      : visibleItems.find(item => item.sessionIds.includes(current))?.workspaceId
     const recent = workspace.phase === 'ready' && sessions.phase === 'ready'
-      ? recentWorkspace(workspace.items, sessions.byId)
+      ? recentWorkspace(visibleItems, sessions.byId)
       : undefined
     const target = workspaceId ?? currentWorkspaceId ?? recent
     if (target === undefined) {
@@ -386,6 +397,10 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   async unarchiveSession(sessionId: SessionId): Promise<void> {
     await this.workspaces.unarchiveSession(sessionId)
+  }
+
+  async unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    await this.workspaces.unarchiveWorkspace(workspaceId)
   }
 
   async pinSession(sessionId: SessionId): Promise<void> {
@@ -468,9 +483,14 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       this.replaceMain(saved.subagentAddress, this.lifetime.signal, 'preserve')
       return
     }
+    // An archived Workspace owns no restore target: its Sessions stay
+    // reachable only after the project returns.
+    const visibleItems = workspaces.items.filter(
+      item => !workspaces.archivedWorkspaceIds.includes(item.workspaceId),
+    )
     const summary = saved.sessionId === undefined ? undefined : sessions.byId[saved.sessionId]
     const workspace = summary === undefined ? undefined
-      : workspaces.items.find(item => item.sessionIds.includes(summary.id))
+      : visibleItems.find(item => item.sessionIds.includes(summary.id))
     if (summary !== undefined && (!summary.blank || workspace === undefined)) {
       this.replaceMain(summary.id, this.lifetime.signal, 'preserve')
       return
@@ -482,8 +502,8 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       && !workspaces.archivedSessionIds.includes(summary.id)) {
       sessionId = await this.restoreBlank(workspace.workspaceId, summary.id)
     }
-    let target = workspace?.workspaceId ?? recentWorkspace(workspaces.items, sessions.byId)
-    if (target === undefined && workspaces.items.length === 0 && sessions.ids.length === 0) {
+    let target = workspace?.workspaceId ?? recentWorkspace(visibleItems, sessions.byId)
+    if (target === undefined && visibleItems.length === 0 && sessions.ids.length === 0) {
       const prepared = await this.initializeDefaultWorkspace(navigation)
       if (navigation.aborted) return
       target = prepared?.workspaceId

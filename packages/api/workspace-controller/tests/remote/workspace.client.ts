@@ -10,6 +10,8 @@ import type { RemoteFailure, RemoteResult } from '@deepseek-ai/dsh-typert-protoc
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
+  WorkspaceArchiveWorkspaceRequest,
+  WorkspaceArchivedWorkspacesValue,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
@@ -23,6 +25,7 @@ import type {
   WorkspacePinValue,
   WorkspaceRenameRequest,
   WorkspaceUnarchiveSessionRequest,
+  WorkspaceUnarchiveWorkspaceRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
   WorkspaceView,
@@ -69,7 +72,12 @@ export function workspace(id: string, overrides: Partial<WorkspaceView> = {}): W
 export function baseline(...ids: readonly string[]): WorkspaceBaselineFrame {
   return {
     type: 'baseline',
-    value: { items: ids.map(id => workspace(id)), archivedSessionIds: [], pinnedSessionIds: [] },
+    value: {
+      items: ids.map(id => workspace(id)),
+      archivedSessionIds: [],
+      pinnedSessionIds: [],
+      archivedWorkspaceIds: [],
+    },
   }
 }
 
@@ -105,6 +113,8 @@ export const workspaceWorld: RemoteTable = {
     }),
     'workspace/archiveSession': (request: WorkspaceArchiveSessionRequest): RemoteResult<WorkspaceArchiveValue> => ok({ archivedSessionIds: [request.sessionId] }),
     'workspace/unarchiveSession': (_request: WorkspaceUnarchiveSessionRequest): RemoteResult<WorkspaceArchiveValue> => ok({ archivedSessionIds: [] }),
+    'workspace/archiveWorkspace': (request: WorkspaceArchiveWorkspaceRequest): RemoteResult<WorkspaceArchivedWorkspacesValue> => ok({ archivedWorkspaceIds: [request.workspaceId] }),
+    'workspace/unarchiveWorkspace': (_request: WorkspaceUnarchiveWorkspaceRequest): RemoteResult<WorkspaceArchivedWorkspacesValue> => ok({ archivedWorkspaceIds: [] }),
     'workspace/pinSession': (request: WorkspacePinSessionRequest): RemoteResult<WorkspacePinValue> => ok({ pinnedSessionIds: [request.sessionId] }),
     'workspace/unpinSession': (_request: WorkspaceUnpinSessionRequest): RemoteResult<WorkspacePinValue> => ok({ pinnedSessionIds: [] }),
   },

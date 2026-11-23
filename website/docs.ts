@@ -171,6 +171,14 @@ const homeAndGuide = pairedPages([
     order: 2,
   },
   {
+    source: 'docs/user/guide/auto-archive.md',
+    route: 'guide/auto-archive.md',
+    label: { root: '自动归档', en: 'Auto-archive' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '自动化', en: 'Automation' },
+    order: 3,
+  },
+  {
     source: 'docs/user/guide/plugin-market.md',
     route: 'guide/plugin-market.md',
     label: { root: '插件索引', en: 'Plugin indexes' },

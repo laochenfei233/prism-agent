@@ -9,12 +9,15 @@ import {
   WorkspaceMoveInvalidError,
   WorkspaceOrderInvalidError,
   WorkspaceUnknownSessionError,
+  WorkspaceUnknownWorkspaceError,
 } from '@deepseek-ai/dsh-workspace'
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { workspaceView } from './feed.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
+  WorkspaceArchiveWorkspaceRequest,
+  WorkspaceArchivedWorkspacesValue,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
@@ -26,6 +29,7 @@ import type {
   WorkspacePinValue,
   WorkspaceRenameRequest,
   WorkspaceUnarchiveSessionRequest,
+  WorkspaceUnarchiveWorkspaceRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
 } from './types.ts'
@@ -45,12 +49,11 @@ export class WorkspaceCommands {
   create(request: WorkspaceCreateRequest): Promise<WorkspaceCreateValue> {
     return this.enqueue(async () => {
       try {
+        // The resolve only computes `created`; the create call always runs so
+        // re-adding an archived Workspace's folder restores that registration.
         const existing = await this.ctx.workspaceRegistry.resolveByPath(request.path)
-        if (existing !== undefined) {
-          return { workspace: workspaceView(existing), created: false }
-        }
         const workspace = await this.ctx.workspaceRegistry.create(request.path)
-        return { workspace: workspaceView(workspace), created: true }
+        return { workspace: workspaceView(workspace), created: existing === undefined }
       } catch (error) {
         if (remoteErrorOf(error) !== undefined) throw error
         throw new RemoteError(
@@ -192,6 +195,36 @@ export class WorkspaceCommands {
   async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue> {
     await this.ctx.workspaceRegistry.unarchiveSession(request.sessionId)
     return { archivedSessionIds: [...this.ctx.workspaceRegistry.archivedSessionIds] }
+  }
+
+  /**
+   * Add one known Workspace to the registry-global archive set; its record,
+   * order, and accounting are untouched, so restoring is the exact prior state.
+   * @param request - Workspace identity to archive.
+   * @returns the complete resulting archive set.
+   */
+  async archiveWorkspace(request: WorkspaceArchiveWorkspaceRequest): Promise<WorkspaceArchivedWorkspacesValue> {
+    try {
+      await this.ctx.workspaceRegistry.archiveWorkspace(WorkspaceId(request.workspaceId))
+    } catch (error) {
+      if (error instanceof WorkspaceUnknownWorkspaceError) {
+        throw workspaceNotFound(request.workspaceId)
+      }
+      throw error
+    }
+    return { archivedWorkspaceIds: [...this.ctx.workspaceRegistry.archivedWorkspaceIds] }
+  }
+
+  /**
+   * Drop one Workspace from the registry-global archive set. An id that is
+   * not archived is not an error: the call is idempotent, so a lost race with
+   * another surface resolves as a no-op.
+   * @param request - Workspace identity to restore.
+   * @returns the complete resulting archive set.
+   */
+  async unarchiveWorkspace(request: WorkspaceUnarchiveWorkspaceRequest): Promise<WorkspaceArchivedWorkspacesValue> {
+    await this.ctx.workspaceRegistry.unarchiveWorkspace(WorkspaceId(request.workspaceId))
+    return { archivedWorkspaceIds: [...this.ctx.workspaceRegistry.archivedWorkspaceIds] }
   }
 
   /**

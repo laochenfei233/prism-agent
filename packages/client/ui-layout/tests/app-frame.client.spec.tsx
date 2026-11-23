@@ -83,7 +83,7 @@ function mountFrame(windowWidth = frameWidth, content?: AppFrameProps['renderSlo
     projectionsBySession: {},
   })
   const workspaceState: WorkspaceSnapshot = {
-    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [], state: 'idle', phase: 'ready', error: null,
     ...(workspacesReady ? {} : { state: 'loading' as const, phase: 'pending' as const }),
   }
   const useStore = bindSnapshotSelector(instance)

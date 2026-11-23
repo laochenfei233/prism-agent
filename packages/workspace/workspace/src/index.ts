@@ -55,6 +55,17 @@ export class WorkspaceUnknownSessionError extends Error {
   }
 }
 
+/** An archiveWorkspace request named a Workspace absent from the durable registry order. */
+export class WorkspaceUnknownWorkspaceError extends Error {
+  /**
+   * @param workspaceId - The unknown Workspace id.
+   */
+  constructor(readonly workspaceId: WorkspaceId) {
+    super(`cannot archive workspace '${workspaceId}': the registry holds no such Workspace`)
+    this.name = 'WorkspaceUnknownWorkspaceError'
+  }
+}
+
 /**
  * An archiveSession request named a session that at least one
  * `workspace/session-activity` listener reported active. Nothing was written;
@@ -284,6 +295,16 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * The first-use Workspace identity, retained after its registration is
+   * deleted. Hygiene features treat this Workspace as exempt unless a
+   * deployment explicitly includes it.
+   * @returns the default Workspace id, or `undefined` before first-use initialization.
+   */
+  get defaultWorkspaceId(): WorkspaceId | undefined {
+    return this.requireState().defaultWorkspaceId
+  }
+
+  /**
    * Synchronous workspace projection in durable registry order. Every
    * entity's `sessionIds` getter is already filtered by the startup/live
    * canonical-cwd header index; this method performs no persistence reads.
@@ -332,6 +353,63 @@ export class WorkspaceRegistry extends Service {
       if (sameIds(workspaceIds, state.workspaceIds)) return state.workspaceIds
       await this.setState({ ...state, workspaceIds })
       return workspaceIds
+    })
+  }
+
+  /**
+   * The registry-global Workspace archive set: Workspaces hidden from every
+   * grouping surface. Archiving is display state only — the record, its order
+   * slot, and its session accounting are untouched, so restoring is the exact
+   * prior state, and `create` over the same canonical path restores too.
+   * @returns the archived Workspace ids in archive order.
+   */
+  get archivedWorkspaceIds(): readonly WorkspaceId[] {
+    return this.requireState().archivedWorkspaceIds
+  }
+
+  /**
+   * Archive one Workspace durably by adding it to the registry-global archive
+   * set. Nothing else changes: the directory, record, order, and accounting
+   * stay exactly as they are. An already archived id resolves without
+   * writing. An unknown id rejects — unlike restoring, where removing an id
+   * cannot introduce an unknown one, hiding one that does not exist is a
+   * caller mistake the registry refuses.
+   * @param id - Workspace to archive.
+   * @returns resolution after durability.
+   */
+  archiveWorkspace(id: WorkspaceId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      // The chain slot serializes against every other registry write, so this
+      // check-then-write pair cannot interleave with another archive or restore.
+      const state = this.requireState()
+      if (state.archivedWorkspaceIds.includes(id)) return
+      if (this.entities.get(id) === undefined) throw new WorkspaceUnknownWorkspaceError(id)
+      await this.setState({
+        ...state,
+        archivedWorkspaceIds: [...state.archivedWorkspaceIds, id],
+      })
+    })
+  }
+
+  /**
+   * Restore one Workspace durably by dropping it from the registry-global
+   * archive set; the record and accounting were never touched, so the
+   * Workspace returns with its recorded title, order, and Sessions. Removing
+   * an id cannot introduce an unknown one, so an id that is not archived —
+   * or no longer exists — resolves without writing.
+   * @param id - Workspace to restore.
+   * @returns resolution after durability.
+   */
+  unarchiveWorkspace(id: WorkspaceId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      // The chain slot serializes against every other registry write, so this
+      // check-then-write pair cannot interleave with a concurrent archive.
+      const state = this.requireState()
+      if (!state.archivedWorkspaceIds.includes(id)) return
+      await this.setState({
+        ...state,
+        archivedWorkspaceIds: state.archivedWorkspaceIds.filter(workspaceId => workspaceId !== id),
+      })
     })
   }
 
@@ -509,7 +587,19 @@ export class WorkspaceRegistry extends Service {
 
   private async createCanonical(canonical: string, title?: string, firstUse = false): Promise<WorkspaceEntity> {
     for (const entity of this.entities.values()) {
-      if (entity.path === canonical) return entity
+      if (entity.path === canonical) {
+        // Re-adding an archived Workspace's folder restores it; the write is
+        // inlined because this already runs inside the mutation queue and the
+        // public unarchive would enqueue behind itself.
+        const state = this.requireState()
+        if (state.archivedWorkspaceIds.includes(entity.id)) {
+          await this.setState({
+            ...state,
+            archivedWorkspaceIds: state.archivedWorkspaceIds.filter(id => id !== entity.id),
+          })
+        }
+        return entity
+      }
     }
 
     const workspaceName = title ?? defaultWorkspaceTitle(canonical)
@@ -591,6 +681,8 @@ export class WorkspaceRegistry extends Service {
       pendingMutation: undefined,
       initialized: true,
       workspaceIds: state.workspaceIds.filter(workspaceId => workspaceId !== id),
+      // A deleted Workspace cannot stay hidden; the set would carry a stale id.
+      archivedWorkspaceIds: state.archivedWorkspaceIds.filter(workspaceId => workspaceId !== id),
     }
     await this.setState({
       ...nextState,
@@ -731,6 +823,7 @@ export class WorkspaceRegistry extends Service {
         workspaceIds,
         archivedSessionIds: state.archivedSessionIds,
         pinnedSessionIds: state.pinnedSessionIds,
+        archivedWorkspaceIds: state.archivedWorkspaceIds,
       })
     }
     await this.setState({
@@ -738,6 +831,7 @@ export class WorkspaceRegistry extends Service {
       workspaceIds,
       archivedSessionIds: state.archivedSessionIds,
       pinnedSessionIds: state.pinnedSessionIds,
+      archivedWorkspaceIds: state.archivedWorkspaceIds,
     })
   }
 
