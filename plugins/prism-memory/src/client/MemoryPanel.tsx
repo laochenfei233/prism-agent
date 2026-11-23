@@ -39,7 +39,7 @@ function dateOf(iso: string): string {
 
 /** Render the memory page. */
 export function MemoryPanel(props: MemoryPanelProps): ReactNode {
-  const { load, search, remember, review, t } = props
+  const { load, search, remember, review, edit, retire, t } = props
   const [phase, setPhase] = useState<Phase>('loading')
   const [failure, setFailure] = useState('')
   const [overview, setOverview] = useState<MemoryOverview | null>(null)
@@ -51,6 +51,7 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
   const [notice, setNotice] = useState('')
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState<{ id: string, text: string } | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -100,6 +101,7 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
     setSearched(false)
     setNotice('')
     setFailed(false)
+    setEditing(null)
   }
 
   const onAdd = (): void => {
@@ -116,6 +118,23 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
     void run(async () => {
       const settled = await review(row.id, decision)
       return t(decision === 'approve' ? 'approved' : 'rejected', { id: settled.id })
+    })
+  }
+
+  const onEditSave = (): void => {
+    if (editing === null || editing.text.trim() === '') return
+    const target = editing
+    void run(async () => {
+      const rewritten = await edit(target.id, target.text.trim())
+      setEditing(null)
+      return t('edited', { id: rewritten.id })
+    })
+  }
+
+  const onRetire = (row: MemoryRow): void => {
+    void run(async () => {
+      const retired = await retire(row.id)
+      return t('retired', { id: retired.id })
     })
   }
 
@@ -237,7 +256,48 @@ export function MemoryPanel(props: MemoryPanelProps): ReactNode {
                         <span>{dateOf(row.createdAt)}</span>
                         <span>{row.id}</span>
                       </div>
-                      <p className="pm-row-text">{row.text}</p>
+                      {editing?.id === row.id ? (
+                        <div className="pm-bar">
+                          <Input
+                            className="pm-grow"
+                            value={editing.text}
+                            placeholder={t('editHint')}
+                            aria-label={t('editHint')}
+                            autoFocus
+                            onChange={event => { setEditing({ id: row.id, text: event.currentTarget.value }) }}
+                          />
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            disabled={busy || editing.text.trim() === ''}
+                            onClick={onEditSave}
+                          >
+                            {t('editSave')}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => { setEditing(null) }}
+                          >
+                            {t('editCancel')}
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="pm-row-text">{row.text}</p>
+                          <div className="pm-actions">
+                            <Button size="sm" variant="outline" disabled={busy} onClick={() => { setEditing({ id: row.id, text: row.text }) }}>
+                              {t('editAction')}
+                            </Button>
+                            <Button size="sm" variant="ghost" disabled={busy} onClick={() => { onRetire(row) }}>
+                              {t('retireAction')}
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>

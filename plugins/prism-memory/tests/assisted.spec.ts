@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { Context as ContextType } from '@deepseek-ai/cordis'
+import TimerPlugin from '@deepseek-ai/cordis-plugin-timer'
 import SessionStore from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -344,6 +345,7 @@ describe('the assisted configuration', () => {
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(ToolRuntime, {})
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(TimerPlugin)
 
     await expect(ctx.plugin(PrismMemory, { assistedDistill: true })).rejects.toThrow(/assistedDistill/)
   })

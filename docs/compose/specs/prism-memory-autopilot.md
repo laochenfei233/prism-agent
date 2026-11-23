@@ -1,13 +1,15 @@
 ---
 feature: prism-memory-autopilot
 status: delivered
-updated: 2026-11-05
+updated: 2026-11-23
 branch: feat/prism-memory-autopilot
 commits: b99ebbb2bb..c328fe507c
 worktree: .worktrees/prism-memory-autopilot
 ---
 
 # Prism Memory Autopilot
+
+English | [中文](prism-memory-autopilot.zh.md)
 
 ## Report
 
@@ -21,6 +23,16 @@ worktree: .worktrees/prism-memory-autopilot
 - 摘要"直接生效"与"requireApproval 绝对规则"相冲突：独立审查抓到 `putAutomatic` 是唯一绕过闸门的写入路径。修正为摘要状态一律过 `admissionStatus`。
 - dream 内部记录靠状态而非标签排除注入/搜索——把摘要翻成 `active` 前必须先确认排除机制，否则是静默的注入面扩大。
 - fan-in 裁决的回链覆盖是审查发现的边界：同一较新主张与多条旧主张成对时，只裁第一对，其余留给人——用 `supersedes` 回链守卫表达。
+- resync 撞车是设计信号：master 的 assisted 窗口与本分支的 llmDistill 是同一个能力的两次实现。统一时保留协议更好的一半（窗口化、可引用消息、可复用 bootstrap），把信任策略叠加在录取一侧，而不是让两个通道并存。
+
+## Amendment 2026-11-23: resync unification and follow-ups
+
+The resync with master surfaced a second model-read channel: master had shipped the windowed `assistedDistill` producer (with `/memory bootstrap` and `/memory verify`) while this branch shipped the per-turn `llmDistill` channel. The two were unified on the assisted window: the branch's `extract.ts` protocol and `llmDistill*` keys are retired, assisted candidates are admitted through the same source tiers as the form distiller (keyed by the speaker of the message each candidate cites), and the assisted call keeps the `purpose: 'memory-distill'` stamp, now declared through the dsh-llm request-purpose map. Trust stays tiered by who said it, not by which producer wrote it. Recorded against the released rc.1 surface in `docs/upgrade-guide/v0.2.2-rc.1/prism-memory-assisted-distill/`.
+
+Two follow-ups shipped in the same pass:
+
+- **Scheduled tidy.** The hygiene pass also runs on a wall clock — `scheduledMaintain` (default on) every `scheduledMaintainMinutes` (default 360) and once shortly after load — so a quiet workspace still gets expiry archiving, duplicate merging, and capacity eviction. Background failures are contained; the turn-path passes stay loud.
+- **Page edit and retire.** The memory page rewrites a claim through the supersede chain (inheriting layer, class, scope, tags; the old wording stays auditable and `/memory restore` rolls back) and retires one through the same path as `/memory forget`. Both are operator writes with no calling session, so session-scoped claims stay under their session's authority.
 
 ## [S1] Problem
 
@@ -95,6 +107,9 @@ worktree: .worktrees/prism-memory-autopilot
 - [x] T6: LLM 通道——`extract.ts` + 服务接线 + `purpose` 联合扩展 (covers: S2.4) (depends: T1)
 - [x] T7: 测试——上述每条行为至少一条 spec (depends: T2, T3, T4, T5, T6)
 - [x] T8: 文档——README.en/zh、升级指南 (depends: T1, T5, T6)
+- [x] T9: resync 统一模型读通道——assisted 候选走分级信任、retire extract.ts、purpose 声明迁移 (depends: T6)
+- [x] T10: 定时清扫——scheduledMaintain/scheduledMaintainMinutes、装载布防、失败只记日志 (depends: none)
+- [x] T11: 页面改写与退役——/memory edit、/memory retire 路由与面板控件，supersedes 审计链 (depends: none)
 
 ## [S4] Acceptance
 

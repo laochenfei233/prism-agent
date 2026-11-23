@@ -32,6 +32,7 @@
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/cordis-plugin-include": ["../../vendor/include/lib/types/index.d.ts"],
       "@deepseek-ai/cordis-plugin-loader": ["../../vendor/loader/lib/types/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-timer": ["../../vendor/timer/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent": ["../../packages/core/agent/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent-loop": ["../../packages/core/agent-loop/lib/types/index.d.ts"],

@@ -9,6 +9,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import TimerPlugin from '@deepseek-ai/cordis-plugin-timer'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
@@ -109,6 +110,8 @@ export async function mountMemory(options: HarnessOptions = {}): Promise<Context
   await ctx.plugin(StorageDomain, { backend: 'sqlite' })
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  // The kernel timer the scheduled hygiene pass arms its interval through.
+  await ctx.plugin(TimerPlugin)
   if (options.sessionQuery === true) await ctx.plugin(StubSessionQuery)
   if (options.llm === true) installLlmStub(ctx)
   if (options.commands === true) await ctx.plugin(CommandRuntime)

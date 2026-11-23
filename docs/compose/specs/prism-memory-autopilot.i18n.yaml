@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for prism-memory-autopilot.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-memory-autopilot.md
+/:
+  en: 38c040fe2dc9e790
+  zh: 38c040fe2dc9e790
+/prism-memory-autopilot:
+  en: c55d695d82443f82
+  zh: f9271bb68e3c29aa
+/prism-memory-autopilot/report:
+  en: 39d0abeb19627027
+  zh: e24ce90ede1a5903
+/prism-memory-autopilot/amendment-2026-11-23-resync-unification-and-follow-ups:
+  en: ab97b4cd57181470
+  zh: 625a3c683911ec7f
+/prism-memory-autopilot/s1-problem:
+  en: aa59d386f8a22b48
+  zh: 997f3ffabdd476cb
+/prism-memory-autopilot/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-memory-autopilot/s2-design/s2-1-tiered-trust:
+  en: 7c790f1fb7eb55ae
+  zh: f52a8b31afc40483
+/prism-memory-autopilot/s2-design/s2-2-corroboration:
+  en: 3f453252fa4027f9
+  zh: b5209b7779d867ef
+/prism-memory-autopilot/s2-design/s2-3-consolidation-autopilot-dream:
+  en: 490b8759f7d0eb7c
+  zh: f22e6a8da19849ec
+/prism-memory-autopilot/s2-design/s2-4-llm:
+  en: afa6b6e451674ef2
+  zh: afa6b6e451674ef2
+/prism-memory-autopilot/s2-design/s2-5:
+  en: 3d9d9cb1fbd9eaa6
+  zh: 3d9d9cb1fbd9eaa6
+/prism-memory-autopilot/s3-scope:
+  en: 3442004bd8fde06c
+  zh: 42b85799b96ccb0d
+/prism-memory-autopilot/tasks:
+  en: 4f041a28a75f5c0b
+  zh: 20f9f0750bb77216
+/prism-memory-autopilot/s4-acceptance:
+  en: 11e4a7f77849f3c8
+  zh: 6333542c94a92887

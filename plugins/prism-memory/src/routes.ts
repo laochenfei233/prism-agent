@@ -19,3 +19,9 @@ export const MEMORY_REMEMBER_PATH = '/api/prism-memory/remember'
 
 /** One review settlement. */
 export const MEMORY_REVIEW_PATH = '/api/prism-memory/review'
+
+/** One operator rewrite of a stored claim. */
+export const MEMORY_EDIT_PATH = '/api/prism-memory/edit'
+
+/** One operator retirement of a stored claim. */
+export const MEMORY_RETIRE_PATH = '/api/prism-memory/retire'

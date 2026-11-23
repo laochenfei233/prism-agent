@@ -158,6 +158,10 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 apply 时巡检还会跑卫生清扫（`dreamAutoMaintain`，默认开）：过期归档、近似重复合并与容量淘汰随整理一起发生，而不是等运维命令。`/memory maintain` 仍可用于空跑查看或一次计划外的巡检。
 
+### 定时清扫
+
+`maintain` 也会按墙钟运行：每满 `scheduledMaintainMinutes`（默认 360）分钟，以及装载后不久的一次，插件都会以 `apply` 跑一次卫生 pass —— 过期归档、近似重复合并、容量淘汰 —— 不需要轮次，也不需要运维命令，安静的工作区也能保持整洁。该 pass 受 `maxRecords` 约束，无事可做时不写任何东西；一次失败的 pass 只记日志、留给下一个周期，这是与轮次路径 pass「坏存储要吵闹」刻意相反的策略。设 `scheduledMaintain: false` 可把整理收回轮次路径与运维命令。
+
 ### 日期
 
 一条记录可以带到期日，区别于它的失效时间。失效让一条主张退役；到期日让它保持有效，并在日期到来时作为提醒浮现，范围在 `reminderWindowDays` 之内。这就是本插件全部的提醒面：它是变得可执行的记忆，不是调度器。
@@ -187,6 +191,10 @@ apply 时巡检还会跑卫生清扫（`dreamAutoMaintain`，默认开）：过�
 ### 比较两条主张
 
 `/memory compare <idA> <idB>` 把两条主张并排对照，附上机械事实 —— 排序器分词上的 Jaccard 相似度、共享的召回标签、以及两者之间任何 supersede、合并或派生关系 —— 并给出一个由部署自身阈值决定的机械判定：达到或高于 `dedupeJaccard` 为 `equivalent`；两条主张共用一个标签且落在矛盾区间内为 `conflicting`；共用一个标签但低于该区间为 `complementary`；其余为 `unrelated`。判定是词汇，不是决定：等价的主张保留双方的身份与来源，互补的主张把任何先后次序留给读者，冲突的主张连同各自的条件一起保留。这次比较不合并、不退役、不改写任何东西。
+
+### 在页面上改写与退役
+
+页面的改写会重写一条主张的措辞：新句子取代旧句子，并继承它的层、类别、作用域与标签，因此一次编辑只改句子本身，不碰别的；取代链就是审计故事 —— 旧措辞带着后继链接保持可读，`/memory restore` 可以回滚这次编辑。退役按钮把一条主张归档，让它不再被召回，走的是与会话里 `/memory forget` 相同的路径，证据里记下页面这次操作。两者都是没有调用会话的运维写入，因此 project 或 conversation 作用域的主张仍归它的会话管辖：页面会列出它，但改写与退役路由会拒绝它。
 
 ## 第二层：持久的会话历史索引
 
@@ -275,6 +283,8 @@ apply 时巡检还会跑卫生清扫（`dreamAutoMaintain`，默认开）：过�
 | `dreamAutoResolveConflicts` | `true` | 按新旧裁决矛盾：较新的主张取代较旧的 |
 | `dreamAutoMaintain` | `true` | 整合提交后自动带 apply 运行卫生 pass |
 | `dailyReflection` | `true` | 为每个有写入的已完成本地日写一份交代 |
+| `scheduledMaintain` | `true` | 卫生 pass 也按墙钟定时跑，而不只在轮次路径上 |
+| `scheduledMaintainMinutes` | `360` | 两次定时卫生 pass 之间的分钟数 |
 | `importSources` | `[]` | `/memory import` 可读取的外部布局；不指名则不读 |
 | `importStatus` | `active` | 导入的主张写入时所用的状态 |
 | `importConfidence` | `0.6` | 导入的主张写入时所用的置信度 |
@@ -374,7 +384,7 @@ token 影响：无。页面通过自己的路由读写，而它所结算的东�
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 223 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 229 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -404,8 +414,8 @@ node scripts/smoke.mjs                                                        # 
 - **轮次末巡检的失败属于该轮次的一部分。** 沉淀与整理会传播它们的错误而不是吞掉它们，依据的原则是坏掉的存储应当吵闹。宁愿丢一次巡检也不愿让轮次失败的部署，应当在自己那一层放宽捕获范围。
 - **语料常驻内存。** 每条记录都驻留在该域的同步状态中，受 `maxRecords` 限制，但不受字节数限制。
 - **`hits` 只计显式打开**，因此复用加权是弱信号。沉淀刻意不碰它。
-- **维护与整理巡检没有被调度。** 它们跑在轮次路径上和运维命令上；希望它们在固定时刻跑的部署，需要一条指向 `/memory maintain apply` 或 `/memory dream apply` 的 schedule 配置行。
-- **页面只新增与结算，不编辑。** 改写一条主张是带 `supersedes` 的 `memory_remember`，退役一条仍生效的记录是 `/memory forget <id>`；面板两个都不提供，因为在面板上做的编辑没有审计故事。
+- **整理（consolidation）巡检没有被调度。** 卫生 pass 已按墙钟运行（`scheduledMaintain`），但整理要把新素材与语料比对，所以它的窗口仍在轮次路径上；想在固定时刻跑整理的部署，需要一条指向 `/memory dream apply` 的 schedule 配置行。
+- **页面改的是措辞，不是结构。** 页面编辑经取代链改写一条主张的句子，退役则归档它；改标签、改作用域、合并记录仍是运维命令的事，因为页面没有可以受理作用域变更的会话。
 - **页面的 overview 在每次写入后读取整个库。** 它受 `maxRecords` 约束，对本存储所面向的语料规模是正确的；接近该上限的存储会想先做分页读取。
 - **四个运维方法是公开且不收窄的服务方法。** 没有任何面向模型的调用方能到达它们，而 `maintain`、`dream`、`importMemories`、`exportMarkdown` 本来就是整库操作，因此这不引入新的权限类别 —— 但任何注入 `prismMemory` 的插件都能读到整库，而类型除了名字之外没有表达这一点。
 - **页面没有组件规格。** 该包不自带 React 运行时，插件的 Vitest 配置也没有设置 jsdom 环境，因此页面只由路由规格、请求客户端规格，以及加载该包并执行其 `apply` 的 smoke 覆盖。

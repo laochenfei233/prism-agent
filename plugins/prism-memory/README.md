@@ -158,6 +158,10 @@ The pass concludes four things:
 
 On apply the pass also runs the hygiene sweep (`dreamAutoMaintain`, default on): expiry archiving, near-duplicate merging, and capacity eviction happen with the consolidation instead of waiting for an operator command. `/memory maintain` stays for a dry-run look or an off-cycle pass.
 
+### The scheduled tidy-up
+
+`maintain` also runs on a wall clock: every `scheduledMaintainMinutes` (default 360), and once shortly after load, the plugin applies the hygiene pass — expiry archiving, near-duplicate merging, and capacity eviction — with no turn and no operator command, so a quiet workspace stays tidy. The pass is bounded by `maxRecords` and writes nothing when there is nothing to do; a failing pass is logged and left to the next tick, the deliberate opposite of the turn-path passes' loud failures. Set `scheduledMaintain: false` to keep tidying on the turn path and operator command alone.
+
 ### Dates
 
 A record may carry a due date, distinct from its expiry. An expiry retires a claim; a due date keeps it live and surfaces it as a reminder once the date arrives, within `reminderWindowDays`. This is the plugin's whole reminder surface: it is memory that has become actionable, not a scheduler.
@@ -187,6 +191,10 @@ A claim the model recorded cites its source: `memory_remember` anchors the user 
 ### Comparing two claims
 
 `/memory compare <idA> <idB>` sets two claims side by side with the mechanical facts — Jaccard similarity over the ranker's tokenization, shared recall tags, and any supersede, merge, or derivation link between them — and a mechanical verdict from the deployment's own thresholds: `equivalent` at or above `dedupeJaccard`, `conflicting` when the pair shares a tag inside the contradiction band, `complementary` when it shares a tag below that band, and `unrelated` otherwise. The verdict is vocabulary, not a decision: equivalent claims keep both identities and sources, complementary claims leave any ordering to the reader, and conflicting claims are preserved with their conditions. The comparison merges, retires, and rewrites nothing.
+
+### Editing and retiring from the page
+
+The page's edit rewrites one claim's wording: the new sentence supersedes the old and inherits its layer, class, scope, and tags, so an edit changes the sentence and nothing else, and the supersede chain is the audit story — the old wording stays readable with its successor link, and `/memory restore` rolls an edit back. The retire button archives a claim so it stops being recalled, the same `/memory forget` path a session uses, with the page's own note on the evidence. Both are operator writes with no calling session, so a project-scoped or conversation-scoped claim stays under its session's authority: the page lists it, and the edit and retire routes refuse it.
 
 ## The second layer: a durable session-history index
 
@@ -275,6 +283,8 @@ A record outside the caller's scope is not merely ranked lower; it is filtered o
 | `dreamAutoResolveConflicts` | `true` | Settle contradictions by recency: the newer claim supersedes the older |
 | `dreamAutoMaintain` | `true` | Run the hygiene pass with apply after a committed consolidation |
 | `dailyReflection` | `true` | Write one account per completed local day that wrote something |
+| `scheduledMaintain` | `true` | Run the hygiene pass on a wall clock too, not only on the turn path |
+| `scheduledMaintainMinutes` | `360` | Minutes between scheduled hygiene passes |
 | `importSources` | `[]` | External layouts `/memory import` may read; none is read unless named |
 | `importStatus` | `active` | Status an imported claim is written with |
 | `importConfidence` | `0.6` | Confidence an imported claim is written with |
@@ -374,7 +384,7 @@ Token effect: none. The page reads and writes through its own routes, and what i
 ```sh
 node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit          # host face against the checkout's declarations
 node ../../node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit   # browser face against the DOM library
-node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 223 specs over the real services
+node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts       # 229 specs over the real services
 node ../../node_modules/.bin/tsdown --config tsdown.config.ts                 # emit lib/
 node scripts/smoke.mjs                                                        # artifact plane
 ```
@@ -404,8 +414,8 @@ The specs drive production services — the storage hub with its SQLite backend,
 - **A turn-end pass failure is part of the turn.** Distillation and consolidation propagate their errors rather than swallowing them, on the principle that a broken store should be loud. A deployment that would rather lose a pass than fail a turn should widen the catch at its own layer.
 - **The corpus is held in memory.** Every record is resident in the domain's synchronous state, bounded by `maxRecords` but not by bytes.
 - **`hits` counts explicit opens only**, so reuse weighting is a weak signal. Distillation deliberately does not touch it.
-- **The maintenance and consolidation passes are not scheduled.** They run on the turn path and on operator command; a deployment that wants them at a fixed hour needs a schedule row pointing at `/memory maintain apply` or `/memory dream apply`.
-- **The page adds and settles; it does not edit.** Rewriting a claim is `memory_remember` with `supersedes`, and retiring a live record is `/memory forget <id>`; the panel offers neither, so an edit made there would have no audit story.
+- **The consolidation pass is not scheduled.** The hygiene pass runs on the wall clock (`scheduledMaintain`), but consolidation compares new material against the corpus, so it keeps its window on the turn path; a deployment that wants consolidation at a fixed hour needs a schedule row pointing at `/memory dream apply`.
+- **The page edits wording, not structure.** A page edit rewrites one claim's sentence through the supersede chain, and retire archives it; retagging, re-scoping, and merging stay operator-command work, because the page has no session to admit a scope change.
 - **The page's overview reads the whole store on each write.** That is bounded by `maxRecords` and correct for the corpus sizes this store is designed for; a store near that cap would want a paged read first.
 - **The four operator methods are un-narrowed public service methods.** No model-facing caller can reach them, and `maintain`, `dream`, `importMemories`, and `exportMarkdown` were already whole-store, so this adds no new authority class — but any plugin that injects `prismMemory` can read the whole corpus, and the type does not say so beyond the name.
 - **The page has no component spec.** The bundle declares no React runtime of its own and the plugin's Vitest config sets no jsdom environment, so the page is covered only by the route suites, the request-client spec, and the smoke test that loads the bundle and runs its `apply`.

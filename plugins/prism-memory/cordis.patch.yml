@@ -114,6 +114,14 @@
         dreamAutoMaintain: true
         dailyReflection: true
 
+        # The hygiene pass also runs on a wall clock, so a quiet workspace stays
+        # tidy: expiry archiving, near-duplicate merging, and capacity eviction
+        # on a fixed cadence with no turn and no operator command. Turn the
+        # schedule off to keep tidying on the turn path and operator command
+        # alone.
+        scheduledMaintain: true
+        scheduledMaintainMinutes: 360
+
         # External layouts `/memory import` may read. Empty by default: another
         # tool's memory directories are not enumerated behind the user's back.
         importSources: []

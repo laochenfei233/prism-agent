@@ -37,6 +37,13 @@ export const zh = {
   existing: '已存在同一条，复用计数 +1：{id}',
   approved: '已通过 {id}',
   rejected: '已驳回 {id}',
+  editAction: '改写',
+  editSave: '保存',
+  editCancel: '取消',
+  editHint: '改写这条主张；旧措辞留在取代链上',
+  retireAction: '退役',
+  edited: '已改写 {id}',
+  retired: '已退役 {id}',
   scopeLabel: '范围',
 }
 
@@ -65,6 +72,13 @@ export const en: Record<MemoryLocaleKey, string> = {
   existing: 'The same claim already stood; its reuse count rose: {id}',
   approved: 'Approved {id}',
   rejected: 'Rejected {id}',
+  editAction: 'Edit',
+  editSave: 'Save',
+  editCancel: 'Cancel',
+  editHint: 'Rewrite the claim; the old wording stays on the supersede chain',
+  retireAction: 'Retire',
+  edited: 'Rewritten {id}',
+  retired: 'Retired {id}',
   scopeLabel: 'Scope',
 }
 

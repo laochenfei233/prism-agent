@@ -5,7 +5,7 @@ description: "prism-memory 现在把蒸馏与导入的 claim 自动存为 active
 
 # prism-memory 默认值从先审后收翻转为自动驾驶
 
-English | [中文](guide.zh.md)
+[English](guide.md) | 中文
 
 ## 变更
 

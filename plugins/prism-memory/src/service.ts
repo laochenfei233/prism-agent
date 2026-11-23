@@ -22,6 +22,11 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+// Type-only: activates the `ctx.interval`/`ctx.timeout` merges the scheduled
+// hygiene pass arms its timer through, and the `loader/volatile-update` event
+// that re-arms it when the cadence is edited live.
+import type {} from '@deepseek-ai/cordis-plugin-loader'
+import type {} from '@deepseek-ai/cordis-plugin-timer'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -159,6 +164,16 @@ export type AdmissionStatus = (typeof ADMISSION_STATUSES)[number]
 
 /** Milliseconds in one day, for the day-denominated configuration bounds. */
 const DAY_MS = 86_400_000
+
+/** Milliseconds in one minute, for the scheduled hygiene cadence. */
+const MINUTE_MS = 60_000
+
+/**
+ * Delay before the first scheduled hygiene pass. A boot guard rather than a
+ * deployment choice: it keeps the pass out of the application's start-up window
+ * without postponing it by a whole interval.
+ */
+const FIRST_MAINTAIN_DELAY_MS = 60_000
 
 /**
  * Ranked candidates fetched before the already-injected filter runs. Without the
@@ -520,6 +535,10 @@ export interface PrismMemoryConfig {
   dreamAutoResolveConflicts: Volatile<boolean>
   /** Run the hygiene pass with `apply` after a committed consolidation. */
   dreamAutoMaintain: Volatile<boolean>
+  /** Run the hygiene pass on a wall-clock schedule too, not only on the turn path. */
+  scheduledMaintain: Volatile<boolean>
+  /** Minutes between scheduled hygiene passes. */
+  scheduledMaintainMinutes: Volatile<number>
   /** Write one account of the day per local day. */
   dailyReflection: Volatile<boolean>
 
@@ -790,7 +809,7 @@ interface AutomaticRecordInput {
  */
 export class PrismMemoryService extends Service {
   /** Services required before memory work can activate. */
-  static readonly inject = ['storageDomain', 'systemPrompt', 'sessionProjections', 'agents'] as const
+  static readonly inject = ['storageDomain', 'systemPrompt', 'sessionProjections', 'agents', 'timer'] as const
 
   /** Deployment-owned retrieval, injection, and governance bounds. */
   static readonly Config = z.object({
@@ -835,6 +854,8 @@ export class PrismMemoryService extends Service {
     dreamDigestStatus: z.union([z.const('pending'), z.const('active')]).default('active').volatile(),
     dreamAutoResolveConflicts: z.boolean().default(true).volatile(),
     dreamAutoMaintain: z.boolean().default(true).volatile(),
+    scheduledMaintain: z.boolean().default(true).volatile(),
+    scheduledMaintainMinutes: z.number().step(1).min(5).max(10_080).default(360).volatile(),
     dailyReflection: z.boolean().default(true).volatile(),
     importSources: z.array(z.string()).default([]).volatile(),
     importStatus: z.union([z.const('pending'), z.const('active')]).default('active').volatile(),
@@ -884,6 +905,9 @@ export class PrismMemoryService extends Service {
 
   /** The awaited projection registration, read for the ids one session already received. */
   private projectionHandle: ProjectionHandle<{ injected: string[] }> | undefined
+
+  /** Whether one scheduled hygiene pass is in flight; a slow store cannot stack passes. */
+  private tidyRunning = false
 
   /** Validated deployment configuration, read through each field's `get()`. */
   private readonly config: PrismMemoryConfig
@@ -938,6 +962,10 @@ export class PrismMemoryService extends Service {
         return { injected: [...merged].slice(-MAX_TRACKED_INJECTIONS) }
       },
     })
+
+    // The scheduled hygiene pass: the expiry, merge, and eviction half of
+    // tidying on a wall clock, so a quiet workspace still stays tidy.
+    this.armScheduledMaintain()
 
     // The optional read path behind `/memory verify`, bound the way an optional
     // service is bound anywhere else: a fiber that re-resolves when the service
@@ -1249,7 +1277,10 @@ export class PrismMemoryService extends Service {
       statuses: ADMISSION_STATUSES,
     })
     const identical = near.find(entry => entry.similarity >= this.config.dedupeReplaceJaccard.get())
-    if (identical !== undefined) {
+    // An explicit supersede of the very record an identical hit names is a
+    // rewrite, not a restatement: the writer already knows the claim exists and
+    // is changing it, so the reuse path would silently drop the edit.
+    if (identical !== undefined && identical.record.id !== input.supersedes) {
       // A claim arriving again from a *different* conversation is evidence the
       // write path cannot otherwise record, and the consolidation pass reads it.
       const writer = agent?.session.id ?? null
@@ -1429,6 +1460,33 @@ export class PrismMemoryService extends Service {
       updatedAt: now,
       ...reason === undefined ? {} : { evidence: { ...record.evidence, note: reason } },
     }))
+  }
+
+  /**
+   * Rewrite one record's claim from the operator surface.
+   *
+   * The new wording supersedes the old and inherits its layer, class, scope,
+   * and tags, so an edit changes the sentence and nothing else. The supersede
+   * chain is the audit story: the old record stays readable with its successor
+   * link, and `/memory restore` can roll the edit back.
+   * @param id - the record to rewrite.
+   * @param text - the new claim wording.
+   * @param agent - the calling agent, when the caller is model-facing.
+   * @returns the rewritten record.
+   */
+  async rewrite(id: string, text: string, agent: Agent | undefined): Promise<MemoryRecord> {
+    const previous = this.require(id, agent)
+    const result = await this.remember({
+      text,
+      layer: layerOf(previous),
+      kind: previous.kind,
+      scope: previous.scope,
+      tags: previous.tags,
+      origin: 'operator',
+      supersedes: id,
+      evidenceNote: 'rewritten on the memory page',
+    }, agent)
+    return result.record
   }
 
   /**
@@ -1733,6 +1791,47 @@ export class PrismMemoryService extends Service {
   }
 
   // --- Automatic memory -----------------------------------------------------
+
+  /**
+   * Arm the wall-clock hygiene pass.
+   *
+   * Config is read per arm, not once at load: every field is volatile, so a
+   * cadence edit re-arms the interval, because the bound it was created with is
+   * the old one. One pass runs at a time, and a failing pass is logged and left
+   * to the next tick — this pass is background hygiene, the deliberate opposite
+   * of the turn-path passes, whose storage failures stay loud because they ride
+   * a turn the model is waiting on. The pass is `maintain({ apply: true })`
+   * only: expiry, near-duplicate merging, and capacity eviction are the
+   * time-based half of tidying, while consolidation keeps its own corpus window
+   * on the turn path, where the new material it compares actually arrives.
+   */
+  private armScheduledMaintain(): void {
+    const pass = async (): Promise<void> => {
+      if (this.tidyRunning || !this.config.scheduledMaintain.get()) return
+      this.tidyRunning = true
+      try {
+        await this.maintain({ apply: true })
+      } catch (error) {
+        // Contained by policy: background hygiene never fails the process for
+        // a store condition the next pass will meet again.
+        this.ctx.logger.warn(
+          `prism-memory: scheduled maintain failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      } finally {
+        this.tidyRunning = false
+      }
+    }
+    const arm = (): (() => void) => this.ctx.interval(
+      () => { void pass() },
+      this.config.scheduledMaintainMinutes.get() * MINUTE_MS,
+    )
+    let interval = arm()
+    this.ctx.timeout(() => { void pass() }, FIRST_MAINTAIN_DELAY_MS)
+    this.ctx.on('loader/volatile-update', () => {
+      interval()
+      interval = arm()
+    })
+  }
 
   /**
    * The turn-end pass: read the closing turn's own text, then consolidate when

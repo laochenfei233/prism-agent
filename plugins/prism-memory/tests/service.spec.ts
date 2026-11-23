@@ -712,3 +712,56 @@ describe('the mirror check', () => {
     expect(error.code).toBe('PRISM_MEMORY_NO_EXPORT_DIR')
   })
 })
+
+
+describe('the operator rewrite', () => {
+  it('rewrites the claim and leaves the old wording on the supersede chain', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'rewrite')
+    const stored = await ctx.prismMemory.remember(
+      { text: 'the deploy window is tuesday', layer: 'project', kind: 'fact', tags: ['deploy'] },
+      agent,
+    )
+
+    const rewritten = await ctx.prismMemory.rewrite(stored.record.id, 'the deploy window is wednesday', agent)
+
+    expect(rewritten.text).toBe('the deploy window is wednesday')
+    expect(rewritten.supersedes).toBe(stored.record.id)
+    expect(rewritten.layer).toBe('project')
+    expect(rewritten.kind).toBe('fact')
+    expect(rewritten.tags).toEqual(['deploy'])
+    expect(rewritten.evidence.note).toBe('rewritten on the memory page')
+    const old = ctx.prismMemory.all().find(record => record.id === stored.record.id)
+    expect(old?.status).toBe('superseded')
+    expect(old?.supersededBy).toBe(rewritten.id)
+  })
+
+  it('supersedes instead of counting reuse when the rewrite barely changes the wording', async () => {
+    const ctx = await boot()
+    const stored = await ctx.prismMemory.remember(
+      { text: 'the deploy window is tuesday morning without fail' },
+      undefined,
+    )
+
+    const rewritten = await ctx.prismMemory.rewrite(
+      stored.record.id,
+      'the deploy window is tuesday morning, without fail',
+      undefined,
+    )
+
+    expect(rewritten.supersedes).toBe(stored.record.id)
+    expect(ctx.prismMemory.all().find(record => record.id === stored.record.id)?.status).toBe('superseded')
+  })
+
+  it('refuses an unknown id and a record outside the calling scope', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'rewrite-scope', 'C:/work/rewrite')
+    const stored = await ctx.prismMemory.remember({ text: 'a project claim', scope: 'project' }, agent)
+
+    const missing = await errorOf(ctx.prismMemory.rewrite('mem_missing', 'anything', undefined))
+    expect(missing.code).toBe('PRISM_MEMORY_NOT_FOUND')
+
+    const outside = await errorOf(ctx.prismMemory.rewrite(stored.record.id, 'anything', undefined))
+    expect(outside.code).toBe('PRISM_MEMORY_OUT_OF_SCOPE')
+  })
+})

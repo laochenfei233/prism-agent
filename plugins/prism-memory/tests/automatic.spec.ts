@@ -12,7 +12,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import {
@@ -534,5 +534,47 @@ describe('the backlog on upgrade', () => {
     expect(stated?.reviewNote).toBe('auto-approved on upgrade: stated by the person')
     expect(stored.find(record => record.text.includes('imported'))?.status).toBe('active')
     expect(stored.find(record => record.text.includes('model wrote'))?.status).toBe('pending')
+  })
+})
+
+
+describe('the scheduled hygiene pass', () => {
+  it('archives an expired record on the wall clock, with no turn in the room', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await boot({ scheduledMaintainMinutes: 5 })
+      await ctx.prismMemory.remember(
+        { text: 'a claim whose time-to-live has passed', ttlDays: 1, origin: 'operator' },
+        undefined,
+      )
+
+      // Past the boot guard and far enough for the write's own time-to-live to
+      // lapse under the faked clock, so a scheduled interval lands after it.
+      await vi.advanceTimersByTimeAsync(2 * DAY + 61_000)
+
+      const record = ctx.prismMemory.all().find(entry => entry.text.includes('time-to-live'))
+      expect(record?.status).toBe('archived')
+      expect(record?.evidence.note).toContain('maintenance')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves the corpus alone when the schedule is off', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await boot({ scheduledMaintain: false, scheduledMaintainMinutes: 5 })
+      await ctx.prismMemory.remember(
+        { text: 'a claim whose time-to-live has passed', ttlDays: 1, origin: 'operator' },
+        undefined,
+      )
+
+      await vi.advanceTimersByTimeAsync(2 * DAY + 61_000)
+
+      const record = ctx.prismMemory.all().find(entry => entry.text.includes('time-to-live'))
+      expect(record?.status).toBe('active')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
