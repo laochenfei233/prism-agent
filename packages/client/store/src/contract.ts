@@ -56,6 +56,17 @@ export type BakedActions<T, A extends ActionsDecl<T>> = {
 export interface StoreSpec<T, A extends ActionsDecl<T>> {
   init: () => T
   persist?: string
+  /**
+   * Rehydration merge for the persisted value, run once per instance right
+   * after JSON.parse of the storage content. `persisted` is the untrusted
+   * parsed value, `current` the just-initialized state, and the return value
+   * installs wholesale; a thrown merge lands in the same rehydration-failure
+   * containment as a JSON parse failure (defaults stay). Without the hook the
+   * parsed value installs as-is. A consumer owning the persisted shape
+   * validates here — untrusted localStorage content must never reach derived
+   * state unvalidated.
+   */
+  merge?: (persisted: unknown, current: T) => T
   actions: A
 }
 

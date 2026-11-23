@@ -161,6 +161,8 @@ resolve(request: SpeechRequest): SpeechSpec
 
 /**
  * Execute exactly the resolved provider; no fallback sends audio elsewhere.
+ * Recordings beyond the provider's declared request cap are split at quiet
+ * boundaries and merged, so the cap never rejects an admitted recording.
  * @param spec - resolved input; a withdrawn or replaced registration is rejected.
  * @param signal - caller cancellation.
  * @returns final transcript after provider settlement.

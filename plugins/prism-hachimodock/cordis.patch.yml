@@ -1,0 +1,12 @@
+# The HachimoDock bridge: one loopback HTTP/SSE channel for device status,
+# the approval relay, voice targets, and conversation switching. `webStartup`
+# exists on every profile that mounts the web-app bundle, which is the only
+# place this plugin is meant to load.
+- insert:
+    - id: hachimodock-bridge
+      name: '@prism/prism-hachimodock'
+      inject: [webStartup]
+      config:
+        approvalTimeoutMs: 30000
+        # Delegate only BEFORE claiming, when no authenticated relay is attached.
+        approvalFallback: delegate

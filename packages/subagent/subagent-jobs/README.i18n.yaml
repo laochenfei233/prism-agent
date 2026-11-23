@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/subagent/subagent-jobs/README.md
+/:
+  en: 74681c211fd6c671
+  zh: 7cd71384fe3076e7
+/prism-prism-subagent-jobs:
+  en: 77e42427f1e5579c
+  zh: dd6c233c499f0d02
+/prism-prism-subagent-jobs/summary:
+  en: a255e209b4a1b640
+  zh: 8a028ddec9cb5a5b
+/prism-prism-subagent-jobs/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 49b8d2c4457703e6
+/prism-prism-subagent-jobs/use-this-package:
+  en: 89cd8e391d343b5c
+  zh: 1a7d6b7c7cb533aa
+/prism-prism-subagent-jobs/use-this-package/minimal-configuration:
+  en: 668948a4e2051bb8
+  zh: ffd85f7537acd8e5
+/prism-prism-subagent-jobs/use-this-package/what-one-job-covers:
+  en: 8c91e616161650ee
+  zh: acf4d9f67859f889
+/prism-prism-subagent-jobs/use-this-package/job-outcomes:
+  en: c3a88218302c0e84
+  zh: 8f492f4520017f80
+/prism-prism-subagent-jobs/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: 42b15ac6321706aa
+/prism-prism-subagent-jobs/understand-the-implementation/design-concept:
+  en: 20fd49967658a48b
+  zh: faa567598cb404cc
+/prism-prism-subagent-jobs/understand-the-implementation/source-map:
+  en: 71ef2d0ec90178ef
+  zh: 95aa7837c4b6bc02
+/prism-prism-subagent-jobs/understand-the-implementation/kill-path:
+  en: 5df4f6111785b4f6
+  zh: a4ae3ae905c54846
+/prism-prism-subagent-jobs/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations:
+  en: 3ab854b9ab03145a
+  zh: 3dda644ff0cff9fc
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/what-the-model-sees:
+  en: b2e8ac4e9a603085
+  zh: 51541e2efba67d88
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/token-effect:
+  en: f2256521bfca6f5c
+  zh: 892ca618c1e68e24
+/prism-prism-subagent-jobs/model-experience/job-controls-over-delegations/kv-cache-effect:
+  en: 19f4d26f590d11ac
+  zh: fb09c093d59059aa
+/prism-prism-subagent-jobs/known-limitations-and-deferred-work:
+  en: dcbc7b089bcd67d8
+  zh: fe26ffcbcc900ec3
+/prism-prism-subagent-jobs/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: cdd2a143b725accd

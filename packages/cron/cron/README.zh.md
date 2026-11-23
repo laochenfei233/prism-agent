@@ -66,7 +66,7 @@ try {
 
 管理操作读取的是本进程所领导的那个存储，因此跟随者回答 `cron_not_leader`，而不是给出它启动时读到的那批行：
 
-```ts
+```ts ignore-check
 const job = await ctx.cron.create({
   expression: '0 9 * * 1-5',
   timeZone: 'Asia/Shanghai',

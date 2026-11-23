@@ -21,13 +21,14 @@
  * post-apply reload.
  */
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, IconPlusOutlineRegular, Modal, SegmentedControl } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconPlusOutlineRegular, Modal, SegmentedControl, SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LlmNativeAuth, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls this package's SlotMap merge (the two Models child slots).
 import type {} from './slot-contract.ts'
+import type { ModelsTab } from './slot-contract.ts'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, protocolChoices, providerUsable, reasoningLevelChoices } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
@@ -60,7 +61,7 @@ export interface ModelsSectionInjected {
 type AddMode = 'catalog' | 'custom'
 
 /** The child slots this section declares and dispatches (see ./slot-contract.ts). */
-type ModelsChildSlots = 'settings.models.provider-card' | 'settings.models.footer'
+type ModelsChildSlots = 'settings.models.provider-card' | 'settings.models.footer' | 'settings.models.tab'
 
 /** The child-slot dispatch function the renderer binds for the section. */
 type ModelsRenderSlot = PropsRenderSlots<ModelsChildSlots>['renderSlot']
@@ -246,6 +247,22 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
 
 function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {
   const { controller, operations, schema, t } = injected
+  const tabsId = useId()
+  const [activeTab, setActiveTab] = useState<ModelsTab>('providers')
+  const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<ModelsTab>>(() => new Set<ModelsTab>(['providers']))
+  // A tab mounts on first selection and then stays mounted while hidden, so a
+  // half-filled service card or an installer row survives a look at another tab.
+  useEffect(() => {
+    setVisitedTabs((previous) => {
+      if (previous.has(activeTab)) return previous
+      return new Set([...previous, activeTab])
+    })
+  }, [activeTab])
+  const tabLabels: Readonly<Record<ModelsTab, string>> = {
+    providers: t('tabProviders'),
+    speech: t('tabSpeech'),
+    local: t('tabLocal'),
+  }
   const snapshot = injected.useSnapshot(value => value)
   const state = { ...snapshot, rows: snapshot.rows.map(row => row.entry.provider === 'deepseek-account'
     ? { ...row, entry: { ...row.entry, displayName: t('deepSeekAccount') } } : row) }
@@ -414,7 +431,29 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     <div className={styles['section']}>
       <h2 className={styles['title']}>{t('title')}</h2>
       <p className={styles['intro']}>{t('intro')}</p>
-      {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
+      <SegmentedTabs<ModelsTab>
+        className={styles['tabs']}
+        label={t('tabsLabel')}
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { value: 'providers', label: tabLabels.providers, id: `${tabsId}-providers`, panelId: `${tabsId}-providers-panel` },
+          { value: 'speech', label: tabLabels.speech, id: `${tabsId}-speech`, panelId: `${tabsId}-speech-panel` },
+          { value: 'local', label: tabLabels.local, id: `${tabsId}-local`, panelId: `${tabsId}-local-panel` },
+        ]}
+      />
+      {(['providers', 'speech', 'local'] as const).filter(tab => visitedTabs.has(tab)).map(tab => (
+        <div
+          key={tab}
+          id={`${tabsId}-${tab}-panel`}
+          className={styles['panel']}
+          role="tabpanel"
+          aria-labelledby={`${tabsId}-${tab}`}
+          hidden={tab !== activeTab}
+        >
+          {tab === 'providers'
+            ? <>
+              {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
       {savedIdentity === undefined
         ? null
         : (
@@ -717,7 +756,11 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
             )
             : null}
       </div>
-      {renderSlot('settings.models.footer', {})}
+              {renderSlot('settings.models.footer', {})}
+            </>
+            : <div className={styles['tabPage']}>{renderSlot('settings.models.tab', {}, { only: tab })}</div>}
+        </div>
+      ))}
       <Modal
         open={deleteTarget !== undefined}
         onClose={closeDelete}

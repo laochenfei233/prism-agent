@@ -42,8 +42,10 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .themeCard:hover:not(.selected) {
-  background: var(--dsw-alias-interactive-bg-hover);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* Selected card: #F5F6F7 fill + #ADB2B8 border (static token — the bluish-400

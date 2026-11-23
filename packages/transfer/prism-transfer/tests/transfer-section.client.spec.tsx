@@ -2,42 +2,49 @@
 /** The transfer page as the settings shell renders it: export card, import card, progress, and outcome. */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TransferSection, type TransferFace, type TransferSectionProps } from '../src/client/TransferSection.tsx'
+import { TransferSection, type TransferFace } from '../src/client/TransferSection.tsx'
 import { TRANSFER_EXPORT_PATH } from '../src/routes.ts'
 import { en } from '../src/client/locales.ts'
 import type { TransferJobSnapshot } from '../src/types.ts'
 
 afterEach(cleanup)
 
-const t = (key: keyof typeof en, params?: Record<string, unknown>): string => {
-  let text: string = en[key]
-  for (const [name, value] of Object.entries(params ?? {})) {
-    text = text.replaceAll(`{${name}}`, String(value))
-  }
-  return text
-}
+const t = makeTranslate(en)
 
 /** One registered project in the workspace snapshot. */
-function project(id: string, title: string, sessions: number) {
+function project(id: string, title: string, sessions: number): WorkspaceView {
   return {
-    workspaceId: id,
+    workspaceId: id as WorkspaceId,
     path: `/p/${id}`,
     title,
-    sessionIds: Array.from({ length: sessions }, (_, index) => `s${String(index)}`),
+    sessionIds: Array.from({ length: sessions }, (_, index) => SessionId(`s${String(index)}`)),
     createdAt: '',
     updatedAt: '',
   }
 }
 
-/** Fake workspaces store serving the given rows. */
+/** Fake workspaces store serving the given rows; commands are never called. */
 function fakeWorkspaces(items: ReturnType<typeof project>[]): TransferFace['workspaces'] {
   return {
     list: {
-      getSnapshot: () => ({ items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle' as const, error: null }),
+      getSnapshot: () => ({ items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null }),
       subscribe: vi.fn(() => () => {}),
     },
-  } as unknown as TransferFace['workspaces']
+    create: vi.fn(),
+    initializeDefault: vi.fn(),
+    rename: vi.fn(),
+    delete: vi.fn(),
+    insertBefore: vi.fn(),
+    archiveSession: vi.fn(),
+    unarchiveSession: vi.fn(),
+    pinSession: vi.fn(),
+    unpinSession: vi.fn(),
+    insertSessionBefore: vi.fn(),
+  }
 }
 
 /** Fake picker resolving or failing. */
@@ -55,13 +62,11 @@ function renderPage(options: {
   items?: ReturnType<typeof project>[]
   picker?: TransferFace['directoryPicker']
 } = {}): void {
-  const props = {
-    close: vi.fn(),
-    t,
-    workspaces: fakeWorkspaces(options.items ?? [project('w1', 'Alpha', 2), project('w2', 'Beta', 0)]),
-    directoryPicker: options.picker ?? fakePicker(),
-  } as TransferSectionProps
-  render(<TransferSection {...props} />)
+  render(<TransferSection
+    t={t}
+    workspaces={fakeWorkspaces(options.items ?? [project('w1', 'Alpha', 2), project('w2', 'Beta', 0)])}
+    directoryPicker={options.picker ?? fakePicker()}
+  />)
 }
 
 /** A FileList-shaped view over plain files, matching what a real input provides. */
@@ -70,7 +75,7 @@ function fileList(files: File[]): FileList {
   files.forEach((file, index) => {
     Object.defineProperty(list, index, { value: file, enumerable: true })
   })
-  return list as unknown as FileList
+  return list as FileList
 }
 
 /** One mocked route's answer: a ready Response, a JSON descriptor, or a rejection. */

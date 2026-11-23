@@ -9,6 +9,7 @@
  * @module @prism/prism-memory/memory
  */
 
+import { createHash } from 'node:crypto'
 import type { MemoryRecord } from './domain.ts'
 import { layerOf, layerWeight } from './layers.ts'
 
@@ -107,6 +108,18 @@ export function jaccard(left: ReadonlySet<string>, right: ReadonlySet<string>): 
   let shared = 0
   for (const token of left) if (right.has(token)) shared += 1
   return shared / (left.size + right.size - shared)
+}
+
+/**
+ * SHA-256 of one text, as an evidence fingerprint. A record citing a message
+ * stores the fingerprint of the message's model-visible text at write time;
+ * `/memory verify` recomputes it over the current surface to report whether the
+ * cited source still says what it said.
+ * @param text - the text as it stood when the record was written.
+ * @returns the lowercase hex digest.
+ */
+export function textFingerprint(text: string): string {
+  return createHash('sha256').update(text).digest('hex')
 }
 
 /** The searchable text of a record: its claim, its tags, its kind, and its layer. */
@@ -684,6 +697,9 @@ export function renderExport(
     if (record.supersedes !== null) lines.push(`  - supersedes: \`${record.supersedes}\``)
     if (record.supersededBy !== null) lines.push(`  - superseded by: \`${record.supersededBy}\``)
     if ((record.mergedInto ?? null) !== null) lines.push(`  - merged into: \`${record.mergedInto ?? ''}\``)
+    if ((record.parents ?? []).length > 0) {
+      lines.push(`  - parents: ${(record.parents ?? []).map(parent => `\`${parent}\``).join(', ')}`)
+    }
     lines.push(`  - live: ${isLive(record, now) ? 'yes' : 'no'}`)
     lines.push('', `  ${record.text}`)
   }
@@ -709,6 +725,7 @@ export function renderExport(
       supersedes: record.supersedes,
       supersededBy: record.supersededBy,
       mergedInto: record.mergedInto ?? null,
+      parents: record.parents ?? null,
       origin: record.origin ?? null,
       hits: record.hits,
       evidence: record.evidence,

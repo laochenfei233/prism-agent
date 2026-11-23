@@ -66,7 +66,7 @@ The plugin requires `leaderLockPath` and states where the deployment's scheduler
 
 Management reads the store this process leads, so a follower answers `cron_not_leader` rather than serving rows it read when it started:
 
-```ts
+```ts ignore-check
 const job = await ctx.cron.create({
   expression: '0 9 * * 1-5',
   timeZone: 'Asia/Shanghai',

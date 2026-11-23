@@ -78,6 +78,7 @@ A `package.json` `exports` map uses only the standard key set, in which every ke
 
 - Standard keys, each with one meaning repo-wide, across `packages/*/*/package.json` and `apps/*/package.json`: `.` (the package entry), `./package.json` (toolchain access, not a semantic export), `./src/*` (source passthrough for tests and tools, whose documented status is still open), `./client` (the browser entry, paired with the `dsh.client` declaration), `./types` (the type entry), `./typert` (the typert type runtime), `./remote` (the `@Remote` call surface), `./locale/*.json` (locale resources), `./cordis.patch.yml` (the bundle patch layer declared by `dsh.bundle`). Counts are not listed here because they rot on the next package; the recompute command below prints them.
 - Keys outside that set (`./brand` in 5 packages, `./worker` in 4, `./startup`, `./runner`, and `./protocol` in 2 each, plus many one-off keys) have no documented meaning; they are pending review, not a pattern to copy.
+- `dsh-tools` additionally exposes `./pipeline` for reusable invocation stages and batch scheduling. Its main and pipeline bundles share runtime chunks to preserve error-class identity; workspace constraints check the export targets and publication files.
 - Judged condition: does a change add an export key outside the standard set?
 - Exception: none by default; a new key changes the owning document and the check first, with the domain owner's confirmation.
 - Recompute the distribution:
@@ -116,10 +117,10 @@ Keys opened for one package's local purposes — here `./brand` and `./worker`, 
 
 Dependency declarations and version consistency are guaranteed mechanically by the dependency scan; this page repeats neither the `devDependencies` and `peerDependencies` field rules nor a package admission list of its own. When the scan fails, reproduce it locally and fix the manifest it names, because the scan and its policy file own the rules. Editing the scan or relaxing its policy so that a change can land is not a normal edit and needs the domain owner's confirmation.
 
-- Entry point: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts), run as `pnpm run verify-package-dependencies`, by `scripts/run-gates.ts` as the `package-dependencies` gate, and directly by `.github/workflows/release.yml`.
+- Entry point: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts), run as `pnpm run verify-package-dependencies`, by `scripts/run-gates.ts` as the `package-dependencies` gate.
 - Policy owner: [package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) exports `PACKAGE_DEPENDENCY_POLICY`; the declaration sections, version forms, and exemptions are defined there, with package-level context in [packages/README.md](../../packages/README.md).
 - Boundary: this page lists no packages, field rules, or thresholds; it points at the owning file instead.
-- Find the wiring: `grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`.
+- Find the wiring: `grep -rn "verify-package-dependencies" package.json scripts/run-gates.ts`.
 - Exception: a change to the scan or to the policy requires the domain owner's confirmation and the reason recorded on the change.
 
 The repeatable procedure: reproduce, read the diagnostic, and fix the manifest it names.

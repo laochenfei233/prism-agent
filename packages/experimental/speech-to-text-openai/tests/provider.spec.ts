@@ -59,6 +59,7 @@ describe('OpenAiSpeechProvider', () => {
       location: 'cloud',
       languages: ['auto', 'zh'],
       model: 'whisper-1',
+      maxAudioSeconds: 60,
     })
     expect(provider.preparation).toBeUndefined()
   })

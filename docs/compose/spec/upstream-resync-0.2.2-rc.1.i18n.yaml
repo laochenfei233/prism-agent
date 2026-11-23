@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for upstream-resync-0.2.2-rc.1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-resync-0.2.2-rc.1.md
+/:
+  en: 9f1702807655a01f
+  zh: 9f1702807655a01f
+/upstream-resync-to-dsh-0-2-2-rc-1:
+  en: 7bec053a383f0fa4
+  zh: edfab40f0babb802
+/upstream-resync-to-dsh-0-2-2-rc-1/report:
+  en: ab766a1cf74a1547
+  zh: f0153b4cc1e2289d
+/upstream-resync-to-dsh-0-2-2-rc-1/s1-problem:
+  en: 3ede236db1ad6ad5
+  zh: 170d7200bfbe890d
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design/s2-1-synthetic-three-way-merge-not-hand-replay:
+  en: e13d9446c57a41df
+  zh: 72c9ee6be6847fc8
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design/s2-2-collision-resolution-rules:
+  en: 8d6fa05506e3f149
+  zh: 522e4fb73b2b3cf1
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design/s2-3-version-fields-and-generated-artifacts:
+  en: 0f805a44ca23fb16
+  zh: 1d274179927d5d1a
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design/s2-4-plugin-install-verification-source-level:
+  en: 9e6ca0968ea8975d
+  zh: 9fcc92c7ac97a2a6
+/upstream-resync-to-dsh-0-2-2-rc-1/s2-design/s2-5-verification:
+  en: e9dacadb7f12e740
+  zh: a3b8cfc99ec264fb
+/upstream-resync-to-dsh-0-2-2-rc-1/s3-scope:
+  en: 2d9f5b16ac362d85
+  zh: 11ab521ce2432507
+/upstream-resync-to-dsh-0-2-2-rc-1/tasks:
+  en: 793dc5f4935b2685
+  zh: 2742133bd0e42612
+/upstream-resync-to-dsh-0-2-2-rc-1/s4-acceptance:
+  en: 9f090045ade1457f
+  zh: 72c87a24e458aba3

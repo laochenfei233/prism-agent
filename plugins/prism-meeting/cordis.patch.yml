@@ -4,7 +4,7 @@
 
 - insert:
     - id: prism-meeting
-      name: '@prism-ai/prism-meeting'
+      name: '@prism/prism-meeting'
       config:
         summaryProvider: deepseek-official
         summaryModel: deepseek-flash
@@ -13,10 +13,10 @@
         maxTranscriptChars: 50000
 
     - id: tool-prism-meeting
-      name: '@prism-ai/prism-meeting/tools'
+      name: '@prism/prism-meeting/tools'
 
     # Browser channel and meeting page: needs the Web Connection and its web
     # server, so a profile that composes either without the other leaves this
     # row pending instead of failing it.
     - id: prism-meeting-web
-      name: '@prism-ai/prism-meeting/web'
+      name: '@prism/prism-meeting/web'

@@ -1,21 +1,25 @@
 /**
  * @deepseek-ai/dsh-host-webserver — node:http route registration — node:https
- * when `tls` names a certificate and key — with optional gzip, index injection,
- * and one fallback seat. It knows no harness concepts and serves no files; the
- * composing application owns dist serving. Electron uses file:// plus IPC
+ * when `tls` names a certificate and key — with optional gzip, index injection
+ * for the Peer a page speaks for, and one fallback seat. It serves no files;
+ * the composing application owns dist serving. Electron uses file:// plus IPC
  * instead, and this package never prints the URL.
- * Route handlers retain direct response ownership.
+ * Route handlers retain direct response ownership; a route or the fallback may
+ * instead give a resource, which maps a Fetch `Request` to a `Response` and
+ * also answers in-process reads.
  */
 
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import type { IncomingMessage, ServerResponse, Server } from 'node:http'
+import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse, Server } from 'node:http'
 import { createServer as createSecureServer } from 'node:https'
 import { isIP, type AddressInfo } from 'node:net'
+import { networkInterfaces } from 'node:os'
 import { resolve } from 'node:path'
 import type { Duplex } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import compressionMiddleware from 'compression'
 import ipaddr from 'ipaddr.js'
 import Negotiator from 'negotiator'
@@ -30,13 +34,15 @@ declare module '@deepseek-ai/cordis' {
   }
   interface Events {
     /**
-     * Collect the structured index injection table. Emitted on every index
-     * render and every worker boot-payload request; listeners push their
-     * current rows, so a row's data is read fresh at emit time.
+     * Collect the structured index injection table for the page `peer` speaks
+     * for. Emitted on every index render and every worker boot-payload
+     * request; listeners push their current rows, so a row's data is read
+     * fresh at emit time.
      * @param table - Mutable row table; listeners append in activation order.
+     * @param peer - The Peer the rendered page speaks for.
      * @mode emit
      */
-    'webserver/index-inject'(table: IndexInjection[]): void
+    'webserver/index-inject'(table: IndexInjection[], peer: PeerScope): void
   }
 }
 
@@ -50,6 +56,22 @@ export interface WebRoute {
   path: string
   /** Owns the full response lifecycle (may hold the response open, e.g. SSE). */
   handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+}
+
+/**
+ * Answers one GET or HEAD request with a Fetch response. An HTTP request
+ * arrives without a Peer and carries the client's headers; an in-process
+ * {@link WebServer.readResource} read passes the Peer its caller admitted.
+ */
+export type WebResource = (request: Request, peer?: PeerScope) => Promise<Response>
+
+/** One named route answered by a resource instead of a handler. */
+export interface WebResourceRoute {
+  kind: WebRouteKind
+  /** Absolute pathname, no trailing slash. */
+  path: string
+  /** Answers HTTP GET and HEAD requests and in-process reads. */
+  resource: WebResource
 }
 
 /** One exact-path HTTP upgrade registration. */
@@ -84,6 +106,20 @@ export interface Config {
    * load: it would expose the port on every interface at once.
    */
   host: string
+  /**
+   * Extra concrete addresses that bind the same port next to `host`: a phone
+   * on the machine's network reaches `additionalHosts` while the primary keeps
+   * serving its own audience. Each entry follows the `host` rules (concrete
+   * IPv4/IPv6 literal, wildcard rejected) and must not repeat `host` or another
+   * entry — duplicates fail the load. A listen on one entry can still fail
+   * after the load — the address left the machine between composition and
+   * listen (DHCP), or another socket holds the port — and that failure logs a
+   * warning and drops only that address: the primary listener and the entries
+   * that did bind keep serving. Requires an explicit `port`, because port 0
+   * asks the OS for a fresh port per listener and the addresses would then
+   * serve different ports.
+   */
+  additionalHosts?: string[]
   /** Listen port; zero requests an OS-assigned port. */
   port: number
   /**
@@ -101,24 +137,29 @@ export interface Config {
   compressionLevel?: number
   /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
   compressionThresholdBytes?: number
+  /**
+   * Request-header byte bound handed to the listener (`maxHeaderSize`).
+   * Cookies ignore ports, so a browser store that accumulated one session
+   * cookie per past loopback port crosses Node's 16 KiB default, and a
+   * parser-level 431 would keep the launch-token exchange that prunes those
+   * cookies from ever running.
+   * @default 65536
+   */
+  maxRequestHeaderBytes?: number
 }
 
 const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
-/**
- * Fixed request-header bound, above Node's 16 KiB default: cookies ignore
- * ports, so a browser store that accumulated one session cookie per past
- * loopback port crosses the default, and a parser-level 431 would keep the
- * launch-token exchange that prunes those cookies from ever running.
- */
-const MAX_REQUEST_HEADER_BYTES = 64 * 1024
+/** Default request-header byte bound; see {@link Config.maxRequestHeaderBytes}. */
+const DEFAULT_MAX_REQUEST_HEADER_BYTES = 64 * 1024
 
 interface ResolvedConfig extends Config {
   compression: 'none' | 'gzip'
   compressionLevel: number
   compressionThresholdBytes: number
+  maxRequestHeaderBytes: number
 }
 
 type NodeMiddleware = (
@@ -223,6 +264,41 @@ export function bindUrlHost(host: string): string | undefined {
   return isIP(text) === 6 ? `[${text}]` : text
 }
 
+/** Bind rank of one RFC1918 range: the home 192.168 range first, then 10/8, then 172.16/12. */
+function lanRank(address: string): number {
+  const [first, second] = address.split('.').map(Number)
+  if (first === 192 && second === 168) return 0
+  if (first === 10) return 1
+  return 2
+}
+
+/**
+ * The machine's own private IPv4 addresses a phone on the same network dials,
+ * in a stable order (192.168 first, then 10/8, then 172.16/12). Internal
+ * interfaces, link-local 169.254, and the CGNAT 100.64/10 range (Tailscale and
+ * friends, which bring their own transports) are excluded; the result is
+ * deduplicated across interfaces. Empty on a machine with no such address.
+ * @param interfaces - the OS interface table; defaults to `os.networkInterfaces()`.
+ * @returns address literals ready for `additionalHosts`, sorted by rank.
+ */
+export function detectLanBindAddresses(
+  interfaces: Readonly<Record<string, readonly { address: string; family: string; internal: boolean }[] | undefined>> = networkInterfaces(),
+): string[] {
+  const found = new Map<string, number>()
+  for (const entries of Object.values(interfaces)) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== 'IPv4' || entry.internal) continue
+      const [first, second = -1] = entry.address.split('.').map(Number)
+      const private16 = first === 192 && second === 168
+      const private8 = first === 10
+      const private12 = first === 172 && second >= 16 && second <= 31
+      if (!private16 && !private8 && !private12) continue
+      if (!found.has(entry.address)) found.set(entry.address, lanRank(entry.address))
+    }
+  }
+  return [...found.entries()].sort((a, b) => a[1] - b[1]).map(([address]) => address)
+}
+
 function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
   // `compression` is typed for Express, but its runtime uses only the
   // node:http request and response members supplied here.
@@ -275,24 +351,86 @@ async function readTlsFile(field: 'certFile' | 'keyFile', path: string): Promise
   return content
 }
 
+/** Methods a resource answers; any other method receives 405. */
+const RESOURCE_METHODS = 'GET, HEAD'
+
+/** Fetch response headers as node:http headers; each `set-cookie` value stays a separate line. */
+function nodeHeaders(headers: Headers): OutgoingHttpHeaders {
+  const out: OutgoingHttpHeaders = Object.fromEntries(headers)
+  const cookies = headers.getSetCookie()
+  if (cookies.length > 0) out['set-cookie'] = cookies
+  return out
+}
+
+/**
+ * Write a Fetch response's status, headers, and body to a node:http exchange,
+ * respecting backpressure; the caller ends the response. A HEAD request and a
+ * null body write no body bytes; the abort signal, raised when the client
+ * closes the connection, cancels the body.
+ */
+async function writeResponse(res: ServerResponse, response: Response, head: boolean, signal: AbortSignal): Promise<void> {
+  res.writeHead(response.status, nodeHeaders(response.headers))
+  const body = response.body
+  if (body === null || head) {
+    await body?.cancel()
+    return
+  }
+  // Send the status and headers before the first body chunk arrives. The Web
+  // Worker tunnel has no socket and sends them with the first chunk.
+  if ((res as { socket?: unknown }).socket !== undefined) res.flushHeaders()
+  const reader = body.getReader()
+  const cancel = (): void => {
+    // A rejected cancel means the body already failed; the pending read rejects with the same error.
+    reader.cancel().catch(() => undefined)
+  }
+  if (signal.aborted) cancel()
+  else signal.addEventListener('abort', cancel, { once: true })
+  // One drain/close listener pair per response: the gzip middleware forwards
+  // `on('drain')` to its zlib stream but not `off`, so a listener added per
+  // backpressure wait would stay on that stream. The `off('drain')` below is
+  // likewise a no-op under gzip; the one listener goes with that response's
+  // zlib stream.
+  let resume: (() => void) | undefined
+  const wake = (): void => {
+    const waiting = resume
+    resume = undefined
+    waiting?.()
+  }
+  res.on('drain', wake)
+  res.on('close', wake)
+  try {
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+      if (!res.write(chunk.value) && !signal.aborted) await new Promise<void>((resolve) => { resume = resolve })
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel)
+    res.off('drain', wake)
+    res.off('close', wake)
+  }
+}
+
 /**
  * The browser HTTP carrier service. Activation loads any configured TLS
  * material, then listens immediately; a material or listen failure rejects
  * initialization, and the boot process reports the failed fiber. Route
  * registration order does not affect requests because configured named routes
- * must be distinct, and the fallback handler answers anything not yet claimed
- * during startup with 404 until its owner registers.
+ * must be distinct, and a request no named route matches is answered 404
+ * until the fallback owner registers.
  */
+/** Schema transform for one bind literal: concrete, non-wildcard, verbatim. */
+const bindLiteral = z.transform(z.string(), (value) => {
+  const parsed = parseIpLiteral(value)
+  if (parsed === undefined) throw notLiteralError(value)
+  if (isWildcardAddress(parsed)) {
+    throw new Error(`webserver: host ${JSON.stringify(value)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
+  }
+  return value
+})
+
 export class WebServer extends Service {
   static Config: z<Config> = z.object({
-    host: z.transform(z.string(), (value) => {
-      const parsed = parseIpLiteral(value)
-      if (parsed === undefined) throw notLiteralError(value)
-      if (isWildcardAddress(parsed)) {
-        throw new Error(`webserver: host ${JSON.stringify(value)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
-      }
-      return value
-    }).required(),
+    host: bindLiteral.required(),
+    additionalHosts: z.array(bindLiteral).default(undefined as never),
     port: z.natural().max(65535).required(),
     // An omitted object must not become `{}` and fail the required pair fields.
     tls: z.object({
@@ -302,10 +440,11 @@ export class WebServer extends Service {
     compression: z.union([z.const('none'), z.const('gzip')]).default(DEFAULT_COMPRESSION),
     compressionLevel: z.number().step(1).min(0).max(9).default(DEFAULT_COMPRESSION_LEVEL),
     compressionThresholdBytes: z.natural().default(DEFAULT_COMPRESSION_THRESHOLD_BYTES),
+    maxRequestHeaderBytes: z.natural().min(1024).default(DEFAULT_MAX_REQUEST_HEADER_BYTES),
   })
 
-  private readonly exact = new Map<string, WebRoute>()
-  private readonly prefixes = new Map<string, WebRoute>()
+  private readonly exact = new Map<string, WebRoute | WebResourceRoute>()
+  private readonly prefixes = new Map<string, WebRoute | WebResourceRoute>()
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
   private readonly upgradedSockets = new Set<Duplex>()
   /**
@@ -317,11 +456,14 @@ export class WebServer extends Service {
    */
   private readonly tlsConnections = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
-  private fallback: WebRoute['handler'] | undefined
-  private server!: Server
+  private fallback: WebRoute['handler'] | Pick<WebResourceRoute, 'resource'> | undefined
+  private servers: Server[] = []
+  private readonly additionalHosts: readonly string[]
+  private readonly boundAdditional: string[] = []
   private listenedPort: number | undefined
   private readonly gzip: NodeMiddleware | undefined
   private readonly tlsConfig: TlsConfig | undefined
+  private readonly maxRequestHeaderBytes: number
 
   constructor(ctx: Context, private config: Config) {
     super(ctx, 'webServer')
@@ -329,6 +471,23 @@ export class WebServer extends Service {
     // Schemastery passes an explicit `tls: null` through; only a real object serves TLS.
     this.tlsConfig = resolved.tls ?? undefined
     this.gzip = resolved.compression === 'gzip' ? createGzipMiddleware(resolved) : undefined
+    this.maxRequestHeaderBytes = resolved.maxRequestHeaderBytes
+    // Cross-field bind rules are load failures, not per-request events: a
+    // repeated address would bind twice (the second listen always fails), and
+    // port 0 would hand every listener a different OS port.
+    const primary = normalizeBindAddress(resolved.host)
+    const seen = new Set([primary])
+    for (const entry of resolved.additionalHosts ?? []) {
+      const canonical = normalizeBindAddress(entry)
+      if (seen.has(canonical)) {
+        throw new Error(`webserver: additionalHosts entry ${JSON.stringify(entry)} repeats an address already bound`)
+      }
+      seen.add(canonical)
+    }
+    if ((resolved.additionalHosts?.length ?? 0) > 0 && resolved.port === 0) {
+      throw new Error('webserver: additionalHosts requires an explicit port; port 0 binds a fresh OS port per listener')
+    }
+    this.additionalHosts = resolved.additionalHosts ?? []
   }
 
   /** The listening port (the OS-assigned value when config.port is 0), or `undefined` before `listen` binds. */
@@ -339,6 +498,16 @@ export class WebServer extends Service {
   /** The configured bind address (one concrete local interface). */
   get host(): Config['host'] {
     return this.config.host
+  }
+
+  /**
+   * Every address this service bound: `host` first, then the
+   * {@link Config.additionalHosts} entries whose listen succeeded. A host
+   * fence reads the list to admit the listener's own authorities; an address
+   * that failed to bind serves nothing and is not admitted.
+   */
+  get hosts(): readonly string[] {
+    return [this.config.host, ...this.boundAdditional]
   }
 
   /**
@@ -368,10 +537,10 @@ export class WebServer extends Service {
   /**
    * Register a named route. Duplicate (kind, path) throws — route patterns are
    * a composition-level contract, so a collision is a misconfiguration.
-   * @param route - kind, path, and the owning handler.
+   * @param route - kind, path, and the owning handler or resource.
    * @returns the disposer removing the route.
    */
-  register(route: WebRoute): () => void {
+  register(route: WebRoute | WebResourceRoute): () => void {
     const table = route.kind === 'exact' ? this.exact : this.prefixes
     if (table.has(route.path)) {
       throw new Error(`webserver: duplicate ${route.kind} route "${route.path}"`)
@@ -395,19 +564,47 @@ export class WebServer extends Service {
   }
 
   /**
-   * Claim the fallback seat: the handler answering every request no named
-   * route matches (the SPA dist server in the shipped Web composition). One
-   * owner only — a second registration throws, because two fallbacks cannot
-   * compose.
-   * @param handler - owns the full response lifecycle of unmatched requests.
+   * Claim the fallback seat: the handler or resource answering every request
+   * no named route matches (the SPA dist server in the shipped Web
+   * composition). One owner only — a second registration throws, because two
+   * fallbacks cannot compose.
+   * @param fallback - a handler owning the full response lifecycle of
+   * unmatched requests, or `{ resource }` answering them.
    * @returns the disposer releasing the seat.
    */
-  registerFallback(handler: WebRoute['handler']): () => void {
+  registerFallback(fallback: WebRoute['handler'] | Pick<WebResourceRoute, 'resource'>): () => void {
     if (this.fallback !== undefined) {
       throw new Error('webserver: fallback already registered')
     }
-    this.fallback = handler
+    this.fallback = fallback
     return () => { this.fallback = undefined }
+  }
+
+  /**
+   * Read the response an HTTP request for the same URL would receive, as the
+   * resource computes it for `peer`, without an HTTP exchange. The request
+   * path picks the responder by the HTTP match order — exact, longest prefix,
+   * then the fallback — and only a resource answers. This method checks no
+   * cookie, Host, or Origin: the caller admits the reader before reading.
+   * @param request - the read; its URL path selects the responder.
+   * @param peer - the Peer the read speaks for, passed to the resource.
+   * @returns the resource's response, without a body for HEAD as over HTTP;
+   * 405 with `Allow: GET, HEAD` for any other method, checked before matching,
+   * where over HTTP a handler route or an unmatched path answers such a
+   * method itself; 404 when the path matches a handler route, or reaches the
+   * fallback seat while it is unclaimed or holds a handler. A resource that
+   * throws rejects the read, where an HTTP request would receive 400.
+   */
+  async readResource(request: Request, peer: PeerScope): Promise<Response> {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return new Response(null, { status: 405, headers: { allow: RESOURCE_METHODS } })
+    }
+    const responder = this.responderFor(new URL(request.url).pathname)
+    if (typeof responder !== 'object' || !('resource' in responder)) return new Response(null, { status: 404 })
+    const response = await responder.resource(request, peer)
+    if (request.method === 'GET') return response
+    await response.body?.cancel()
+    return new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers })
   }
 
   /**
@@ -430,19 +627,16 @@ export class WebServer extends Service {
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
-      const rawPath = new URL(req.url ?? '/', 'http://x').pathname
-      const route = this.match(rawPath)
-      if (route !== undefined) {
-        await route.handler(req, res)
-        return
-      }
-      const fallback = this.fallback
-      if (fallback === undefined) {
+      const target = new URL(req.url ?? '/', 'http://x')
+      const responder = this.responderFor(target.pathname)
+      if (responder === undefined) {
         res.writeHead(404)
         res.end()
         return
       }
-      await fallback(req, res)
+      if (typeof responder === 'function') await responder(req, res)
+      else if ('resource' in responder) await this.serveResource(req, res, target, responder.resource)
+      else await responder.handler(req, res)
     }
     // Last-resort guard: handle() rejecting would otherwise be an unhandled
     // rejection killing the process on one malformed request (bad %-escape,
@@ -464,80 +658,114 @@ export class WebServer extends Service {
       else this.gzip(req, res, next)
     }
     const tls = this.tlsConfig
-    // Disposal waits for in-flight acquisition and closes any listener it produces.
+    // Disposal waits for in-flight acquisition and closes every listener it
+    // produced, one per bound address.
     await this.ctx.effect(async () => {
-      if (tls === undefined) {
-        this.server = createServer({ maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
-      } else {
+      let tlsMaterial: { cert: string; key: string; certFile: string; keyFile: string } | undefined
+      if (tls !== undefined) {
         const certFile = resolve(tls.certFile)
         const keyFile = resolve(tls.keyFile)
         const [cert, key] = await Promise.all([
           readTlsFile('certFile', certFile),
           readTlsFile('keyFile', keyFile),
         ])
-        try {
-          this.server = createSecureServer({ cert, key, maxHeaderSize: MAX_REQUEST_HEADER_BYTES }, listener)
-        } catch (error) {
-          throw new Error(`webserver: tls.certFile ${certFile} and tls.keyFile ${keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
-        }
-        this.server.on('connection', (socket) => {
-          this.tlsConnections.add(socket)
-          socket.once('close', () => { this.tlsConnections.delete(socket) })
-        })
+        tlsMaterial = { cert, key, certFile, keyFile }
       }
-      this.server.on('upgrade', (req, socket, head) => {
-        const onError = (error: Error): void => {
-          this.ctx.logger.warn(error)
-          socket.destroy()
+
+      // One server per address, all sharing the request listener, the upgrade
+      // dispatch, and the TLS connection table.
+      const buildServer = (): Server => {
+        let server: Server
+        if (tlsMaterial === undefined) {
+          server = createServer({ maxHeaderSize: this.maxRequestHeaderBytes }, listener)
+        } else {
+          try {
+            server = createSecureServer(
+              { cert: tlsMaterial.cert, key: tlsMaterial.key, maxHeaderSize: this.maxRequestHeaderBytes },
+              listener,
+            )
+          } catch (error) {
+            throw new Error(`webserver: tls.certFile ${tlsMaterial.certFile} and tls.keyFile ${tlsMaterial.keyFile} are not a usable certificate and key pair: ${error instanceof Error ? error.message : String(error)}`)
+          }
+          server.on('connection', (socket) => {
+            this.tlsConnections.add(socket)
+            socket.once('close', () => { this.tlsConnections.delete(socket) })
+          })
         }
-        socket.on('error', onError)
-        socket.once('close', () => {
-          socket.off('error', onError)
-          this.upgradedSockets.delete(socket)
-        })
-        let route: WebUpgradeRoute | undefined
-        try {
-          /* v8 ignore next -- node:http always sets url on server requests. */
-          route = this.upgrades.get(new URL(req.url ?? '/', 'http://x').pathname)
-        } catch (error) {
-          this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-          socket.destroy()
-          return
-        }
-        if (route === undefined) {
-          socket.destroy()
-          return
-        }
-        this.upgradedSockets.add(socket)
-        try {
-          Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
+        server.on('upgrade', (req, socket, head) => {
+          const onError = (error: Error): void => {
+            this.ctx.logger.warn(error)
+            socket.destroy()
+          }
+          socket.on('error', onError)
+          socket.once('close', () => {
+            socket.off('error', onError)
+            this.upgradedSockets.delete(socket)
+          })
+          let route: WebUpgradeRoute | undefined
+          try {
+            /* v8 ignore next -- node:http always sets url on server requests. */
+            route = this.upgrades.get(new URL(req.url ?? '/', 'http://x').pathname)
+          } catch (error) {
             this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
             socket.destroy()
-          })
-        } catch (error) {
-          this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-          socket.destroy()
-        }
-      })
+            return
+          }
+          if (route === undefined) {
+            socket.destroy()
+            return
+          }
+          this.upgradedSockets.add(socket)
+          try {
+            Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
+              this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+              socket.destroy()
+            })
+          } catch (error) {
+            this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+            socket.destroy()
+          }
+        })
+        return server
+      }
 
-      await new Promise<void>((resolve, reject) => {
-        this.server.once('error', reject)
-        this.server.listen(this.config.port, this.config.host, () => {
-          this.server.off('error', reject)
-          this.server.on('error', (err) => { this.ctx.logger.error(err) })
-          this.listenedPort = (this.server.address() as AddressInfo).port
+      const listenOne = (server: Server, bindHost: string): Promise<void> => new Promise((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(this.config.port, bindHost, () => {
+          server.off('error', reject)
+          server.on('error', (err) => { this.ctx.logger.error(err) })
+          this.listenedPort = (server.address() as AddressInfo).port
           resolve()
         })
       })
+
+      // The primary bind is the deployment's own requirement: its failure
+      // rejects activation. An additional address is an opportunistic
+      // exposure — a vanished interface or a held port drops only that
+      // address, with a warning, and the rest keep serving.
+      const primary = buildServer()
+      await listenOne(primary, this.config.host)
+      this.servers.push(primary)
+      for (const bindHost of this.additionalHosts) {
+        const server = buildServer()
+        try {
+          await listenOne(server, bindHost)
+        } catch (error) {
+          this.ctx.logger.warn(new Error(`webserver: additional bind ${JSON.stringify(bindHost)} did not take: ${error instanceof Error ? error.message : String(error)}`))
+          continue
+        }
+        this.servers.push(server)
+        this.boundAdditional.push(bindHost)
+      }
 
       // Node does not include upgraded sockets in closeAllConnections(), and a TLS
       // connection joins that table only after its handshake. The service owns both
       // kinds with the other connections, so it tracks and destroys them explicitly.
       return async () => {
-        const serverClosed = new Promise<void>((resolve) => {
-          this.server.close(() => { resolve() })
-        })
-        this.server.closeAllConnections()
+        const serverClosed = Promise.all(this.servers.map(server => new Promise<void>((resolve) => {
+          server.close(() => { resolve() })
+        })))
+        for (const server of this.servers) server.closeAllConnections()
         const socketsClosed = [...this.upgradedSockets, ...this.tlsConnections].map(socket => new Promise<void>((resolve) => {
           socket.once('close', () => { resolve() })
           socket.destroy()
@@ -547,16 +775,63 @@ export class WebServer extends Service {
     }, 'webServer.listen')
   }
 
+  /**
+   * The responder for one request path, shared by HTTP requests and
+   * {@link readResource}: the matched named route, otherwise the fallback.
+   */
+  private responderFor(pathname: string): WebRoute | WebResourceRoute | WebRoute['handler'] | Pick<WebResourceRoute, 'resource'> | undefined {
+    return this.match(pathname) ?? this.fallback
+  }
+
   /** Longest-prefix-wins over the prefix table after an exact-table miss. */
-  private match(pathname: string): WebRoute | undefined {
+  private match(pathname: string): WebRoute | WebResourceRoute | undefined {
     const exact = this.exact.get(pathname)
     if (exact !== undefined) return exact
-    let best: WebRoute | undefined
+    let best: WebRoute | WebResourceRoute | undefined
     for (const [prefix, route] of this.prefixes) {
       if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) continue
       if (best === undefined || prefix.length > best.path.length) best = route
     }
     return best
+  }
+
+  /**
+   * Answer one HTTP exchange from a resource. Only GET and HEAD reach it;
+   * any other method receives 405 and its request body is never read. The
+   * request becomes a Fetch `Request` without a Peer whose URL is the request
+   * target resolved against a placeholder origin, as the match reads it; the
+   * client's authority stays only in the `host` header. The connection
+   * closing before this method ends the response aborts the request signal
+   * and cancels the response body.
+   */
+  private async serveResource(req: IncomingMessage, res: ServerResponse, target: URL, resource: WebResource): Promise<void> {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { allow: RESOURCE_METHODS })
+      res.end()
+      return
+    }
+    const headers = new Headers()
+    for (const [name, value] of Object.entries(req.headers)) {
+      for (const item of typeof value === 'string' ? [value] : value ?? []) headers.append(name, item)
+    }
+    const abort = new AbortController()
+    // An own flag, not `writableEnded`: the Web Worker tunnel marks an aborted
+    // response ended before it emits `close`.
+    let ended = false
+    const onClose = (): void => {
+      if (!ended) abort.abort()
+    }
+    res.on('close', onClose)
+    try {
+      const response = await resource(new Request(target, { method: req.method, headers, signal: abort.signal }))
+      await writeResponse(res, response, req.method === 'HEAD', abort.signal)
+      if (!abort.signal.aborted) {
+        ended = true
+        res.end()
+      }
+    } finally {
+      res.off('close', onClose)
+    }
   }
 
   /**
@@ -572,25 +847,28 @@ export class WebServer extends Service {
   }
 
   /**
-   * Gather the structured injection table: one `webserver/index-inject` emit,
-   * every subscriber pushes its current rows. Fresh per call, so subscribers
-   * read live state (module graph, theme preference) at emit time.
+   * Gather the structured injection table for one Peer: one
+   * `webserver/index-inject` emit, every subscriber pushes its current rows.
+   * Fresh per call, so subscribers read live state (module graph, theme
+   * preference, the Peer's access) at emit time.
+   * @param peer - the Peer the page speaks for.
    * @returns rows in subscriber activation order.
    */
-  collectIndexInjections(): IndexInjection[] {
+  collectIndexInjections(peer: PeerScope): IndexInjection[] {
     const table: IndexInjection[] = []
-    this.ctx.emit('webserver/index-inject', table)
+    this.ctx.emit('webserver/index-inject', table, peer)
     return table
   }
 
   /**
-   * Render one index.html body: the structured injection table first, then
-   * the raw `tapIndex` transforms over the result.
+   * Render one index.html body for one Peer: the structured injection table
+   * first, then the raw `tapIndex` transforms over the result.
    * @param html - the raw index.html body.
+   * @param peer - the Peer the page speaks for.
    * @returns the transformed body.
    */
-  renderIndex(html: string): string {
-    return this.applyIndexTaps(renderIndexInjections(html, this.collectIndexInjections()))
+  renderIndex(html: string, peer: PeerScope): string {
+    return this.applyIndexTaps(renderIndexInjections(html, this.collectIndexInjections(peer)))
   }
 }
 

@@ -19,6 +19,14 @@ import { TRANSFER_EXPORT_PATH, TRANSFER_IMPORT_PATH, TRANSFER_JOB_PATH, TRANSFER
 const tempRoot = await mkdtemp(join(tmpdir(), 'prism-transfer-route-'))
 const text = (value: string): Uint8Array => new TextEncoder().encode(value)
 
+/**
+ * A Request body from node bytes: undici's BodyInit accepts only
+ * ArrayBuffer-backed views, so node's pool-backed Buffers copy across.
+ */
+function requestBody(bytes: Uint8Array): BodyInit {
+  return new Uint8Array(bytes)
+}
+
 /** A recorded route registry standing in for the connection service. */
 function fakeConnection() {
   const routes = new Map<string, (request: Request) => Promise<Response>>()
@@ -65,7 +73,7 @@ async function postArchive(
   const response = await routeHandler(connection.routes, TRANSFER_IMPORT_PATH)(
     new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
       method: 'POST',
-      body: body as unknown as BodyInit,
+      body: requestBody(body),
       headers: { 'content-type': 'application/octet-stream' },
     }),
   )
@@ -283,7 +291,7 @@ describe('transfer routes', () => {
     const response = await routes.get(TRANSFER_IMPORT_PATH)!(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}&name=imported.zip`, {
         method: 'POST',
-        body: body as unknown as BodyInit,
+        body: requestBody(body),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -367,7 +375,7 @@ describe('transfer routes', () => {
     const first = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
         method: 'POST',
-        body: bytes as unknown as BodyInit,
+        body: requestBody(bytes),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -375,7 +383,7 @@ describe('transfer routes', () => {
     const second = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}`, {
         method: 'POST',
-        body: bytes as unknown as BodyInit,
+        body: requestBody(bytes),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -540,7 +548,7 @@ describe('transfer routes', () => {
     const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}`, {
         method: 'POST',
-        body: archive as unknown as BodyInit,
+        body: requestBody(archive),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -559,7 +567,7 @@ describe('transfer routes', () => {
     const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=${encodeURIComponent('\t \u0007')}`, {
         method: 'POST',
-        body: archive as unknown as BodyInit,
+        body: requestBody(archive),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -575,7 +583,7 @@ describe('transfer routes', () => {
     const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=big.bin`, {
         method: 'POST',
-        body: big as unknown as BodyInit,
+        body: requestBody(big),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -613,7 +621,7 @@ describe('transfer routes', () => {
     const first = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=first.zip`, {
         method: 'POST',
-        body: firstArchive as unknown as BodyInit,
+        body: requestBody(firstArchive),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -623,7 +631,7 @@ describe('transfer routes', () => {
     const second = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}`, {
         method: 'POST',
-        body: firstArchive as unknown as BodyInit,
+        body: requestBody(firstArchive),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -640,7 +648,7 @@ describe('transfer routes', () => {
     const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?name=bad.zip`, {
         method: 'POST',
-        body: Buffer.from(bad) as unknown as BodyInit,
+        body: requestBody(Buffer.from(bad)),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )
@@ -693,7 +701,7 @@ describe('transfer routes', () => {
     const response = await routeHandler(routes, TRANSFER_IMPORT_PATH)(
       new Request(`http://host${TRANSFER_IMPORT_PATH}?dest=${encodeURIComponent(home)}&name=combined.zip`, {
         method: 'POST',
-        body: Buffer.from(archive) as unknown as BodyInit,
+        body: requestBody(Buffer.from(archive)),
         headers: { 'content-type': 'application/octet-stream' },
       }),
     )

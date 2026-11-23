@@ -1,4 +1,4 @@
-// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-sidebar.md (S5).
+// PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5).
 /** Settlement guard shared by every presentation of one pending approval. */
 import { useEffect, useRef, useState } from 'react'
 import type { ApprovalDecision, PendingApproval } from './contract/slots.ts'

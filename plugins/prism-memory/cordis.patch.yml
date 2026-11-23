@@ -79,18 +79,22 @@
         autoDistillUserConfidence: 0.7
         autoDistillLimit: 3
 
-        # Model-read extraction: one auxiliary call per turn that reads for
-        # claims the form matcher misses. Off in the plugin's own defaults so a
-        # profile without an llm service can still mount the bundle; this
-        # deployment turns it on. Provider and model empty means the call
-        # follows the session's routed model.
-        llmDistill: true
-        llmDistillProvider: ''
-        llmDistillModel: ''
-        llmDistillMaxTokens: 512
-        llmDistillMaxInputChars: 4000
-        llmDistillMinChars: 80
-        llmDistillLimit: 3
+        # Model-assisted distillation: every assistedDistillEveryTurns turns,
+        # the last assistedDistillBufferTurns turns go to the deployment's own
+        # model with one instruction: propose the durable claims the form
+        # matcher misses. Each candidate lands on the trust tier of the message
+        # it cites — the person's own words can go live, an inference parks
+        # until corroborated. Off in the plugin's own defaults so a profile
+        # without an llm service can still mount the bundle; this deployment
+        # turns it on. Provider and model empty means the call follows the
+        # session's routed model.
+        assistedDistill: true
+        assistedDistillEveryTurns: 40
+        assistedDistillBufferTurns: 12
+        assistedDistillLimit: 3
+        assistedDistillProvider: ''
+        assistedDistillModel: ''
+        assistedDistillMaxTokens: 1024
 
         # The consolidation pass. Its window boundary is the last journal entry,
         # so it survives a restart without a private counter. On apply it also

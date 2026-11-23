@@ -64,7 +64,7 @@ commits: 813a8ea6（基线）..交付工作树
 | A7 进行中的导入 | 已落地进历史（`b4593d01`） | 从索引中移除该区域；导入不再进行中。 |
 | A8 CLI 安装身份 | `apps/cli/package.json` 30 个提交，多数是实验组合变化下的依赖变动 | 上游保持 `@deepseek-ai/dsh` / bin `dsh`：改名仍是 fork 偏离。在上游新的依赖列表之上重新施加包名、bin、程序名、帮助期望、网关行与四个门禁。 |
 | A9 默认 home | `home-paths` 1 个提交（新增 `.agents` 共享根与 `DSH_AGENTS_HOME`，纯增量） | 在上游新增之上重新施加 `DSH_HOME_DIR_NAME = '.prism'` 与其 JSDoc。上游对 `agent-instructions` 的 `dshHome` 移除与我们是同向的：我们对该包的 README/注释编辑会落在字段已消失的新文件上。 |
-| A10 上游 CI 套件 | `.github/workflows/**` 46 个提交 | 导入后再次删除 `.github/workflows/desktop-sync.yml`：该定时任务拉取上游、合并并推送，在本仓库被禁止（孤儿基线无法合并；同步属于本交接件）。 |
+| A10 上游 CI 套件 | `.github/workflows/**` 46 个提交 | 导入后恢复删除：只保留三个 Prism 桌面流水线（`desktop-release.yml`、`desktop-publish.yml`、`windows-package.yml`），删除 23 个导入的 workflow，`desktop-sync.yml` 也在其中（该定时任务拉取上游、合并并推送，在本仓库被禁止；孤儿基线无法合并，同步属于本交接件）。见 [fork-upstream-divergence.zh.md](fork-upstream-divergence.zh.md) 的 A10 行。 |
 
 **D5 — 行为反转是被消费的，不是被对抗的。** 不变式机制由上游移除，本 fork 不重新加入：重新导入会删除不变式文件，并整体采用上游更新的规则与文档，包括 `AGENTS.md`。本仓库自己的文档（CAPABILITY-PLAN.md 的计数、规则文本）凡仍在描述不变式层的，在同一次交付里更新。同一原则适用于退役的 `schedule` 组合包、收窄的安装依赖与子路径插件展示清单：fork 消费上游状态，只保留索引点名的偏离。
 

@@ -4,6 +4,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { DataSection, type DataSectionProps } from '../src/client/DataSection.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -12,11 +13,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const t = (key: keyof typeof en, params?: Record<string, unknown>): string =>
-  en[key].replace(/\{(\w+)\}/g, (_match, name: string) => {
-    const value = params?.[name]
-    return typeof value === 'string' ? value : ''
-  })
+const t = makeTranslate(en)
 
 /**
  * Answer data-route calls from one script.
@@ -54,14 +51,13 @@ function renderSection(options: {
     stubFetch({ state: { body: { ok: true, value: { root: '/data/home', pointerPath: '/home/.prism-data-home' } } } })
   }
   const pick = vi.fn(options.pick ?? (async () => null))
-  const renderSlot = vi.fn((_name: string, _props: unknown, only?: { only?: string }): ReactNode =>
-    <div data-testid={`slot-${only?.only ?? 'all'}`} />)
+  const renderSlot = vi.fn<DataSectionProps['renderSlot']>((_name, _props, opts): ReactNode =>
+    <div data-testid={`slot-${opts?.only ?? 'all'}`} />)
   const props = {
     t,
     renderSlot,
     pickDirectory: pick,
-    close: vi.fn(),
-  } as unknown as DataSectionProps
+  } as DataSectionProps
   render(<DataSection {...props} />)
   return { pick }
 }

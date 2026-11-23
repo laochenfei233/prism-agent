@@ -383,13 +383,19 @@ export class BrowserAuth {
    * Serialize the mint cookie plus one expired cookie per other session-cookie
    * name the request still carries. Cookies ignore ports, so a browser store
    * keeps one name per past loopback authority, and those stale cookies would
-   * eventually push every request past the listener's header bound.
+   * eventually push every request past the listener's header bound. Each stale
+   * name gets both secure variants of the deletion: deletion must cover both
+   * secure variants or a TLS→HTTP switch cannot clear the stale cookie — a
+   * non-secure Set-Cookie never deletes a Secure-only cookie (RFC 6265bis),
+   * and the request's Cookie header does not reveal which variant the store
+   * holds.
    * @param authority - the mint cookie's audience.
    * @param value - signed cookie payload.
    * @param expiresAt - absolute mint expiry timestamp.
-   * @param secure - whether the minted and expired cookies carry `Secure`.
+   * @param secure - whether the minted cookie carries `Secure`.
    * @param rawCookie - the request's Cookie header, when present.
-   * @returns the Set-Cookie values to write.
+   * @returns the Set-Cookie values to write; Node sends the array as repeated
+   * Set-Cookie headers.
    */
   private sessionCookies(
     authority: string,
@@ -402,7 +408,10 @@ export class BrowserAuth {
     return [
       sessionCookie(name, value, expiresAt, Math.floor(this.maxAgeMilliseconds / 1000), secure),
       ...staleCookieNames(rawCookie ?? '', name)
-        .map(stale => sessionCookie(stale, '', 0, 0, secure)),
+        .flatMap(stale => [
+          sessionCookie(stale, '', 0, 0, secure),
+          sessionCookie(stale, '', 0, 0, !secure),
+        ]),
     ]
   }
 

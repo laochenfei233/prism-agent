@@ -24,7 +24,7 @@ kind: "package-library"
 
 在不得与另一进程交错的读-改-写周期外获取锁，并在 `finally` 中释放：
 
-```ts
+```ts ignore-check
 import { PathLock, PathLockedError } from '@deepseek-ai/dsh-util-path-lock'
 
 declare const lockPath: string

@@ -1,8 +1,8 @@
 /**
- * Browser half: registers the Models-page footer card and its dictionaries.
+ * Browser half: registers the Models-page local-models tab and its dictionaries.
  *
- * The card rides the models page's declared `settings.models.footer`
- * extension seat; the section itself is never edited.
+ * The card rides the models page's declared `settings.models.tab` extension
+ * seat as the `local` page; the section itself is never edited.
  *
  * @module @prism/prism-local-models/client
  */
@@ -25,10 +25,10 @@ export const inject = ['slots', 'locale']
  */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'local-models: dictionaries')
-  ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
-    name: 'settings.models.footer',
-    id: 'local-models-card',
-    order: 10,
+  ctx.slots.inject('settings.models.tab', () => ctx.slots.register({
+    name: 'settings.models.tab',
+    id: 'local',
+    order: 30,
     locale: NS,
   }, LocalModelsCard))
 }

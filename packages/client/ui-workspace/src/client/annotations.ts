@@ -148,8 +148,13 @@ export function annotationPrompt(template: string, title: string, annotation: Se
   return template.replaceAll('{title}', title).replaceAll('{json}', annotationJson(annotation))
 }
 
-/** Read one priority out of imported JSON, keeping only the documented scale. */
-function importedPriority(value: unknown): SessionPriority {
+/**
+ * Read one priority out of parsed JSON, keeping only the documented scale;
+ * anything else reads as the default.
+ * @param value - parsed JSON value.
+ * @returns the priority, or {@link DEFAULT_PRIORITY} when the value is off-scale.
+ */
+export function validatedPriority(value: unknown): SessionPriority {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
     ? value as SessionPriority
     : DEFAULT_PRIORITY
@@ -184,8 +189,12 @@ export function composeAnnotation(draft: AnnotationDraft): SessionAnnotation {
   return annotation
 }
 
-/** Narrow parsed JSON to a plain object; arrays and primitives are not annotations. */
-function isRecord(value: unknown): value is Record<string, unknown> {
+/**
+ * Narrow parsed JSON to a plain object; arrays and primitives are not records.
+ * @param value - parsed JSON value.
+ * @returns whether the value is a non-array object.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -235,7 +244,7 @@ export function parseAnnotationImport(text: string): SessionAnnotation {
   return composeAnnotation({
     favorite: record['favorite'] === true,
     reviewLater: record['reviewLater'] === true,
-    priority: importedPriority(record['priority']),
+    priority: validatedPriority(record['priority']),
     tags: Array.isArray(rawTags)
       ? rawTags.filter(tag => typeof tag === 'string').join(',')
       : typeof rawTags === 'string' ? rawTags : '',

@@ -4,6 +4,8 @@
  * @module @deepseek-ai/dsh-token-meter/projection
  */
 
+import type { SessionProjectionSummaryExcluded } from '@deepseek-ai/dsh-session-projection/types'
+
 /**
  * Durable cumulative provider usage for a complete session log.
  *
@@ -15,6 +17,13 @@ export interface TokenUsageProjection {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
+  /**
+   * Unix epoch milliseconds of the latest settlement event that reported a
+   * usage sample. The session-level cost estimate prices its tier at this
+   * log-derived instant, so the rendered value never depends on the reading
+   * wall clock. Absent until a provider-reported usage settles.
+   */
+  lastSettledAt?: number
 }
 
 /**
@@ -70,8 +79,8 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
     /** Provider-reported usage accumulated across the complete durable log. */
     tokenUsage: TokenUsageProjection
     /** Newest request pressure paired with the newest known route capacity. */
-    contextPressure: ContextPressureProjection
+    contextPressure: SessionProjectionSummaryExcluded<ContextPressureProjection>
     /** Heuristic system/tools/message composition of the next request. */
-    contextBreakdown: ContextBreakdownProjection
+    contextBreakdown: SessionProjectionSummaryExcluded<ContextBreakdownProjection>
   }
 }

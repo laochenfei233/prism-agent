@@ -8,6 +8,8 @@ commits: 50ff54bd96..51342066b9
 
 # Context Menu Plugin Rows
 
+English | [中文](context-menu-plugins.zh.md)
+
 ## Report
 
 **What was built** — A settled assistant message's secondary-press menu now carries plugin rows. ui-chat declares `conversation.chat.message.menu.item` as a child of the `assistant-step` node renderer; the message menu renders its entries after the shipped copy, add-to-composer, and side-conversation rows, and each entry dismisses the menu through the injected `useMenuOpenState` hook. The gate is the durable message id the node view already holds (`AssistantChatData.finalNode`), so streaming, user, and empty bodies keep the three shipped rows. ui-message-feedback registers its two rating rows there (order 10) and opens the same per-message feedback dialog the hover strip opens; the strip keeps its retract-on-second-click behavior. The Session row's existing `sidebar.workspaces.session.menu.item` path is untouched.

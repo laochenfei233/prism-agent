@@ -3,7 +3,7 @@ description: "Prism 会议 profile 层：持久会议记录、实时麦克风转
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-meeting
+# @prism/prism-meeting
 
 [English](README.md) | 中文
 
@@ -32,7 +32,7 @@ kind: "package-bundle"
 ```sh
 dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-meeting
+dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
 
 本包声明了 `dsh.bundle.patch`，因此 `dsh plugin` 会把它作为 profile 层来协调，而不是挂载单个插件。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务。音频识别需要设置 `DASHSCOPE_API_KEY`，或为该 profile 配置其他语音提供者。

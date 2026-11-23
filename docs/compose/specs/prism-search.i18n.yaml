@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for prism-search.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-search.md
+/:
+  en: c3193f74186b3b60
+  zh: c3193f74186b3b60
+/prism-search:
+  en: 57e4d1e6533a43a6
+  zh: b6cb3952a0fd7046
+/prism-search/report:
+  en: 0bbde4c1596582ce
+  zh: eb90a6e7a0b42429
+/prism-search/s1-problem:
+  en: e5e1530e2b2e0d30
+  zh: dbc0bd2cb4a554aa
+/prism-search/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-search/s2-design/s2-1-surface-one-new-ctx-web-search-provider:
+  en: 93e0d3c9c2a4ee0e
+  zh: 4b5abdf6c5fe5197
+/prism-search/s2-design/s2-2-recall-18-free-engines:
+  en: a4f76971f0814951
+  zh: 46ea11bbe07839f6
+/prism-search/s2-design/s2-3-fusion-reciprocal-rank-fusion:
+  en: e607564d806e6005
+  zh: 91d1259d6237be08
+/prism-search/s2-design/s2-4-content-fetch-the-top-pages:
+  en: c147b77d2f0d35d0
+  zh: 0496be92a9b8065f
+/prism-search/s2-design/s2-5-ordering-one-model-from-model-management:
+  en: 89fa3ff7dceacc51
+  zh: a39db5f2c6d17a81
+/prism-search/s2-design/s2-6-settings-one-section-two-writes:
+  en: 843b42784b2abc50
+  zh: f4009a1a1f9f933d
+/prism-search/s2-design/s2-7-configuration:
+  en: 945ddd1841d72c7a
+  zh: bb9a74dc1986df32
+/prism-search/s2-design/s2-8-failure-behaviour:
+  en: 6cce04a4eb93117c
+  zh: 10c6de36155ff31d
+/prism-search/s3-scope:
+  en: d647a76fe8499502
+  zh: f565c6cfc309a871
+/prism-search/tasks:
+  en: 6836d0fd238e9098
+  zh: ac23c68b3ac86a5d
+/prism-search/s4-acceptance:
+  en: a86349546b32e0e1
+  zh: db308c1ebe0140c7

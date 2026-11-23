@@ -163,7 +163,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
 
   private isTrusted(request: ConnectionTrustRequest): boolean {
     const carrier = this.owner.get('webServer')
-    return isTrustedApiRequest(request, this.trustedHosts, carrier?.host, carrier?.protocol ?? 'http:')
+    return isTrustedApiRequest(request, this.trustedHosts, carrier?.hosts, carrier?.protocol ?? 'http:')
   }
 
   private publishPeer(interactions: ConnectionInteractions): PeerId {

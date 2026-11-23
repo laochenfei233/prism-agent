@@ -121,7 +121,13 @@ function cwdSpellings(ctx: NormalizeContext): string[] {
   const macAliases = spellings
     .filter(spelling => spelling.startsWith('/') && !spelling.startsWith('/private/'))
     .map(spelling => `/private${spelling}`)
-  return [...new Set([...spellings, ...macAliases])]
+  // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (Windows snapshots). The
+  // runtime embeds the cwd through JSON.stringify, so on Windows the session text carries the JSON-escaped
+  // spelling (doubled backslashes) while the header carries the raw one; both must tokenize.
+  const jsonEscaped = spellings
+    .filter(spelling => spelling.includes('\\'))
+    .map(spelling => spelling.replaceAll('\\', '\\\\'))
+  return [...new Set([...spellings, ...macAliases, ...jsonEscaped])]
     .sort((left, right) => right.length - left.length)
 }
 
@@ -274,19 +280,23 @@ function tokenizeFixtureValue(
  * path.
  *
  * @param rawLog The raw or refresh-stabilized session JSONL fixture.
+ * @param cwdOverride The run's real working directory, when the stabilized header no longer carries it:
+ *   a refresh pass replaces the header's cwd with the `{{cwd}}` placeholder before tokenizing, so the
+ *   message texts' raw and JSON-escaped spellings would otherwise never match a placeholder.
  * @returns Compact JSONL whose known cwd spellings become `{{cwd}}`.
  * @throws If a non-empty line is invalid JSON or the session cwd has no basename.
  */
-export function tokenizeSessionFixtureCwd(rawLog: string): string {
+export function tokenizeSessionFixtureCwd(rawLog: string, cwdOverride?: string): string {
   const lines = rawLog.split('\n')
   const firstLine = lines.find(line => line.trim().length > 0)
   const header = firstLine === undefined ? undefined : JSON.parse(firstLine) as { cwd?: unknown }
-  const cwd = typeof header?.cwd === 'string' ? header.cwd : ''
+  const cwd = cwdOverride ?? (typeof header?.cwd === 'string' ? header.cwd : '')
   const basename = cwd.split(/[\\/]/).at(-1)
   if (basename === undefined || basename.length === 0) {
     throw new Error('acp-snapshot: cannot tokenize a cwd without a basename')
   }
   const ctx: NormalizeContext = { sessionIds: [], cwd }
+  if (process.env.DSH_TOKENIZE_DEBUG === '1') console.error('[tokenize] cwd=', JSON.stringify(cwd), 'spellings=', JSON.stringify(cwdSpellings(ctx)))
   return lines.map((line) => {
     if (line.trim().length === 0) return line
     return JSON.stringify(tokenizeFixtureValue(JSON.parse(line), ctx, basename))

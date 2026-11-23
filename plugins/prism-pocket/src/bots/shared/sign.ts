@@ -6,10 +6,23 @@
  * @module @prism/prism-pocket/bots/shared
  */
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
 /** How far a callback timestamp may drift before the delivery is refused. */
 export const CALLBACK_TIMESTAMP_TOLERANCE_SECONDS = 300
+
+/**
+ * Compare two strings without leaking the match position through timing.
+ * @param a - the left-hand string (typically the locally computed value).
+ * @param b - the right-hand string (typically the attacker-influenced value).
+ * @returns whether the strings are byte-identical.
+ */
+export function timingSafeStringEquals(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'utf8')
+  const right = Buffer.from(b, 'utf8')
+  // timingSafeEqual throws on differing lengths, so the length guard doubles as the fast reject.
+  return left.byteLength === right.byteLength && timingSafeEqual(left, right)
+}
 
 /**
  * The callback signature: SHA-1 hex of the sorted concatenation.

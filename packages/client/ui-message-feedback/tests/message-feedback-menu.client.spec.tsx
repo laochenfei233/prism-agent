@@ -21,8 +21,7 @@ function mount() {
   const openDialog = vi.fn()
   const setMenuOpen = vi.fn()
   const useMenuOpenState = (() => [true, setMenuOpen]) as never
-  const props = { messageId: MSG, openDialog, useMenuOpenState, t } as unknown as
-    Parameters<typeof MessageFeedbackMenuItems>[0]
+  const props = { messageId: MSG, openDialog, useMenuOpenState, t } as Parameters<typeof MessageFeedbackMenuItems>[0]
   return { ...render(<MessageFeedbackMenuItems {...props} />), openDialog, setMenuOpen }
 }
 

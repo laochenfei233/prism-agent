@@ -1,7 +1,7 @@
 # PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2).
 [package]
 name = "dsh-desktop"
-version = "0.2.1-rc.4-alpha3"
+version = "0.2.2-rc.1"
 description = "Prism Agent desktop shell (Tauri 2)"
 authors = ["dsh-desktop contributors"]
 license = "MIT"
@@ -32,7 +32,7 @@ tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-clipboard-manager = "2"
-tokio = { version = "1", features = ["process", "time", "sync", "rt-multi-thread", "macros", "io-util", "fs"] }
+tokio = { version = "1", features = ["process", "time", "sync", "rt-multi-thread", "macros", "io-util", "fs", "net"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import { contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createSettingsShellStore } from '../src/client/shell-store.ts'
@@ -18,8 +19,19 @@ import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
 const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
 
+const scrollIntoView = vi.fn()
+let scrollIntoViewDescriptor: PropertyDescriptor | undefined
+
+beforeEach(() => {
+  scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+  Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+  scrollIntoView.mockClear()
+})
+
 afterEach(() => {
   cleanup()
+  if (scrollIntoViewDescriptor === undefined) Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  else Object.defineProperty(Element.prototype, 'scrollIntoView', scrollIntoViewDescriptor)
   vi.useRealTimers()
 })
 
@@ -105,6 +117,7 @@ function mount({
     usePanelInfo, useSessionRetainInfo: () => undefined, useResource,
     useWorkspaces: unusedHook,
     ...allowAllAccess,
+    useContextMenu: contextMenuHook(),
     wide,
     reconnect,
     openDesktopUpdate: () => {},
@@ -382,7 +395,7 @@ describe('SettingsPanel navigation', () => {
       ],
     })
     openPanel()
-    // Glyphs carry no id of their own, so the drawn paths are what tells them apart.
+    // The drawn content (sprite use href or inline paths) tells the glyphs apart.
     const glyphs = ['General', 'Models', 'Agent presets', 'Plugins', 'Archived sessions', 'Appearance', 'Contributed']
       .map(name => screen.getByRole('button', { name }).querySelector('svg')?.innerHTML)
 
@@ -422,6 +435,8 @@ describe('SettingsPanel navigation', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByTestId('section-models')).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Models' }))
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' })
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.activeElement)
 
     cleanup()
     const inactive = mount({ onboardingActive: false }).renderSlot.mock.calls

@@ -9,7 +9,7 @@
 import type { BotAdapterFactory, BotInbound } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { fetchBotJson, postBotJson, stringField } from '../shared/http.ts'
-import { ReconnectingWs } from '../shared/ws.ts'
+import { ReconnectingWs, waitForSocketReady } from '../shared/ws.ts'
 
 /** Per-message character limit applied on sends. */
 export const SLACK_MESSAGE_LIMIT = 4000
@@ -48,6 +48,8 @@ export function buildSlackAck(envelopeId: string): string {
 /** One message event, narrowed to the fields the adapter reads. */
 export interface SlackMessage {
   readonly chatId: string
+  readonly senderId: string
+  readonly messageId: string
   readonly senderName?: string
   readonly text: string
 }
@@ -62,13 +64,18 @@ export function readSlackMessage(payload: unknown): SlackMessage | undefined {
   if (typeof payload !== 'object' || payload === null) return undefined
   const event = (payload as { event?: unknown }).event
   if (typeof event !== 'object' || event === null) return undefined
-  const record = event as { type?: unknown; channel?: unknown; user?: unknown; text?: unknown; bot_id?: unknown; subtype?: unknown }
+  const record = event as { type?: unknown; channel?: unknown; user?: unknown; ts?: unknown; text?: unknown; bot_id?: unknown; subtype?: unknown }
   if (record.type !== 'message' || typeof record.channel !== 'string' || typeof record.text !== 'string') return undefined
   if (record.bot_id !== undefined || record.subtype !== undefined) return undefined
   if (record.text.trim().length === 0) return undefined
   const senderName = typeof record.user === 'string' ? record.user : undefined
+  // The member id is the stable per-user id; the event ts is unique per channel message.
+  const senderId = typeof record.user === 'string' ? record.user : ''
+  const messageId = typeof record.ts === 'string' ? record.ts : ''
   return {
     chatId: record.channel,
+    senderId,
+    messageId,
     text: record.text.trim(),
     ...(senderName !== undefined ? { senderName } : {}),
   }
@@ -119,17 +126,9 @@ export const createSlackAdapter: BotAdapterFactory = (config, hooks) => {
         },
       )
       ws.start()
-      await new Promise<void>((resolve, reject) => {
-        const began = Date.now()
-        const check = setInterval(() => {
-          if (ws?.open === true) {
-            clearInterval(check)
-            resolve()
-          } else if (Date.now() - began > 15_000) {
-            clearInterval(check)
-            reject(new Error('Socket Mode socket did not open within 15s'))
-          }
-        }, 250)
+      await waitForSocketReady(() => ws?.open === true, {
+        channel: 'slack',
+        awaited: 'Socket Mode socket did not open',
       })
     },
     async stop() {

@@ -194,8 +194,9 @@ export function apply(ctx: Context, config: Config): void {
       + ' pass --public-url with the root browsers actually reach it through',
     )
   }
-  if (ctx.webServer.protocol === 'http:' && !isLoopbackHost(boundHost)) {
-    console.warn(`dsh web: listening on ${boundHost} over plain HTTP; restrict this port to a trusted proxy or network`)
+  const remoteBound = ctx.webServer.hosts.some(host => !isLoopbackHost(host))
+  if (ctx.webServer.protocol === 'http:' && remoteBound) {
+    console.warn(`dsh web: listening on ${ctx.webServer.hosts.join(', ')} over plain HTTP; restrict this port to a trusted proxy or network`)
   }
   // The bind URL belongs to this host. Under SSH, the operator reaches it
   // through a local forwarding address that this process cannot derive.
@@ -228,7 +229,12 @@ export function apply(ctx: Context, config: Config): void {
         const authenticatedUrl = connectionCtx.connection.authenticatedUrl(webUrl)
         ANNOUNCED_ROOTS.add(connectionCtx.root)
         if (config.printUrl) {
-          console.log(`dsh web: ${authenticatedUrl}`)
+          // A bound LAN address is the URL a phone on the same network opens;
+          // the shell's launch-url parser takes the first URL of the line.
+          const lanHost = ctx.webServer.hosts.slice(1).find(host => !isLoopbackHost(host) && bindUrlHost(host) !== undefined)
+          const lanSuffix = lanHost === undefined ? ''
+            : ` (LAN: ${connectionCtx.connection.authenticatedUrl(`${ctx.webServer.protocol}//${bindUrlHost(lanHost)}:${String(ctx.webServer.port)}`)})`
+          console.log(`dsh web: ${authenticatedUrl}${lanSuffix}`)
         }
         if (handoffBrowser) {
           console.log('dsh web: opening the default browser; pass --no-open to disable')

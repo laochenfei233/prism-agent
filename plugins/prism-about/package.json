@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "About settings section for the Prism Agent desktop app: current version, the in-app updater (GitHub Releases only), and project links",
+  "description": "About settings section for the Prism Agent desktop app: current version, the in-app updater (domestic mirror first, GitHub Releases fallback), and project links",
   "license": "MIT",
   "main": "lib/index.js",
   "exports": {

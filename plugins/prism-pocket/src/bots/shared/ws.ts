@@ -178,3 +178,69 @@ export class ReconnectingWs {
     }
   }
 }
+
+/** Default give-up deadline for {@link waitForSocketReady}. */
+export const READY_TIMEOUT_MS = 15_000
+
+/** Default predicate poll interval for {@link waitForSocketReady}. */
+export const READY_POLL_MS = 250
+
+/** Labels and timing for one {@link waitForSocketReady} wait. */
+export interface SocketReadyOptions {
+  /** Bot channel whose socket is awaited, e.g. `discord`. */
+  channel: string
+  /**
+   * What the predicate waits for, phrased as the timeout message's subject
+   * with its verb, e.g. `gateway READY did not arrive`.
+   */
+  awaited: string
+  /** Give-up deadline; defaults to {@link READY_TIMEOUT_MS}. */
+  timeoutMs?: number
+  /** Predicate poll interval; defaults to {@link READY_POLL_MS}. */
+  pollMs?: number
+}
+
+/**
+ * The rejection {@link waitForSocketReady} settles with when the deadline
+ * lapses: `channel` and `awaited` name the failing site, `timeoutMs` the
+ * elapsed deadline. The message keeps the adapters' historical form,
+ * `<awaited> within <seconds>s`.
+ */
+export class SocketReadyTimeoutError extends Error {
+  constructor(
+    public readonly channel: string,
+    public readonly awaited: string,
+    public readonly timeoutMs: number,
+  ) {
+    super(`${awaited} within ${Math.round(timeoutMs / 1000)}s`)
+    this.name = 'SocketReadyTimeoutError'
+  }
+}
+
+/**
+ * Poll `predicate` until it turns true — the bounded wait the ws adapters
+ * run after `ReconnectingWs.start()` for READY or login state. The predicate
+ * is checked before the deadline on every tick, so an early success never
+ * waits for the deadline to be exceeded first.
+ *
+ * @param predicate - polled each tick; resolves the wait once it returns true.
+ * @param options - channel and awaited labels plus optional timing overrides.
+ * @returns A promise that resolves once `predicate` returns true and rejects
+ *   with {@link SocketReadyTimeoutError} after `timeoutMs`.
+ */
+export function waitForSocketReady(predicate: () => boolean, options: SocketReadyOptions): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? READY_TIMEOUT_MS
+  const pollMs = options.pollMs ?? READY_POLL_MS
+  return new Promise<void>((resolve, reject) => {
+    const began = Date.now()
+    const check = setInterval(() => {
+      if (predicate()) {
+        clearInterval(check)
+        resolve()
+      } else if (Date.now() - began > timeoutMs) {
+        clearInterval(check)
+        reject(new SocketReadyTimeoutError(options.channel, options.awaited, timeoutMs))
+      }
+    }, pollMs)
+  })
+}

@@ -42,9 +42,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .reset:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .reset:disabled {
@@ -158,9 +160,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .saveButton:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-active);
-  color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-active);
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .saveButton:disabled {
@@ -192,9 +196,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .chip:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-active);
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-active);
+  }
 }
 
 .chipDelete {
@@ -209,9 +215,11 @@
   cursor: pointer;
 }
 
+@media (hover: hover) {
 .chipDelete:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-active);
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-active);
+  }
 }
 
 .segmented {

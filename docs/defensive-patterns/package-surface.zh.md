@@ -78,6 +78,7 @@ import { isSurfaceEligibleType } from '../../core/session/src/surface.ts'
 
 - 标准键，每个键在全仓只有一个含义，统计口径是 `packages/*/*/package.json` 与 `apps/*/package.json`：`.`（包主入口）、`./package.json`（工具链访问，不是语义导出）、`./src/*`（测试与工具的源码透传，文档状态仍待定）、`./client`（浏览器入口，与 `dsh.client` 声明配对）、`./types`（类型入口）、`./typert`（typert 类型运行时）、`./remote`（`@Remote` 调用面）、`./locale/*.json`（本地化资源）、`./cordis.patch.yml`（`dsh.bundle` 声明的 bundle 补丁层）。这里不列各键的包数，因为下一个包就会让它过期；下面的复算命令会打印当前数字。
 - 集合之外的键（`./brand` 5 个包、`./worker` 4 个、`./startup`、`./runner`、`./protocol` 各 2 个，另有大量一次性键）没有文档含义，属待核项，不是可照抄的先例。
+- `dsh-tools` 另行提供 `./pipeline`，用于复用调用阶段与批量调度。主入口与 pipeline bundle 共享运行时 chunk，以保持错误类的身份一致；工作区检查验证导出目标与发布文件。
 - 判定条件：改动是否新增了标准集合以外的 export 键？
 - 例外：无默认例外；新增键须先改正家文档与检查，并取得对应领域专家确认。
 - 复算分布：
@@ -116,7 +117,7 @@ python3 -c "import json,glob,collections; c=collections.Counter(); [c.update(jso
 
 依赖声明与版本一致性由依赖扫描机械保证；本页既不复述 `devDependencies` 与 `peerDependencies` 的字段规则，也不另立包准入清单。扫描失败时，在本地复现并修正它指名的清单，因为规则的正家是扫描与其策略文件。为了让改动落地而修改扫描或放宽策略不属于常规改动，须经对应领域专家确认。
 
-- 入口：[verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts)，以 `pnpm run verify-package-dependencies` 运行，被 `scripts/run-gates.ts` 作为 `package-dependencies` 门禁调用，`.github/workflows/release.yml` 也直接运行它。
+- 入口：[verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts)，以 `pnpm run verify-package-dependencies` 运行，被 `scripts/run-gates.ts` 作为 `package-dependencies` 门禁调用。
 - 策略正家：[package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) 导出 `PACKAGE_DEPENDENCY_POLICY`；声明面、版本形态与豁免都在该文件定义，包级背景见 [packages/README.zh.md](../../packages/README.zh.md)。
 - 边界：本页不列包清单、字段规则或阈值，只指向正家文件。
 - 查接线：`grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`。

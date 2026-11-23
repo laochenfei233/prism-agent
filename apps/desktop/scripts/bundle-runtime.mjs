@@ -384,10 +384,11 @@ function patchDesktopBrowserAuth() {
 // The served entry document carries the bridge a shell-embedded dsh UI talks
 // to its host through. Two of its jobs answer WebView2 limits that break the
 // plain web UI inside the iframe: wry answers only the clipboard
-// PermissionRequested, so web notification plugins never fire, and
-// NewWindowRequested is not raised for target=_blank clicks, so external
-// links die. The bridge routes both to the shell — native toasts through
-// tauri-plugin-notification, and external links through the opener plugin.
+// PermissionRequested, so web notification plugins never fire, and wry
+// cancels every new-window request (SetHandled) when no handler is attached,
+// so target=_blank links die. The bridge routes both to the shell — native
+// toasts through tauri-plugin-notification, and external links through the
+// opener plugin.
 // Its third job reports that the interface finished mounting, which is what
 // the shell's splash waits for; the frame's own load event fires while client
 // plugins are still activating. Its fourth job is the desktop update carrier:
@@ -424,9 +425,17 @@ export function injectDesktopHostBridge(distDest) {
   }
   Object.defineProperty(window, "Notification", { configurable: true, value: DshNotification })
 
+  // The bubble listener opens only anchors the page did not claim: a page
+  // handler that preventDefaults before this listener runs (React links open
+  // in-app or through the window.open override below) suppresses the
+  // system-browser open. Unclaimed anchors are prevented and routed here,
+  // ahead of the opener plugin's own click listener, which would otherwise
+  // preventDefault and then throw on the frame's missing Tauri IPC and leave
+  // the link dead. A handler that stops propagation before the document never
+  // reaches this listener and falls to the shell's new-window route instead.
   document.addEventListener("click", (event) => {
     const anchor = event.target.closest?.("a")
-    if (!anchor) return
+    if (!anchor || event.defaultPrevented) return
     const href = anchor.getAttribute("href")
     if (!href) return
     let url
@@ -436,7 +445,7 @@ export function injectDesktopHostBridge(distDest) {
       event.preventDefault()
       post({ kind: "open", url: url.href })
     }
-  }, true)
+  })
 
   const nativeOpen = window.open
   window.open = (url, ...rest) => {

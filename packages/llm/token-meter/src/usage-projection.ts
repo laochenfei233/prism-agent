@@ -49,6 +49,14 @@ const projectionSchema = z.object({
   cacheWriteTokens: z.number().int().nonnegative(),
 }).strict()
 
+/** Wire view of the totals plus the log-derived settlement instant. */
+const projectionViewSchema: z.ZodType<TokenUsageProjection> = projectionSchema.extend({
+  lastSettledAt: z.number().int().nonnegative().optional(),
+}).strict().transform(({ lastSettledAt, ...totals }) => ({
+  ...totals,
+  ...lastSettledAt === undefined ? {} : { lastSettledAt },
+}))
+
 /**
  * The token-usage unit's state schema — the one definition of the state
  * shape; the state type is inferred from it.
@@ -60,6 +68,8 @@ const tokenUsageStateSchema = z.object({
     step: z.number().int().nonnegative(),
     buckets: projectionSchema,
   }).nullable(),
+  /** Commit time of the latest settlement event that reported a usage sample. */
+  settledAt: z.number().int().nonnegative().nullable(),
 }).strict()
 
 type TokenUsageState = z.infer<typeof tokenUsageStateSchema>
@@ -85,13 +95,6 @@ function usageOf(event: SessionEvent): TokenUsage | undefined {
   return lastAssistantStreamChunk(event.data.stream, 'usage')?.usage
 }
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    tokenUsage: TokenUsageState
-    contextPressure: ContextPressureState
-  }
-}
-
 /** The context-pressure state schema and source of its inferred type. */
 const contextPressureStateSchema = z.object({
   contextWindow: z.number().int().positive().optional(),
@@ -105,20 +108,24 @@ const contextPressureStateSchema = z.object({
   }).optional(),
 }).strict()
 
-type ContextPressureState = z.infer<typeof contextPressureStateSchema>
+/** Host fold state for provider pressure and surface adjustments. */
+export type ContextPressureState = z.infer<typeof contextPressureStateSchema>
 
 /**
  * Token-meter's session projection unit.
  *
  * Each v2 Assistant settlement contributes the last usage sample embedded in
  * its stream. `llm/retry-started` closes the replacement slot so the retried
- * attempt adds to the total.
+ * attempt adds to the total. `settledAt` stamps the commit time of the
+ * settlement whose sample produced the current totals, so the wire view
+ * carries a log-derived instant for tier pricing instead of any reader's
+ * wall clock; an identical re-settlement changes neither totals nor stamp.
  */
 export const tokenUsageProjectionDefinition = {
   key: 'tokenUsage',
-  stateVersion: 2,
+  stateVersion: 3,
   stateSchema: tokenUsageStateSchema,
-  init: () => ({ totals: zeroBuckets(), last: null }),
+  init: () => ({ totals: zeroBuckets(), last: null, settledAt: null }),
   apply: (state, event) => {
     if (event.type === 'llm/retry-started') {
       return state.last?.turn === event.data.turn && state.last.step === event.data.step
@@ -144,9 +151,16 @@ export const tokenUsageProjectionDefinition = {
     return {
       totals: addReplacing(state.totals, previous, buckets),
       last: { turn, step, buckets },
+      settledAt: event.time,
     }
   },
-  wire: { viewSchema: projectionSchema, view: state => state.totals },
+  wire: {
+    viewSchema: projectionViewSchema,
+    view: ({ totals, settledAt }) => ({
+      ...totals,
+      ...settledAt === null ? {} : { lastSettledAt: settledAt },
+    }),
+  },
 } satisfies ProjectionDefinition<'tokenUsage', TokenUsageState>
 
 /**
@@ -214,5 +228,6 @@ export const contextPressureProjectionDefinition = {
         ? {}
         : { projectedTokens: Math.max(0, pressureTokens + surfaceTokens - sampledSurfaceTokens) },
     }),
+    summary: false,
   },
 } satisfies ProjectionDefinition<'contextPressure', ContextPressureState>

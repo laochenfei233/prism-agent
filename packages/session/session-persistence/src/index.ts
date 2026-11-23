@@ -9,6 +9,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionHandle, SessionAccess } from './handle.ts'
+import type { SessionLocation } from './errors.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 
 // Re-export the metadata vocabulary so Consumers import it from the Service Definition.
@@ -67,6 +68,12 @@ export interface SessionPersistenceSnapshot {
    * but never one whose log changed after the time it compares against.
    */
   readonly updatedAt?: number
+  /**
+   * Backend-resolved location of the selected materialized per-Session
+   * artifact, for diagnostics and export. Absent when the backend has no
+   * materialized per-Session file, including an unmaterialized pending Session.
+   */
+  readonly location?: SessionLocation
 }
 
 /** Options for {@link SessionPersistence.create}. */

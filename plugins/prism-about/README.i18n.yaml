@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-about/README.md
 /prism-about:
-  en: 1ed9bd7ce0a2785d
-  zh: ba9113e54b56d011
+  en: 0386ebb475f2399a
+  zh: a3c0a13304251abf
 /prism-about/what-it-shows:
-  en: ece9f3e9fc5fa0d6
-  zh: bda35e4580731824
+  en: 4034af0803443a92
+  zh: 725d1ca419a117a9
 /prism-about/what-it-does-not-do:
-  en: e89940f2f309fd95
-  zh: 15f434b95189a22b
+  en: 2b2ca27d65f8de66
+  zh: 16c690435f508568
 /prism-about/layout:
   en: 1ab8b509e0fe148b
   zh: c5295d9510d025f5

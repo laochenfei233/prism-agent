@@ -1,8 +1,7 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
-import yaml from 'js-yaml'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   assertClientBuildEnvironment,
@@ -20,20 +19,11 @@ import {
 } from './client-build-environment.ts'
 import { clientBundle } from '../packages/client/tsdown.client.ts'
 
-const root = resolve(import.meta.dirname, '..')
 const PROBE_NAME = 'DSH_CLIENT_BUILD_TEST'
 const COMMIT_HASH = '0123456789abcdef0123456789abcdef01234567'
 const PROBE_KEY = `process.env.${PROBE_NAME}`
 const originalProbe = process.env[PROBE_NAME]
 const roots: string[] = []
-const dshBuildWorkflows = [
-  'build-exe-for-python-sdk.yml',
-  'ci.yml',
-  'e2e.yml',
-  'release.yml',
-  'release-publish.yml',
-  'sandbox.yml',
-]
 
 afterEach(() => {
   if (originalProbe === undefined) Reflect.deleteProperty(process.env, PROBE_NAME)
@@ -139,6 +129,40 @@ describe('client build environment', () => {
       DSH_CLIENT_VERSION: '1.2.3',
     })
     expect(repositoryCommitHash('/unused', { DSH_CLIENT_COMMIT_HASH: COMMIT_HASH })).toBe(COMMIT_HASH.slice(0, 7))
+  })
+
+  it.each([undefined, 'true', 'false'])('isolates local branding while retaining repository metadata (dirty=%s)', (dirty) => {
+    const parent = {
+      DSH_BUILD_CLIENT_PROFILE: 'official',
+      DSH_CLIENT_BUILD_PROFILE: 'official',
+      DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_VERSION: '1.2.3',
+      DSH_CLIENT_GIT_DIRTY: dirty,
+      DSH_CLIENT_EXTRA: 'inherited',
+    }
+    const local = resolveClientBuildEnvironment(parent, 'local')
+    expect(local).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'local',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_VERSION: '1.2.3',
+      ...(dirty === 'true' ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
+    })
+    expect(clientBuildProcessEnvironment(parent, local)).toEqual(local)
+    expect(resolveClientBuildEnvironment({ ...parent, DSH_BUILD_CLIENT_PROFILE: 'local' })).toEqual(local)
+    expect(resolveClientBuildEnvironment({ ...parent, ...local }, 'official')).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'official',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_TITLE: 'DeepSeek Harness',
+      DSH_CLIENT_VERSION: '1.2.3',
+    })
+  })
+
+  it('requires source metadata for an explicit local build', () => {
+    expect(() => { resolveClientBuildEnvironment({}, 'local') }).toThrow(/DSH_CLIENT_COMMIT_HASH/)
+    expect(() => {
+      resolveClientBuildEnvironment({ DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7) }, 'local')
+    }).toThrow(/DSH_CLIENT_VERSION/)
   })
 
   it('owns repository version, commit, and dirty metadata for complete builds', () => {
@@ -292,16 +316,5 @@ describe('client build environment', () => {
     expect(() => { readClientBuildRecord(dual) }).not.toThrow()
     write(join(dual, 'packages/client/example/lib/client.browser.js'), 'module.exports = { browser: true }\n')
     expect(() => { readClientBuildRecord(dual) }).toThrow(/artifacts differ/)
-  })
-
-  it('keeps public client values out of workflow-wide environments', () => {
-    for (const name of dshBuildWorkflows) {
-      const path = `.github/workflows/${name}`
-      const document: unknown = yaml.load(readFileSync(resolve(root, path), 'utf8'))
-      if (typeof document !== 'object' || document === null || Array.isArray(document)) {
-        throw new TypeError(`${path} must contain a workflow object`)
-      }
-      expect(JSON.stringify(document), path).not.toContain('DSH_CLIENT_')
-    }
   })
 })

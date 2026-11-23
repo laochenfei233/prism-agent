@@ -16,7 +16,12 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import type { MemoryRecord } from './domain.ts'
 import { layerOf, MEMORY_LAYERS } from './layers.ts'
 import { IMPORT_SOURCE_IDS } from './import.ts'
-import { PrismMemoryError, type PrismMemoryService } from './service.ts'
+import {
+  EXPORT_INDEX_FILE,
+  EXPORT_MARKDOWN_FILE,
+  PrismMemoryError,
+} from './service.ts'
+import type { EvidenceOutcome, PrismMemoryService } from './service.ts'
 
 /** Cordis plugin name for the command registrant. */
 export const name = 'prism-memory-commands'
@@ -39,8 +44,11 @@ const USAGE = [
   '  maintain [apply]           Hygiene pass; dry run unless "apply" is given',
   '  dream [apply]              Consolidation pass; dry run unless "apply" is given',
   '  journal [limit]            The consolidation journal and daily reflections',
+  '  verify [limit]             Re-check cited sources: intact, drifted, missing, or unavailable',
+  '  compare <idA> <idB>        Set two claims side by side; a mechanical verdict, never a merge',
   '  import [apply] [sources]   Read other tools\' memory files; dry run unless "apply" is given',
-  '  export [dir]               Write the Markdown mirror and its JSON index',
+  '  bootstrap [apply] [limit]  Distill past sessions of this directory; dry run unless "apply" is given',
+  '  export [dir]               Write the mirror and its JSON index; "check" audits an existing mirror',
 ].join('\n')
 
 /** One parsed invocation: the subcommand and its remaining arguments. */
@@ -84,6 +92,14 @@ function dateOf(value: number | null): string {
 function line(record: MemoryRecord): string {
   const session = record.evidence.sessionId === null ? '' : ` session=${record.evidence.sessionId}`
   return `[${record.id}] ${layerOf(record)}/${record.kind}/${record.scope}/${record.status} created=${dateOf(record.createdAt)} invalid=${dateOf(record.invalidAt)}${session}\n  ${record.text}`
+}
+
+/** One explanatory clause per verification outcome; `intact` needs none. */
+const VERDICT_CLAUSE: Record<EvidenceOutcome, string> = {
+  intact: '',
+  drifted: ' — the cited message\'s text changed',
+  missing: ' — the cited session or message no longer resolves',
+  unavailable: ' — no reader could open the cited session',
 }
 
 /** Build the `status` report. */
@@ -186,6 +202,10 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
         `  confidence: ${target.confidence}  hits: ${target.hits}  corroborations: ${target.corroborations ?? 0}${(target.corroboratedAt ?? null) === null ? '' : ` (confirmed ${dateOf(target.corroboratedAt ?? null)})`}`,
         `  valid ${dateOf(target.validAt)} · expires ${dateOf(target.expiresAt ?? null)} · due ${dateOf(target.dueAt ?? null)} · note ${target.evidence.note ?? 'none'}`,
       ]
+      if ((target.parents ?? []).length > 0) detail.push(`  parents: ${(target.parents ?? []).join(', ')}`)
+      if (target.evidence.messageId !== null) {
+        detail.push(`  cited: message=${target.evidence.messageId} hash=${target.evidence.textHash ?? 'none'}`)
+      }
       if (chain.length > 1) {
         detail.push('  chain, oldest first:')
         for (const entry of chain) detail.push(`    [${entry.id}] ${entry.status} created=${dateOf(entry.createdAt)}`)
@@ -221,6 +241,7 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
         `duplicates: ${report.duplicates.length === 0 ? 'none' : report.duplicates.map(pair => `${pair.drop}→${pair.keep} (${pair.similarity.toFixed(2)})`).join(', ')}`,
         `evicted: ${report.evicted.length === 0 ? 'none' : report.evicted.join(', ')}`,
         `orphaned supersede links: ${report.orphaned.length === 0 ? 'none' : report.orphaned.join(', ')}`,
+        `orphaned parent links: ${report.orphanedParents.length === 0 ? 'none' : report.orphanedParents.join(', ')}`,
       ]
       return { kind: 'success', text: [heading, ...details].join('\n') }
     }
@@ -257,6 +278,43 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
       return { kind: 'success', text: lines.join('\n') }
     }
 
+    case 'verify': {
+      const report = await memory.verifyEvidence()
+      const count = (outcome: EvidenceOutcome): number =>
+        report.verdicts.filter(verdict => verdict.outcome === outcome).length
+      const lines = [
+        `records citing a message: ${report.verdicts.length} — intact ${count('intact')}, drifted ${count('drifted')}, missing ${count('missing')}, unavailable ${count('unavailable')}`,
+        report.uncited === 0 ? '' : `records citing no message: ${report.uncited} (nothing to verify)`,
+        report.readerUnavailable ? 'No session-query engine is mounted; cited sources could not be re-read.' : '',
+      ].filter(entry => entry !== '')
+      const notIntact = report.verdicts.filter(verdict => verdict.outcome !== 'intact')
+      if (notIntact.length > 0) {
+        const limit = limitOf(rest === '' ? undefined : rest, 50)
+        lines.push(`Not intact (${notIntact.length}):`)
+        for (const verdict of notIntact.slice(0, limit)) lines.push(`  [${verdict.id}]${VERDICT_CLAUSE[verdict.outcome]}`)
+        if (notIntact.length > limit) lines.push(`  …and ${notIntact.length - limit} more`)
+      }
+      return { kind: 'success', text: lines.join('\n') }
+    }
+
+    case 'compare': {
+      const { first, tail } = firstAndRest(rest)
+      const second = firstAndRest(tail ?? '').first
+      if (first === '' || second === '') return { kind: 'error', text: USAGE }
+      const report = memory.operatorCompare(first, second)
+      return {
+        kind: 'success',
+        text: [
+          line(report.left),
+          line(report.right),
+          `mechanical: similarity ${report.similarity.toFixed(2)}, shared tags ${report.sharedTags.length === 0 ? 'none' : report.sharedTags.join(', ')}, relation ${report.relation ?? 'none'}`,
+          `verdict (mechanical vocabulary, not a decision): ${report.verdict}`,
+          'Equivalent claims keep both identities and sources. Complementary claims leave any ordering to you.',
+          'Conflicting claims are preserved with their conditions; nothing is merged automatically.',
+        ].join('\n'),
+      }
+    }
+
     case 'import': {
       const tokens = rest.split(/\s+/).filter(token => token !== '')
       const apply = tokens.includes('apply')
@@ -280,7 +338,55 @@ async function execute(memory: PrismMemoryService, invocation: CommandInvocation
       return { kind: 'success', text: [heading, ...details].join('\n') }
     }
 
+    case 'bootstrap': {
+      const tokens = rest.split(/\s+/).filter(token => token !== '')
+      const apply = tokens[0] === 'apply'
+      const limitToken = apply ? tokens[1] : tokens[0]
+      const parsed = limitToken === undefined ? NaN : Number.parseInt(limitToken, 10)
+      const report = await memory.bootstrap({
+        apply,
+        ...Number.isFinite(parsed) && parsed > 0 ? { limit: parsed } : {},
+        agent: invocation.agent,
+      })
+      const heading = report.applied
+        ? 'Bootstrap applied.'
+        : 'Bootstrap dry run: nothing was written. Re-run as "/memory bootstrap apply" to commit.'
+      const lines = [
+        heading,
+        `route: ${report.target.provider}/${report.target.model}`,
+        `sessions processed by an earlier pass: ${report.processedCount}`,
+        `selected: ${report.sessions.length === 0 ? 'none' : `${report.sessions.length} session(s), newest first`}`,
+      ]
+      for (const session of report.sessions) {
+        lines.push(`  ${session.sessionId} — ${session.messageCount === null ? 'unreadable' : `${session.messageCount} message(s)`} on the surface`)
+      }
+      if (report.applied) {
+        lines.push(
+          `stored: ${report.created.length === 0 ? 'none' : report.created.join(', ')} — pending, into review`,
+          `already known: ${report.skipped}`,
+          `failed sessions: ${report.failed}`,
+        )
+      }
+      return { kind: 'success', text: lines.join('\n') }
+    }
+
     case 'export': {
+      // "check" is a positional keyword, the way maintain and dream take
+      // "apply": auditing an existing mirror is the same surface, not a new
+      // subcommand.
+      const { first, tail } = firstAndRest(rest)
+      if (first.toLowerCase() === 'check') {
+        const result = await memory.checkExport(tail === undefined ? {} : { dir: tail })
+        const lines = [
+          `Mirror check for ${result.dir}:`,
+          `  ${EXPORT_MARKDOWN_FILE}: ${result.markdown}`,
+          `  ${EXPORT_INDEX_FILE}: ${result.index}`,
+        ]
+        if (result.markdown !== 'match' || result.index !== 'match') {
+          lines.push('Re-run "/memory export" to refresh the mirror.')
+        }
+        return { kind: 'success', text: lines.join('\n') }
+      }
       const dir = rest === '' ? undefined : rest
       const result = await memory.exportMarkdown(dir === undefined ? {} : { dir })
       return { kind: 'success', text: `Exported ${result.total} record(s) to ${result.dir}:\n  ${result.files.join('\n  ')}` }

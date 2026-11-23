@@ -98,8 +98,16 @@ export function createActivationObserver(
   provider: string,
   childId: SessionId,
   parent: Agent,
+  delivery: 'parent' | 'caller',
 ): ActivationObserver {
-  const identity = { runId: SubagentRunId(randomUUID()), provider, id: childId, local: false }
+  const identity = {
+    runId: SubagentRunId(randomUUID()),
+    provider,
+    id: childId,
+    parentId: parent.id,
+    delivery,
+    local: false,
+  }
   return {
     start: (child?: Agent): void => {
       identity.local = child !== undefined

@@ -8,25 +8,42 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createAgent, mountMemory } from './fixtures/harness.ts'
+import { appendUser, createAgent, driveTurnStopping, mountMemory } from './fixtures/harness.ts'
 
 const owned = new Set<Context>()
+const directories = new Set<string>()
 afterEach(async () => {
   await Promise.all([...owned].map(ctx => ctx.fiber.dispose()))
   owned.clear()
+  await Promise.all([...directories].map(dir => rm(dir, { recursive: true, force: true })))
+  directories.clear()
 })
 
 /**
  * Mount the memory rows with the command registrant.
  * @param config - field overrides for the plugin's Config row.
+ * @param options - optional rows, such as the session-query stub.
  * @returns the live context, disposed by the suite.
  */
-async function boot(config: Record<string, unknown> = {}): Promise<Context> {
-  const ctx = await mountMemory({ config, commands: true })
+async function boot(
+  config: Record<string, unknown> = {},
+  options: { readonly sessionQuery?: boolean } = {},
+): Promise<Context> {
+  const ctx = await mountMemory({ config, commands: true, ...options })
   owned.add(ctx)
   return ctx
+}
+
+/** One temporary directory a mirror can be written to, removed by the suite. */
+async function scratch(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'prism-memory-commands-'))
+  directories.add(dir)
+  return dir
 }
 
 /** One settled invocation, reduced to the fields a spec asserts on. */
@@ -139,5 +156,81 @@ describe('the /memory command', () => {
     const report = await run(ctx, agent, '/memory')
     expect(report.kind).toBe('success')
     expect(report.text).toContain('visible 1 record(s)')
+  })
+
+  it('verifies cited evidence end to end and counts an uncited operator claim', async () => {
+    const ctx = await boot({}, { sessionQuery: true })
+    const agent = await createAgent(ctx, 'verify')
+    appendUser(agent, 'I prefer concise answers from now on')
+    await driveTurnStopping(ctx, agent)
+    await run(ctx, agent, '/memory remember an operator claim without a source')
+
+    const settled = await run(ctx, agent, '/memory verify')
+    expect(settled.kind).toBe('success')
+    expect(settled.text).toContain('intact 1')
+    expect(settled.text).toContain('records citing no message: 1')
+  })
+
+  it('reports a drifted source with its reason', async () => {
+    const ctx = await boot({}, { sessionQuery: true })
+    const agent = await createAgent(ctx, 'verify-drift')
+    appendUser(agent, 'the deploy window is tuesday')
+    const anchor = agent.session.deriveMessages().at(-1)
+    if (anchor === undefined) throw new Error('no user message to cite')
+    await ctx.prismMemory.remember({
+      text: 'a claim whose fingerprint was tampered with',
+      evidenceMessage: { id: anchor.id, textHash: 'ff'.repeat(32) },
+    }, agent)
+
+    const settled = await run(ctx, agent, '/memory verify')
+    expect(settled.kind).toBe('success')
+    expect(settled.text).toContain('drifted 1')
+    expect(settled.text).toContain("the cited message's text changed")
+  })
+
+  it('compares two claims and states the preservation rule', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'compare')
+    const first = await ctx.prismMemory.remember({ text: 'the retry budget is three attempts', tags: ['retry'] }, agent)
+    const second = await ctx.prismMemory.remember({
+      text: 'the retry budget is five attempts',
+      tags: ['retry'],
+      supersedes: first.record.id,
+    }, agent)
+
+    const settled = await run(ctx, agent, `/memory compare ${first.record.id} ${second.record.id}`)
+    expect(settled.kind).toBe('success')
+    expect(settled.text).toContain('verdict (mechanical vocabulary, not a decision): conflicting')
+    expect(settled.text).toContain('relation right supersedes left')
+    expect(settled.text).toContain('Conflicting claims are preserved with their conditions')
+  })
+
+  it('audits an existing mirror through export check', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'export-check')
+    await run(ctx, agent, '/memory remember the domain stays at version 1')
+    const dir = await scratch()
+
+    const missing = await run(ctx, agent, `/memory export check ${dir}`)
+    expect(missing.text).toContain('memory.md: missing')
+    expect(missing.text).toContain('memory.index.json: missing')
+
+    await run(ctx, agent, `/memory export ${dir}`)
+    const match = await run(ctx, agent, `/memory export check ${dir}`)
+    expect(match.text).toContain('memory.md: match')
+
+    await run(ctx, agent, '/memory remember a claim written after the mirror was taken')
+    const stale = await run(ctx, agent, `/memory export check ${dir}`)
+    expect(stale.text).toContain('memory.md: stale')
+    expect(stale.text).toContain('Re-run "/memory export" to refresh the mirror.')
+  })
+
+  it('names the verify and compare surfaces in the usage text', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'usage')
+    const refused = await run(ctx, agent, '/memory nonsense-subcommand')
+    expect(refused.kind).toBe('error')
+    expect(refused.text).toContain('verify [limit]')
+    expect(refused.text).toContain('compare <idA> <idB>')
   })
 })

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { apply as applyMenus, inject as injectMenus } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, fireEvent, render } from '@testing-library/react'
@@ -25,6 +26,7 @@ import type {
   ChatFlowInjected, ChatNodeInjected, ChatSnapshot, TranscriptViewRowInjected, UseChatNodeTurnData, UseDisclosure,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { QuotaNoticeInjected } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { UsagePriceEditorInjected, UsagePriceInjected } from '../src/client/contract/usage.ts'
 import type { PerformanceUsageRowInjected } from '../src/client/settings/PerformanceUsageRow.tsx'
 import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../src/chat-settings.ts'
 import { ActivityPill, UsagePill } from '../src/client/chat/StatsPills.tsx'
@@ -44,6 +46,7 @@ const SID = 'session-1' as SessionId
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
+  runtime.ctx.provide('fileDrag', { actions: { prepare: async () => ({ start: () => true, release: () => {} }), reportFailure: () => {} }, read: () => undefined } satisfies import('@deepseek-ai/cordis').Context['fileDrag'])
   const chatSettings = stubConfigForm<ChatSettings>()
   runtime.ctx.provide('configForms', {
     developerTools: { enabled: createSnapshotStore(true) },
@@ -51,6 +54,7 @@ async function bench() {
       ? chatSettings.scope
       : stubConfigForm().scope,
   } as never)
+  runtime.ctx.provide('connection', { state: createSnapshotStore('connected') } as never)
   runtime.ctx.provide('layout', { openRightbar: vi.fn(), closeRightbar: vi.fn() } as never)
   runtime.ctx.provide('sidebarRight', { openResource: vi.fn(), openTab: vi.fn() } as never)
   runtime.ctx.provide('sidebarRightTabs', {
@@ -73,6 +77,8 @@ async function bench() {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
+  runtime.ctx.provide('shortcuts', { catalog: createSnapshotStore([]) })
+  await runtime.mount({ inject: [...injectMenus], apply: applyMenus })
   await runtime.root.declare({
     'main': { kind: 'keyed', scope: 'root' },
     'shell.overlay': { kind: 'list', scope: 'root' },
@@ -92,6 +98,21 @@ async function bench() {
 
 function storeOf(runtime: SlotTestRuntime, key: 'conversation.session' | 'conversation.session.header' | 'conversation.view') {
   return (runtime.slots.entries(key)[0] as { store?: unknown } | undefined)?.store
+}
+
+/** Assert a slot entry injected the shared unit-price hooks seat; slot entries inject faces untyped. */
+function assertUsagePriceHooks(face: object | undefined): asserts face is UsagePriceInjected {
+  if (face === undefined || !('hooks' in face)) {
+    throw new Error('test fixture: the slot entry did not inject the usage-price hooks')
+  }
+}
+
+/** Assert the header entry injected the full editor face (hooks seat plus the setUnitPrice action). */
+function assertUsagePriceFace(face: object | undefined): asserts face is UsagePriceEditorInjected {
+  assertUsagePriceHooks(face)
+  if (!('setUnitPrice' in face)) {
+    throw new Error('test fixture: the slot entry did not inject the usage-price editor face')
+  }
 }
 
 describe('Chat apply wiring', () => {
@@ -150,6 +171,8 @@ describe('Chat apply wiring', () => {
     const view = b.runtime.slots.entries('conversation.view')[0]
     const flow = b.runtime.slots.entries('conversation.chat.flow')[0]
     const assistant = b.runtime.slots.entries('conversation.chat.node').find(entry => entry.options.key === 'assistant-step')
+    const user = b.runtime.slots.entries('conversation.chat.node').find(entry => entry.options.key === 'user')
+    const steering = b.runtime.slots.entries('conversation.chat.node').find(entry => entry.options.key === 'steering')
     const userContent = b.runtime.factoryOf('conversation.chat.user.content')
     expect(userContent).toMatchObject({ scope: 'session', locale: 'chat', component: UserContent })
     expect(userContent.children?.['conversation.chat.user.images']).toMatchObject({ kind: 'single', scope: 'session' })
@@ -161,6 +184,11 @@ describe('Chat apply wiring', () => {
     expect(view?.children?.['conversation.chat.message.images']).toBeUndefined()
     expect(view?.children?.['conversation.chat.user.images']).toBeUndefined()
     expect(flow?.children?.['conversation.chat.node']).toBeDefined()
+    expect(flow?.children?.['conversation.chat.user.before']).toBeUndefined()
+    expect(user?.children?.['conversation.chat.user.before']).toMatchObject({ kind: 'chain', scope: 'session' })
+    expect(steering).toBeDefined()
+    expect(steering?.children?.['conversation.chat.user.before']).toBeUndefined()
+    expect(b.runtime.slots.spec('conversation.chat.user.before')).toMatchObject({ kind: 'chain', scope: 'session' })
     expect(flow?.children?.['conversation.chat.message.images']).toBeUndefined()
     expect(flow?.children?.['conversation.chat.user.images']).toBeUndefined()
     expect(userContent.children?.['conversation.chat.message.images']).toBeUndefined()
@@ -170,6 +198,7 @@ describe('Chat apply wiring', () => {
     await b.chat.dispose()
     expect(b.runtime.slots.spec('conversation.chat.flow')).toBeUndefined()
     expect(b.runtime.slots.spec('conversation.chat.node')).toBeUndefined()
+    expect(b.runtime.slots.spec('conversation.chat.user.before')).toBeUndefined()
     expect(b.runtime.slots.spec('conversation.chat.message.images')).toBeUndefined()
     expect(b.runtime.slots.spec('conversation.chat.user.images')).toBeUndefined()
     expect(() => b.runtime.factoryOf('conversation.chat.user.content')).toThrow('no definition')
@@ -189,6 +218,31 @@ describe('Chat apply wiring', () => {
     expect(winners()).toEqual({ activity: PluginActivity, usage: UsagePill })
     dispose()
     expect(winners()).toEqual({ activity: ActivityPill, usage: UsagePill })
+  })
+
+  it('shares one price store between the header cost reading and the completed-Turn row, and drops both with Chat', async () => {
+    const b = await bench()
+    onTestFinished(() => { localStorage.clear() })
+    const headerIds = (): (string | undefined)[] => b.runtime.slots
+      .entries('conversation.session.header.actions').map(entry => entry.options.id)
+    const header = b.runtime.slots.entries('conversation.session.header.actions')
+      .find(entry => entry.options.id === 'usage-cost')!
+    const tail = b.runtime.slots.entries('conversation.chat.node')
+      .find(entry => entry.options.key === 'turn-tail')!
+    const face = header.inject!()
+    assertUsagePriceFace(face)
+    const tailFace = tail.inject!()
+    assertUsagePriceHooks(tailFace)
+    expect(face.hooks.unitPrices).toBe(tailFace.hooks.unitPrices)
+    expect(face.hooks.unitPrices.getSnapshot()).toEqual({})
+
+    face.setUnitPrice('deepseek-flash', { miss: 1, hit: 0.5, output: 2 })
+    expect(face.hooks.unitPrices.getSnapshot()).toEqual({ 'deepseek-flash': { miss: 1, hit: 0.5, output: 2 } })
+
+    expect(headerIds()).toContain('usage-cost')
+    await b.chat.dispose()
+    expect(headerIds()).not.toContain('usage-cost')
+    expect(b.runtime.slots.entries('conversation.chat.node')).toHaveLength(0)
   })
 
   it.each([

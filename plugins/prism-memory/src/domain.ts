@@ -24,6 +24,13 @@ export const memoryEvidenceSchema = zod.object({
   messageId: zod.string().nullable(),
   /** Free-form note; `memory_forget` and `/memory reject` record their reason here. */
   note: zod.string().nullable(),
+  /**
+   * SHA-256 of the model-visible text of the cited message at write time, or
+   * `null` when the record cites no message. `/memory verify` recomputes it to
+   * report whether the cited source still says what it said. Absent on a record
+   * written before fingerprints existed.
+   */
+  textHash: zod.string().nullable().optional(),
 })
 
 /** Every durable field of one memory record. */
@@ -91,6 +98,13 @@ export const memoryRecordSchema = zod.object({
   corroborations: zod.number().optional(),
   /** When a consolidation pass confirmed this record's corroboration. */
   corroboratedAt: zod.number().nullable().optional(),
+  /**
+   * Records this claim was derived from, in the order the derivation listed
+   * them. Written only by a consolidation digest over its member claims, so a
+   * cycle cannot form and none is checked. Absent on a claim written by any
+   * other producer.
+   */
+  parents: zod.array(zod.string()).optional(),
 })
 
 /** One stored memory record as it exists on the medium. */

@@ -107,7 +107,11 @@ fn sanitize_rows(rows: Vec<Yaml>) -> Vec<Yaml> {
 /// win-terminal-inspector copy AND its patch row are gated on the plugin
 /// being present in the runtime: mac/linux bundles do not ship it, and an
 /// entry the loader cannot resolve crashes the hub on every startup.
-pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
+pub(crate) fn ensure_default_plugins(
+    app: &AppHandle,
+    node: &Path,
+    dsh_bin: &Path,
+) -> Result<(), String> {
     let home = dsh_home();
     let profile = profile_web_dir(&home);
     // The patch layer below writes into the profile directory. Windows used
@@ -115,6 +119,15 @@ pub(crate) fn ensure_default_plugins(app: &AppHandle) -> Result<(), String> {
     // did, so a fresh profile left the patch write failing with ENOENT and
     // the hub never spawning (blank shell window, no logs).
     fs::create_dir_all(&profile).map_err(|e| e.to_string())?;
+    // The bundle-layer merge below extends the manifest `dsh` writes on its
+    // first boot, but seeding runs before that boot: a home that has never
+    // started dsh has no manifest, and the merge used to fail with ENOENT
+    // before the hub was ever spawned. Write the scaffold the CLI's own
+    // `initProfile` writes (manifest, patch layer, pnpm settings) instead of
+    // duplicating the web template here.
+    if !profile.join("package.json").exists() {
+        ensure_profile_scaffold(&profile, node, dsh_bin)?;
+    }
     let runtime_plugins = match runtime_plugins_dir(app) {
         Ok(dir) => dir,
         Err(_) => return Ok(()), // dev without bundled plugins: nothing to preinstall
@@ -306,11 +319,52 @@ fn ensure_local_bundles(
 /// entry that names it, because the loader fails hard on a name it cannot
 /// resolve. Only retired local bundles are listed here: plugin-center installs
 /// write their own names into the same array.
-const RETIRED_LOCAL_BUNDLES: &[&str] = &["dsh-tauri"];
+const RETIRED_LOCAL_BUNDLES: &[&str] = &["dsh-tauri", "dsh-agent-progress"];
 
 /// Whether one profile bundle entry names a retired local bundle.
 fn is_retired_local_bundle(name: &str) -> bool {
     RETIRED_LOCAL_BUNDLES.contains(&name)
+}
+
+/// Write the web profile scaffold a home gets on its first `dsh web` boot:
+/// the manifest with the web template's bundle layers, the user patch layer,
+/// and the pnpm settings out-of-tree plugins need. Seeding runs before that
+/// boot, so a home that has never started dsh has none of the three yet.
+///
+/// `initProfile` is resolved from the deployed closure (`dsh_bin`'s package
+/// root), so the template stays owned by the CLI that will boot the profile
+/// instead of being copied here.
+///
+/// # Errors
+///
+/// Returns the spawn failure or the child's stderr when the scaffold cannot
+/// be written; seeding then stops instead of merging into a missing manifest.
+fn ensure_profile_scaffold(profile: &Path, node: &Path, dsh_bin: &Path) -> Result<(), String> {
+    const SCRIPT: &str = concat!(
+        "import { initProfile } from '@deepseek-ai/dsh-app-boot';\n",
+        "import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles';\n",
+        "initProfile(process.argv[1], PROFILE_TEMPLATES.web.bundles);\n",
+    );
+    let closure = dsh_bin
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| format!("cannot derive closure root from {}", dsh_bin.display()))?;
+    let output = std::process::Command::new(node)
+        .arg("--input-type=module")
+        .arg("-e")
+        .arg(SCRIPT)
+        .arg(profile)
+        .current_dir(closure)
+        .output()
+        .map_err(|error| format!("profile scaffold: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "profile scaffold failed ({}): {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
 }
 
 /// Select bundled local packages as profile bundle layers without disturbing
@@ -601,8 +655,8 @@ fn record_installation(home: &Path, runtime_plugins: &Path) {
 #[cfg(test)]
 mod seed_tests {
     use super::{
-        copy_is_stale, ensure_local_bundles, installation_changed, place_launcher_copy,
-        record_installation,
+        copy_is_stale, ensure_local_bundles, ensure_profile_bundles, installation_changed,
+        place_launcher_copy, record_installation,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -794,6 +848,33 @@ mod seed_tests {
         assert!(copy_is_stale(&runtime_plugins.join("example"), &identical, true));
         record_installation(&root, &runtime_plugins);
         assert!(!installation_changed(&root, &runtime_plugins));
+    }
+
+    #[test]
+    fn local_bundles_extend_the_profile_manifest_in_place() {
+        let root = scratch("bundles");
+        let profile = root.join("profiles").join("web");
+        fs::create_dir_all(&profile).expect("profile");
+        fs::write(
+            profile.join("package.json"),
+            "{\"name\":\"dsh-profile-web\",\"private\":true,\"dependencies\":{},\"dsh\":{\"profile\":{\"bundles\":[\"@deepseek-ai/dsh-base\",\"@deepseek-ai/dsh-web-app\"]}}}\n",
+        )
+        .expect("manifest");
+
+        ensure_profile_bundles(&profile, &["aegis".to_owned(), "prism-about".to_owned()])
+            .expect("merged");
+
+        let written: serde_json::Value =
+            serde_json::from_str(&manifest(&profile)).expect("manifest is JSON");
+        assert_eq!(
+            written["dsh"]["profile"]["bundles"],
+            serde_json::json!([
+                "@deepseek-ai/dsh-base",
+                "@deepseek-ai/dsh-web-app",
+                "aegis",
+                "prism-about"
+            ])
+        );
     }
 
     /// A directory link for the guard case. A junction needs no privilege, and

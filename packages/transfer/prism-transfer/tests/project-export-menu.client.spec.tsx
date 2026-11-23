@@ -5,6 +5,8 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { ProjectExportMenuItem } from '../src/client/ProjectExportMenuItem.tsx'
 import type { ProjectExportMenuProps } from '../src/client/slots.ts'
 import { zh } from '../src/client/locales.ts'
@@ -20,10 +22,10 @@ describe('ProjectExportMenuItem', () => {
     })
     try {
       const props = {
-        workspaceId: 'w1',
+        workspaceId: 'w1' as WorkspaceId,
         useMenuOpenState: () => [true, setMenuOpen],
-        t: (key: keyof typeof zh) => zh[key],
-      } as unknown as ProjectExportMenuProps
+        t: makeTranslate(zh),
+      } as ProjectExportMenuProps
       render(<ProjectExportMenuItem {...props} />)
 
       fireEvent.click(screen.getByRole('menuitem', { name: zh.menuExportProject }))

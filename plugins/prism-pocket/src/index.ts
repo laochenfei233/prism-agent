@@ -20,20 +20,27 @@ import { deliverBark, deliverWebPush } from './push/sender.ts'
 import { installPocketTriggers, type PocketDeliverer } from './push/triggers.ts'
 import { SubscriptionStore } from './push/store.ts'
 import { detectTailscale } from './tailscale.ts'
+import { detectCloudflared } from './tunnel.ts'
+import { detectLanAddress } from './lan.ts'
+import { RemotePrefsStore, readRemotePrefs } from './remote-prefs.ts'
 import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
-import { phoneAccess, probeVerdict } from './commands.ts'
+import { lanAccess, phoneAccess, probeVerdict, tunnelAccess } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
 import { BotStore } from './bots/store.ts'
 import { BotSupervisor } from './bots/supervisor.ts'
-import { BotConversations, readBotHostServices } from './bots/binding.ts'
+import { BotConversations, operatorAuthorized, readBotHostServices } from './bots/binding.ts'
 import { BotOutbox, assistantTextOf } from './bots/outbox.ts'
 import { BotAskRelay } from './bots/asks.ts'
+import { InboundDedup } from './bots/shared/dedup.ts'
 import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, runBotAction, type BotRouteDeps } from './bots/routes.ts'
 import type { BotChannelId, BotInbound } from './bots/types.ts'
 
 export { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
-export { isOriginTrusted, phoneAccess, phoneTarget, remoteCommands } from './remote-status.ts'
+export { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './remote-status.ts'
 export { detectTailscale, parseTailscaleStatus } from './tailscale.ts'
+export { detectCloudflared, versionOf } from './tunnel.ts'
+export { detectLanAddress } from './lan.ts'
+export { RemotePrefsStore, readRemotePrefs, readTunnelUrl } from './remote-prefs.ts'
 export { encryptPushPayload } from './push/encrypt.ts'
 export { generateVapidKeys, loadOrCreateVapidKeys, vapidAuthorization } from './push/keys.ts'
 export { deliverBark, deliverWebPush } from './push/sender.ts'
@@ -81,6 +88,7 @@ interface ConnectionRoute {
 /** Structural view of the startup-provided web surface values. */
 interface WebStartupLike {
   readonly host?: string
+  readonly additionalHosts?: readonly string[]
   readonly port?: number
   readonly publicUrl?: string
   readonly trustedHosts?: readonly string[]
@@ -93,6 +101,7 @@ interface PocketRuntime {
   webserver: WebServerLike
   material: Promise<VapidMaterial>
   store: SubscriptionStore
+  prefs: RemotePrefsStore
   config: Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
 }
 
@@ -103,12 +112,17 @@ interface PocketRuntime {
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = Config(config) as Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
-  const connection = Reflect.get(ctx, 'connection') as ConnectionRoute
-  const webserver = Reflect.get(ctx, 'webServer') as WebServerLike
-  const webStartup = Reflect.get(ctx, 'webStartup') as WebStartupLike
+  // `ctx.get` reads without the inject requirement; the context proxy rejects
+  // undeclared `Reflect.get` access since the cordis resync.
+  const connection = ctx.get('connection') as ConnectionRoute
+  const webserver = ctx.get('webServer') as WebServerLike
+  const webStartup = ctx.get('webStartup') as WebStartupLike
   const runtime: PocketRuntime = {
     surface: {
       host: webStartup.host ?? '127.0.0.1',
+      ...(webStartup.additionalHosts !== undefined && webStartup.additionalHosts.length > 0
+        ? { additionalHosts: [...webStartup.additionalHosts] }
+        : {}),
       port: webStartup.port ?? 3080,
       ...(webStartup.publicUrl !== undefined ? { publicUrl: webStartup.publicUrl } : {}),
       trustedHosts: [...(webStartup.trustedHosts ?? [])],
@@ -117,14 +131,15 @@ export function apply(ctx: Context, config: Config = {}): void {
     webserver,
     material: loadOrCreateVapidKeys(join(homeOf(ctx), 'pocket', 'keys.json')),
     store: new SubscriptionStore(join(homeOf(ctx), 'pocket', 'subscriptions.json')),
+    prefs: new RemotePrefsStore(join(homeOf(ctx), 'pocket', 'remote.json')),
     config: resolved,
   }
 
   ctx.effect(() => connection.fetch.register({
     path: POCKET_REMOTE_PATH,
-    methods: ['GET'],
+    methods: ['GET', 'POST'],
     requestBody: 'buffered',
-    fetch: async () => jsonResponse(await statusOf(runtime)),
+    fetch: async request => remoteResponse(request, runtime),
   }), 'pocket: remote status')
 
   ctx.effect(() => connection.fetch.register({
@@ -180,6 +195,7 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
   // harness's fail-loud policy would exit the process).
   const relay = new BotAskRelay({
     targetOf: sessionId => conversations.targetOf(sessionId),
+    authorized: (channel, chatId, senderId) => operatorAuthorized(store.entry(channel), chatId, senderId),
     send: async (channel, chatId, text) => {
       try {
         await send(channel, chatId, text)
@@ -194,10 +210,15 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
     warn,
   })
 
+  // One replay filter for both entry paths (adapter hooks and callback routes).
+  const dedup = new InboundDedup()
+
   const deliverInbound = async (channel: BotChannelId, message: BotInbound): Promise<void> => {
     try {
+      // An empty messageId skips dedup: the platform gave nothing to key on.
+      if (message.messageId.length > 0 && !dedup.first(`${channel}:${message.messageId}`)) return
       const entry = store.entry(channel)
-      if (entry?.sessionId !== undefined && relay.consume(channel, message.chatId, entry.sessionId, message.text)) return
+      if (entry?.sessionId !== undefined && relay.consume(channel, message.chatId, entry.sessionId, message.senderId, message.text)) return
       await conversations.onInbound(channel, message)
     } catch (cause: unknown) {
       warn(cause instanceof Error ? cause.message : String(cause))
@@ -313,13 +334,41 @@ async function deliverToSubscription(
 /** How long one request to the advertised phone address may take before it counts as unreachable. */
 const PHONE_PROBE_TIMEOUT_MS = 2500
 
-/** Assemble the remote-status body: surface facts, tailscale probe, pocket state. */
+/** Answer one remote-status request: GET reads, POST persists the selection. */
+async function remoteResponse(request: Request, runtime: PocketRuntime): Promise<Response> {
+  if (request.method === 'GET') return jsonResponse(await statusOf(runtime))
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return jsonResponse({ error: 'invalid JSON body' }, 400)
+  }
+  const prefs = readRemotePrefs(body)
+  if (prefs === undefined) {
+    return jsonResponse({ error: 'expected { provider: "tailscale" | "tunnel", tunnelUrl?: "https://…" }' }, 400)
+  }
+  runtime.prefs.write(prefs)
+  return jsonResponse(await statusOf(runtime))
+}
+
+/** Assemble the remote-status body: surface facts, the probes, and the selected transport. */
 async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
-  const tailscale = await detectTailscale()
-  const phone = await resolvePhone(phoneAccess(runtime.surface, tailscale))
+  const [tailscale, cloudflared] = await Promise.all([detectTailscale(), detectCloudflared()])
+  const lan = detectLanAddress()
+  const remote = runtime.prefs.read()
+  const tunnelUrl = remote.tunnelUrl ?? runtime.surface.publicUrl
+  const access = remote.provider === 'tunnel'
+    ? tunnelAccess(runtime.surface, tunnelUrl)
+    : remote.provider === 'lan'
+      ? lanAccess(runtime.surface, lan.ipv4)
+      : phoneAccess(runtime.surface, tailscale)
+  const phone = await resolvePhone(access)
   return {
     server: runtime.surface,
+    lan,
     tailscale,
+    cloudflared,
+    remote: { provider: remote.provider, ...(tunnelUrl !== undefined ? { tunnelUrl } : {}) },
     phone: phoneOf(runtime.connection, phone),
     pocket: {
       pushEnabled: runtime.config.pushEnabled,
@@ -440,7 +489,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 /** Read the harness home from the boot-provided path helper. */
 function homeOf(ctx: Context): string {
-  const provider: unknown = Reflect.get(ctx, 'dshHomePath')
+  const provider: unknown = ctx.get('dshHomePath')
   if (typeof provider !== 'function') {
     throw new Error('pocket: the dshHomePath service is required to locate pocket storage')
   }

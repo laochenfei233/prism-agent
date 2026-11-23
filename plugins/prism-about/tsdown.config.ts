@@ -8,10 +8,14 @@
  * baseline module resolved through the injected `require` instead of being
  * inlined into a second copy.
  */
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'tsdown'
 
 /** Package name; also the module-table row id the browser half registers under. */
 const ID = 'prism-about'
+
+/** The repository version, embedded into the browser half for the About page. */
+const CLIENT_VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version as string
 
 /** Shell-seeded specifiers the browser half must not inline (see `packages/client/web/src/platform.ts`). */
 const BASELINE = [
@@ -50,6 +54,7 @@ export default defineConfig([
     clean: false,
     sourcemap: true,
     fixedExtension: false,
+    define: { 'process.env.DSH_CLIENT_VERSION': JSON.stringify(CLIENT_VERSION) },
     deps: { neverBundle: BASELINE },
     outputOptions: {
       entryFileNames: 'client.js',

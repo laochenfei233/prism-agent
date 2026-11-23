@@ -18,8 +18,8 @@ import { mergeBotConfig, readBotConfig, summarizeConfig } from './validate.ts'
 import { readWechatCallback, verifyWechatCallback, resolveWechatVerifyEcho } from './adapters/wechat.ts'
 import { readWecomCallback, resolveWecomVerifyEcho } from './adapters/wecom.ts'
 import { readWhatsappMessages, resolveWhatsappVerifyChallenge, verifyWhatsappSignature } from './adapters/whatsapp.ts'
-import type { WechatConfig, WecomConfig, WhatsappConfig } from './types.ts'
-import { callbackSignature, timestampFresh } from './shared/sign.ts'
+import type { BotInbound, WechatConfig, WecomConfig, WhatsappConfig } from './types.ts'
+import { callbackSignature, timestampFresh, timingSafeStringEquals } from './shared/sign.ts'
 import { readXmlField } from './shared/xml.ts'
 
 /** The authenticated list/action route (defined in `src/routes.ts` beside its siblings). */
@@ -43,19 +43,22 @@ export interface BotChannelView {
 /** What the list route answers. */
 export interface BotListView {
   readonly bots: readonly BotChannelView[]
+  /** The active pairing code the page displays beside the QR. */
+  readonly pairingCode: string
 }
 
 /** How the routes deliver inbound chat messages (ask relay already consumed). */
 export interface BotRouteDeps {
   readonly store: BotStore
   readonly supervisor: BotSupervisor
-  readonly deliverInbound: (channel: BotChannelId, message: { readonly chatId: string; readonly text: string }) => Promise<void>
+  readonly deliverInbound: (channel: BotChannelId, message: Pick<BotInbound, 'chatId' | 'senderId' | 'messageId' | 'text'>) => Promise<void>
   readonly warn: (detail: string) => void
 }
 
 /** Build every channel's view for the list route. */
 export function listView(deps: Pick<BotRouteDeps, 'store' | 'supervisor'>): BotListView {
   return {
+    pairingCode: deps.store.pairingCode(),
     bots: BOT_CHANNELS.map(channel => {
       const entry = deps.store.entry(channel)
       const state = deps.supervisor.state(channel)
@@ -87,32 +90,27 @@ function plainValues(channel: BotChannelId, config: import('./types.ts').BotConf
   return values
 }
 
-/** The actions the POST route accepts. */
-type BotAction = 'config' | 'start' | 'stop' | 'test'
-
-/** The POST body, validated before use. */
-interface BotActionRequest {
-  readonly channel: BotChannelId
-  readonly action: BotAction
-  readonly config?: unknown
-  readonly enabled?: boolean
-}
+/** The POST body, validated before use; `rotatePairing` is channel-less. */
+export type BotActionRequest =
+  | { readonly action: 'rotatePairing' }
+  | { readonly action: 'config'; readonly channel: BotChannelId; readonly config: unknown; readonly enabled: boolean }
+  | { readonly action: 'start' | 'stop' | 'test'; readonly channel: BotChannelId }
 
 /** Read one action request; anything else is a 400. */
 export function readBotAction(value: unknown): BotActionRequest {
   if (typeof value !== 'object' || value === null) throw new Error('expected a JSON body')
   const record = value as { channel?: unknown; action?: unknown; config?: unknown; enabled?: unknown }
+  if (record.action === 'rotatePairing') return { action: 'rotatePairing' }
   if (typeof record.channel !== 'string' || !BOT_CHANNELS.includes(record.channel as BotChannelId)) {
     throw new Error(`unknown channel: ${String(record.channel)}`)
   }
-  if (record.action !== 'config' && record.action !== 'start' && record.action !== 'stop' && record.action !== 'test') {
-    throw new Error(`unknown action: ${String(record.action)}`)
+  if (record.action === 'config') {
+    return { action: 'config', channel: record.channel as BotChannelId, config: record.config, enabled: record.enabled === true }
   }
-  return {
-    channel: record.channel as BotChannelId,
-    action: record.action,
-    ...(record.action === 'config' ? { config: record.config, enabled: record.enabled === true } : {}),
+  if (record.action === 'start' || record.action === 'stop' || record.action === 'test') {
+    return { action: record.action, channel: record.channel as BotChannelId }
   }
+  throw new Error(`unknown action: ${String(record.action)}`)
 }
 
 /**
@@ -122,6 +120,10 @@ export function readBotAction(value: unknown): BotActionRequest {
  * @returns the response body; `error` carries the failure detail when one applies.
  */
 export async function runBotAction(request: BotActionRequest, deps: BotRouteDeps): Promise<unknown> {
+  if (request.action === 'rotatePairing') {
+    deps.store.rotatePairingCode()
+    return listView(deps)
+  }
   const { channel, action } = request
   if (action === 'config') {
     const stored = deps.store.config(channel)
@@ -217,12 +219,12 @@ export function registerBotCallbackRoutes(
     const encrypt = readXmlField(body, 'Encrypt') ?? ''
     const encryptedMode = encrypt.length > 0
     const signatureMatches = verifyWechatCallback(config.token, signature, timestamp, nonce)
-      || (encryptedMode && callbackSignatureOf(config.token, timestamp, nonce, encrypt) === signature)
+      || (encryptedMode && timingSafeStringEquals(callbackSignatureOf(config.token, timestamp, nonce, encrypt), signature))
     if (!signatureMatches || !timestampFresh(timestamp)) return { status: 403, body: 'signature mismatch' }
     if (!encryptedMode) return { status: 200, body: 'success' }
     const message = readWechatCallback(config, body)
     if (message?.content !== undefined && message.content.trim().length > 0) {
-      await deps.deliverInbound('wechat', { chatId: message.from, text: message.content.trim() })
+      await deps.deliverInbound('wechat', { chatId: message.from, senderId: message.from, messageId: message.msgId ?? '', text: message.content.trim() })
     }
     return { status: 200, body: 'success' }
   })
@@ -236,7 +238,7 @@ export function registerBotCallbackRoutes(
     if (request.method === 'GET') {
       const echo = url.searchParams.get('echostr') ?? ''
       const encrypt = echo
-      if (callbackSignatureOf(config.token, timestamp, nonce, encrypt) !== msgSignature || !timestampFresh(timestamp)) {
+      if (!timingSafeStringEquals(callbackSignatureOf(config.token, timestamp, nonce, encrypt), msgSignature) || !timestampFresh(timestamp)) {
         return { status: 403, body: 'signature mismatch' }
       }
       const decrypted = resolveWecomVerifyEcho(config, echo)
@@ -244,11 +246,11 @@ export function registerBotCallbackRoutes(
       return { status: 200, body: decrypted }
     }
     const encrypt = readXmlField(body, 'Encrypt') ?? ''
-    if (callbackSignatureOf(config.token, timestamp, nonce, encrypt) !== msgSignature || !timestampFresh(timestamp)) {
+    if (!timingSafeStringEquals(callbackSignatureOf(config.token, timestamp, nonce, encrypt), msgSignature) || !timestampFresh(timestamp)) {
       return { status: 403, body: 'signature mismatch' }
     }
     const message = readWecomCallback(config, encrypt)
-    if (message !== undefined) await deps.deliverInbound('wecom', { chatId: message.from, text: message.content })
+    if (message !== undefined) await deps.deliverInbound('wecom', { chatId: message.from, senderId: message.from, messageId: message.msgId ?? '', text: message.content })
     return { status: 200, body: 'success' }
   })
 
@@ -266,7 +268,7 @@ export function registerBotCallbackRoutes(
     }
     try {
       for (const message of readWhatsappMessages(JSON.parse(body))) {
-        await deps.deliverInbound('whatsapp', { chatId: message.from, text: message.text })
+        await deps.deliverInbound('whatsapp', { chatId: message.from, senderId: message.from, messageId: message.id, text: message.text })
       }
     } catch (cause: unknown) {
       // A body that fails to parse is answered 200 so Meta stops retrying; the detail is logged.

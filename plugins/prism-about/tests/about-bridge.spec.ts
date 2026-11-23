@@ -1,6 +1,11 @@
 /** Carrier detection and view derivation for the About section. */
 import { afterEach, describe, expect, it } from 'vitest'
-import { deriveButtonState, readCarrier, type DesktopUpdateCarrier } from '../src/client/about-bridge.ts'
+import {
+  deriveButtonState,
+  deriveSourceView,
+  readCarrier,
+  type DesktopUpdateCarrier,
+} from '../src/client/about-bridge.ts'
 
 /** Installs one carrier-shaped stub on the global for a test. */
 function stubCarrier(value: unknown): void {
@@ -67,5 +72,34 @@ describe('deriveButtonState', () => {
   it('offers the update and retry actions', () => {
     expect(deriveButtonState('available', false)).toBe('available')
     expect(deriveButtonState('error', true)).toBe('error')
+  })
+})
+
+describe('deriveSourceView', () => {
+  it('shows the mirror host as display-only text when it is configured', () => {
+    const view = deriveSourceView({
+      host: 'prism.xyern.com',
+      repo: 'laochenfei233/prism-agent',
+      releaseUrl: 'https://github.com/laochenfei233/prism-agent/releases',
+    })
+    expect(view).toEqual({ badgeKey: 'sourceMirror', href: '', label: 'prism.xyern.com' })
+  })
+
+  it('keeps the repository link on a bare GitHub configuration', () => {
+    const view = deriveSourceView({
+      repo: 'laochenfei233/prism-agent',
+      releaseUrl: 'https://github.com/laochenfei233/prism-agent/releases',
+    })
+    expect(view).toEqual({
+      badgeKey: 'sourceGitHub',
+      href: 'https://github.com/laochenfei233/prism-agent/releases',
+      label: 'laochenfei233/prism-agent',
+    })
+  })
+
+  it('falls back to the unavailable state without recognizable facts', () => {
+    expect(deriveSourceView(undefined)).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
+    expect(deriveSourceView({})).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
+    expect(deriveSourceView({ repo: '', releaseUrl: '' })).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
   })
 })

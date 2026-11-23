@@ -1,6 +1,6 @@
 - dialog "设置":
+  - text: 设置
   - navigation:
-    - text: 设置
     - button "通用设置"
     - button "外观"
     - button "模型"

@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-transfer",
   "description": "Export and import projects (workspace folder plus attached sessions) and settings values as archive files",
-  "version": "0.2.1-rc.4",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },

@@ -27,10 +27,12 @@
   gap: 6px;
 }
 
+@media (hover: hover) {
 .reject:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
-  border-color: transparent;
+    background: var(--dsw-alias-interactive-bg-hover-danger);
+    color: var(--dsw-alias-state-error-primary);
+    border-color: transparent;
+  }
 }
 
 .hint {

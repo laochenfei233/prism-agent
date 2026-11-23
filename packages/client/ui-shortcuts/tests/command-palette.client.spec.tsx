@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import type { ShortcutCatalogEntry, ShortcutCommandId, ShortcutContext, ShortcutResolution } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { CommandPalette } from '../src/client/CommandPalette.tsx'
 import { createCommandPaletteStore } from '../src/client/palette-store.ts'
 import { en } from '../src/client/locales.ts'
@@ -18,11 +18,11 @@ const row = (id: string, label: string, aliases: readonly string[] = [], keys: r
 function fixture(rows: readonly ShortcutCatalogEntry[]) {
   const store = createCommandPaletteStore().create()
   const catalog = createSnapshotStore<readonly ShortcutCatalogEntry[]>(rows)
-  const invoke = vi.fn<(id: ShortcutCommandId, context: unknown) => { status: string; reason?: string } | undefined>(
-    () => ({ status: 'handled' }),
+  const invoke = vi.fn<(id: ShortcutCommandId, context: ShortcutContext) => ShortcutResolution | undefined>(
+    () => ({ status: 'handled', run: () => {} }),
   )
   const props = { actions: store.actions, useStore: bindSnapshotSelector(store), useCatalog: bindSnapshotSelector(catalog),
-    invoke, t: makeTranslate(en) } as unknown as Parameters<typeof CommandPalette>[0]
+    invoke, t: makeTranslate(en) } as Parameters<typeof CommandPalette>[0]
   const view = render(<CommandPalette {...props} />)
   return { store, catalog, invoke, view }
 }

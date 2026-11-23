@@ -81,7 +81,7 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 
 ### 应用内更新器（update.rs + prism-about）
 更新链 = `tauri-plugin-updater`（下载/验签/拉起安装器）+ `src/update.rs`（状态机：三条 `prism_*` 命令、`prism://update-state` 事件、`update-state.json` 持久化、启动 30s 静默检查）+ 宿主桥（bundle 期注入 `globalThis.dshDesktop`，`protocolVersion: 1`）+ `plugins/prism-about`（设置·关于节）。
-- **更新源钉死**：`tauri.conf.json` endpoint = `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`（永远解析到最新已发布 release 的资产）；无自定义源入口。draft release 对该 URL 不可见。
+- **更新源钉死**：`tauri.conf.json` endpoints = 国内镜像 `https://cdn.xyern.com/prism-agent/updates/latest.json` 在前（关于页显示官方地址 `prism.xyern.com`，显示/实际有意分离，见 update.rs 的 `MIRROR_*` 常量）+ GitHub Releases `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json` 兜底（按序尝试，首个成功生效）；无自定义源入口。draft release 对 GitHub URL 不可见。
 - **签名**：公钥入库，私钥在 `~/.prism-updater/prism-updater.key`（无口令）；CI secret `TAURI_SIGNING_PRIVATE_KEY`，本机 `pnpm tauri build` 也要设（`tauri dev` 不用）。`createUpdaterArtifacts: true` 首个 release 之前，应用内检查报「无法连接更新源」属预期。
 - **安装序列**（`RunEvent::Exit` 在 `std::process::exit` 时不触发）：先 `download()`（进度按整百分比节流，dsh 仍运行）→ `DshHandle::stop()` → `install(bytes)`；Windows 上插件拉起安装器后直接退出进程，安装器走既有 `--quit` 钩子链并以 `restart_after_install`（默认 true）重启应用。
 - **桥白名单**：壳页只放行三条 `prism_*` 命令；iframe 是 web 内容，绝不做成通用 invoke 中继。`install` 的 RPC 不设超时——成功路径进程即退，回包永不到达，进度靠事件。

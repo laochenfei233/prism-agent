@@ -5,9 +5,10 @@
  * injects only while active (`html.prism-active`).
  *
  * Every selector anchors on a `[data-slot="<key>"]` wrapper the app renders
- * for its slots — the documented addressable seam — or on the plugin's own
- * `.prism-*` classes. When the app renames a seam, the rule simply stops
- * matching; nothing breaks.
+ * for its slots — the documented addressable seam — on the settings shell's
+ * stable `dsh-settings-dialog*` classes (ui-settings-general's styling seam
+ * for out-of-tree stylesheets), or on the plugin's own `.prism-*` classes.
+ * When the app renames a seam, the rule simply stops matching; nothing breaks.
  *
  * @module @prism/prism-pocket/client/css
  */
@@ -20,36 +21,11 @@ html.prism-active {
   -webkit-text-size-adjust: 100%;
 }
 
-/* The drawer: the sidebar leaves the column flow and covers the viewport.
-   The slot anchor renders display:contents, so it is restored to a real box
-   here — otherwise the fixed positioning would have nothing to position. */
-html.prism-active.prism-drawer-open [data-slot="sidebar"] {
-  /* The anchor's inline display:contents only yields to !important. */
-  display: block !important;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: min(82vw, 360px);
-  height: 100dvh;
-  z-index: 100;
-  overflow-y: auto;
-  box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.prism-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgb(0 0 0 / 0.45);
-  opacity: 0;
-  transition: opacity 0.22s ease;
-  pointer-events: none;
-}
-html.prism-active.prism-drawer-open .prism-backdrop {
-  opacity: 1;
-  pointer-events: auto;
+/* Buttons keep their content width: a flex sibling allowed to shrink wraps
+   its label mid-word (the data section's change-location button was the
+   first victim). Rows that need to wrap carry flex-wrap of their own. */
+html.prism-active .dsh-settings-dialog button {
+  flex-shrink: 0;
 }
 
 /* The soft keyboard: the header yields, the dock stays. */
@@ -465,6 +441,5 @@ select.prism-input { height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prism-card { animation: none; }
-  .prism-backdrop { transition: none; }
 }
 `

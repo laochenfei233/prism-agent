@@ -65,6 +65,7 @@ export class OpenAiSpeechProvider implements SpeechProvider {
       languages: options.languages,
       model: options.model,
       ...models.length === 0 ? {} : { models },
+      maxAudioSeconds: options.maxDurationSeconds,
     }
     this.streaming = new OpenAiStreaming(options)
   }

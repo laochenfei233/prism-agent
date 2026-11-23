@@ -91,6 +91,7 @@ describe('the OpenAI-compatible recognizer composition', () => {
       location: 'cloud',
       languages: ['auto'],
       model: 'whisper-1',
+      maxAudioSeconds: 3600,
     }])
   }, 60_000)
 
