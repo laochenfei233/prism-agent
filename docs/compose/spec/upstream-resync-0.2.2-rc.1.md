@@ -62,7 +62,7 @@ The user's explicit acceptance for this delivery: every `plugins/<name>` must st
 ## [S3] Scope
 
 - In scope: the rc.4→0.2.2-rc.1 delta replay via synthetic merge, collision resolution per S2.2, generated artifacts and version fields per S2.3, the divergence index anchor update, and source-level plugin install verification per S2.4.
-- Out of scope: pushing either repository; desktop installer packaging; rebasing the other active branches (`feat/prism-memory-provenance`'s uncommitted work, `chore/tauri-rust-upgrade`, the `prism-guardrails` and `subagent-job-bridge` worktrees) onto the resync result.
+- Out of scope: pushing either repository; desktop installer packaging; rebasing the other active branches (the uncommitted memory-audit work, `chore/tauri-rust-upgrade`, the `prism-guardrails` and `subagent-job-bridge` worktrees) onto the resync result.
 
 ## Tasks
 

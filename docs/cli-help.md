@@ -184,6 +184,9 @@ Options:
   --host <host>                  bind address: one concrete IPv4 or IPv6 literal
                                  of a local interface; wildcard addresses are
                                  rejected
+  --bind-lan                     also bind the machine's own private IPv4
+                                 addresses (192.168/10/172.16-31), resolved at
+                                 startup; requires an explicit --port
   --no-open                      do not open the Web UI in the default browser
   --port <port>                  listen port; pass 0 to let the OS pick a free
                                  one
@@ -203,6 +206,7 @@ Examples:
   dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
   dsh --profile web --host 10.0.0.7          bind one local interface address
+  dsh --profile web --bind-lan --port 8080   also serve the machine's private IPv4 addresses on port 8080
   dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
                                              advertise a prefix-stripping HTTPS proxy entry and admit its authority
   dsh --profile web --tls-cert ./server-chain.pem --tls-key ./server-key.pem

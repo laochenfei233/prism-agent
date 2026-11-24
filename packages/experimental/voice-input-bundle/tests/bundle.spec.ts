@@ -9,9 +9,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import * as yaml from 'js-yaml'
 import { Context } from '@deepseek-ai/cordis'
-import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+import { parseEntryYaml } from '@deepseek-ai/cordis-plugin-include'
 import SpeechToText from '@deepseek-ai/dsh-experimental-speech-to-text'
 import * as DashScope from '@deepseek-ai/dsh-experimental-speech-to-text-dashscope'
 import * as Plugin from '@deepseek-ai/dsh-experimental-speech-to-text-http'
@@ -33,10 +32,7 @@ function insertedRows(): Row[] {
     dsh?: { bundle?: { patch?: string } }
   }
   expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
-  const parsed = yaml.load(
-    readFileSync(resolve(root, manifest.dsh!.bundle!.patch!), 'utf8'),
-    { schema: entryListSchema },
-  )
+  const parsed = parseEntryYaml(readFileSync(resolve(root, manifest.dsh!.bundle!.patch!), 'utf8'))
   if (!Array.isArray(parsed)) throw new TypeError('the voice-input patch must parse to a patch list')
   const rows = (parsed as { insert?: Row[] }[]).flatMap(patch => patch.insert ?? [])
   // Every bare package the patch mounts must be resolvable from this package.

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { runInNewContext } from 'node:vm'
+import { bootThemeInjections } from '../src/boot-theme.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { stubConfigForm, type StubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
@@ -53,6 +55,38 @@ describe('ThemeRuntime', () => {
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('mono-accent')
     expect(theme.getTheme().active.colorScheme).toBe('dark')
+  })
+
+  it.each(['light', 'dark', 'system'] as const)('preserves boot preference %s until Host settings arrive', (preference) => {
+    for (const row of bootThemeInjections(preference)) {
+      if (row.kind === 'script') runInNewContext(row.text, { document })
+    }
+    try {
+      const { theme, host, events } = make()
+      expect(theme.getTheme().preference).toBe(preference)
+      expect({ preference: theme.getTheme().preference, palette: theme.getTheme().active.colorScheme }).toMatchSnapshot()
+      expect(events).toEqual([])
+      host.publish({ status: 'ready', value: {
+        preference: 'light', fontSize: 14, codeFontSize: 13, terminalFontSize: 13,
+        textFontFamily: '', codeFontFamily: '', terminalFontFamily: '',
+        customScheme: 'light', customCanvas: '#ffffff', customAccent: '#ff6900', customPresets: [],
+      }, revision: 1, writable: true })
+      expect(theme.getTheme().preference).toBe('light')
+      expect(host.set).not.toHaveBeenCalled()
+    } finally {
+      delete document.documentElement.dataset.dsThemeSource
+      document.body.removeAttribute('data-ds-dark-theme')
+      document.body.removeAttribute('style')
+    }
+  })
+
+  it('uses the default when the boot preference is invalid', () => {
+    document.documentElement.dataset.dsThemeSource = 'invalid'
+    try {
+      expect(make().theme.getTheme().preference).toBe('system')
+    } finally {
+      delete document.documentElement.dataset.dsThemeSource
+    }
   })
 
   it('seeds the initial font size from the boot-script body variable, ignoring junk', () => {

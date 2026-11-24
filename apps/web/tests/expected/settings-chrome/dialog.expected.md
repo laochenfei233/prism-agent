@@ -4,10 +4,10 @@
     - button "通用设置"
     - button "外观"
     - button "模型"
-    - button "内置插件"
+    - button "插件管理"
     - button "Agent 预设"
-    - button "导入"
-    - button "备份"
+    - button "数据"
+    - button "远程连接"
   - button "打开配置文件"
   - button "关闭"
   - text: 权限 选择新会话的默认权限模式

@@ -1,9 +1,11 @@
-/** Official Prism Agent occupants for the generic browser-brand slots. */
+/** Official Prism Agent occupants: the profile-gated sidebar brand slots and the home whale frame layer. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { BrandKey } from './locales.ts'
+import { PixelWhale } from './home-whale/PixelWhale.tsx'
 import { OfficialBrandMark, OfficialBrandName } from './Brand.tsx'
 import { en, zh } from './locales.ts'
 
@@ -21,12 +23,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const inject = ['slots', 'locale']
 
 /**
- * Fill the sidebar brand slots as one declaration-aware registration set. The
- * conversation hero stays on its declaring package's Prism fallback, so the
- * official build registers nothing there.
+ * Fill the sidebar brand slots as one declaration-aware registration set, and
+ * frame the blank home with the whale decoration.
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
+  ctx.slots.inject('conversation.hero.frame', () => ctx.slots.register({
+    name: 'conversation.hero.frame',
+    id: 'pixel-whale',
+  }, PixelWhale))
   if (process.env.DSH_CLIENT_BUILD_PROFILE !== 'official') return
   ctx.effect(() => ctx.locale.register(BRAND_NS, { zh, en }), 'ui-brand-official: brand dictionary')
   ctx.slots.inject('sidebar.brand.mark', () =>

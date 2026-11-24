@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SessionPendingInteraction, SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionPendingInteraction } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session-status/client'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RowApproval, type RowApprovalProps } from '../src/client/RowApproval.tsx'
@@ -24,7 +25,7 @@ function rowProps(
 ): RowApprovalProps {
   const sessionId = id('s1')
   const snapshot: SessionStatusSnapshot = new Map([[sessionId, {
-    running: false, pendingInteraction: pending, completionUnread: false,
+    running: false, pendingInteraction: pending, completionUnread: false, completionFailed: false,
   }]])
   return {
     sessionId,

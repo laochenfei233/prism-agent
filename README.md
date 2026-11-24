@@ -62,7 +62,7 @@ Review the [safety notice](SAFETY.md) before running the project.
 | --- | --- |
 | Conversation import | Bring existing conversations from ten coding agents into the session list: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI. |
 | Export, migrate, back up | Export projects (folder + sessions + media) and settings as self-describing archives and import them back; scheduled backups to WebDAV, SMB, or S3. |
-| Provenance memory | Durable, auditable memory: supersede chains, evidence fingerprints, `/memory verify` · `compare` · `maintain`, and model-assisted distillation. |
+| Auditable memory | Durable, auditable memory: supersede chains, evidence fingerprints, `/memory verify` · `compare` · `maintain`, and model-assisted distillation. |
 | Meetings and voice | Meeting transcription and minutes on the meetings page; local SenseVoice and online recognizers (MiMo, DashScope, and nine HTTP wire forms) with segmented long-audio transcription. |
 | Local models | Run local models on your own machine from the Models page. |
 | Remote access and bots | The Pocket mobile page plus nine chat channels (Telegram, Discord, Slack, Feishu/Lark, DingTalk, QQ, WeCom, WeChat, WhatsApp) with pairing-code binding and an approval relay. |

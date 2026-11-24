@@ -172,6 +172,8 @@ interface MeetingSpeechProvider {
   readonly name: string
   /** Provider resource readiness; a provider that needs no download transcribes while unprepared. */
   readonly phase: string
+  /** Language hints the provider accepts, including `auto` when it detects language. */
+  readonly languages: readonly string[]
   /** Preparation progress beyond the phase; absent when the provider has no preparation control or reports nothing extra. */
   readonly preparation?: MeetingSpeechPreparation
 }
@@ -199,6 +201,8 @@ interface MeetingSpeechStatus {
   readonly providers: readonly MeetingSpeechProvider[]
   /** Provider a transcription without an explicit selection uses. */
   readonly selected: string
+  /** Language hint a transcription without an explicit selection uses. */
+  readonly language: string
 }
 ```
 

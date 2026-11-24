@@ -203,7 +203,9 @@ describe('side-conversation content', () => {
     render(<>{SideChatConversation({ renderFactorySlot } as never)}</>)
     expect(renderFactorySlot).toHaveBeenCalledExactlyOnceWith(
       'conversation.content',
-      { variant: 'embedded', phase: 'active', hero: false },
+      // The merged slot contract requires the Workspace-picked handler; the
+      // embedded occurrence passes the no-op its source documents.
+      { variant: 'embedded', phase: 'active', hero: false, onWorkspaceSelected: expect.any(Function) },
     )
   })
 })

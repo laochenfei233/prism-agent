@@ -27,20 +27,20 @@ id: 2026-11-05-cron-message-source
 baseline: false
 changes:
   - root: "event:agent/inbox/spliced"
-    previous: "2026-10-13-user-rpc-principal"
-    after: "c797fcc92780db18c44fcbe603fe44a7051be5310785f27d6b676a5af4d948d0"
+    previous: "2026-11-19-cua-input-notices"
+    after: "d3dcdc21130c63631548151bc26929a3f05a7ca29cc957f1eea8da1cfe2d0868"
     decision: same-version
   - root: "event:developer/message"
-    previous: "2026-10-13-user-rpc-principal"
-    after: "d88688defdf08b52170dc7f4faa3a35b70136cdbe7a32000c69f1472a597a8fc"
+    previous: "2026-11-19-cua-input-notices"
+    after: "1e42757fe16ef9e2dd45ec328710e337ec8d6c4791304a048d2c9a374e8c4755"
     decision: same-version
   - root: "event:session/title-llm-request"
-    previous: "2026-10-13-user-rpc-principal"
-    after: "cc80152216ab3bd33412da06d59f9308c535833a90584897d8f9fd1fb873c8b1"
+    previous: "2026-11-19-cua-input-notices"
+    after: "04229f2fff9e243d02092dc26aa27924a4f126f66b5f90cfdd8374f9c7f76090"
     decision: same-version
   - root: "event:user/message"
-    previous: "2026-10-13-user-rpc-principal"
-    after: "1dc3688420349ac567e54fd0967420ffaf57960fdf189d46f3305f5002006f80"
+    previous: "2026-11-19-cua-input-notices"
+    after: "3e61772c5b1261ba3e69f5ee569feccb13f5d90aa70fbdbf24869a3ac140d0c9"
     decision: same-version
 ```
 

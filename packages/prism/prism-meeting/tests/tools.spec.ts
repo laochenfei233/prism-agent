@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context, type Volatile } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { MeetingAnswerRecord, MeetingMinutesId, MeetingMinutesRecord } from '@prism/prism-meeting'
 import MeetingMinutesService from '@prism/prism-meeting'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
@@ -86,6 +87,7 @@ function makeService(calls: string[] = []): MeetingMinutesService {
 async function setup(calls: string[] = []): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(NativeToolExecutor)

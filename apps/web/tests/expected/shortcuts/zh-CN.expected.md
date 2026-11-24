@@ -66,6 +66,9 @@
       - listitem:
         - button "修改聚焦上一个区域快捷键"
         - text: 聚焦上一个区域 ⌥ ⇧ ⌘ F6
+      - listitem:
+        - button "修改切换已读/未读快捷键"
+        - text: 切换已读/未读 ⇧ ⌘ U
   - region "消息输入":
     - heading "消息输入" [level=3]
     - list:

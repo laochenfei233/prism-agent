@@ -71,7 +71,7 @@ export function apply(ctx: Context): void {
           // The job-owner fence already proved the killer is the delegating
           // session, so the human-parent authority names that same session.
           cancel: () => {
-            ctx.subagents.interrupt(info.id, { kind: 'user', parentSessionId: info.parentId })
+            ctx.subagents.interrupt(info.id, { kind: 'user' })
           },
           done,
         }),

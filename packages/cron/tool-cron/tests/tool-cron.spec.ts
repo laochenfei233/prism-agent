@@ -46,9 +46,9 @@ await isolatedInboxCtx.plugin(ToolRuntime)
 await isolatedInboxCtx.plugin(NativeToolExecutor)
 
 /** Build one registry-compatible live agent whose injections enter its test Inbox. */
-function stubAgent(rawId: string, suppliedCtx?: Context): StubAgent {
+function stubAgent(rawId: string, suppliedCtx?: Context, suppliedSession?: Session): StubAgent {
   const agentCtx = suppliedCtx ?? isolatedInboxCtx
-  const session = agentCtx.sessions.create(SessionId(rawId))
+  const session = suppliedSession ?? agentCtx.sessions.create(SessionId(rawId))
   if (agentCtx.sessions.get(session.id) !== session) agentCtx.sessions.enter(session)
   const inbox = createInboxStub()
   let status: Agent['status'] = 'running'
@@ -191,6 +191,7 @@ describe('scheduled-task tool registration', () => {
 
   it('rejects a run ceiling that is not a positive safe integer', async () => {
     const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     expect(() => { toolCron.apply(ctx, { defaultMaxRunMs: 1.5 }) }).toThrow(
@@ -300,8 +301,13 @@ describe('scheduled-task tool authority', () => {
     expect(idle.error?.info?.code).toBe('GOAL_TOOL_DRIVER_REQUIRED')
 
     root.setStatus('running')
-    const child = stubAgent('tool-cron-child')
-    ctx.agents.enter(child.agent, root.agent)
+    // A nested caller is a subagent-origin Session: its open human turn does
+    // not carry the root-agent authority the unattended spend requires.
+    const child = stubAgent('tool-cron-child', ctx, ctx.sessions.create(
+      SessionId('tool-cron-child'),
+      { meta: { origin: 'subagent' } },
+    ))
+    ctx.agents.enter(child.agent)
     await ctx.agents.announce(child.agent, 'startup')
     openTurn(child, { kind: 'user' })
     const nested = await execute(ctx, 'cron_create', createArgs(), child.agent)

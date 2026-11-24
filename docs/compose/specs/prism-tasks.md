@@ -32,11 +32,11 @@ English | [中文](prism-tasks.zh.md)
 
 ### S2.2 数据：只用客户端已发布的投影
 
-根会话按 `useSession(snapshot => snapshot.subagent?.address.parentSessionId) ?? sessionId` 解析：从子会话进入时先归到它的 Lead，与 [TeamAction](../../../packages/experimental/client-ui-agent-team/src/client/TeamAction.tsx) 的取法一致。
+根会话按 `useSession(snapshot => snapshot.subagent?.address.parentSessionId) ?? sessionId` 解析：从子会话进入时先归到它的 Lead，与 [TeamAction](../../../packages/team/agent-team/src/types.ts) 的取法一致。
 
 拓扑读 `projectionsBySession[parent].values.subagentCatalog`（每条 `SubagentCatalogEntry` 带 id、createdAt、mode ∈ one-shot/continuable/external/unknown、label）与 `subagentTiming`（settledMs、当前轮 active.since、lastTurnCompleted），类型在 [subagent 投影类型](../../../packages/subagent/subagent/src/projection-types.ts)；节点是否在运行读 `useSessions(state => state.byId[id].running)`。
 
-团队读 `projectionsBySession[leadSessionId].values.agentTeam`，字段为 `members`（id、name、role、phase）与 `tasks`（id、revision、subject、description、status、ownerName、blockedBy、writeScopes、ready），见 [agent-team 类型](../../../packages/experimental/agent-team/src/types.ts)；`failure` 非空时顶部显示一行告警，名册与任务保持最后一次有效值。
+团队读 `projectionsBySession[leadSessionId].values.agentTeam`，字段为 `members`（id、name、role、phase）与 `tasks`（id、revision、subject、description、status、ownerName、blockedBy、writeScopes、ready），见 [agent-team 类型](../../../packages/team/agent-team/src/types.ts)；`failure` 非空时顶部显示一行告警，名册与任务保持最后一次有效值。
 
 **限制一**：`subagentCatalog` 是父会话自己的投影，只有父会话在客户端加载后才可用；孙级节点要等那个子会话也被加载过才有自己的目录。所以 v1 只画「已加载的父会话 + 它的直接子代理」，更深的层级渲染成不可展开，README 必须写明。
 

@@ -429,8 +429,10 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
 
   return (
     <div className={styles['section']}>
-      <h2 className={styles['title']}>{t('title')}</h2>
-      <p className={styles['intro']}>{t('intro')}</p>
+      <div className={styles['sectionHeader']}>
+        <h2 className={styles['title']}>{t('title')}</h2>
+        <p className={styles['intro']}>{t('intro')}</p>
+      </div>
       <SegmentedTabs<ModelsTab>
         className={styles['tabs']}
         label={t('tabsLabel')}

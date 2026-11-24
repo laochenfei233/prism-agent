@@ -8,6 +8,8 @@ commits: 3013583bd5..bb13e6e65b
 
 # Prism-memory 模型辅助蒸馏 + 历史会话 bootstrap
 
+English | [中文](prism-memory-model-distill.zh.md)
+
 ## Report
 
 **What was built** — `@prism/prism-memory` 的第四个写入方与一条冷启动路径。`assistedDistill`（默认关）开启后，turn-stopping 路径维护一个滚动轮次缓冲，每满 `assistedDistillEveryTurns` 个轮次把对话交给部署自己的模型（`ctx.llm.stream` 一次性调用，路由 `assistedDistillProvider`/`Model` 覆盖或沿用调用轮次的路由），读回 JSON 候选并以 `pending`、project/global 作用域写入；模型命名的消息以 `textHash` 指纹被引用，`/memory verify` 可重读。`/memory bootstrap [apply] [limit]` 用同一协议对本工作目录的既往会话逐个沉淀（调用会话除外，exact-cwd 权限），`bootstrap-log` 自记记录保证同一会话不二次处理，空跑零调用零写入，缺 sessionQuery/llm/路由/cwd 时 loud 失败。模型调用失败、不可解析输出、无路由都只留日志跳过，存储写入失败照旧传播。

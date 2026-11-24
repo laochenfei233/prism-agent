@@ -25,9 +25,10 @@ function injectedOf(c: TestClient): SettingsRootInjected {
   return (entry.inject as () => SettingsRootInjected)()
 }
 
-/** The shell's child declarations (chrome, actions, sections, and onboarding overlays). */
+/** The slots this package declares, through the shell or the `settings.section.view` Factory. */
 const CHILD_SPECS = {
   'settings.launcher': { kind: 'single', scope: 'root' },
+  'settings.notice': { kind: 'single', scope: 'root' },
   'settings.trigger': { kind: 'single', scope: 'root' },
   'settings.header': { kind: 'single', scope: 'root' },
   'settings.action': { kind: 'list', scope: 'root' },
@@ -40,11 +41,11 @@ const CHILD_NAMES = Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>
 
 /**
  * Section ids the web-app roster registers, in nav order: this package, then
- * ui-theme, ui-settings-models, ui-settings-plugins, ui-agent-preset, and the
- * 数据 section that hosts backup, import/export, and cross-agent import. A
- * plugin adding a section changes this list.
+ * ui-theme, ui-settings-models, ui-settings-plugins, ui-agent-preset, the
+ * 数据 section that hosts backup, import/export, and cross-agent import, and
+ * the remote-connection section. A plugin adding a section changes this list.
  */
-const PRODUCT_SECTIONS: readonly string[] = ['general', 'appearance', 'models', 'plugins', 'agent-presets', 'data']
+const PRODUCT_SECTIONS: readonly string[] = ['general', 'appearance', 'models', 'plugins', 'agent-presets', 'data', 'remote-connection']
 /** Onboarding steps the web-app roster registers, in coordinator order; both come from ui-settings-models. */
 const PRODUCT_ONBOARDING: readonly { id: string; order: number }[] = [
   { id: 'welcome-notice', order: -100 },
@@ -122,13 +123,13 @@ describe('ui-settings-general shell', () => {
     const { sections } = injectedOf(c).hooks
     await c.mock.streams.opened('account/watch', 1)
     expect(sections.getSnapshot().map(row => row.id)).toEqual(PRODUCT_SECTIONS)
-    c.mock.streams.push('account/watch', { status: 'credential-stored', attempt: null })
+    c.mock.streams.push('account/watch', { type: 'snapshot', state: { status: 'credential-stored', attempt: null } })
     await vi.waitFor(() => {
       expect(sections.getSnapshot().map(row => row.id)).toEqual(['account', ...PRODUCT_SECTIONS])
     })
-    c.mock.streams.push('account/watch', { status: 'credential-stored', attempt: null })
+    c.mock.streams.push('account/watch', { type: 'snapshot', state: { status: 'credential-stored', attempt: null } })
     await vi.waitFor(() => { expect(sections.getSnapshot().filter(row => row.id === 'account')).toHaveLength(1) })
-    c.mock.streams.push('account/watch', { status: 'signed-out', attempt: null })
+    c.mock.streams.push('account/watch', { type: 'snapshot', state: { status: 'signed-out', attempt: null } })
     await vi.waitFor(() => { expect(sections.getSnapshot().map(row => row.id)).toEqual(PRODUCT_SECTIONS) })
   })
 

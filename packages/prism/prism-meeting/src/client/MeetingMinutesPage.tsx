@@ -998,7 +998,7 @@ export function MeetingMinutesPage(props: MeetingMinutesPageProps): ReactNode {
         open={menu !== null}
         portal
         anchor={<span className={css.menuAnchor} aria-hidden="true" />}
-        getAnchorRect={() => menu?.rect ?? null}
+        anchorPoint={menu === null ? undefined : { x: menu.rect.x, y: menu.rect.y }}
         onClose={() => { setMenu(null) }}
         items={[{ id: 'push', label: t('push') }]}
         onSelect={() => {

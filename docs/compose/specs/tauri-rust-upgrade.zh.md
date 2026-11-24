@@ -31,7 +31,7 @@ commits: f9433f3732..7b4ae7086a
 
 ## [S2] 设计
 
-### S2.1 分支与来源
+### S2.1 分支与基线
 
 从 master 创建 `chore/tauri-rust-latest`，把升级提交留在这个分支上。不要 rebase 或复活 `chore/tauri-rust-upgrade`，也不要 cherry-pick 它的 folder-drop 提交；那些工作已经通过其他提交进入 master。
 

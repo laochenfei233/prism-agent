@@ -27,8 +27,11 @@ One preset joins the base bundle's permission-presets table: `autonomous-guarded
 A new plugin `@prism/prism-autonomy` (`plugins/prism-autonomy`), composed by a bundle patch row like the other prism plugins. Its config:
 
 ```ts
-preset: string // default 'autonomous-guarded' — the preset that engages autonomy
-requireHuman: Array<{ tool?: string; reasonPrefix?: string }> // default [{ reasonPrefix: 'escalate sandbox to' }]
+// The plugin's config and its defaults.
+const config = {
+  preset: 'autonomous-guarded', // the preset that engages autonomy
+  requireHuman: [{ reasonPrefix: 'escalate sandbox to' }], // the require-human list
+}
 ```
 
 The session's current preset is read from a session projection `autonomy` that folds the durable `permission/preset` events, so the derived state survives reload and restart (replay-safe). Any other preset means off. Misconfiguration fails loud at load: `preset` must exist in the permission-presets catalog.

@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for prism-guardrails-stuck-nudge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-guardrails-stuck-nudge.md
+/:
+  en: 89da4b2a068b0ef1
+  zh: 89da4b2a068b0ef1
+/prism-guardrails-stuck-nudge:
+  en: ea54f8d94e6f76eb
+  zh: a74e89966eb26aee
+/prism-guardrails-stuck-nudge/report:
+  en: e9b1cfd0aed9ba29
+  zh: e9b1cfd0aed9ba29
+/prism-guardrails-stuck-nudge/s1-problem:
+  en: 3a55e2cdef9ee968
+  zh: 88679c4df6c808db
+/prism-guardrails-stuck-nudge/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-guardrails-stuck-nudge/s2-design/s2-1-tools-post-execute:
+  en: 79595a526675f7dc
+  zh: 79595a526675f7dc
+/prism-guardrails-stuck-nudge/s2-design/s2-2-llm:
+  en: e084bc14177ee30d
+  zh: e084bc14177ee30d
+/prism-guardrails-stuck-nudge/s2-design/s2-3-additionalcontexts:
+  en: 121ef5fda79b078c
+  zh: 121ef5fda79b078c
+/prism-guardrails-stuck-nudge/s2-design/s2-4:
+  en: 91de7d9b43622b43
+  zh: 91de7d9b43622b43
+/prism-guardrails-stuck-nudge/s3-scope:
+  en: d3b3fe61abf6df4c
+  zh: 212a6d6a1df1d856
+/prism-guardrails-stuck-nudge/tasks:
+  en: eaa52f444baf2b73
+  zh: eaa52f444baf2b73
+/prism-guardrails-stuck-nudge/s4-acceptance:
+  en: a08c7f12e2d423f5
+  zh: 263bbbae5f02c39e

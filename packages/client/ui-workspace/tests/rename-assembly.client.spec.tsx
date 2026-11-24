@@ -1,5 +1,6 @@
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 // @vitest-environment jsdom
+import { syncedConfig } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as applyMenus, inject as injectMenus } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 /**
@@ -26,6 +27,7 @@ import { RemoteError, SlotTestRuntime, usePinnedBrowserLanguages } from '@deepse
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { SECTION_HOOK_CONTEXT, SECTION_INJECT } from './section-scroller.client.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
@@ -53,7 +55,7 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
-  await runtime.mount({ inject: [...injectMenus], apply: applyMenus })
+  await runtime.mount({ inject: [...injectMenus], apply: applyMenus }, syncedConfig({ resolutionTimeoutMs: 1000 }))
   return runtime
 }
 
@@ -62,7 +64,7 @@ type FrameProps = PropsRenderSlots<'sidebar.workspaces' | 'shell.overlay'>
 function SidebarFrame({ renderSlot }: FrameProps) {
   return (
     <>
-      {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}
+      {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} }, { hookContext: SECTION_HOOK_CONTEXT })}
       {renderSlot('shell.overlay', {})}
     </>
   )
@@ -72,7 +74,7 @@ function SidebarFrame({ renderSlot }: FrameProps) {
 async function declareFrame(runtime: SlotTestRuntime): Promise<void> {
   await runtime.root.declare(
     {
-      'sidebar.workspaces': { kind: 'single', scope: 'root' },
+      'sidebar.workspaces': { kind: 'single', scope: 'root', inject: SECTION_INJECT },
       'shell.overlay': { kind: 'list', scope: 'root' },
     } as never,
     SidebarFrame as never,
@@ -98,10 +100,10 @@ describe('session rename through the assembled browser', () => {
       summary: { title: 'Persisted title', displayTitle: 'Session title', cwd: '/w/alpha' },
       session: { rename: vi.fn() },
     })
-    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView' }).ready
+    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView', facets: { conversation: true } }).ready
     await seedWorkspace(runtime)
     await declareFrame(runtime)
-    await runtime.mount({ inject: [...inject], apply })
+    await runtime.mount({ inject: [...inject], apply }, syncedConfig({ recentViewLimit: 10 }))
     const registerAction = (id: string, order: number, priority: number, label: string) => {
       runtime.slots.register(
         { name: 'sidebar.workspaces.session.menu.item', id, order, priority },
@@ -127,7 +129,7 @@ describe('session rename through the assembled browser', () => {
     fireEvent.click(trigger)
     await view.findByRole('menuitem', { name: '置顶会话' })
     expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '置顶会话', '重命名', '分叉会话', '复制 Session ID', '收藏会话', '标记待回看', '标签与备注…', '在资源管理器中打开',
+      '置顶会话', '重命名', '标为未读', '分叉会话', '复制 Session ID', '收藏会话', '标记待回看', '标签与备注…', '在资源管理器中打开',
       '复制路径', 'Export action', 'Last action', '前往配置', '归档会话',
     ])
     // The copy-id, reveal, export, settings, and archive rows each start a group.
@@ -177,10 +179,10 @@ describe('session rename through the assembled browser', () => {
       summary: { title: '旧标题', displayTitle: '旧标题', cwd: '/w/alpha' },
       session: { rename },
     })
-    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView' }).ready
+    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView', facets: { conversation: true } }).ready
     await seedWorkspace(runtime)
     await declareFrame(runtime)
-    await runtime.mount({ inject: [...inject], apply })
+    await runtime.mount({ inject: [...inject], apply }, syncedConfig({ recentViewLimit: 10 }))
     const view = runtime.renderRoot()
 
     // The current session's group auto-expands; open the row's action menu.
@@ -219,10 +221,10 @@ describe('session rename through the assembled browser', () => {
       summary: { title: '旧标题', displayTitle: '旧标题', cwd: '/w/alpha' },
       session: { rename },
     })
-    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView' }).ready
+    await runtime.sessions.retainFor(runtime.ctx, SID, { source: 'mainView', facets: { conversation: true } }).ready
     await seedWorkspace(runtime)
     await declareFrame(runtime)
-    await runtime.mount({ inject: [...inject], apply })
+    await runtime.mount({ inject: [...inject], apply }, syncedConfig({ recentViewLimit: 10 }))
     const view = runtime.renderRoot()
     await runtime.flush()
 

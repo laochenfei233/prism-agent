@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -108,7 +109,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       scratch.push(ws)
       const reason = new Error('cancel before grant creation')
       await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('cancelled'),
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: brandString<SessionId>('cancelled'),
       }, AbortSignal.abort(reason))).rejects.toBe(reason)
       expect(loggedInvocations(log)).toEqual([])
     } finally { await dispose() }
@@ -119,7 +120,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
     try {
       const ws = workspaceRoot()
       scratch.push(ws)
-      const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-1') }
+      const policy: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: brandString<SessionId>('sess-1') }
 
       const confined = await sandbox.confine(['pwsh', '/Command', 'x'], policy)
       const tempDir = flag(confined.argv, '--temp')
@@ -192,8 +193,8 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
     try {
       const ws = workspaceRoot()
       scratch.push(ws)
-      const readOnly: SandboxPolicy = { mode: 'read-only', workspaceRoot: ws, sessionId: SessionId('switch') }
-      const workspaceWrite: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('switch') }
+      const readOnly: SandboxPolicy = { mode: 'read-only', workspaceRoot: ws, sessionId: brandString<SessionId>('switch') }
+      const workspaceWrite: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: ws, sessionId: brandString<SessionId>('switch') }
 
       expect((await sandbox.confine(['true'], readOnly)).argv).toEqual([
         'node', 'windows-acl-runner.js',
@@ -247,9 +248,9 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       const wsA = workspaceRoot()
       const wsB = workspaceRoot()
       scratch.push(wsA, wsB)
-      const parent = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsA, sessionId: SessionId('parent') })
-      const child = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsA, sessionId: SessionId('child') })
-      const moved = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsB, sessionId: SessionId('parent') })
+      const parent = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsA, sessionId: brandString<SessionId>('parent') })
+      const child = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsA, sessionId: brandString<SessionId>('child') })
+      const moved = await sandbox.confine(['true'], { mode: 'workspace-write', workspaceRoot: wsB, sessionId: brandString<SessionId>('parent') })
 
       expect(flag(child.argv, '--temp')).not.toBe(flag(parent.argv, '--temp'))
       expect(flag(child.argv, '--temp-write-sid')).not.toBe(flag(parent.argv, '--temp-write-sid'))
@@ -331,7 +332,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       setBehavior('fail')
       sandbox.internals.rmTempDir = () => { throw new Error('temp rm exploded') }
       await expect(sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('rm-fail'),
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: brandString<SessionId>('rm-fail'),
       })).rejects.toThrow(/temp grant materialization failed and its cleanup also failed/u)
     } finally {
       await dispose()
@@ -381,7 +382,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       const ws = workspaceRoot()
       scratch.push(ws)
       const confined = await sandbox.confine(['true'], {
-        mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('dispose'),
+        mode: 'workspace-write', workspaceRoot: ws, sessionId: brandString<SessionId>('dispose'),
       })
       const tempDir = flag(confined.argv, '--temp') ?? ''
       const tempSid = flag(confined.argv, '--temp-write-sid') ?? ''

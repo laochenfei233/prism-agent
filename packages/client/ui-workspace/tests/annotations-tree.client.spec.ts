@@ -2,11 +2,12 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session-status/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionAnnotation } from '../src/client/annotations.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, filteredSessionIds, orderByPriority, type SessionRowState,
+  deriveFlat, deriveGroups, deriveSearchResults, filteredSessionIds, orderByPriority, sessionSearchIndex,
+  type SessionRowState,
 } from '../src/client/tree.ts'
 
 const sid = (id: string) => id as SessionId
@@ -109,7 +110,7 @@ describe('search matches annotations', () => {
     const state = list(summary('a', 2), summary('b', 1))
     const workspaces = [workspace('w', ['a', 'b'])]
     const annotations = { a: { tags: ['Deploy'] }, b: { note: 'waiting on the deploy' } } as Record<string, SessionAnnotation>
-    const byTag = deriveSearchResults(state, workspaces, 'dep', rowState(annotations), noStatuses, noContent, 10)
+    const byTag = deriveSearchResults(state, workspaces, 'dep', rowState(annotations), noStatuses, noContent, 10, sessionSearchIndex(state, workspaces, [], 'default'))
     expect(byTag.items.map(item => item.id)).toEqual([sid('a'), sid('b')])
     expect(byTag.items[0]?.annotation?.tags).toEqual(['Deploy'])
   })
@@ -118,14 +119,14 @@ describe('search matches annotations', () => {
     const state = list(summary('plain', 3), summary('marked', 2), summary('other', 1))
     const workspaces = [workspace('w', ['plain', 'marked', 'other'])]
     const annotations = { marked: { favorite: true }, other: { tags: ['release'] } } as Record<string, SessionAnnotation>
-    const found = deriveSearchResults(state, workspaces, 'dep', rowState(annotations), noStatuses, noContent, 10)
+    const found = deriveSearchResults(state, workspaces, 'dep', rowState(annotations), noStatuses, noContent, 10, sessionSearchIndex(state, workspaces, [], 'default'))
     expect(found.items).toEqual([])
   })
 
   it('follows the annotation filter while searching', () => {
     const state = list(summary('deploy', 2))
     const workspaces = [workspace('w', ['deploy'])]
-    const found = deriveSearchResults(state, workspaces, 'deploy', rowState({}, 'favorite'), noStatuses, noContent, 10)
+    const found = deriveSearchResults(state, workspaces, 'deploy', rowState({}, 'favorite'), noStatuses, noContent, 10, sessionSearchIndex(state, workspaces, [], 'default'))
     expect(found.items).toEqual([])
   })
 })

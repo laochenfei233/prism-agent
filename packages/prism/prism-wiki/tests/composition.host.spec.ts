@@ -20,6 +20,7 @@ import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
@@ -80,6 +81,8 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
   const root = await scratch('composition')
   const configPath = join(root, 'cordis.yml')
   const rows = [
+    '- id: session-projections',
+    "  name: '@deepseek-ai/dsh-session-projection'",
     '- id: prompt',
     "  name: '@deepseek-ai/dsh-system-prompt'",
     '- id: tools',
@@ -128,6 +131,7 @@ async function boot(vaultRoot: string, options: { readonly web?: boolean } = {})
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['@deepseek-ai/dsh-commands', CommandRuntime],

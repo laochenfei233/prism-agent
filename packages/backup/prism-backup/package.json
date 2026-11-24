@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-backup",
   "description": "Back up configuration, memory, and project folders to WebDAV, SMB, or S3 from the settings page",
-  "version": "0.2.2-rc.1",
+  "version": "0.2.3-alpha.2",
   "publishConfig": {
     "access": "public"
   },
@@ -55,7 +55,7 @@
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "fflate": "^0.8.2",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

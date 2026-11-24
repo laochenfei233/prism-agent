@@ -7,22 +7,47 @@
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { request as httpRequest, type IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
+import * as Token from '@deepseek-ai/dsh-host-authentication-token'
+import { BrowserAuth } from '@deepseek-ai/dsh-host-authentication-token/src/browser-auth.ts'
 import LocalCredentials from '@deepseek-ai/dsh-credentials-local'
 import HttpServer from '@deepseek-ai/dsh-host-webserver'
 import * as FrontendStatic from '../src/index.ts'
+
+const heldIndex = vi.hoisted(() => ({
+  path: undefined as string | undefined,
+  entered: undefined as (() => void) | undefined,
+  release: undefined as Promise<undefined> | undefined,
+}))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...original,
+    readFile: async (...args: Parameters<typeof original.readFile>) => {
+      if (args[0] === heldIndex.path) {
+        heldIndex.entered?.()
+        await heldIndex.release
+      }
+      return original.readFile(...args)
+    },
+  }
+})
 
 let root: string | undefined
 let context: Context | undefined
 
 afterEach(async () => {
+  heldIndex.path = undefined
+  heldIndex.entered = undefined
+  heldIndex.release = undefined
   await context?.fiber.dispose()
   context = undefined
   if (root !== undefined) await rm(root, { recursive: true, force: true })
@@ -54,6 +79,7 @@ async function loadComposition(): Promise<Context> {
     "    host: '127.0.0.1'",
     '    port: 0',
     "- name: '@deepseek-ai/dsh-client-connection'",
+    "- name: '@deepseek-ai/dsh-host-authentication-token'",
     '- id: frontend',
     "  name: '@deepseek-ai/dsh-host-frontend-static'",
     '  config:',
@@ -69,6 +95,7 @@ async function loadComposition(): Promise<Context> {
     ['@deepseek-ai/dsh-credentials-local', LocalCredentials],
     ['@deepseek-ai/dsh-host-webserver', HttpServer],
     ['@deepseek-ai/dsh-client-connection', Connection],
+    ['@deepseek-ai/dsh-host-authentication-token', Token],
     ['@deepseek-ai/dsh-host-frontend-static', FrontendStatic],
   ])
   context.loader.internal = {
@@ -110,7 +137,8 @@ describe('real Loader composition', () => {
     expect(unloaded).toEqual([])
     const server = loaded.webServer
     const port = server.port
-    const launchUrl = loaded.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`)
+    const auth = await BrowserAuth.create(loaded[Context.root], loaded.credentials, 30)
+    const launchUrl = new URL(auth.authenticatedUrl(`http://127.0.0.1:${String(port)}`))
     const exchange = await fetch(launchUrl, { redirect: 'manual' })
     expect(exchange.status).toBe(303)
     expect(exchange.headers.get('location')).toBe('./')
@@ -125,16 +153,17 @@ describe('real Loader composition', () => {
 
     expect(await request(port, '/')).toMatchObject({
       status: 401,
-      type: 'text/plain; charset=utf-8',
-      body: 'dsh web authentication required; reopen the URL printed by dsh web.\n',
+      type: null,
+      body: 'unauthorized',
     })
 
     // Every HTML entry authenticates: an additional page is not reachable from
     // an unauthenticated peer that could boot its owner-authority runtime.
+    // The webserver answers the denial itself with its plain 401 body.
     expect(await request(port, '/preview.html')).toMatchObject({
       status: 401,
-      type: 'text/plain; charset=utf-8',
-      body: 'dsh web authentication required; reopen the URL printed by dsh web.\n',
+      type: null,
+      body: 'unauthorized',
     })
     expect(await request(port, '/preview.html', authenticated())).toEqual({
       status: 200,
@@ -171,7 +200,8 @@ describe('real Loader composition', () => {
       renderedFor.push(peer)
       rows.push({ kind: 'script-preload', src: 'plugins/boot.js' })
     })
-    for (const path of ['/', '/index.html', '/?view=test']) {
+    expect((await request(port, '/index.html?token=ordinary-query')).status).toBe(401)
+    for (const path of ['/', '/index.html', '/?view=test', '/index.html?token=ordinary-query']) {
       const got = await request(port, path, authenticated())
       expect(got.status).toBe(200)
       expect(got.type).toBe('text/html; charset=utf-8')
@@ -185,8 +215,11 @@ describe('real Loader composition', () => {
       expect(base).toBeLessThan(got.body.indexOf('<link rel="preload" as="script" href="plugins/boot.js">'))
       expect(base).toBeLessThan(got.body.indexOf('<script>window.__T__=1</script>'))
     }
-    // An authenticated browser renders for the owner's shared browser Peer.
-    expect(renderedFor).toEqual([loaded.connection.browserPeer, loaded.connection.browserPeer, loaded.connection.browserPeer])
+    // Default-token requests render for the Peer owned by the token provider.
+    const admission = loaded.connection.authentication.authenticate({ headers: { host: `127.0.0.1:${String(port)}`, cookie } })
+    if ('rejection' in admission) throw new Error('token provider refused its issued Cookie')
+    expect(admission.peer).not.toBe(loaded.connection.browserPeer)
+    expect(renderedFor).toEqual([admission.peer, admission.peer, admission.peer, admission.peer])
     offRows()
     expect(await request(port, '/', authenticated({ method: 'HEAD' }))).toEqual({
       status: 200,
@@ -248,28 +281,105 @@ describe('real Loader composition', () => {
     const loaded = await loadComposition()
     const server = loaded.webServer
     const port = server.port
-    const launchUrl = loaded.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`)
+    const entries: { label: string; url: string; open: boolean }[] = []
+    loaded.emit(loaded.webServer, 'webserver/entry-url', `http://127.0.0.1:${String(port)}`, entries)
+    const launchUrl = entries[0]!.url
     // Past launches on other loopback ports left same-domain session cookies
     // the browser still sends; the header crosses Node's default bound.
     const stale = Array.from({ length: 80 }, (_, at) => `dsh-auth-stale-${String(at)}=${'x'.repeat(220)}`).join('; ')
     expect(stale.length).toBeGreaterThan(16 * 1024)
-    const exchange = await fetch(`http://127.0.0.1:${String(port)}${new URL(launchUrl).search}`, {
-      redirect: 'manual',
-      headers: { cookie: stale },
+    // The mint plus both deletion variants per stale name exceed the fetch
+    // client's default response-header bound; read the exchange over node:http
+    // with the same raised bound the listener itself accepts requests under.
+    const exchange = await new Promise<IncomingMessage>((resolve, reject) => {
+      const outgoing = httpRequest(
+        `http://127.0.0.1:${String(port)}${new URL(launchUrl).search}`,
+        { maxHeaderSize: 64 * 1024 },
+        resolve,
+      )
+      outgoing.setHeader('cookie', stale)
+      outgoing.on('error', reject)
+      outgoing.end()
     })
-    expect(exchange.status).toBe(303)
-    const cookies = exchange.headers.getSetCookie()
-    expect(cookies).toHaveLength(81)
-    expect(cookies.filter(cookie => cookie.includes('Max-Age=0'))).toHaveLength(80)
-    // With only the mint cookie left, the next desktop request authenticates.
+    expect(exchange.statusCode).toBe(303)
+    const cookies = exchange.rawHeaders.flatMap((name, at) => name.toLowerCase() === 'set-cookie' ? [exchange.rawHeaders[at + 1]!] : [])
+    expect(cookies).toHaveLength(161)
+    expect(cookies.filter(cookie => cookie.includes('Max-Age=0'))).toHaveLength(160)
+    // With the mint cookie (plus both deletion variants per stale name), the next
+    // desktop request authenticates.
     const mint = cookies.find(cookie => !cookie.includes('Max-Age=0'))!.split(';', 1)[0]!
     expect((await request(port, '/', { headers: { cookie: mint } })).status).toBe(200)
   })
 
+  it('renders each HTTP index for the Peer returned by page admission', { timeout: 60_000 }, async () => {
+    const loaded = await loadComposition()
+    const reader = loaded.connection.createPeer({ principal: { kind: 'owner' }, interactions: 'none' })
+    expect(reader).not.toBe(loaded.connection.browserPeer)
+    let attempts = 0
+    const unregister = loaded.connection.authentication.register({
+      authenticate(input) {
+        attempts++
+        const value = input.headers instanceof Headers ? input.headers.get('x-reader') : input.headers['x-reader']
+        return value === 'external' ? reader : undefined
+      },
+    })
+    const renderedFor: Connection.PeerScope[] = []
+    loaded.on('webserver/index-inject', (rows, peer) => {
+      renderedFor.push(peer)
+      rows.push({ kind: 'global', name: '__READER__', value: peer === reader })
+    })
+    for (const path of ['/', '/index.html']) {
+      const response = await request(loaded.webServer.port, path, { headers: { 'x-reader': 'external' } })
+      expect(response.status).toBe(200)
+      expect(response.body).toContain('globalThis["__READER__"] = true')
+    }
+    expect(renderedFor).toEqual([reader, reader])
+    expect(attempts).toBe(2)
+    await unregister()
+    expect((await request(loaded.webServer.port, '/', { headers: { 'x-reader': 'external' } })).status).toBe(401)
+  })
+
+  it('reports unavailable authentication without rendering the index', async () => {
+    const loaded = await loadComposition()
+    loaded.connection.authentication.register({ authenticate() { throw new Error('provider unavailable') } })
+    const rendered = vi.fn()
+    loaded.on('webserver/index-inject', rendered)
+    for (const path of ['/', '/index.html']) {
+      expect(await request(loaded.webServer.port, path)).toMatchObject({ status: 503, body: 'authentication unavailable' })
+      expect(await request(loaded.webServer.port, path, { method: 'HEAD' })).toMatchObject({ status: 503, body: '' })
+    }
+    expect(rendered).not.toHaveBeenCalled()
+  })
+
+  it.each(['request', 'peer'] as const)('does not inject an index after its %s ends during file reading', { timeout: 60_000 }, async (ended) => {
+    const loaded = await loadComposition()
+    const reader = loaded.connection.createPeer({ principal: { kind: 'owner' } })
+    const controller = new AbortController()
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    heldIndex.path = join(root!, 'dist', 'index.html')
+    heldIndex.entered = () => { entered.resolve(undefined) }
+    heldIndex.release = release.promise
+    const renderedFor: Connection.PeerScope[] = []
+    loaded.on('webserver/index-inject', (_rows, peer) => { renderedFor.push(peer) })
+    const result = loaded.webServer.readResource(new Request('http://reader.invalid/', { signal: controller.signal }), reader)
+    const outcome = result.then(() => 'served', () => 'cancelled')
+    try {
+      await entered.promise
+      if (ended === 'request') controller.abort()
+      else await reader.dispose()
+      release.resolve(undefined)
+      expect(await outcome).toBe('cancelled')
+      expect(renderedFor).toEqual([])
+    } finally {
+      release.resolve(undefined)
+      await outcome
+    }  })
+
   it('answers in-process reads for the given Peer without browser authentication', { timeout: 60_000 }, async () => {
     const loaded = await loadComposition()
     const server = loaded.webServer
-    const reader = { principal: { kind: 'owner' } } as Connection.PeerScope
+    const reader = loaded.connection.createPeer({ principal: { kind: 'owner' } })
     const read = (path: string, init?: RequestInit) => server.readResource(new Request(`http://reader.invalid${path}`, init), reader)
     const renderedFor: Connection.PeerScope[] = []
     loaded.on('webserver/index-inject', (rows, peer) => {
@@ -319,7 +429,7 @@ describe('real Loader composition', () => {
     expect([revalidated.status, revalidated.headers.get('etag'), revalidated.headers.get('cache-control')]).toEqual([304, etag, 'no-cache'])
     expect(await revalidated.text()).toBe('')
     // An in-process read revalidates the same way.
-    const reader = { principal: { kind: 'owner' } } as Connection.PeerScope
+    const reader = loaded.connection.createPeer({ principal: { kind: 'owner' } })
     const read = await loaded.webServer.readResource(new Request(`${base}/app.js`, { headers: { 'if-none-match': etag } }), reader)
     expect(read.status).toBe(304)
 

@@ -25,7 +25,7 @@
     { "path": "../../client/ui-renderer" },
     { "path": "../../client/ui-sidebar" },
     { "path": "../../client/ui-slots" },
-    { "path": "../../client/ui-workspace" },
+    { "path": "../../client/ui-workspace/tsconfig.client.json" },
     { "path": "../../util/brand" }
   ]
 }

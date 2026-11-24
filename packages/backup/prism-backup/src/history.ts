@@ -18,9 +18,9 @@ const countsSchema = z.object({
   memoryFiles: z.number().int().min(0),
   projects: z.number().int().min(0),
   projectFiles: z.number().int().min(0),
-}).strict()
+})
 
-const recordSchema = z.object({
+const recordSchema = z.strictObject({
   id: z.string().min(1),
   startedAt: z.number().int().min(0),
   finishedAt: z.number().int().min(0),
@@ -31,7 +31,7 @@ const recordSchema = z.object({
   objectKey: z.string().min(1).optional(),
   sizeBytes: z.number().int().min(0).optional(),
   counts: countsSchema,
-  failure: z.object({
+  failure: z.strictObject({
     code: z.enum([
       'prism-backup/bad-request',
       'prism-backup/not-configured',
@@ -43,8 +43,8 @@ const recordSchema = z.object({
       'prism-backup/failed',
     ]),
     message: z.string(),
-  }).strict().optional(),
-}).strict()
+  }).optional(),
+}).transform((value): BackupRunRecord => value)
 
 /** Authoritative backup history storage; a malformed record rejects opening. */
 export const backupDomain = defineDomain({
