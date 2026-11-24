@@ -16,6 +16,7 @@ import { mimocodeReader } from './mimo.ts'
 import { openclawReader } from './openclaw.ts'
 import { opencodeReader } from './opencode.ts'
 import { piReader } from './pi.ts'
+import { zcodeReader } from './zcode.ts'
 
 /** One reader for a foreign conversation store. */
 export interface SourceReader {
@@ -41,4 +42,5 @@ export const SOURCE_READERS: Readonly<Record<ImportSourceId, SourceReader>> = {
   hermes: hermesReader,
   pi: piReader,
   gemini: geminiReader,
+  zcode: zcodeReader,
 }

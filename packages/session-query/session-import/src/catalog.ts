@@ -32,6 +32,7 @@ export const SOURCE_DEFINITIONS: readonly SourceDefinition[] = [
   { id: 'hermes', label: 'Hermes', segments: ['.hermes'] },
   { id: 'pi', label: 'Pi', segments: ['.pi', 'agent', 'sessions'] },
   { id: 'gemini', label: 'Gemini CLI', segments: ['.gemini', 'tmp'] },
+  { id: 'zcode', label: 'ZCode', segments: ['.zcode'] },
 ]
 
 /**

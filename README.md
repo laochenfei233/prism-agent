@@ -60,7 +60,7 @@ Review the [safety notice](SAFETY.md) before running the project.
 
 | Capability | What you get |
 | --- | --- |
-| Conversation import | Bring existing conversations from ten coding agents into the session list: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI. |
+| Conversation import | Bring existing conversations from eleven coding agents into the session list: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, and ZCode. |
 | Export, migrate, back up | Export projects (folder + sessions + media) and settings as self-describing archives and import them back; scheduled backups to WebDAV, SMB, or S3. |
 | Auditable memory | Durable, auditable memory: supersede chains, evidence fingerprints, `/memory verify` · `compare` · `maintain`, and model-assisted distillation. |
 | Meetings and voice | Meeting transcription and minutes on the meetings page; local SenseVoice and online recognizers (MiMo, DashScope, and nine HTTP wire forms) with segmented long-audio transcription. |

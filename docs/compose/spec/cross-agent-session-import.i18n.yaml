@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/cross-agent-session-import.md
 /:
-  en: 0d98b2243e24c8d6
-  zh: 0d98b2243e24c8d6
+  en: 51da55dfae478e46
+  zh: 51da55dfae478e46
 /cross-agent-session-import:
   en: 4544144288cc83b5
   zh: b7cb04fdf533aae1
 /cross-agent-session-import/s1-problem:
-  en: a3195ba4dca568a6
-  zh: 8177a81ad12749c6
+  en: eb4225461291b40c
+  zh: 2d940182721e5826
 /cross-agent-session-import/s2-design:
   en: ecbb0dbfa14686f0
   zh: 3c4e147edaa36f87
@@ -18,11 +18,11 @@
   en: 7c8bbfbf750c7594
   zh: 041da38bb2671530
 /cross-agent-session-import/s2-design/s2-2-source-catalog:
-  en: 791a4b261146be86
-  zh: e31b84d5921622b5
+  en: b12854b959a46f83
+  zh: e57388e8ae9fb739
 /cross-agent-session-import/s2-design/s2-3-normalized-transcript:
-  en: 8522b90a23916b18
-  zh: 44a8631b97495d7b
+  en: 1aa04df954bca4a2
+  zh: 1d106c0a45fc8af8
 /cross-agent-session-import/s2-design/s2-3a-native-deepseek-harness-copy:
   en: 9b1ed0758cdee5c3
   zh: 8a33b3ee148c0884
@@ -42,11 +42,11 @@
   en: 92f28370924ae865
   zh: ff0d83cfe65f99b1
 /cross-agent-session-import/s3-scope:
-  en: fca82d468f4e5c3e
-  zh: 721f46d4ac74608a
+  en: 8aadebe2ba98ab86
+  zh: 2b878a94293f8b93
 /cross-agent-session-import/tasks:
   en: d16e79d010d7cb84
   zh: 785626eebecc951d
 /cross-agent-session-import/s4-acceptance:
-  en: 33df9b5a04013ff6
-  zh: 1afd4f0f5f41432f
+  en: 0484e05a4f85b943
+  zh: d72ea62cd08d64f7
