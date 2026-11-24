@@ -3,7 +3,7 @@ feature: tool-name-suggestions
 status: implemented
 updated: 2026-11-25
 branch: feat/tool-name-suggestions
-commits: e161bdab89
+commits: e161bdab89 (feat/tool-name-suggestions), e7c738b135 (master)
 ---
 
 # 未知工具名的相近名称建议
