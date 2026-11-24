@@ -32,6 +32,12 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-attachment-local` | yes | Private content-addressed DSH_HOME attachment storage |
 
+## autonomy
+
+| Package | Config | Description |
+|---|---|---|
+| `@prism/prism-autonomy` | yes | Autonomous approvals: the autonomous-guarded permission preset auto-answers approval requests through the approval seam, keeping deny rails and sandbox escalations under human control |
+
 ## backup
 
 | Package | Config | Description |
@@ -434,7 +440,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-session-log-export` | yes | Web Session-log ZIP export and Session Markdown copy |
 | `@deepseek-ai/dsh-session-query-sqlite` | yes | Concrete ctx.sessionQuery backend with SQLite FTS5 search |
-| `@prism/prism-session-import` | yes | Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI) |
+| `@prism/prism-session-import` | yes | Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, ZCode) |
 
 ## settings
 
