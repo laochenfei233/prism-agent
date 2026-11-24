@@ -19,6 +19,7 @@ export type ImportSourceId =
   | 'hermes'
   | 'pi'
   | 'gemini'
+  | 'zcode'
 
 /** One user prompt or assistant reply normalized from a foreign transcript. */
 export interface ImportedMessage {

@@ -63,6 +63,7 @@ export const Config: Schema<Config> = Schema.object({
     hermes: Schema.string(),
     pi: Schema.string(),
     gemini: Schema.string(),
+    zcode: Schema.string(),
   }),
   maxMessages: Schema.number().step(1).min(1).default(2000),
   maxMessageTextBytes: Schema.number().step(1).min(256).default(32768),

@@ -14,6 +14,7 @@ import { mimocodeReader } from '../src/sources/mimo.ts'
 import { openclawReader } from '../src/sources/openclaw.ts'
 import { opencodeReader } from '../src/sources/opencode.ts'
 import { piReader } from '../src/sources/pi.ts'
+import { zcodeReader } from '../src/sources/zcode.ts'
 
 const roots: string[] = []
 
@@ -337,5 +338,40 @@ describe('Gemini CLI reader', () => {
     expect(scan.sessions[0]?.meta).toMatchObject({ key: 'g1' })
     const loaded = await scan.sessions[0]?.load()
     expect(loaded?.messages.map(message => message.text)).toEqual(['hello gemini', 'complete'])
+  })
+})
+
+describe('ZCode reader', () => {
+  it('reads the shared chat database, skipping subagent sessions and synthetic text', async () => {
+    const root = await rootOf('zcode')
+    await mkdir(join(root, 'cli', 'db'), { recursive: true })
+    const database = new DatabaseSync(join(root, 'cli', 'db', 'db.sqlite'))
+    database.exec(`
+      CREATE TABLE session (id TEXT PRIMARY KEY, parent_id TEXT, directory TEXT, title TEXT,
+        time_created INTEGER, time_updated INTEGER, time_archived INTEGER);
+      CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT);
+      CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, data TEXT);
+    `)
+    database.prepare('INSERT INTO session VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('sess_main', null, root, 'ZCode chat', 1000, 2000, null)
+    database.prepare('INSERT INTO session VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('sess_subagent_agent_x', 'sess_main', root, 'Subagent', 1100, 2100, null)
+    database.prepare('INSERT INTO message VALUES (?, ?, ?, ?)')
+      .run('m1', 'sess_main', 1100, JSON.stringify({ role: 'user' }))
+    database.prepare('INSERT INTO part VALUES (?, ?, ?, ?, ?)')
+      .run('p1', 'm1', 'sess_main', 1100, JSON.stringify({ type: 'text', text: 'hello zcode' }))
+    database.prepare('INSERT INTO part VALUES (?, ?, ?, ?, ?)')
+      .run('p2', 'm1', 'sess_main', 1101, JSON.stringify({ type: 'text', synthetic: true, text: '<system-reminder>noise</system-reminder>' }))
+    database.prepare('INSERT INTO message VALUES (?, ?, ?, ?)')
+      .run('m2', 'sess_main', 1200, JSON.stringify({ role: 'assistant' }))
+    database.prepare('INSERT INTO part VALUES (?, ?, ?, ?, ?)')
+      .run('p3', 'm2', 'sess_main', 1200, JSON.stringify({ type: 'text', text: 'hi there' }))
+    database.close()
+
+    const scan = await zcodeReader.scan(root)
+    expect(scan.sessions.map(session => session.meta.key)).toEqual(['sess_main'])
+    expect(scan.sessions[0]?.meta).toMatchObject({ cwd: root, title: 'ZCode chat' })
+    const loaded = await scan.sessions[0]?.load()
+    expect(loaded?.messages.map(message => message.text)).toEqual(['hello zcode', 'hi there'])
   })
 })

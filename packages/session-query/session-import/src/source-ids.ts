@@ -11,6 +11,7 @@ import type { ImportSourceId } from './types.ts'
 export const IMPORT_SOURCE_IDS = [
   'claude', 'codex', 'grok', 'dsh', 'mimocode',
   'opencode', 'openclaw', 'hermes', 'pi', 'gemini',
+  'zcode',
 ] as const satisfies readonly ImportSourceId[]
 
 /**
