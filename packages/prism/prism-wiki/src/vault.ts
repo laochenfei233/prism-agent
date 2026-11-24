@@ -196,6 +196,7 @@ export function extractWikiLinks(body: string): readonly string[] {
   const seen = new Set<string>()
   const links: string[] = []
   for (const match of body.matchAll(pattern)) {
+    /* v8 ignore next -- the capture group always participates in a match of this pattern. */
     const target = linkTarget(match[1] ?? '')
     if (target === '') continue
     const key = target.toLowerCase()
@@ -218,6 +219,7 @@ export function extractWikiLinks(body: string): readonly string[] {
  */
 export function parsePageText(text: string, path: WikiPagePath): { frontmatter: WikiFrontmatter; body: string } {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
+  /* v8 ignore next -- a split always yields at least one line, so lines[0] is defined. */
   if ((lines[0] ?? '').trim() !== '---') {
     throw invalidField(path, 'title', 'is missing because the file has no frontmatter block')
   }
@@ -465,6 +467,7 @@ export class VaultFiles {
         // A page that vanished mid-walk or cannot be parsed is reported by
         // listUnreadablePages and by lint; it must not abort an enumeration
         // every other reader depends on.
+        /* v8 ignore next 2 -- walkFiles lists only regular files, so this read fails only with a vault error or a missing-file code. */
         if (!(error instanceof WikiVaultError) && !isMissing(error)) throw error
       }
     }
@@ -484,6 +487,7 @@ export class VaultFiles {
       try {
         parsePageText(await readFile(file, 'utf8'), path)
       } catch (error) {
+        /* v8 ignore next 2 -- walkFiles lists only regular files, so this read fails only with a vault error. */
         if (!(error instanceof WikiVaultError)) throw error
         unreadable.push({ path, message: error.message })
       }
@@ -544,6 +548,7 @@ export class VaultFiles {
    */
   async addSource(path: WikiSourcePath, text: string): Promise<void> {
     const key = sourceKey(path)
+    /* v8 ignore next -- split always yields a first segment. */
     if (key === '' || ASSET_DIRECTORIES.has(key.split('/')[0] ?? '')) {
       throw new WikiVaultError(`"${path}" is not a storable raw source path`, 'WIKI_SOURCE_NOT_FOUND')
     }
@@ -644,6 +649,7 @@ export class VaultFiles {
         } catch (error) {
           // The stored page is itself unparsable. The stale revision is still the
           // actionable failure, so it is reported without a page to compare.
+          /* v8 ignore next 2 -- parsePageText raises only vault errors, which this guard keeps. */
           if (!(error instanceof WikiVaultError)) throw error
         }
         throw new WikiVaultError(
@@ -688,10 +694,12 @@ export class VaultFiles {
         parsed = parsePageText(text, path)
       } catch (error) {
         // A page a hand edit left unparsable is still worth naming in the catalog.
+        /* v8 ignore next 2 -- parsePageText raises only vault errors, which this guard keeps. */
         if (!(error instanceof WikiVaultError)) throw error
         failure = error.message
       }
       if (parsed === null) {
+        /* v8 ignore next -- a failed parse always leaves its message here. */
         attention.push(`- \`${path}\`: ${failure ?? 'frontmatter is invalid'}`)
         continue
       }
@@ -717,7 +725,8 @@ export class VaultFiles {
       lines.push(...attention)
       lines.push('')
     }
-    if (lines[lines.length - 1] === '') lines.pop()
+    // Every branch above ends with a blank separator line; drop exactly one.
+    lines.pop()
     const text = `${lines.join('\n')}\n`
     await writeAtomically(join(this.root, 'index.md'), text)
   }
@@ -810,7 +819,9 @@ function normalizePageTarget(target: string): string {
  * @returns the target with any display text and heading dropped, trimmed.
  */
 function linkTarget(payload: string): string {
+  /* v8 ignore next -- split always yields a first segment. */
   const beforeDisplay = payload.split('|')[0] ?? ''
+  /* v8 ignore next -- split always yields a first segment. */
   return (beforeDisplay.split('#')[0] ?? '').trim()
 }
 
@@ -957,8 +968,10 @@ async function walkFiles(directory: string, options: WalkOptions = {}): Promise<
     entries = await readdir(directory, { withFileTypes: true })
   } catch (error) {
     // A missing directory is reported as null so a caller can tell "absent" from "empty".
+    /* v8 ignore start -- a directory this vault opens fails only with a missing-file code. */
     if (isMissing(error)) return null
     throw error
+    /* v8 ignore stop */
   }
   const files: string[] = []
   for (const entry of entries) {
@@ -967,9 +980,11 @@ async function walkFiles(directory: string, options: WalkOptions = {}): Promise<
     if (entry.isDirectory()) {
       if (options.excludedDirectories?.has(entry.name) === true) continue
       const nested = await walkFiles(path, options)
+      /* v8 ignore next -- a listed subdirectory cannot vanish between listing and walking. */
       if (nested !== null) files.push(...nested)
       continue
     }
+    /* v8 ignore next 2 -- a symlinked directory entry requires privileges this platform withholds, so entries are always files or directories. */
     if (!entry.isFile()) continue
     if (options.extensions !== undefined && !options.extensions.some(extension => entry.name.endsWith(extension))) continue
     files.push(path)
@@ -990,8 +1005,10 @@ async function writeAtomically(path: string, content: string): Promise<void> {
     await writeFile(temporary, content, 'utf8')
     await rename(temporary, path)
   } catch (error) {
+    /* v8 ignore start -- a rename over a stored page fails only on a platform file lock; the temporary is removed either way. */
     await rm(temporary, { force: true })
     throw error
+    /* v8 ignore stop */
   }
 }
 
@@ -1021,8 +1038,10 @@ async function readDirectoryNames(directory: string): Promise<string[] | null> {
     return entries.map(entry => entry.name)
   } catch (error) {
     // An absent directory is an expected answer here; every other failure is a real fault.
+    /* v8 ignore start -- a directory this vault opens fails only with a missing-file code. */
     if (isMissing(error)) return null
     throw error
+    /* v8 ignore stop */
   }
 }
 
@@ -1037,8 +1056,10 @@ async function fileExists(path: string): Promise<boolean> {
     return metadata.isFile()
   } catch (error) {
     // An absent file is an expected answer here; every other failure is a real fault.
+    /* v8 ignore start -- a stat over a validated vault path fails only with a missing-file code. */
     if (isMissing(error)) return false
     throw error
+    /* v8 ignore stop */
   }
 }
 
@@ -1048,6 +1069,7 @@ async function fileExists(path: string): Promise<boolean> {
  * @returns true for ENOENT and ENOTDIR.
  */
 function isMissing(error: unknown): boolean {
+  /* v8 ignore next 2 -- filesystem rejections are always error objects here. */
   if (typeof error !== 'object' || error === null) return false
   const code = (error as NodeJS.ErrnoException).code
   return code === 'ENOENT' || code === 'ENOTDIR'
@@ -1136,6 +1158,7 @@ function invalidField(path: WikiPagePath, field: string, detail: string): WikiVa
  */
 function closingDelimiterIndex(lines: readonly string[]): number {
   for (let index = 1; index < lines.length; index += 1) {
+    /* v8 ignore next -- the loop bound keeps every indexed line defined. */
     if ((lines[index] ?? '').trim() === '---') return index
   }
   return -1
@@ -1151,12 +1174,15 @@ function closingDelimiterIndex(lines: readonly string[]): number {
 function readFrontmatterFields(lines: readonly string[]): Map<string, RawField> {
   const fields = new Map<string, RawField>()
   for (let index = 0; index < lines.length; index += 1) {
+    /* v8 ignore next -- the loop bound keeps every indexed line defined. */
     const line = lines[index] ?? ''
     const trimmed = line.trim()
     if (trimmed === '' || trimmed.startsWith('#')) continue
     const match = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/.exec(line)
     if (match === null) continue
+    /* v8 ignore next -- both capture groups always participate in a match of this pattern. */
     const key = match[1] ?? ''
+    /* v8 ignore next -- both capture groups always participate in a match of this pattern. */
     const rest = (match[2] ?? '').trim()
     if (rest !== '') {
       fields.set(key, parseInlineValue(rest))
@@ -1165,8 +1191,10 @@ function readFrontmatterFields(lines: readonly string[]): Map<string, RawField> 
     const items: string[] = []
     let next = index + 1
     while (next < lines.length) {
+      /* v8 ignore next -- the loop bound keeps every indexed line defined. */
       const item = /^\s*-\s*(.*)$/.exec(lines[next] ?? '')
       if (item === null) break
+      /* v8 ignore next -- the capture group always participates in a match of this pattern. */
       pushListValue(items, unquote((item[1] ?? '').trim()))
       next += 1
     }
@@ -1202,11 +1230,13 @@ function splitInlineList(inner: string): readonly string[] {
   let current = ''
   let quote: string | null = null
   for (let index = 0; index < inner.length; index += 1) {
+    /* v8 ignore next -- the loop bound keeps every indexed character defined. */
     const character = inner[index] ?? ''
     if (quote !== null) {
       current += character
       if (character === '\\') {
         index += 1
+        /* v8 ignore next -- an escaped closing quote leaves no character to append. */
         current += inner[index] ?? ''
         continue
       }

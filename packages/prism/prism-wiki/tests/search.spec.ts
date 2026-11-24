@@ -4,12 +4,14 @@
  * recovery from a database that is not usable.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { WikiSearchIndex, type WikiSearchEntry } from '../src/search.ts'
+import { writeForeignDatabase, writeUnbrandedDatabase } from './fixtures/vault-fixtures.ts'
 import type { WikiPagePath } from '../src/types.ts'
 
 const page = (path: string): WikiPagePath => brandString<WikiPagePath>(path)
@@ -222,5 +224,207 @@ describe('cache durability', () => {
   it('writes nothing outside its own database path', async () => {
     const before = await readFile(join(root, 'unrelated.txt'), 'utf8').catch(() => null)
     expect(before).toBeNull()
+  })
+
+  it('keeps the cache in memory when the path is the memory marker', async () => {
+    await index.close()
+    const memory = new WikiSearchIndex(':memory:')
+    await memory.open()
+    await memory.reconcile([entry('concepts/mem.md', { body: 'memory text' })])
+
+    expect((await memory.search('memory', { limit: 10 })).map(hit => hit.path)).toEqual(['concepts/mem.md'])
+    await memory.close()
+    index = memory
+  })
+
+  it('closes cleanly while a failing open is still in flight', async () => {
+    await index.close()
+    const foreignPath = join(root, '.wiki', 'foreign.db')
+    writeForeignDatabase(foreignPath)
+    const doomed = new WikiSearchIndex(foreignPath)
+    const opening = doomed.open()
+
+    await expect(doomed.close()).resolves.toBeUndefined()
+    await expect(opening).rejects.toThrow('belongs to another application')
+    index = new WikiSearchIndex(join(root, '.wiki', 'index.db'))
+    await index.open()
+  })
+})
+
+describe('a database this cache does not own', () => {
+  /** The cache path every case re-arms with a foreign file. */
+  const dbPath = (): string => join(root, '.wiki', 'index.db')
+
+  /** Reopen a fresh cache over the path, after the foreign file is gone. */
+  async function reopenFresh(): Promise<void> {
+    await rm(dbPath(), { force: true })
+    index = new WikiSearchIndex(dbPath())
+    await index.open()
+  }
+
+  it('refuses a file another application branded, and searches raise the refusal', async () => {
+    await index.close()
+    await rm(dbPath(), { force: true })
+    writeForeignDatabase(dbPath())
+
+    const foreign = new WikiSearchIndex(dbPath())
+    await expect(foreign.open()).rejects.toThrow('belongs to another application')
+    await expect(foreign.search('anything', { limit: 10 })).rejects.toThrow('belongs to another application')
+
+    await reopenFresh()
+  })
+
+  it('refuses an unbranded file that already holds tables', async () => {
+    await index.close()
+    await rm(dbPath(), { force: true })
+    writeUnbrandedDatabase(dbPath())
+
+    const unbranded = new WikiSearchIndex(dbPath())
+    await expect(unbranded.open()).rejects.toThrow('holds tables this index did not create')
+
+    await reopenFresh()
+  })
+
+  it('rebuilds a cache whose derived schema is an older version', async () => {
+    await index.reconcile([entry('concepts/old.md', { body: 'stale text' })])
+    await index.close()
+    const raw = new DatabaseSync(dbPath())
+    raw.exec('PRAGMA user_version = 0')
+    raw.close()
+
+    const migrated = new WikiSearchIndex(dbPath())
+    await migrated.open()
+    await migrated.reconcile([entry('concepts/new.md', { body: 'fresh text' })])
+
+    expect(await migrated.search('stale', { limit: 10 })).toEqual([])
+    expect((await migrated.search('fresh', { limit: 10 })).map(hit => hit.path)).toEqual(['concepts/new.md'])
+    await migrated.close()
+    index = migrated
+  })
+})
+
+describe('recovery from a cache that turns unusable while open', () => {
+  it('rebuilds the page table after it is dropped under an open handle', async () => {
+    await index.reconcile([entry('concepts/kept.md', { body: 'kept text' })])
+
+    // Dropping the derived table behind the open handle makes the next
+    // statement fail as a SQLite error, and the cache rebuilds itself.
+    const saboteur = new DatabaseSync(join(root, '.wiki', 'index.db'))
+    try {
+      saboteur.exec('DROP TABLE wiki_pages')
+    } finally {
+      saboteur.close()
+    }
+
+    await index.reconcile([entry('concepts/kept.md', { body: 'kept text', mtimeMs: 2 })])
+
+    expect((await index.search('kept', { limit: 10 })).map(hit => hit.path)).toEqual(['concepts/kept.md'])
+  })
+
+  it('rolls a failed reconciliation back and raises the fault', async () => {
+    await index.reconcile([entry('concepts/kept.md', { body: 'kept text' })])
+    // A page whose tags explode mid-insert faults the transaction after BEGIN.
+    const hostile: WikiSearchEntry = {
+      ...entry('concepts/hostile.md', { body: 'hostile text' }),
+      get tags(): readonly string[] { throw new Error('tags exploded') },
+    }
+
+    await expect(index.reconcile([hostile])).rejects.toThrow('tags exploded')
+
+    // The rollback left the previous rows intact.
+    expect((await index.search('kept', { limit: 10 })).map(hit => hit.path)).toEqual(['concepts/kept.md'])
+    expect(await index.search('hostile', { limit: 10 })).toEqual([])
+  })
+
+  it('rolls a failed rebuild back and raises the fault', async () => {
+    await index.reconcile([entry('concepts/kept.md', { body: 'kept text' })])
+    const hostile: WikiSearchEntry = {
+      ...entry('concepts/hostile.md', { body: 'hostile text' }),
+      get tags(): readonly string[] { throw new Error('tags exploded') },
+    }
+
+    await expect(index.rebuild([hostile])).rejects.toThrow('tags exploded')
+
+    expect((await index.search('kept', { limit: 10 })).map(hit => hit.path)).toEqual(['concepts/kept.md'])
+  })
+
+  it('raises when an unusable cache cannot be discarded', async () => {
+    await index.reconcile([entry('concepts/kept.md', { body: 'kept text' })])
+    // Recovery discards the cache files before reopening; an occupied sidecar
+    // cannot be discarded, so the failure reaches the caller with the handle open.
+    await rm(join(root, '.wiki', 'index.db-wal'), { force: true })
+    await mkdir(join(root, '.wiki', 'index.db-wal'), { recursive: true })
+    await writeFile(join(root, '.wiki', 'index.db-wal', 'keeper.txt'), 'occupied', 'utf8')
+    const saboteur = new DatabaseSync(join(root, '.wiki', 'index.db'))
+    try {
+      saboteur.exec('DROP TABLE wiki_pages')
+    } finally {
+      saboteur.close()
+    }
+
+    await expect(index.reconcile([entry('concepts/kept.md', { body: 'kept text', mtimeMs: 2 })]))
+      .rejects.toThrow(/ENOTEMPTY|index\.db/iu)
+  })
+})
+
+describe('excerpt bounding', () => {
+  it('bounds an excerpt to the head of a body without the query term', async () => {
+    // The title matches, so the hit is returned for a body that holds no term.
+    await index.reconcile([entry('concepts/titled.md', {
+      title: 'Needle holder',
+      body: `${'padding '.repeat(60)}`,
+    })])
+
+    const hits = await index.search('needle', { limit: 10 })
+
+    expect(hits).toHaveLength(1)
+    expect(hits[0]?.excerpt.startsWith('padding')).toBe(true)
+    expect(hits[0]?.excerpt.endsWith('…')).toBe(true)
+  })
+
+  it('cuts an excerpt at the budget when the matched term itself is longer', async () => {
+    const term = 'y'.repeat(250)
+    await index.reconcile([entry('concepts/long-term.md', {
+      body: `${'x'.repeat(150)}${term}${'z'.repeat(150)}`,
+    })])
+
+    const hits = await index.search(term, { limit: 10 })
+
+    expect(hits[0]?.excerpt).toHaveLength(200)
+    expect(hits[0]?.excerpt.startsWith('yyy')).toBe(true)
+  })
+
+  it('marks only the edges that were cut', async () => {
+    await index.reconcile([
+      entry('concepts/head.md', { body: `needle ${'x'.repeat(300)}` }),
+      entry('concepts/tail.md', { body: `${'x'.repeat(300)} needle` }),
+    ])
+
+    const hits = await index.search('needle', { limit: 10 })
+    const excerpts = hits.map(hit => hit.excerpt)
+
+    // The head match opens the excerpt uncut; the tail match closes it uncut.
+    expect(excerpts.some(text => text.startsWith('needle'))).toBe(true)
+    expect(excerpts.some(text => text.endsWith('…'))).toBe(true)
+    expect(excerpts.some(text => text.startsWith('…'))).toBe(true)
+    expect(excerpts.some(text => text.endsWith('needle'))).toBe(true)
+  })
+
+  it('locates terms out of order and folds case through the fallback path', async () => {
+    // Both bodies exceed the excerpt budget, so the excerpt machinery runs.
+    await index.reconcile([
+      entry('concepts/ordered.md', { body: `alpha ${'filler '.repeat(40)} beta ${'more '.repeat(40)}` }),
+      entry('concepts/dotted.md', { body: `The İtalian way of folding ${'x'.repeat(300)}` }),
+    ])
+
+    const inOrder = await index.search('alpha beta', { limit: 10 })
+    expect(inOrder[0]?.excerpt).toContain('alpha')
+
+    const reversed = await index.search('beta alpha', { limit: 10 })
+    expect(reversed[0]?.excerpt).toContain('alpha')
+
+    // Case folding changes the body length, so the offset search falls back.
+    const folded = await index.search('way', { limit: 10 })
+    expect(folded[0]?.excerpt).toContain('way')
   })
 })

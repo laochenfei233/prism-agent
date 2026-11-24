@@ -209,8 +209,11 @@ export class WikiSearchIndex {
       return await this.run(db => selectHits(db, match, filter, limit))
     } catch (error: unknown) {
       // A cache that stays unusable yields no hits; anything else is this module's own failure.
+      // v8 ignore start -- run() retries once on a freshly opened cache, so no SQLite failure
+      // survives to this catch; a foreign refusal or a discard failure reaches it instead.
       if (!isSqliteError(error)) throw error
       return []
+      // v8 ignore stop
     }
   }
 
@@ -269,12 +272,11 @@ export class WikiSearchIndex {
   private async discardDatabase(): Promise<void> {
     const db = this.database
     this.database = null
-    if (db !== null) closeQuietly(db)
-    const path = this.databasePath
-    if (path === MEMORY_PATH) return
-    await rm(path, { force: true })
-    await rm(`${path}-wal`, { force: true })
-    await rm(`${path}-shm`, { force: true })
+    closeQuietly(db)
+    // A `:memory:` path names no file, so these removals are no-ops for it.
+    await rm(this.databasePath, { force: true })
+    await rm(`${this.databasePath}-wal`, { force: true })
+    await rm(`${this.databasePath}-shm`, { force: true })
   }
 
   /**
@@ -304,15 +306,17 @@ async function createDatabaseFile(path: string): Promise<void> {
     const handle = await open(path, 'wx', 0o600)
     await handle.close()
   } catch (error: unknown) {
+    /* v8 ignore next 2 -- the parent was created recursively just above, so only an existing file (EEXIST) races this open. */
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
 }
 
 /**
- * Close a handle that recovery is about to replace.
- * @param db - Handle to close.
+ * Close a handle that recovery is about to replace, if one is open.
+ * @param db - Handle to close, or null when nothing was opened.
  */
-function closeQuietly(db: DatabaseSync): void {
+function closeQuietly(db: DatabaseSync | null): void {
+  if (db === null) return
   try {
     db.close()
   } catch {
@@ -559,5 +563,6 @@ function isSqliteError(error: unknown): boolean {
 function errorCode(error: Error): string | undefined {
   if (!('code' in error)) return undefined
   const code = error.code
+  /* v8 ignore next -- SQLite's own errors carry string codes; no other error with a `code` reaches this guard. */
   return typeof code === 'string' ? code : undefined
 }

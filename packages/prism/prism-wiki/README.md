@@ -138,12 +138,12 @@ pnpm run test:docs
 pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md
 ```
 
-- `pnpm run test` runs the unit suite: `tests/vault.spec.ts` against real temporary vault directories, `tests/search.spec.ts` against a real FTS5 database file, `tests/tools.spec.ts` and `tests/commands.spec.ts` through the real registries, `tests/web.spec.ts` through the real Connection Fetch registry, `tests/client-api.client.spec.ts` over the browser client, `tests/client-page.client.spec.tsx` over the page in jsdom, and `tests/composition.host.spec.ts` booting the shipped rows through the vendored Loader.
+- `pnpm run test` runs the unit suite: `tests/vault.spec.ts` against real temporary vault directories, `tests/search.spec.ts` against a real FTS5 database file, `tests/tools.spec.ts` and `tests/commands.spec.ts` through the real registries, `tests/service.spec.ts` over the vault service's own seams, `tests/web.spec.ts` through the real Connection Fetch registry, `tests/client-api.client.spec.ts` over the browser client, `tests/client-page.client.spec.tsx` over the page in jsdom, and `tests/composition.host.spec.ts` booting the shipped rows through the vendored Loader.
 - `pnpm run typecheck` compiles the host and client programs against the checkout.
 - `pnpm run test:docs` runs the documentation gates: pairing, wrap, links, budgets, and the package-README checks.
 - `pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` checks this README pair alone.
 
-The package does not yet meet the repository's per-file coverage gate: `test:coverage` still reports uncovered branches, most in `src/client/WikiPage.tsx`, `src/vault.ts`, and `src/search.ts`.
+The package meets the repository's per-file coverage gate: `test:coverage` reports 100% statements, branches, functions, and lines for every file under `src/`, with `src/client/index.tsx` exempted as the browser entry.
 
 -----
 

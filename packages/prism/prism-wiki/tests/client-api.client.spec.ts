@@ -91,6 +91,19 @@ function okFetch(value: unknown): { readonly fetch: typeof fetch; readonly calls
   return fetchOf({ ok: true, value })
 }
 
+/** A fetch stub answering one raw JSON text, for values JSON-in-JS cannot express. */
+function fetchOfText(text: string): { readonly fetch: typeof fetch; readonly calls: Call[] } {
+  const calls: Call[] = []
+  return {
+    fetch: async (input, init) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      calls.push({ url, init: init ?? {} })
+      return new Response(text, { headers: { 'content-type': 'application/json' } })
+    },
+    calls,
+  }
+}
+
 /** Read one operation's outcome, resolving or rejecting to the value itself. */
 async function outcome(run: () => Promise<unknown>): Promise<unknown> {
   return await run().catch((error: unknown) => error)
@@ -220,5 +233,55 @@ describe('wiki api', () => {
       if (!(failure instanceof WikiRequestError)) throw new Error(`${name}: the client resolved instead of raising`)
       expect(failure.code, name).toBe('prism-wiki/invalid-response')
     }
+  })
+
+  it('rejects a number the wire carried as a non-finite value', async () => {
+    // `1e999` parses to Infinity, which JSON-in-JS cannot carry but the wire can.
+    const raw = JSON.stringify({ ok: true, value: { report } }).replace('"pages":1', '"pages":1e999')
+    const failure = await outcome(async () => await createWikiApi(fetchOfText(raw).fetch).lint())
+
+    if (!(failure instanceof WikiRequestError)) throw new Error('the client resolved instead of raising')
+    expect(failure.code).toBe('prism-wiki/invalid-response')
+  })
+
+  it('narrows a finding page that is null, present, or the wrong type', async () => {
+    const findings = (page: unknown): unknown => ({
+      report: { ...report, findings: [{ kind: 'orphan-page', page, detail: 'x' }] },
+    })
+
+    const absent = await createWikiApi(okFetch(findings(null)).fetch).lint()
+    expect(absent.report.findings[0]?.page).toBeNull()
+
+    const named = await createWikiApi(okFetch(findings('concepts/alpha.md')).fetch).lint()
+    expect(named.report.findings[0]?.page).toBe('concepts/alpha.md')
+
+    const failure = await outcome(async () => await createWikiApi(okFetch(findings(7)).fetch).lint())
+    if (!(failure instanceof WikiRequestError)) throw new Error('the client resolved instead of raising')
+    expect(failure.code).toBe('prism-wiki/invalid-response')
+  })
+
+  it('reads a page whose confidence the author stated as none', async () => {
+    const unstated = { ...stored, frontmatter: { ...frontmatter, confidence: null } }
+    const value = await createWikiApi(okFetch({ page: unstated, links: [], backlinks: [], sources: [] }).fetch)
+      .read(readRequest)
+
+    expect(value.page.frontmatter.confidence).toBeNull()
+  })
+
+  it('falls back to the page fetch when none is injected', async () => {
+    const calls: Call[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = async (input, init) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      calls.push({ url, init: init ?? {} })
+      return Response.json({ ok: true, value: { pages: [] } })
+    }
+    try {
+      await createWikiApi().list()
+    } finally {
+      globalThis.fetch = original
+    }
+
+    expect(calls[0]?.url).toBe('api/prism-wiki/list')
   })
 })

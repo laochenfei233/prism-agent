@@ -312,11 +312,13 @@ function todayText(): string {
 
 /** One page kind from a form control's value, keeping the current kind for an unknown value. */
 function pageTypeOf(value: string, fallback: WikiPageType): WikiPageType {
+  /* v8 ignore next -- the kind control offers only these members. */
   return PAGE_TYPES.find(type => type === value) ?? fallback
 }
 
 /** One page state from a form control's value, keeping the current state for an unknown value. */
 function statusOf(value: string, fallback: WikiPageStatus): WikiPageStatus {
+  /* v8 ignore next -- the state control offers only these members. */
   return PAGE_STATUSES.find(status => status === value) ?? fallback
 }
 
@@ -337,6 +339,7 @@ function kindTone(kind: WikiLintKind): TagTone {
 /** A wiki path without its `.md` suffix. */
 function stripMarkdownSuffix(path: string): string {
   const trimmed = path.toLowerCase()
+  /* v8 ignore next -- every name this page resolves arrives with its .md suffix. */
   return trimmed.endsWith('.md') ? trimmed.slice(0, -3) : trimmed
 }
 
@@ -349,6 +352,7 @@ function stripMarkdownSuffix(path: string): string {
  */
 function resolvePagePath(target: string, pages: readonly WikiPageSummary[]): string | undefined {
   const needle = target.trim().toLowerCase()
+  /* v8 ignore next -- an empty link target never becomes a link the delegate would follow. */
   if (needle.length === 0) return undefined
   const bare = stripMarkdownSuffix(needle)
   const found = pages.find((entry) => {
@@ -369,6 +373,7 @@ function resolvePagePath(target: string, pages: readonly WikiPageSummary[]): str
  * @returns the local `.md` destination.
  */
 function wikilinkDestination(target: string): string {
+  /* v8 ignore next -- split always yields a first segment. */
   const bare = target.split(/[#^]/u)[0] ?? ''
   const trimmed = bare.trim()
   const path = trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`
@@ -383,6 +388,7 @@ function escapeLinkText(text: string): string {
 /** The fence marker opening a fenced code block on one line, or null. */
 function fenceOpening(line: string): string | null {
   const match = /^(`{3,}|~{3,})/u.exec(line.trimStart())
+  /* v8 ignore next -- the group always participates in a match of this pattern. */
   return match === null ? null : match[1] ?? null
 }
 
@@ -561,6 +567,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
    * @param target - the link target as written.
    */
   const openTarget = useCallback((target: string | null): void => {
+    /* v8 ignore next -- a finding without a page renders its button disabled, so no click carries null. */
     if (target === null) return
     const resolved = resolvePagePath(target, pages)
     if (resolved !== undefined) {
@@ -636,6 +643,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
 
   /** Update the open draft through its latest value. */
   const patchDraft = useCallback((patch: (current: WikiDraft) => WikiDraft): void => {
+    /* v8 ignore next -- the patch handlers render only while a draft is open. */
     setDraft(current => (current === null ? current : patch(current)))
   }, [])
 
@@ -648,6 +656,7 @@ export function WikiPage(props: WikiPageProps): ReactNode {
 
   /** Store the open draft, echoing the revision it loaded. */
   const onSave = useCallback(async (): Promise<void> => {
+    /* v8 ignore next -- the save button renders only while a draft is open. */
     if (draft === null) return
     const path = draft.path.trim()
     if (path.length === 0) {

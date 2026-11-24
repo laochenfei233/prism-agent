@@ -176,6 +176,9 @@ describe('knowledge page', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Alpha' })).toBeTruthy()
     expect(await screen.findByText('Alpha body.')).toBeTruthy()
     expect(wikiFace.read).toHaveBeenCalledWith('concepts/alpha.md')
+
+    fireEvent.click(screen.getByRole('button', { name: en.refresh }))
+    await waitFor(() => expect(wikiFace.list).toHaveBeenCalledTimes(2))
   })
 
   it('follows a wikilink to the page it names', async () => {
@@ -189,13 +192,17 @@ describe('knowledge page', () => {
     expect(wikiFace.read).toHaveBeenCalledWith('concepts/beta.md')
   })
 
-  it('lists the pages that link to the open page', async () => {
+  it('lists the pages that link to the open page, and follows one', async () => {
     renderPage(face())
 
     const article = await openPage('Alpha')
 
     expect(within(article).getByRole('heading', { level: 3, name: en.backlinks })).toBeTruthy()
-    expect(within(article).getByRole('button', { name: 'concepts/beta.md' })).toBeTruthy()
+    const backlink = within(article).getByRole('button', { name: 'concepts/beta.md' })
+    expect(backlink).toBeTruthy()
+
+    fireEvent.click(backlink)
+    expect(await screen.findByText('Beta body.')).toBeTruthy()
   })
 
   it('answers the reader query with the ranked hits', async () => {
@@ -392,6 +399,593 @@ describe('knowledge page', () => {
 
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('vault states', () => {
+  it('shows the empty-vault placeholders', async () => {
+    const wikiFace = face({ list: vi.fn(async (): Promise<WikiListValue> => ({ pages: [] })) })
+    renderPage(wikiFace)
+
+    expect(await screen.findByText(en.vaultEmpty)).toBeTruthy()
+    expect(screen.getByText(en.vaultEmptyHint)).toBeTruthy()
+  })
+
+  it('reports a failed listing and dismisses the notice', async () => {
+    const wikiFace = face({
+      list: vi.fn(async (): Promise<WikiListValue> => { throw 'disk gone' }),
+    })
+    renderPage(wikiFace)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(en.loadFailed.replace('{reason}', 'disk gone'))
+
+    fireEvent.click(within(alert).getByRole('button', { name: en.dismiss }))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('reports a failed page read and dismisses the notice', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (): Promise<WikiReadValue> => { throw new Error('the page vanished') }),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: /Alpha/u }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('the page vanished')
+    fireEvent.click(within(alert).getByRole('button', { name: en.dismiss }))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('renders every page state tone in the tree', async () => {
+    const wikiFace = face({
+      list: vi.fn(async (): Promise<WikiListValue> => ({
+        pages: [
+          summary('concepts/alpha.md'),
+          { ...summary('concepts/beta.md'), status: 'disputed' },
+          { ...summary('concepts/gamma.md'), status: 'stub' },
+          { ...summary('concepts/delta.md'), status: 'superseded' },
+        ],
+      })),
+    })
+    renderPage(wikiFace)
+
+    expect(await screen.findByText(en.statusDisputed)).toBeTruthy()
+    // Every state appears twice: its filter pill and its tree-row tag.
+    expect(screen.getAllByText(en.statusDisputed)).toHaveLength(2)
+    expect(screen.getAllByText(en.statusStub)).toHaveLength(2)
+    expect(screen.getAllByText(en.statusSuperseded)).toHaveLength(2)
+    expect(screen.getAllByText(en.statusCurrent).length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('the search tab', () => {
+  it('starts idle, searches on Enter, and reports no hits', async () => {
+    const wikiFace = face({ search: vi.fn(async (): Promise<WikiSearchValue> => ({ hits: [] })) })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('tab', { name: en.tabSearch }))
+
+    const panel = screen.getByRole('tabpanel')
+    expect(within(panel).getByText(en.searchEmpty)).toBeTruthy()
+    expect(within(panel).getByText(en.searchHint)).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(en.searchPlaceholder), { target: { value: 'ghost' } })
+    fireEvent.keyDown(screen.getByLabelText(en.searchPlaceholder), { key: 'a' })
+    expect(wikiFace.search).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByLabelText(en.searchPlaceholder), { key: 'Enter' })
+
+    expect(await within(panel).findByText(en.searchNone)).toBeTruthy()
+    expect(wikiFace.search).toHaveBeenCalledWith({ query: 'ghost', limit: 30 })
+  })
+
+  it('shows the searching state, then the hits, and opens one', async () => {
+    let settle: ((value: WikiSearchValue) => void) | null = null
+    const wikiFace = face({
+      search: vi.fn((): Promise<WikiSearchValue> => new Promise(resolve => { settle = resolve })),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.search }))
+    const panel = screen.getByRole('tabpanel')
+    expect(await within(panel).findByText(en.searching)).toBeTruthy()
+
+    settle?.({ hits: [{ ...hit, title: 'Alpha', path: pagePath('concepts/alpha.md') }] })
+    expect(await within(panel).findByText(en.hitsCount.replace('{count}', '1'))).toBeTruthy()
+
+    fireEvent.click(within(panel).getByRole('button', { name: /the needle excerpt/u }))
+    expect(await screen.findByRole('article')).toBeTruthy()
+    expect(wikiFace.read).toHaveBeenCalledWith('concepts/alpha.md')
+  })
+
+  it('reports a failed search', async () => {
+    const wikiFace = face({
+      search: vi.fn(async (): Promise<WikiSearchValue> => { throw new Error('the index is closed') }),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.search }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('the index is closed')
+  })
+})
+
+describe('the health tab', () => {
+  it('runs the check when opened and reports a clean vault', async () => {
+    const wikiFace = face()
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('tab', { name: en.tabHealth }))
+
+    const panel = await screen.findByRole('tabpanel')
+    expect(await within(panel).findByText(en.lintClean)).toBeTruthy()
+    expect(within(panel).getByText(en.lintSummary.replace('{pages}', '2').replace('{sources}', '0'))).toBeTruthy()
+    expect(wikiFace.lint).toHaveBeenCalled()
+  })
+
+  it('lists findings, opening the page ones and disabling the vault-wide ones', async () => {
+    const wikiFace = face({
+      lint: vi.fn(async (): Promise<WikiLintValue> => ({
+        report: {
+          pages: 2,
+          sources: 1,
+          findings: [
+            { kind: 'orphan-page', page: 'concepts/alpha.md', detail: 'no page links to this page' },
+            { kind: 'broken-link', page: 'concepts/alpha.md', detail: '[[Ghost]] resolves to no page' },
+            { kind: 'frontmatter', page: 'concepts/beta.md', detail: 'type "concept" expects the directory "wiki/concepts/"' },
+            { kind: 'unintegrated-source', page: null, detail: 'raw source "notes/note.md" is cited by no page' },
+          ],
+        },
+      })),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('tab', { name: en.tabHealth }))
+
+    const panel = await screen.findByRole('tabpanel')
+    const orphan = await within(panel).findByRole('button', { name: /Orphan page/u })
+    // A finding about the vault as a whole names no page, so it is not clickable.
+    expect(within(panel).getByRole('button', { name: /Unintegrated source/u }).disabled).toBe(true)
+    expect(within(panel).getByRole('button', { name: /Broken link/u }).disabled).toBe(false)
+    expect(within(panel).getByRole('button', { name: /Frontmatter/u }).disabled).toBe(false)
+    expect(orphan.disabled).toBe(false)
+
+    fireEvent.click(orphan)
+    expect(await screen.findByRole('article')).toBeTruthy()
+    expect(wikiFace.read).toHaveBeenCalledWith('concepts/alpha.md')
+  })
+
+  it('reports a failed check and retries from the tab', async () => {
+    const wikiFace = face({
+      lint: vi.fn()
+        .mockImplementationOnce(async (): Promise<WikiLintValue> => { throw new Error('the vault is locked') })
+        .mockImplementationOnce(async (): Promise<WikiLintValue> => ({
+          report: { pages: 2, sources: 0, findings: [] },
+        })),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('tab', { name: en.tabHealth }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('the vault is locked')
+
+    fireEvent.click(screen.getByRole('button', { name: en.lint }))
+    expect(await screen.findByText(en.lintClean)).toBeTruthy()
+    expect(wikiFace.lint).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('the editor', () => {
+  it('carries every field the reader typed into the save request', async () => {
+    const wikiFace = face()
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.newPage }))
+    fireEvent.change(titleField(), { target: { value: 'Attention' } })
+    fireEvent.change(screen.getByLabelText(en.fieldStatus), { target: { value: 'disputed' } })
+    const updatedField = screen.getByLabelText(en.fieldUpdated)
+    fireEvent.change(updatedField, { target: { value: '2026-01-01' } })
+    if (!(updatedField instanceof HTMLInputElement)) throw new Error('the updated field is not an input')
+    expect(updatedField.value).toBe('2026-01-01')
+    fireEvent.change(screen.getByLabelText(en.fieldConfidence), { target: { value: '0.75' } })
+    fireEvent.change(screen.getByLabelText(en.fieldTags), { target: { value: ' a ， b , c ' } })
+    fireEvent.change(screen.getByLabelText(en.fieldSources), { target: { value: 'notes/n.md' } })
+    fireEvent.change(screen.getByLabelText(en.fieldAliases), { target: { value: 'Att' } })
+    fireEvent.change(screen.getByLabelText(en.fieldContradicts), { target: { value: 'concepts/beta.md' } })
+    fireEvent.change(screen.getByLabelText(en.fieldBody), { target: { value: 'Body text.' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    await waitFor(() => {
+      expect(wikiFace.save).toHaveBeenCalledWith({
+        path: 'concepts/attention.md',
+        frontmatter: {
+          title: 'Attention',
+          type: 'concept',
+          tags: ['a', 'b', 'c'],
+          updated: '2026-01-01',
+          status: 'disputed',
+          sources: ['notes/n.md'],
+          aliases: ['Att'],
+          confidence: 0.75,
+          contradicts: ['concepts/beta.md'],
+        },
+        body: 'Body text.',
+      })
+    })
+    expect(wikiFace.notify).toHaveBeenCalledWith(en.saved.replace('{path}', 'concepts/attention.md'), 'success')
+  })
+
+  it('reads a blank or non-numeric confidence as unstated', async () => {
+    const wikiFace = face()
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.change(screen.getByLabelText(en.fieldConfidence), { target: { value: 'high' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    await waitFor(() => {
+      expect(wikiFace.save).toHaveBeenCalledWith(expect.objectContaining({
+        frontmatter: expect.objectContaining({ confidence: null }),
+      }))
+    })
+  })
+
+  it('refuses a draft whose title derives no path, and one without a title', async () => {
+    const wikiFace = face()
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.newPage }))
+    fireEvent.change(titleField(), { target: { value: '???' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    expect((await screen.findByRole('alert')).textContent).toContain(en.invalidPath)
+
+    fireEvent.change(titleField(), { target: { value: '' } })
+    fireEvent.change(pathField(), { target: { value: 'concepts/custom.md' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    expect((await screen.findByRole('alert')).textContent).toContain(en.invalidTitle)
+    expect(wikiFace.save).not.toHaveBeenCalled()
+  })
+
+  it('edits a stored page with its path locked, and cancels back to the reader', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: { ...frontmatter('Alpha'), confidence: 0.5 }, body: 'Alpha body.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    expect(screen.getByText(en.editorEdit)).toBeTruthy()
+    expect(pathField().disabled).toBe(true)
+    // A stated confidence is echoed into the field as its number.
+    const confidenceField = screen.getByLabelText(en.fieldConfidence)
+    if (!(confidenceField instanceof HTMLInputElement)) throw new Error('the confidence field is not an input')
+    expect(confidenceField.value).toBe('0.5')
+
+    fireEvent.change(titleField(), { target: { value: 'Alpha II' } })
+    fireEvent.change(screen.getByLabelText(en.fieldType), { target: { value: 'entity' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    await waitFor(() => {
+      expect(wikiFace.save).toHaveBeenCalledWith(expect.objectContaining({
+        path: 'concepts/alpha.md',
+        expectedRevision: 'rev-1',
+        frontmatter: expect.objectContaining({ title: 'Alpha II', type: 'entity' }),
+      }))
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }))
+    expect(screen.queryByLabelText(en.fieldTitle)).toBeNull()
+    expect(screen.getByRole('article')).toBeTruthy()
+  })
+
+  it('shows the saving state and reports a failed save through the notice host', async () => {
+    let settle: ((value: WikiSaveValue) => void) | null = null
+    const wikiFace = face({
+      save: vi.fn((): Promise<WikiSaveValue> => new Promise(resolve => { settle = resolve })),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    expect(screen.getByRole('button', { name: en.saving })).toBeTruthy()
+
+    settle?.({
+      page: { path: 'concepts/alpha.md', frontmatter: frontmatter('Alpha'), body: 'Body.', revision: 'rev-2' },
+    })
+    await screen.findByRole('article')
+    expect(wikiFace.notify).toHaveBeenCalledWith(en.saved.replace('{path}', 'concepts/alpha.md'), 'success')
+  })
+
+  it('reports a save failure that is not a revision conflict', async () => {
+    const wikiFace = face({
+      save: vi.fn(async (): Promise<WikiSaveValue> => { throw new Error('the disk is full') }),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    await waitFor(() => {
+      expect(wikiFace.notify).toHaveBeenCalledWith(
+        en.saveFailed.replace('{reason}', 'the disk is full'), 'warning',
+      )
+    })
+  })
+
+  it('dismisses the conflict notice and keeps editing beside the stored page', async () => {
+    const wikiFace = face({
+      save: vi.fn(async (): Promise<WikiSaveValue> => {
+        throw new WikiRequestError('prism-wiki/revision-conflict', 'changed elsewhere', {
+          path: 'concepts/alpha.md', frontmatter: frontmatter('Alpha'), body: 'The stored body.', revision: 'rev-9',
+        })
+      }),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    fireEvent.change(screen.getByLabelText(en.fieldBody), { target: { value: 'My kept draft.' } })
+    fireEvent.click(screen.getByRole('button', { name: en.save }))
+
+    const notice = await screen.findByRole('alert')
+    fireEvent.click(within(notice).getByRole('button', { name: en.dismiss }))
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    // The compare view keeps the draft editable beside the stored text.
+    fireEvent.change(screen.getByLabelText(en.fieldBody), { target: { value: 'My revised kept draft.' } })
+    const draft = screen.getByLabelText(en.fieldBody)
+    if (!(draft instanceof HTMLTextAreaElement)) throw new Error('the editor draft is not a textarea')
+    expect(draft.value).toBe('My revised kept draft.')
+    expect(screen.getByText('The stored body.')).toBeTruthy()
+  })
+
+  it('shows the loading placeholder while a page read is in flight', async () => {
+    let settle: ((value: WikiReadValue) => void) | null = null
+    const wikiFace = face({
+      read: vi.fn((path: string): Promise<WikiReadValue> => new Promise(resolve => { settle = resolve })),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: /Alpha/u }))
+    expect(await screen.findByText(en.pageLoading)).toBeTruthy()
+
+    settle?.(readValue('concepts/alpha.md'))
+    expect(await screen.findByRole('article')).toBeTruthy()
+  })
+
+  it('shows the placeholders of a page without backlinks or sources', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: 'Plain body.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    const article = await openPage('Alpha')
+
+    expect(within(article).getByText(en.noBacklinks)).toBeTruthy()
+    expect(within(article).getByText(en.noSources)).toBeTruthy()
+  })
+
+  it('keeps wikilinks inside code literal and renders labelled and anchored links', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: {
+          path,
+          frontmatter: frontmatter('Alpha'),
+          body: [
+            'Fenced:',
+            '',
+            '```',
+            '[[Gamma]]',
+            '```',
+            '',
+            '~~~',
+            '[[Delta]]',
+            '~~~',
+            '',
+            'Inline `[[Epsilon]]` code.',
+            '',
+            'Label [[Beta|the [second] page]]. Anchor [[Beta#top]].',
+            '',
+          ].join('\n'),
+          revision: 'rev-1',
+        },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    const article = await openPage('Alpha')
+
+    for (const literal of ['Gamma', 'Delta', 'Epsilon']) {
+      expect(within(article).queryByRole('button', { name: literal })).toBeNull()
+    }
+    fireEvent.click(within(article).getByRole('button', { name: 'the [second] page' }))
+    expect(wikiFace.read).toHaveBeenCalledWith('concepts/beta.md')
+  })
+
+  it('derives the vault-root path for a new overview page', async () => {
+    renderPage(face())
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    fireEvent.click(screen.getByRole('button', { name: en.newPage }))
+    fireEvent.change(screen.getByLabelText(en.fieldType), { target: { value: 'overview' } })
+
+    expect(pathField().value).toBe('overview.md')
+  })
+
+  it('keeps degenerate links literal and derives no path from a nameless target', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: {
+          path,
+          frontmatter: frontmatter('Alpha'),
+          body: [
+            'Empty [[|label]] and [[ ]].',
+            '',
+            'Empty label [[Beta|]].',
+            '',
+            'Full [[concepts/beta.md]].',
+            '',
+            'Wanted [[???]].',
+            '',
+            'Open ``two` one` end.',
+            '',
+          ].join('\n'),
+          revision: 'rev-1',
+        },
+        links: [],
+        backlinks: [],
+        sources: [],
+      })),
+    })
+    renderPage(wikiFace)
+
+    const article = await openPage('Alpha')
+
+    expect(within(article).queryByRole('button', { name: 'label' })).toBeNull()
+    expect(within(article).getByRole('button', { name: 'Beta' })).toBeTruthy()
+    expect(within(article).getByRole('button', { name: 'concepts/beta.md' })).toBeTruthy()
+    expect(within(article).getByRole('button', { name: '???' })).toBeTruthy()
+
+    fireEvent.click(within(article).getByRole('button', { name: '???' }))
+    expect(pathField().value).toBe('')
+    expect(titleField().value).toBe('???')
+  })
+})
+
+describe('tree filters and groups', () => {
+  it('narrows by pill, text, and clears both', async () => {
+    const wikiFace = face({
+      list: vi.fn(async (): Promise<WikiListValue> => ({
+        pages: [
+          summary('concepts/alpha.md'),
+          { ...summary('concepts/beta.md'), type: 'entity', status: 'disputed' },
+        ],
+      })),
+    })
+    renderPage(wikiFace)
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    // The type pill shares its name with the group toggle; the pill has no expanded state.
+    const entityPill = screen.getAllByRole('button', { name: 'Entity' }).find(el => !el.hasAttribute('aria-expanded'))
+    if (entityPill === undefined) throw new Error('the Entity pill did not render')
+    fireEvent.click(entityPill)
+    expect(screen.getByRole('button', { name: /Beta/u })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Alpha/u })).toBeNull()
+
+    fireEvent.click(entityPill)
+    expect(screen.getByRole('button', { name: /Alpha/u })).toBeTruthy()
+
+    const disputedPill = screen.getByRole('button', { name: en.statusDisputed })
+    fireEvent.click(disputedPill)
+    expect(screen.queryByRole('button', { name: /Alpha/u })).toBeNull()
+    fireEvent.click(disputedPill)
+    expect(screen.getByRole('button', { name: /Alpha/u })).toBeTruthy()
+
+    fireEvent.click(disputedPill)
+    fireEvent.click(screen.getByRole('button', { name: en.clearFilters }))
+    expect(screen.getByRole('button', { name: /Alpha/u })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(en.filter), { target: { value: 'concepts/alpha' } })
+    expect(screen.getByRole('button', { name: /Alpha/u })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Beta/u })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText(en.filter), { target: { value: 'zzz' } })
+    expect(await screen.findByText(en.treeEmpty)).toBeTruthy()
+  })
+
+  it('collapses a type group down to its page count', async () => {
+    renderPage(face())
+    await screen.findByRole('button', { name: /Alpha/u })
+
+    // The group toggle is the aria-expanded button named like the kind; the
+    // filter pill shares the name but carries no expanded state.
+    const toggle = screen.getAllByRole('button', { name: en.typeConcept }).find(el => el.hasAttribute('aria-expanded'))
+    if (toggle === undefined) throw new Error('the Concept group toggle did not render')
+    fireEvent.click(toggle)
+
+    expect(await screen.findByText(en.pagesInGroup.replace('{count}', '2'))).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Alpha/u })).toBeNull()
+
+    fireEvent.click(toggle)
+    expect(await screen.findByRole('button', { name: /Alpha/u })).toBeTruthy()
+  })
+})
+
+describe('the source panel', () => {
+  it('shows the reading state, the truncation hint, and dismisses', async () => {
+    let settle: ((value: WikiSourceValue) => void) | null = null
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: 'Alpha body.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: ['notes/paper.md'],
+      })),
+      source: vi.fn((request: WikiSourceRequest): Promise<WikiSourceValue> => new Promise(resolve => { settle = resolve })),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: 'notes/paper.md' }))
+    expect(await screen.findByText(en.sourceLoading)).toBeTruthy()
+
+    settle?.({ path: 'notes/paper.md', text: 'The long source text.', truncated: true })
+    expect(await screen.findByText('The long source text.')).toBeTruthy()
+    expect(screen.getByText(en.sourceTruncated)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: en.dismiss }))
+    expect(screen.queryByText('The long source text.')).toBeNull()
+  })
+
+  it('reports a failed source read', async () => {
+    const wikiFace = face({
+      read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
+        page: { path, frontmatter: frontmatter('Alpha'), body: 'Alpha body.', revision: 'rev-1' },
+        links: [],
+        backlinks: [],
+        sources: ['notes/paper.md'],
+      })),
+      source: vi.fn(async (request: WikiSourceRequest): Promise<WikiSourceValue> => {
+        throw new Error('the source is gone')
+      }),
+    })
+    renderPage(wikiFace)
+    await openPage('Alpha')
+
+    fireEvent.click(screen.getByRole('button', { name: 'notes/paper.md' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('the source is gone')
   })
 })
 
