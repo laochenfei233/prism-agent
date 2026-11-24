@@ -1,6 +1,6 @@
 /** Resolve direct third-party browser inputs through the shipping build configurations, without emitting files. */
 
-import { globSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -80,6 +80,36 @@ export function browserSourceAliases(root: string): { find: RegExp; replacement:
   })
 }
 
+/**
+ * One source entry, accepting its `.tsx` sibling when the configured `.ts` path
+ * is absent. A package whose browser entry renders JSX ships
+ * `src/client/index.tsx`, while the face-less build config names the `.ts` path.
+ * @param dir - Absolute package directory the entry is relative to.
+ * @param entry - One configured entry path.
+ * @returns The entry path that exists, or the configured one.
+ */
+function existingSourceEntry(dir: string, entry: string): string {
+  if (!entry.endsWith('.ts') || existsSync(resolve(dir, entry))) return entry
+  const tsx = entry.replace(/\.ts$/, '.tsx')
+  return existsSync(resolve(dir, tsx)) ? tsx : entry
+}
+
+/**
+ * Client build entries, resolving each configured path through
+ * {@link existingSourceEntry}.
+ * @param dir - Absolute package directory the entries are relative to.
+ * @param entry - Entry value from the package's client build config.
+ * @returns The entry value to hand to the bundle.
+ */
+function existingSourceEntries(dir: string, entry: unknown): unknown {
+  if (typeof entry === 'string') return existingSourceEntry(dir, entry)
+  if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry
+  return Object.fromEntries(Object.entries(entry).map(([name, value]) => [
+    name,
+    typeof value === 'string' ? existingSourceEntry(dir, value) : value,
+  ]))
+}
+
 async function collectClientBundles(
   root: string,
   manifests: ReadonlyMap<string, Manifest>,
@@ -99,7 +129,7 @@ async function collectClientBundles(
     const bundle = await Rolldown.rolldown({
       ...client.inputOptions,
       cwd: dir,
-      input: client.entry as Rolldown.InputOption,
+      input: existingSourceEntries(dir, client.entry) as Rolldown.InputOption,
       platform: 'browser',
       transform: client.define === undefined ? {} : { define: client.define },
       plugins: [recorder(seen, workspaceNames), client.plugins ?? []] as NonNullable<Rolldown.InputOptions['plugins']>,

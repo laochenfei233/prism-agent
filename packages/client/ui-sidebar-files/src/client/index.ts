@@ -73,7 +73,7 @@ export function apply(ctx: ClientContext): void {
     resolve: async ({ sessionId, path }, signal) => {
       const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
       const applications = await ctx.remote.session.workspacePathApplications({ path })
-        .then((result) => result.ok ? result.value : null)
+        .then(result => result.ok ? result.value : null)
         .catch(() => null)
       signal.throwIfAborted()
       const absolutePath = resolveWorkspacePath(cwd, path)
