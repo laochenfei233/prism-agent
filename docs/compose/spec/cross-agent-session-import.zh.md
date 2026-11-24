@@ -1,14 +1,25 @@
 ---
 feature: cross-agent-session-import
-status: in-progress
+status: delivered
 updated: 2026-11-24
 branch: feat/session-import
-commits: c64d35c4..HEAD
+commits: c64d35c4..aefa21596b
 ---
 
 # 跨 Agent 会话导入
 
 [English](cross-agent-session-import.md) | 中文
+
+## 报告
+
+**做了什么** —— 设置中的导入页读取十一个外部编码 Agent 存储的对话历史，并把每段对话写成本 harness 的持久会话；会话按工作文件夹归入项目，并入已有项目需显式确认。DeepSeek Harness home 按原生复制（原会话 id、完整事件日志、附件）；其余十个来源归一化为用户/助手文本。最近的增量加入了 ZCode（`~/.zcode/cli/db/db.sqlite`，同款 `session`/`message`/`part` 结构），带子 agent 与合成文本过滤，并已在真实存储上验证。
+
+**验证** —— `sources.spec.ts` 11/11（含 ZCode fixture）；包内全套测试 32 通过 / 2 失败，两者在 master 上同样失败（属既有基线）；`tsc` host 与 client 两套编译面干净；真实存储探测确认了角色、合成标记、part 类型丢弃、时间戳与 `parent_id`/`time_archived` 过滤；`test:docs` 14 通过 / 7 失败，失败集与干净 master 完全一致；`verify-plugin-packages`、`verify-config-catalog`、`verify-translation-pairing`（重录了编辑过的两对）、oxlint、whitespace 与 vendor manifest 门禁全部通过。
+
+**历程记录** ——
+- ZCode 的存储与 MiMo Code、OpenCode 同用一套 `session`/`message`/`part` SQLite 结构，因此读取器直接复用 `scanChatDatabase`，没有新写解析器。
+- 合成文本过滤要求 JSON 布尔值：SQLite 的 `json_extract` 把 `true` 显示成 `1`，一度误导 fixture 写成 `synthetic: 1`；而读取器路径在 JavaScript 里解析 JSON，需要 `synthetic: true`。
+- Devin 与 Antigravity 按用户决策暂缓，等待可验证的真实样本；社区资料指向 Devin `~/.local/share/devin/cli/sessions.db`（`sessions` + `message_nodes`）与 Antigravity `~/.gemini/antigravity*/brain/<id>/.system_generated/logs/transcript_full.jsonl` 配合 `conversation_summaries.db`，但可触及的机器上都没有这两类存储可供验证读取器。
 
 ## [S1] 问题
 
@@ -123,20 +134,20 @@ DeepSeek Harness 读取器改为暴露原日志：头部中的 id、createdAt �
 
 ## Tasks
 
-- [ ] T1: 建立包骨架、manifest、tsconfig 两套编译面、tsdown 配置与 bundle 登记（依赖：无）
-- [ ] T2: 实现规范化模型、来源目录和文件读取器（依赖：T1）
-- [ ] T3: 实现 MiMo Code、OpenCode、OpenClaw、Hermes 的 SQLite 读取器（依赖：T2）
-- [ ] T4: 实现发现、计划、应用、会话合成与工作区合并确认（依赖：T2、T3）
-- [ ] T5: 实现路由与带确认和结果视图的设置分区（依赖：T4）
-- [ ] T6: 添加每个读取器的单元测试、plan/apply 测试和一个真实组合测试（依赖：T4、T5）
-- [ ] T7: 编写 README 双语对、更新分组 README 与根布局，然后跑仓库门禁（依赖：T6）
+- [x] T1: 建立包骨架、manifest、tsconfig 两套编译面、tsdown 配置与 bundle 登记（依赖：无）
+- [x] T2: 实现规范化模型、来源目录和文件读取器（依赖：T1）
+- [x] T3: 实现 MiMo Code、OpenCode、OpenClaw、Hermes 的 SQLite 读取器（依赖：T2）
+- [x] T4: 实现发现、计划、应用、会话合成与工作区合并确认（依赖：T2、T3）
+- [x] T5: 实现路由与带确认和结果视图的设置分区（依赖：T4）
+- [x] T6: 添加每个读取器的单元测试、plan/apply 测试和一个真实组合测试（依赖：T4、T5）
+- [x] T7: 编写 README 双语对、更新分组 README 与根布局，然后跑仓库门禁（依赖：T6）
 
 ## [S4] 验收
 
-- [ ] A1: 十一个来源都能在其文档根目录被发现，读取器按顺序返回用户与助手文本，并带 cwd、时间戳和稳定 key。
-- [ ] A2: 应用计划后创建的会话日志可解码，其 `deriveMessages()` 等于导入的对话；第二次应用把每个会话报告为 `duplicate` 且不改任何字节。
-- [ ] A2b: DeepSeek Harness 原生导入保留原会话 id 与完整事件序列（包括 `tool/call` 与 `tool/result`），用存储日志构造的 `Session.create` 能把工具结果派生成模型历史；附件已出现在当前 home。
-- [ ] A3: 导入的会话出现在其文件夹对应的项目下；文件夹已有项目时，只有 `confirmMerge` 为 true 才合并，否则以 `merge-confirmation-required` 拒绝。
-- [ ] A4: plan 与 apply 之后来源根目录未变（文件哈希与 SQLite mtime）。
-- [ ] A5: 设置页列出来源、预览项目、在合并确认被勾选前阻止导入，并报告逐会话结果。
-- [ ] A6: 聚焦测试、`pnpm run typecheck`、`pnpm run build`、包 README 检查与 `verify-client-ui-i18n` 全部通过。
+- [x] A1: 十一个来源都能在其文档根目录被发现，读取器按顺序返回用户与助手文本，并带 cwd、时间戳和稳定 key。
+- [x] A2: 应用计划后创建的会话日志可解码，其 `deriveMessages()` 等于导入的对话；第二次应用把每个会话报告为 `duplicate` 且不改任何字节。
+- [x] A2b: DeepSeek Harness 原生导入保留原会话 id 与完整事件序列（包括 `tool/call` 与 `tool/result`），用存储日志构造的 `Session.create` 能把工具结果派生成模型历史；附件已出现在当前 home。
+- [x] A3: 导入的会话出现在其文件夹对应的项目下；文件夹已有项目时，只有 `confirmMerge` 为 true 才合并，否则以 `merge-confirmation-required` 拒绝。
+- [x] A4: plan 与 apply 之后来源根目录未变（文件哈希与 SQLite mtime）。
+- [x] A5: 设置页列出来源、预览项目、在合并确认被勾选前阻止导入，并报告逐会话结果。
+- [x] A6: 聚焦测试、`pnpm run typecheck`、`pnpm run build`、包 README 检查与 `verify-client-ui-i18n` 全部通过。
