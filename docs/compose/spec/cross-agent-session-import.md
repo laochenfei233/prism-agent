@@ -1,7 +1,7 @@
 ---
 feature: cross-agent-session-import
 status: in-progress
-updated: 2026-10-29
+updated: 2026-11-24
 branch: feat/session-import
 commits: c64d35c4..HEAD
 ---
@@ -12,7 +12,7 @@ English | [中文](cross-agent-session-import.zh.md)
 
 ## [S1] Problem
 
-Users arrive with conversation history in other CLI agents: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI. Prism Agent shows an empty sidebar for that history, and the only import work in this repository targets another DSH home ([SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), not foreign formats.
+Users arrive with conversation history in other CLI agents: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, and ZCode. Prism Agent shows an empty sidebar for that history, and the only import work in this repository targets another DSH home ([SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), not foreign formats.
 
 Reading the history is not enough: the user must be able to open an imported conversation and continue it, with the prior text in the model request. The imported conversations must also land in projects: one project per working folder, and when that folder is already a project here, merging the imported sessions into it is a decision the user confirms, never a silent side effect.
 
@@ -40,12 +40,13 @@ Each source has one reader that turns its native store into the normalized trans
 | Hermes | `~/.hermes` | `state.db` (`sessions`, `messages`) or exported `session_*.json` |
 | Pi | `~/.pi/agent/sessions` | `--<cwd>--/<timestamp>_<uuid>.jsonl` |
 | Gemini CLI | `~/.gemini/tmp` | `<project>/chats/session-*.jsonl` or legacy `.json` |
+| ZCode | `~/.zcode` | `cli/db/db.sqlite` (`session`, `message`, `part`) |
 
 The current home (`ctx.dshHomePath()`) is excluded from the DeepSeek Harness source and reported as unavailable instead of listed twice.
 
 ### [S2.3] Normalized transcript
 
-For the nine converted sources, one reader returns:
+For the ten converted sources, one reader returns:
 
 ```ts
 interface ImportedSession {
@@ -117,7 +118,7 @@ Readers open files with read access and SQLite databases with `readOnly: true`. 
 
 ## [S3] Scope
 
-- In scope: the ten readers, the normalized transcript, plan/apply, the route, the settings section, project grouping with merge confirmation, unit tests, one real-composition test, README and package registration.
+- In scope: the eleven readers, the normalized transcript, plan/apply, the route, the settings section, project grouping with merge confirmation, unit tests, one real-composition test, README and package registration.
 - Out of scope: importing attachments or tool-call transcripts, bidirectional sync, live watching for new foreign sessions, importing another DSH home's workspace grouping and memory (owned by [SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), and reverse export.
 
 ## Tasks
@@ -132,7 +133,7 @@ Readers open files with read access and SQLite databases with `readOnly: true`. 
 
 ## [S4] Acceptance
 
-- [ ] A1: each of the ten sources is discovered at its documented root, and its reader returns user and assistant text in order with cwd, timestamps, and a stable key.
+- [ ] A1: each of the eleven sources is discovered at its documented root, and its reader returns user and assistant text in order with cwd, timestamps, and a stable key.
 - [ ] A2: applying a plan creates decodable session logs whose `deriveMessages()` equals the imported dialogue; a second apply reports every session as `duplicate` and changes no bytes.
 - [ ] A2b: a native DeepSeek Harness import keeps the original session id and complete event sequence, including `tool/call` and `tool/result`, and `Session.create` over the stored log derives the tool result into model history; attachments are present in the current home.
 - [ ] A3: imported sessions appear under the project for their folder; a folder whose project already exists is merged only when `confirmMerge` is true, and rejected with `merge-confirmation-required` otherwise.

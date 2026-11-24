@@ -1,7 +1,7 @@
 ---
 feature: cross-agent-session-import
 status: in-progress
-updated: 2026-10-29
+updated: 2026-11-24
 branch: feat/session-import
 commits: c64d35c4..HEAD
 ---
@@ -12,7 +12,7 @@ commits: c64d35c4..HEAD
 
 ## [S1] 问题
 
-用户从其他命令行 Agent 带来大量对话历史：Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 和 Gemini CLI。Prism Agent 的侧栏对这些历史显示为空，而仓库里唯一的导入工作服务的是另一个 DSH home（[SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)），不是外部格式。
+用户从其他命令行 Agent 带来大量对话历史：Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi、Gemini CLI 和 ZCode。Prism Agent 的侧栏对这些历史显示为空，而仓库里唯一的导入工作服务的是另一个 DSH home（[SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)），不是外部格式。
 
 只把历史读出来还不够：用户必须能打开导入的对话并继续它，之前的内容要进入模型请求。导入的对话还必须落到项目里：一个工作文件夹对应一个项目；当这个文件夹已经是这里的项目时，把导入的会话并入它是用户确认过的决定，不能成为静默的副作用。
 
@@ -40,12 +40,13 @@ commits: c64d35c4..HEAD
 | Hermes | `~/.hermes` | `state.db`（`sessions`、`messages`）或导出的 `session_*.json` |
 | Pi | `~/.pi/agent/sessions` | `--<cwd>--/<timestamp>_<uuid>.jsonl` |
 | Gemini CLI | `~/.gemini/tmp` | `<project>/chats/session-*.jsonl` 或旧版 `.json` |
+| ZCode | `~/.zcode` | `cli/db/db.sqlite`（`session`、`message`、`part`） |
 
 当前 home（`ctx.dshHomePath()`）会从 DeepSeek Harness 来源中排除，并报告为不可用，而不是重复列一遍。
 
 ### [S2.3] 规范化对话
 
-对于九个转换来源，读取器返回：
+对于十个转换来源，读取器返回：
 
 ```ts
 interface ImportedSession {
@@ -117,7 +118,7 @@ DeepSeek Harness 读取器改为暴露原日志：头部中的 id、createdAt �
 
 ## [S3] 范围
 
-- 范围内：十个读取器、规范化对话、plan/apply、路由、设置分区、带合并确认的项目分组、单元测试、一个真实组合测试、README 与包登记。
+- 范围内：十一个读取器、规范化对话、plan/apply、路由、设置分区、带合并确认的项目分组、单元测试、一个真实组合测试、README 与包登记。
 - 范围外：导入附件或工具调用记录、双向同步、监听外部工具的新会话、导入另一个 DSH home 的工作区分组与记忆（由 [SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md) 负责）、反向导出。
 
 ## Tasks
@@ -132,7 +133,7 @@ DeepSeek Harness 读取器改为暴露原日志：头部中的 id、createdAt �
 
 ## [S4] 验收
 
-- [ ] A1: 十个来源都能在其文档根目录被发现，读取器按顺序返回用户与助手文本，并带 cwd、时间戳和稳定 key。
+- [ ] A1: 十一个来源都能在其文档根目录被发现，读取器按顺序返回用户与助手文本，并带 cwd、时间戳和稳定 key。
 - [ ] A2: 应用计划后创建的会话日志可解码，其 `deriveMessages()` 等于导入的对话；第二次应用把每个会话报告为 `duplicate` 且不改任何字节。
 - [ ] A2b: DeepSeek Harness 原生导入保留原会话 id 与完整事件序列（包括 `tool/call` 与 `tool/result`），用存储日志构造的 `Session.create` 能把工具结果派生成模型历史；附件已出现在当前 home。
 - [ ] A3: 导入的会话出现在其文件夹对应的项目下；文件夹已有项目时，只有 `confirmMerge` 为 true 才合并，否则以 `merge-confirmation-required` 拒绝。
