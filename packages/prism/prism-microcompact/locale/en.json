@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "prism-microcompact",
+    "description": "Clears stale tool results from the conversation surface before summarization compaction and tracks the arming threshold."
+  }
+}

@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for upstream-resync-0.2.3-alpha.2.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/upstream-resync-0.2.3-alpha.2.md
+/:
+  en: cb89f0a74651492b
+  zh: cb89f0a74651492b
+/upstream-resync-0-2-3-alpha-2:
+  en: 3b180a079ba9ba30
+  zh: c7a043cce01d3adc
+/upstream-resync-0-2-3-alpha-2/report:
+  en: 4c2035a6416e6835
+  zh: 773d4b67c815f769
+/upstream-resync-0-2-3-alpha-2/s1-problem:
+  en: af6afb9fba7562d8
+  zh: e6a35c11bcf708e2
+/upstream-resync-0-2-3-alpha-2/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/upstream-resync-0-2-3-alpha-2/s2-design/s2-1-merge-method:
+  en: 2a1d56965ecc01e5
+  zh: 77e5ab28310877c1
+/upstream-resync-0-2-3-alpha-2/s2-design/s2-2-collision-resolution-rules:
+  en: 68ab4540cc3fada7
+  zh: 7fd00b3d8254c2fb
+/upstream-resync-0-2-3-alpha-2/s2-design/s2-3-version-fields-and-generated-artifacts:
+  en: 3323a8e626dc1c55
+  zh: e2cf2d7dab9d454e
+/upstream-resync-0-2-3-alpha-2/s2-design/s2-4-divergence-replay:
+  en: 8b30f6df368985af
+  zh: 9fdf5af705c3f41d
+/upstream-resync-0-2-3-alpha-2/tasks:
+  en: ea051a745373aad5
+  zh: d37e8d471548524d
+/upstream-resync-0-2-3-alpha-2/s4-acceptance:
+  en: ad15a5cbe2a8e46f
+  zh: fe76a72afc1b9fb4

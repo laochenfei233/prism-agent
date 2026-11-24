@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for meeting-minutes-preparation-and-answers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/meeting-minutes-preparation-and-answers.md
-meeting-minutes-preparation-and-answers.md: 1c83c120e76444b0397f1f268f7174ac746578b7
-meeting-minutes-preparation-and-answers.zh.md: d4a5259009ec2b1ab33c30d0a67f956f4f54855a
+/:
+  en: 1958bf75d683cd7b
+  zh: 1958bf75d683cd7b
+/meeting-minutes-speech-preparation-and-in-page-answers:
+  en: 3e9bafae8aa2fa1d
+  zh: 1896ae2692ea0bda
+/meeting-minutes-speech-preparation-and-in-page-answers/report:
+  en: 1dfbbd71ca240b5a
+  zh: 8b464ffca9bcc3ec
+/meeting-minutes-speech-preparation-and-in-page-answers/s1-problem:
+  en: f78b82245726a069
+  zh: 6ea770d0be790ee3
+/meeting-minutes-speech-preparation-and-in-page-answers/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/meeting-minutes-speech-preparation-and-in-page-answers/s2-design/s2-1-speech-preparation-exposure:
+  en: 5056e8aed92e69d4
+  zh: 4f6ddad4a59a74f7
+/meeting-minutes-speech-preparation-and-in-page-answers/s2-design/s2-2-transcription-waits-for-preparation:
+  en: 3891cacea4e40a95
+  zh: acc11f289f247ee2
+/meeting-minutes-speech-preparation-and-in-page-answers/s2-design/s2-3-in-page-answers:
+  en: 79d4561cb525f29e
+  zh: c46f9ec3642b44b5
+/meeting-minutes-speech-preparation-and-in-page-answers/s2-design/s2-4-page-polish:
+  en: 7c9ae85b37be34ce
+  zh: b49f7af60f624adf
+/meeting-minutes-speech-preparation-and-in-page-answers/s3-scope:
+  en: 9f707a60eb303844
+  zh: b02b5d2e9539a3a7
+/meeting-minutes-speech-preparation-and-in-page-answers/tasks:
+  en: facdb8e19dcffb00
+  zh: b8d521194fd062bf
+/meeting-minutes-speech-preparation-and-in-page-answers/s4-acceptance:
+  en: bf2bbd0174fa2c35
+  zh: 4a34a42ed07b5820

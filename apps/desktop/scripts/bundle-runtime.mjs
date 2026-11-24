@@ -10,7 +10,7 @@
 // The shell resolves these paths in src-tauri/src/dsh_runner.rs
 // (resolve_runtime). Run from apps/desktop:
 //
-//   node scripts/bundle-runtime.mjs [--platform win|mac|linux] [--node-version v22.20.0]
+//   node scripts/bundle-runtime.mjs [--platform win|mac|linux] [--arch x64|arm64] [--node-version v22.20.0]
 //
 // --platform defaults to the host platform. In CI the workflow passes the
 // runner platform so each matrix job bundles its own runtime.
@@ -58,16 +58,40 @@ function hostPlatform() {
 // without shell interpretation; route through cmd.exe there.
 function runPnpm(args, opts) {
   const env = pnpmEnv();
-  if (process.platform === 'win32') {
+  if (crossArchBundle()) {
+    // pnpm selects optional native dependencies (and runs install scripts)
+    // for the architecture of the node process executing it, which PATH
+    // ordering cannot change. Drive the pnpm entry (a JS shim) with the
+    // bundled target-arch node so a cross-arch bundle installs the target's
+    // prebuilds, not the host's.
+    const pnpmEntry = realpathSync(execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim());
+    step(`cross-arch bundle (${process.arch} host -> ${ARCH} target): running pnpm under ${bundledNodeExe()}`);
+    execFileSync(bundledNodeExe(), [pnpmEntry, ...args], { ...opts, stdio: 'inherit', env });
+  } else if (process.platform === 'win32') {
     execFileSync('cmd.exe', ['/c', 'pnpm', ...args], { ...opts, stdio: 'inherit', env });
   } else {
     execFileSync('pnpm', args, { ...opts, stdio: 'inherit', env });
   }
 }
 
+// True when the node running this script does not match the bundle target:
+// the bundled node must then drive pnpm so native dependencies resolve for
+// the target instead of the host.
+function crossArchBundle() {
+  if (PLATFORM === 'win' || process.arch === ARCH) return false;
+  if (!existsSync(bundledNodeExe())) {
+    throw new Error(`cross-arch bundle needs the bundled ${ARCH} node at ${bundledNodeExe()}; installNode must run before any pnpm call`);
+  }
+  return true;
+}
+
+function bundledNodeExe() {
+  return join(NODE_DIR, PLATFORM === 'win' ? 'node.exe' : 'node');
+}
+
 // A cross-arch macOS bundle (x64 on an arm64 runner) must resolve native
-// dependencies for the target arch: pnpm picks packages and prebuilds by the
-// node it runs under, so PATH points at the bundled x64 node first.
+// dependencies for the target arch: PATH points at the bundled x64 node so
+// the install scripts pnpm spawns also run under it.
 function pnpmEnv() {
   if (PLATFORM !== 'mac' || ARCH !== 'x64') return process.env;
   const binDir = join(NODE_DIR, 'bin');
@@ -274,6 +298,7 @@ async function deployDsh() {
   copyLocalPlugins(repo);
   if (PLATFORM === 'linux') pruneForeignLinuxPlatformPackages();
   if (PLATFORM === 'mac' || PLATFORM === 'linux') pruneForeignNativeModules();
+  verifyRequiredNativeAddons();
   // Last: flattenClosure and the patch passes rebuild node_modules from the
   // store, which would overwrite an earlier dist patch.
   injectDesktopHostBridge(distDest);
@@ -614,6 +639,32 @@ function pruneForeignNativeModules() {
   step(`pruned ${removed} foreign-arch native module(s) from ${PLATFORM} closure`);
 }
 
+// Fail the bundle when the plugin loader's mandatory native addon has no
+// build for the target. `node-addon-require-builtin` ships its native binary
+// as per-platform optionalDependencies; a closure resolved for the wrong
+// platform or architecture crashes every dsh startup with MODULE_NOT_FOUND
+// for require_builtin.node (seen as "dsh exited during startup" when an x64
+// Mac received an arm64 closure). Runs after the prune passes, so a missing
+// package here means the deploy resolved the wrong platform.
+export function verifyRequiredNativeAddons(
+  nodeModulesDir = join(DSH_DIR, 'node_modules'),
+  platform = PLATFORM,
+  arch = ARCH,
+) {
+  const suffix = platform === 'mac'
+    ? `darwin-${arch}`
+    : platform === 'linux' ? `linux-${arch}-gnu` : `win32-${arch}-msvc`;
+  const platformPkg = join(nodeModulesDir, `node-addon-require-builtin-${suffix}`);
+  if (!existsSync(platformPkg)) {
+    throw new Error(
+      `runtime closure has no node-addon-require-builtin build for ${suffix}; ` +
+      `native dependencies resolved for the wrong platform or architecture — ` +
+      `bundle with an explicit --arch and run pnpm under a node matching it`,
+    );
+  }
+  step(`native addon ${suffix} present`);
+}
+
 // True when the file's declared architectures cover the target (Mach-O thin
 // or fat via cputype, ELF via e_machine). PE and unknown formats never cover.
 function nativeCovers(file, cputype, machine) {
@@ -928,6 +979,7 @@ async function installWinTerminalInspector() {
 function writeManifest() {
   const manifest = {
     platform: PLATFORM,
+    arch: ARCH,
     node: readdirSync(NODE_DIR).join(','),
     dshCli: existsSync(join(DSH_DIR, 'lib', 'bin.js')),
     plugins: existsSync(PLUGINS_DIR) ? readdirSync(PLUGINS_DIR) : [],

@@ -8,6 +8,8 @@ commits: 5e4a579eaa..3a74af2a3e
 
 # Prism-guardrails 卡住提醒（stuck nudge）
 
+English | [中文](prism-guardrails-stuck-nudge.zh.md)
+
 ## Report
 
 **What was built** — guardrails bundle 的第十三条 rail。一轮之内连续失败调用达到 `stuckNudgeAfterFailures`（默认 3，出厂开启，`0` 关闭）时，一次走 agent 自身 provider 路由、绑定 `exec.signal` 的一次性裁判调用判断这串失败是否同一个循环；置信度达 `stuckNudgeConfidence` 的肯定把一句提醒附在失败调用的已接受结果上（`additionalContexts`），调用本身永不被拒。任何成功清空失败串；循环开启新轮次（无论由什么消息开启）即重置失败串与 `stuckNudgePerTurn` 配额。无 llm 服务、无路由、输出不可解析、裁判调用失败都只留 warn 日志并放行；ledger 记 `steer`，`/guardrails` 列出该 rail 与武装状态。

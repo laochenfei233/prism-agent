@@ -13,6 +13,7 @@ import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import WikiVaultService from '../src/index.ts'
 import * as web from '../src/web.ts'
@@ -97,6 +98,9 @@ async function webHarness(vaultRoot: string): Promise<WebHarness> {
   // The row declares `webServer` because Connection's registries resolve
   // services through the caller's context; the stub only has to exist.
   ctx.provide('webServer', { register: () => () => {} })
+  // SystemPrompt injects `sessionProjections`, so the registry must be live
+  // before the prompt and the vault service activate.
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(WikiVaultService, { vaultRoot })
   await seed(ctx)

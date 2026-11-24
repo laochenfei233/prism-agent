@@ -126,6 +126,7 @@ async function collectClientBundles(
     const client = configs.find(config => config.name === `${manifest.name}/client`)
     if (client === undefined) throw new Error(`browser notices: ${manifest.name} has no browser build config`)
     if (typeof client.inputOptions === 'function') throw new Error(`browser notices: ${manifest.name} needs resolved input options`)
+    if (typeof client.outputOptions === 'function') throw new Error(`browser notices: ${manifest.name} needs resolved output options`)
     const bundle = await Rolldown.rolldown({
       ...client.inputOptions,
       cwd: dir,
@@ -136,7 +137,7 @@ async function collectClientBundles(
       tsconfig: resolve(root, 'tsconfig.base.client.json'),
     })
     try {
-      await bundle.generate({ format: 'cjs', sourcemap: false })
+      await bundle.generate({ format: 'cjs', ...client.outputOptions, sourcemap: false })
     } finally {
       await bundle.close()
     }

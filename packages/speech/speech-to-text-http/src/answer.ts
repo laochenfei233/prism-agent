@@ -53,7 +53,13 @@ export function parseAnswerText(body: string, name = ''): unknown {
   }
 }
 
-/** @returns after one delay, rejecting when the deadline signal aborts. */
+/**
+ * Wait one delay, then resolve; an aborted deadline rejects immediately with the
+ * signal's reason, so a stalled answer never outlives its deadline.
+ * @param milliseconds - how long to wait before resolving.
+ * @param signal - the deadline signal that aborts the wait.
+ * @returns after one delay, rejecting when the deadline signal aborts.
+ */
 export async function sleepFor(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -68,7 +74,12 @@ export async function sleepFor(milliseconds: number, signal: AbortSignal): Promi
   })
 }
 
-/** Operator-readable text for one thrown value. */
+/**
+ * Operator-readable text for one thrown value: an Error's own message, or the
+ * string form of anything else thrown along the fetch path.
+ * @param error - the thrown value to describe.
+ * @returns the operator-readable text.
+ */
 export function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

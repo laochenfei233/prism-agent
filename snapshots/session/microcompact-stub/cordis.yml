@@ -1,0 +1,45 @@
+# Microcompact clears stale tool results before summarization compaction arms.
+
+- id: agent-instructions
+  disabled: true
+
+- id: skill
+  disabled: true
+
+- id: skill-filesystem
+  disabled: true
+
+- id: tool-skill
+  disabled: true
+
+
+- id: llm-deepseek
+  config:
+    models:
+      - id: deepseek-v4-flash
+        contextWindow: 200000
+        maxTokens: 1000
+
+# The three reads price ~1471 heuristic tokens each. The arming threshold
+# 2000 = floor(min(0.01 x 200000, 200000 - 1000 - 0)) is crossed from the
+# step-2 pre-step on, and keepRecentResults 2 leaves nothing stale until the
+# step-4 pre-step, where the oldest read is cleared.
+# Compaction-basic clamps to floor(min(0.9 x 200000, 200000 - 1000 - 170000))
+# = 29000, above every measurement this scenario produces, so the model-free
+# pass demonstrably runs before summarization would.
+- id: prism-microcompact
+  config:
+    thresholdRatio: 0.01
+    headroomTokens: 0
+    keepRecentResults: 2
+
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.9
+    headroomTokens: 170000
+    retainTokens: 20
+
+# Fixed-budget microcompact scenario: keep the recorded tool set, whose token counts the thresholds were tuned to.
+- id: tool-fs
+  config:
+    applyPatch: false

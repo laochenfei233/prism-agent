@@ -26,6 +26,7 @@ async function mockPlatform() {
   let state: string | undefined
   let redirectUri: string | undefined
   let avatarRequests = 0
+  let notificationLists = 0
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1')
     const reply = (payload: unknown): void => {
@@ -84,15 +85,18 @@ async function mockPlatform() {
       reply({ normal_wallets: [{ currency: 'CNY', balance: '1.00' }], bonus_wallets: [] })
       return
     }
-    if (url.pathname === '/api/v0/users/get_unnotified_bonuses') { reply([]); return }
+    if (url.pathname === '/api/v0/users/notifications/list') {
+      notificationLists++
+      reply({ next_poll_after: 600, notifications: [] }); return
+    }
     res.writeHead(404).end()
   })
   await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve) })
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('account login: missing mock listener')
-  const origin = `http://127.0.0.1:${String(address.port)}`
+  const origin = `http://localhost:${String(address.port)}`
   return {
-    origin, inits, pages, avatarRequests: () => avatarRequests,
+    origin, inits, pages, avatarRequests: () => avatarRequests, notificationLists: () => notificationLists,
     close: () => new Promise<void>((resolve) => { server.close(() => { resolve() }); server.closeAllConnections() }),
   }
 }
@@ -131,8 +135,10 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
     await settings.getByRole('button', { name: 'Models', exact: true }).click()
     const tab = context.waitForEvent('page')
+    const callback = context.waitForEvent('request', request => new URL(request.url()).pathname === '/oauth/callback')
     await settings.getByRole('button', { name: 'Sign in', exact: true }).click()
     const authorization = await tab
+    expect((await (await callback).allHeaders())['sec-fetch-site']).toBe('cross-site')
     await authorization.waitForURL(url => url.pathname === '/dsh/authorized', { timeout: 30_000 })
     expect(await authorization.evaluate(() => window.opener === null)).toBe(true)
     const menu = page.getByRole('button', { name: 'Account menu', exact: true })
@@ -152,7 +158,9 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     await menu.locator('[data-avatar-status="failed"]').waitFor()
     expect(await menu.locator('img').count()).toBe(0)
     const states: string[] = []
+    let expectedLists = 1
     const capture = async (stage: string): Promise<void> => {
+      await expect.poll(platform.notificationLists).toBe(expectedLists)
       const sidebar = menu.locator('[data-avatar-status]')
       const account = page.getByRole('region', { name: 'Account', exact: true })
       const mounted = await account.count() > 0
@@ -160,10 +168,11 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
         ? await account.locator('[data-avatar-status]').getAttribute('data-avatar-status') : 'unmounted'
       states.push(`${stage}: sidebar=${await sidebar.getAttribute('data-avatar-status')}, settings=${settingsStatus}, `
         + `sidebarImages=${await menu.locator('img').count()}, settingsImages=${mounted ? await account.locator('img').count() : 0}, `
-        + `requests=${platform.avatarRequests()}`)
+        + `requests=${platform.avatarRequests()}, notificationLists=${platform.notificationLists()}`)
     }
     await capture('Initial load')
     await menu.click()
+    expectedLists++
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
     const account = settings.getByRole('region', { name: 'Account', exact: true })
     await expect.poll(platform.avatarRequests).toBe(2)
@@ -174,6 +183,7 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     await settings.getByRole('button', { name: 'Close', exact: true }).click()
     await settings.waitFor({ state: 'detached' })
     await menu.click()
+    expectedLists++
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
     await expect.poll(() => menu.locator('img').count()).toBe(1)
     await expect.poll(() => account.locator('img').count()).toBe(1)
@@ -186,6 +196,7 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     await settings.getByRole('button', { name: 'Close', exact: true }).click()
     await settings.waitFor({ state: 'detached' })
     await menu.click()
+    expectedLists++
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
     await account.waitFor()
     expect(await menu.locator('img').count()).toBe(1)
@@ -201,6 +212,7 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek account sign-in in a plain
     await settings.getByRole('button', { name: 'Close', exact: true }).click()
     await settings.waitFor({ state: 'detached' })
     await menu.click()
+    expectedLists++
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
     await expect.poll(() => menu.locator('img').count()).toBe(1)
     await expect.poll(() => account.locator('img').count()).toBe(1)

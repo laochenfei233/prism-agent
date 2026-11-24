@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for http-asr-provider.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/http-asr-provider.md
-http-asr-provider.md: 577bb4de92c02625724b926d59f4e3cff6adf254
-http-asr-provider.zh.md: 9b808e396dc03e11ae1db3e910a0a9830d1242bb
+/:
+  en: 4b3391d164773b68
+  zh: 4b3391d164773b68
+/http-asr-provider:
+  en: 92d6380efc85ef57
+  zh: 19161d177d33ba2e
+/http-asr-provider/report:
+  en: feb176c9c5c83374
+  zh: a2e92a181d54db8b
+/http-asr-provider/s1-problem:
+  en: 3761bd961fabc096
+  zh: 2fc11204e9e9b580
+/http-asr-provider/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/http-asr-provider/s2-design/s2-1-one-config-driven-package-many-services:
+  en: f073664d21477ee0
+  zh: 74e753e694c52b7d
+/http-asr-provider/s2-design/s2-2-consumers-stay-unchanged:
+  en: c769e9663961f725
+  zh: cbe595b8b321fba4
+/http-asr-provider/s3-scope:
+  en: b73a0c53d149d053
+  zh: b381cac634d154e2
+/http-asr-provider/tasks:
+  en: fc192ded3f8c8a61
+  zh: a9801398e0dcfb00
+/http-asr-provider/s4-acceptance:
+  en: 850cfa10586827a0
+  zh: 694e5f61a592164f

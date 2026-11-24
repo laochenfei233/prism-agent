@@ -12,6 +12,7 @@ import { agentEvents, type Agent, type Inbox, type PreStepDecision } from '@deep
 import CommandRuntime, { type CommandResult } from '@deepseek-ai/dsh-commands'
 import { ToolCallId, type ToolSchema } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
@@ -50,6 +51,9 @@ export interface WikiMountOptions extends VaultMountOptions {
  * @returns after the service is active.
  */
 export async function mountVault(ctx: Context, options: VaultMountOptions): Promise<void> {
+  // SystemPrompt injects `sessionProjections`, so the registry must be live
+  // before the prompt, the tool registry, and the vault service activate.
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   // `ctx.tools.execute` dispatches through the composed executor seam; without

@@ -66,6 +66,9 @@
       - listitem:
         - button "Edit shortcut for Focus previous region"
         - text: Focus previous region Ctrl + Alt + Shift + F6
+      - listitem:
+        - button "Edit shortcut for Toggle read/unread"
+        - text: Toggle read/unread Ctrl + Shift + U
   - region "Message input":
     - heading "Message input" [level=3]
     - list:

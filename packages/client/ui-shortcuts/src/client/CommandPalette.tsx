@@ -1,7 +1,8 @@
 /** Command palette: filters the live command catalog and runs the selected command. */
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Modal, ShortcutKeys, Toast, focusWithoutRing, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal, ShortcutKeys, Toast, focusWithoutRing } from '@deepseek-ai/dsh-client-ui-primitives'
+import { rankByName } from './rank-by-name.ts'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot, PropsStore } from '@deepseek-ai/dsh-client-store'
 import type { ShortcutCatalogEntry, ShortcutCommandId, Shortcuts } from '@deepseek-ai/dsh-client-shortcuts/client'

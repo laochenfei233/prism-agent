@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for meeting-transcribe-followups.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/meeting-transcribe-followups.md
-meeting-transcribe-followups.md: 19d8fb2c52bb7d062e7e27b68704eb4c56152507
-meeting-transcribe-followups.zh.md: 666acff47dc4e1688f6c337468d5eda46c87156a
+/:
+  en: 27fa1a50e89a84d2
+  zh: 27fa1a50e89a84d2
+/meeting-transcription-follow-ups:
+  en: 5ed125489b56052e
+  zh: 2ed64bc03b31dc1c
+/meeting-transcription-follow-ups/report:
+  en: c136ae10fa137b84
+  zh: 84ca58325fb0e273
+/meeting-transcription-follow-ups/s1-problem:
+  en: 1d5a98950bb95edd
+  zh: 3188ec052f0d3883
+/meeting-transcription-follow-ups/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/meeting-transcription-follow-ups/s2-design/s2-1-ending-stores-the-live-transcript:
+  en: 2a59cd8a0375ac55
+  zh: 2ca99611fb58f841
+/meeting-transcription-follow-ups/s2-design/s2-2-recognizer-selection-on-the-page:
+  en: 47e585afbee47842
+  zh: c2632347e9ac723f
+/meeting-transcription-follow-ups/s2-design/s2-3-deployment-of-the-fix:
+  en: f28c512d6529ff93
+  zh: a40ca29ac51d661a
+/meeting-transcription-follow-ups/s3-scope:
+  en: 2b74f40ca9393ca8
+  zh: 9f8235143e466120
+/meeting-transcription-follow-ups/tasks:
+  en: 60cf01078e5fda78
+  zh: 0217760333cdcf2d
+/meeting-transcription-follow-ups/s4-acceptance:
+  en: e3ac96af054cce15
+  zh: 71c985de27b7adbe

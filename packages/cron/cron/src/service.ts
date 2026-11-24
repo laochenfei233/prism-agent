@@ -58,6 +58,8 @@ export type CronJobUpdate = Partial<Omit<CronJobRequest, 'expression' | 'timeZon
  * whether this process is the scheduler: an operation that cannot be served
  * here reports `cron_not_leader` through the provider's own failure surface
  * rather than returning a stale answer.
+ *
+ * @typert service cron
  */
 export abstract class CronService extends Service {
   /**

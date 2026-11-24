@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for wiki.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/wiki.md
+/wiki-vault:
+  en: 532c1c1151c25741
+  zh: a1c26cb1bfdb0d10
+/wiki-vault/vault-layers:
+  en: c3945ec4b4ba05c3
+  zh: 04c9c7f01575b5ca
+/wiki-vault/sources-and-retrieval:
+  en: 29ff73aa3f735c0e
+  zh: d4a5cc6164e5e095

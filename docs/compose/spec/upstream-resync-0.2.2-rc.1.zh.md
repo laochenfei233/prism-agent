@@ -62,7 +62,7 @@ commits: 28f0c8776f (master anchor)..delivery
 ## [S3] 范围
 
 - 在范围内：经合成合并重放 rc.4→0.2.2-rc.1 delta、按 S2.2 解决冲突、按 S2.3 处理生成工件与版本字段、更新分歧索引锚点、按 S2.4 做源码级插件安装验证。
-- 在范围外：推送任一仓库；桌面安装器打包；把其他活跃分支（`feat/prism-memory-provenance` 的未提交工作、`chore/tauri-rust-upgrade`、`prism-guardrails` 与 `subagent-job-bridge` 两个 worktree）rebase 到本次同步结果上。
+- 在范围外：推送任一仓库；桌面安装器打包；把其他活跃分支（内存审计分支的未提交工作、`chore/tauri-rust-upgrade`、`prism-guardrails` 与 `subagent-job-bridge` 两个 worktree）rebase 到本次同步结果上。
 
 ## 任务
 

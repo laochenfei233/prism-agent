@@ -1,0 +1,10 @@
+version: 1
+scenario: microcompact-stub
+profile: headless
+composition: microcompact-stub
+recording: authored
+platform: posix
+header:
+  class: microcompact-stub
+  pin: true
+  changes: 3

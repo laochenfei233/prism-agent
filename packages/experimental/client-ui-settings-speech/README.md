@@ -32,7 +32,7 @@ The section is a slot-injected settings page following the data section's compos
 
 ## Model Experience
 
-None; the section edits configuration and credentials only.
+None, as the section edits configuration and credentials only.
 
 #### KV Cache effect
 

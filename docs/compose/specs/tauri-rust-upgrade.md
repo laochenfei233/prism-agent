@@ -31,7 +31,7 @@ The current tree is also behind on the toolchain contract. Tauri 2.12.6 requires
 
 ## [S2] Design
 
-### S2.1 Branch and provenance
+### S2.1 Branch and baseline
 
 Create `chore/tauri-rust-latest` from master and keep the upgrade commits on it. Do not rebase or resurrect `chore/tauri-rust-upgrade`, and do not cherry-pick its folder-drop commits; those already reached master through other commits.
 

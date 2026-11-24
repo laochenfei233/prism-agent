@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
-import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,7 +62,7 @@ async function fixture(options: { repo: boolean; withoutGit?: boolean }): Promis
     await ctx.plugin(LocalSubprocessRuntime)
   }
   ctx.provide('sessions', { get: (id: string) => id === 'owner' ? { header: { cwd: dir } } : undefined } as never)
-  const connection = new HostConnectionService(ctx, [], {} as BrowserAuth)
+  const connection = new HostConnectionService(ctx, [])
   const fiber = ctx.plugin({
     inject: ['connection', 'sessions', 'subprocess'],
     apply: (scope) => { apply(scope, CONFIG) },

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for meeting-minutes-plugin.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/meeting-minutes-plugin.md
-meeting-minutes-plugin.md: fac3af2ce81512aab12c0edce88e9ebf3728eb20
-meeting-minutes-plugin.zh.md: 5586788123aa3a44bb24d09a384114909e4bf589
+/:
+  en: 2d06b3843e95862f
+  zh: 2d06b3843e95862f
+/prism-meeting-plugin:
+  en: 6d72d1b6436f5b08
+  zh: 20e8df25eaea393e
+/prism-meeting-plugin/report:
+  en: 78ccc5a824424c1d
+  zh: 2e1561c8c73d2dcd
+/prism-meeting-plugin/s1-problem:
+  en: 933417608e18a838
+  zh: 123f6e60adf6045e
+/prism-meeting-plugin/s2-design:
+  en: 424ae8b59d9f9ede
+  zh: d78a8ead068dc129
+/prism-meeting-plugin/s3-scope:
+  en: 0054046f77522812
+  zh: b1d39657e1e48eed
+/prism-meeting-plugin/tasks:
+  en: bd91d6fd7884ee69
+  zh: b01d2a0f947d88be
+/prism-meeting-plugin/s4-acceptance:
+  en: 180588b1a5c634dd
+  zh: ced215c361d57d15

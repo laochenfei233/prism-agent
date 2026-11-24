@@ -4,6 +4,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { SubagentRunId } from '@deepseek-ai/dsh-subagent'
 import type { SubagentStopReason } from '@deepseek-ai/dsh-subagent'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
@@ -21,6 +22,7 @@ interface Setup {
 async function setup({ controller = true }: { controller?: boolean } = {}): Promise<Setup> {
   const ctx = new Context()
   await ctx.plugin(LocalJobRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   if (controller) ctx.jobs.attachController('test')
   const interrupts = vi.fn()
@@ -47,6 +49,7 @@ function startEdge(overrides: { delivery?: 'parent' | 'caller' } = {}) {
     runId,
     provider: 'spawn',
     id: CHILD,
+    parentSessionId: PARENT,
     parentId: PARENT,
     delivery: 'parent' as const,
     local: true,
@@ -59,6 +62,7 @@ function startEdge(overrides: { delivery?: 'parent' | 'caller' } = {}) {
       runId,
       provider: 'spawn',
       id: CHILD,
+      parentSessionId: PARENT,
       parentId: PARENT,
       delivery: 'parent' as const,
       local: true,
@@ -118,7 +122,7 @@ describe('subagent job bridge', () => {
     edge.emitStart(ctx)
     const job = onlyJob(ctx)
     expect(ctx.jobs.kill(job!.id, PARENT, 'no longer needed')).toBe('requested')
-    expect(interrupts).toHaveBeenCalledWith(CHILD, { kind: 'user', parentSessionId: PARENT })
+    expect(interrupts).toHaveBeenCalledWith(CHILD, { kind: 'user' })
     ctx.emit('subagent/end', edge.endWith('aborted'))
     await vi.waitFor(() => {
       const settled = onlyJob(ctx)

@@ -197,7 +197,9 @@ export type SideChatConversationProps = PropsRuntime<'chat.side.conversation'> &
 
 /** Render the shared Conversation content for the scoped side-conversation Session. */
 export function SideChatConversation({ renderFactorySlot }: SideChatConversationProps) {
-  return <>{renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })}</>
+  // The embedded occurrence never renders the Hero (phase is always `active`, `hero: false`),
+  // so the Workspace-picked handler cannot fire; the no-op keeps the slot contract honest.
+  return <>{renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, onWorkspaceSelected: async () => {} })}</>
 }
 
 /**

@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for prism-memory-model-distill.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-memory-model-distill.md
+/:
+  en: 5a8752ce6114007e
+  zh: 5a8752ce6114007e
+/prism-memory-bootstrap:
+  en: 6a4eb9bf3a2aefc1
+  zh: 5ac449efcaafb0c9
+/prism-memory-bootstrap/report:
+  en: 5a30ff20010d5932
+  zh: 5a30ff20010d5932
+/prism-memory-bootstrap/s1-problem:
+  en: 8e844fc92ff5ae17
+  zh: be340d79c8bb355e
+/prism-memory-bootstrap/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/prism-memory-bootstrap/s2-design/s2-1-producer:
+  en: 7862fad8124ce9a6
+  zh: 7862fad8124ce9a6
+/prism-memory-bootstrap/s2-design/s2-2-bootstrap-memory-bootstrap:
+  en: c45a9689c7399128
+  zh: c45a9689c7399128
+/prism-memory-bootstrap/s2-design/s2-3:
+  en: 3b6e7beb458ebf1e
+  zh: 3b6e7beb458ebf1e
+/prism-memory-bootstrap/s2-design/s2-4:
+  en: c74a978bf258378c
+  zh: c74a978bf258378c
+/prism-memory-bootstrap/s3-scope:
+  en: 4f6e82cac71bf0f5
+  zh: 435770267eed5649
+/prism-memory-bootstrap/tasks:
+  en: 0fe27360c64747c6
+  zh: 0fe27360c64747c6
+/prism-memory-bootstrap/s4-acceptance:
+  en: dc24565b1dfab279
+  zh: 910bbd5aae081f5e
+/prism-memory-bootstrap/journey-log:
+  en: 034889ac94a93507
+  zh: 034889ac94a93507
