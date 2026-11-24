@@ -9,12 +9,6 @@
 
 ```mermaid
 flowchart LR
-  pkg_cron["cron"]
-  svc_cron["ctx.cron<br/>Calendar scheduled-task capability"]
-  pkg_tool_cron["tool-cron"]
-  pkg_api_cron_controller["api-cron-controller"]
-  pkg_cron_controller["cron-controller"]
-  svc_cronController["ctx.cronController<br/>Cron remote controller capability"]
   pkg_prism_meeting["prism-meeting"]
   svc_meetingMinutes["ctx.meetingMinutes<br/>Meeting minutes capability"]
   pkg_prism_microcompact["prism-microcompact"]
@@ -403,8 +397,6 @@ flowchart LR
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
-  pkg_cron --> svc_cron
-  pkg_cron_controller --> svc_cronController
   pkg_cua --> svc_cuaAccess
   pkg_cua --> svc_cuaPrograms
   pkg_deepseek_account --> svc_deepseekAccount
@@ -576,8 +568,6 @@ flowchart LR
   svc_credentials --> pkg_api_settings_controller
   svc_credentials --> pkg_deepseek_auth
   svc_credentials --> pkg_llm_pi_ai
-  svc_cron --> pkg_api_cron_controller
-  svc_cron --> pkg_tool_cron
   svc_cuaAccess --> pkg_cua
   svc_cuaPrograms --> pkg_cua_mcp
   svc_deepseekAccount --> pkg_deepseek_auth
@@ -730,8 +720,6 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ctx.cron` | `core` | [`cron`](../packages/cron/cron) | - | [`tool-cron`](../packages/cron/tool-cron), [`api-cron-controller`](../packages/api/cron-controller) | - | 拥有五字段表达式词汇、持久化的 `cron` 领域、leader 租约、分段计时器 runtime 以及冷 Session 投递；模型表面与浏览器表面是同一服务之上的两个独立消费方。 |
-| `ctx.cronController` | `core` | `cron-controller` | - | - | - | 拥有 cron 服务之上的 Host Remote 控制器，以及浏览器所消费的生成版 Client `ctx.remote.cron` 命名空间。 |
 | `ctx.meetingMinutes` | `core` | [`prism-meeting`](../packages/prism/prism-meeting) | - | - | - | 拥有会议纪要服务：会话语音采集、纪要投影，以及面向模型的纪要工具。 |
 | `ctx.microcompact` | `core` | [`prism-microcompact`](../packages/prism/prism-microcompact) | - | - | - | 拥有可选的 microcompact 过程，在 compaction-basic 布防阈值之前就地清理过期的工具结果。 |
 | `ctx.remoteConnection` | `service` | [`client-remote-connection`](../packages/client/remote-connection) | - | - | - | 管理二维码邀请、获批的配对申请、Remote 浏览器凭据和匿名登录文档；Client 提供审批控件及独立的 Token 链接入口。 |

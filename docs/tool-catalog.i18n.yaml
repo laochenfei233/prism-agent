@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: 7d463550eec00480
-  zh: 6a1c13c15021ef9a
+  en: ea129c793a39fc35
+  zh: c184f5235b56b9b0
 /tool-schema-catalog/deepseek-ai-dsh-tool-session-control:
   en: 79ab575ea6da86e2
   zh: 79ab575ea6da86e2
@@ -372,26 +372,8 @@
   en: 8673f203aea9bdf2
   zh: 4e17783ffdf34c83
 /tool-schema-catalog/deepseek-ai-dsh-tool-web/web-search:
-  en: 533e8dc527017876
-  zh: be04303de123de40
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron:
-  en: 78ab11d7a60003d7
-  zh: 78ab11d7a60003d7
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron/cron-create:
-  en: 18c4045d1f5eb2ce
-  zh: 079a0cf49aa6675e
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron/cron-delete:
-  en: 2acbb4e2a334d328
-  zh: cce83c2f5daec7e3
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron/cron-list:
-  en: a72fd4f791ca8bb0
-  zh: 6e55fb77ab3d8f1f
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron/cron-run:
-  en: ddb1493f9c7fe975
-  zh: e1bd757688fb52cf
-/tool-schema-catalog/deepseek-ai-dsh-tool-cron/cron-update:
-  en: 6e4a4e633da3af9a
-  zh: f3aba1d3f4bad2d5
+  en: 8d1e377c5fff65d7
+  zh: 4726856601afd5a2
 /tool-schema-catalog/deepseek-ai-dsh-experimental-tool-meeting-minutes:
   en: 6fbb82eca883302e
   zh: 6fbb82eca883302e

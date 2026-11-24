@@ -49,12 +49,6 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/connector/feishu': { category: 'optional', reason: 'Separately installed app plugin: the Feishu CLI, its skills, and the account operations of a user-authorized Feishu account.' },
   'packages/connector/tencent-meeting': { category: 'optional', reason: 'Separately installed app plugin that requires tmeet and a user-authorized Tencent Meeting account.' },
   'packages/fs/fs-observation-policy': { category: 'optional', reason: 'Read-before-mutation guard that a deployment enables on the disabled dsh-base row.' },
-  // The fork's calendar scheduling rides an explicit Cron overlay (apps/cli/config/examples/cron),
-  // never the default Web composition.
-  'packages/cron/cron': { category: 'optional', reason: 'Calendar scheduler mounted by the explicit Cron profile overlay.' },
-  'packages/cron/tool-cron': { category: 'optional', reason: 'Model tools mounted together with the Cron capability by the overlay.' },
-  'packages/api/cron-controller': { category: 'optional', reason: 'Remote controller mounted together with the Cron capability by the overlay.' },
-  'packages/client/ui-cron': { category: 'optional', reason: 'Settings panel enabled together with the Cron capability by the overlay.' },
   'packages/sdk/client': { category: 'sdk', reason: 'Published TypeScript embedding client runs in the consumer process.' },
   'packages/typert/generator': { category: 'build', reason: 'Build-time generation of type metadata.' },
   'packages/test-support/agent-loop-testkit': { category: 'test', reason: 'Published agent-loop test harness.' },

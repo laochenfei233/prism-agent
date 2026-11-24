@@ -33,7 +33,6 @@ New packages join existing groups; a new group updates its README and this table
 | [`typert/`](typert/README.md) | Type graph generation, artifact loading, runtime registry |
 | [`goal/`](goal/README.md) | Same-session goal persistence and lifecycle |
 | [`schedule/`](schedule/README.md) | Host-owned scheduled follow-ups |
-| [`cron/`](cron/README.md) | Unattended five-field calendar scheduling in an explicit time zone |
 | [`feedback/`](feedback/README.md) | Human feedback capture and command |
 | [`telemetry/`](telemetry/README.md) | Shared Cordis OTel reporting channels |
 | [`identity/`](identity/README.md) | Shared anonymous identity |

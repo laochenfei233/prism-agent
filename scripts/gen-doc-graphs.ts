@@ -108,22 +108,6 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
-    key: 'cron',
-    pkg: 'cron',
-    title: 'Calendar scheduled-task capability',
-    mode: 'core',
-    consumers: ['tool-cron', 'api-cron-controller'],
-    note: 'Owns the five-field expression vocabulary, the durable `cron` domain, the leader lease, the segmented timer runtime, and cold-Session delivery; the model and browser surfaces are separate consumers over the same service.',
-  },
-  {
-    key: 'cronController',
-    pkg: 'cron-controller',
-    title: 'Cron remote controller capability',
-    mode: 'core',
-    consumers: [],
-    note: 'Owns the Host Remote controller over the cron service and the generated Client `ctx.remote.cron` namespace that the browser consumes.',
-  },
-  {
     key: 'meetingMinutes',
     pkg: 'prism-meeting',
     title: 'Meeting minutes capability',

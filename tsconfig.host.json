@@ -670,8 +670,5 @@
     { "path": "./packages/experimental/speech-to-text-openai" },
     { "path": "./packages/experimental/speech-to-text-dashscope" },
     { "path": "./packages/util/path-lock" },
-    { "path": "./packages/cron/tool-cron" },
-    { "path": "./packages/api/cron-controller/tsconfig.host.json" },
-    { "path": "./packages/cron/cron" },
   ]
 }

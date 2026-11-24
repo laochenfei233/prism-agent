@@ -98,7 +98,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/browser-use/browser-use': { kind: 'none', reason: 'The registry only reserves a provider name; providers own browser tools and Session resources.' },
   'packages/experimental/browser-use-runtime': { kind: 'indirect', reason: 'Browser providers call the library to own resources and expose upstream MCP tools.' },
   'packages/computer-use/computer-use': { kind: 'none', reason: 'The registry only reserves provider names; providers own all model-facing tools and guidance.' },
-  'packages/cron/cron': { kind: 'indirect', reason: 'The capability parses and matches calendar rules; its tool consumer owns the model-facing schemas and its runtime owns the delivery framing.' },
   'packages/document/office-kit': { kind: 'indirect', reason: 'The provider returns rendered and converted bytes; the Office tools own their model-visible results.' },
 
   'packages/account/deepseek-auth': { kind: 'none', reason: 'Request authentication releases HTTP headers to Host plugins and registers no model context or tools.' },
@@ -111,7 +110,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/mcp/mcp-account': { kind: 'none', reason: 'Plugins page account presentation and operations over the MCP manager; the connector and the MCP client document the tools a grant exposes.' },
   'packages/mcp/mcp-manager': { kind: 'indirect', reason: 'The manager only mounts and disposes dsh-mcp-client instances; those instances own every model-facing tool and schema.' },
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side presentation of host-observed output; touches no prompt, message, schema, stream, or tool result.' },
-  'packages/client/ui-cron': { kind: 'none', reason: 'Browser-side presentation of the scheduled-task projection; the model reaches cron through dsh-tool-cron, and this panel touches no prompt, message, schema, stream, or tool result.' },
   'packages/client/ui-session-panel': { kind: 'none', reason: 'Browser-side summary of Session facts the Client already holds; touches no prompt, message, schema, stream, or tool result.' },
   'packages/shell/shell': { kind: 'indirect', reason: 'The service interface delegates all model rendering to dsh-tool-bash.' },
   'packages/shell/shell-env': { kind: 'indirect', reason: 'The env service exposes managed DSH_* facts through the shell tools (dsh-tool-bash/dsh-tool-pwsh); it registers no prompt or schema of its own.' },
@@ -267,7 +265,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/test-support/llm-replay': { kind: 'none', reason: 'The keyless adapter invokes no provider model.' },
   'packages/test-support/remote-mock': { kind: 'none', reason: 'Browser-side test infrastructure (Remote endpoint mock); registers nothing model-facing.' },
   'packages/api/gateway': { kind: 'none', reason: 'Remote dispatch infrastructure; invoked business methods own any model-visible effect.' },
-  'packages/api/cron-controller': { kind: 'none', reason: 'Scheduled-task API and state projection owner; the model reaches cron through dsh-tool-cron, and this package registers no prompt, tool, or session event.' },
   'packages/api/job-controller': { kind: 'none', reason: 'Job observation is browser and Host control state; it registers no prompt, tool, or session event.' },
   'packages/backup/prism-backup': { kind: 'none', reason: 'Backup is Host file transfer plus browser settings state; it registers no prompt, tool, or session event.' },
   'packages/transfer/prism-transfer': { kind: 'none', reason: 'Transfer is Host file transfer plus browser settings state; it registers no prompt, tool, or session event.' },

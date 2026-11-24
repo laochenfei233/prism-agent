@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-09-26-cron-scheduled-tasks.md
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler:
-  en: cde2e52f474ba152
-  zh: d6c1322384c94bab
+  en: 1d45f63bb70dea12
+  zh: 2125a72be9f02e3c
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/problem:
   en: 4cdb9bf09dd8507a
   zh: 2cae6830b3003119
@@ -12,8 +12,8 @@
   en: d4eaf07243b90362
   zh: d9843d2bf066930e
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/plugin-topology-and-owning-verbs:
-  en: 0b7fcaa2cae7652e
-  zh: 21eb6405f7399483
+  en: 81eb914001e118d5
+  zh: 3ab1310c7a2814bb
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/cron-expressions-and-calendar-semantics:
   en: 940f5e14251340dd
   zh: fad34b786c78a0fb
@@ -30,8 +30,8 @@
   en: 95103d7f3eaa45e6
   zh: 05c87c9c038d54ad
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/proposal/implementation-plan:
-  en: 49302f64e9fd2ea8
-  zh: 86e9a711987c1d5e
+  en: a4eebca7d82dcd76
+  zh: df6118a8ff361106
 /agent-note-cron-scheduled-tasks-over-a-process-level-scheduler/alternatives-considered:
   en: 3824605171c4ba54
   zh: b481c715fb388ee3

@@ -1,7 +1,4 @@
 {
-  "ui-cron/src/client/CronPanel.module.css": [
-    ".trigger: border-radius: var(--dsw-radius-full, 999px)"
-  ],
   "ui-deliverables/src/client/ChangedFiles.module.css": [
     ".tile: border-radius: 10px"
   ],

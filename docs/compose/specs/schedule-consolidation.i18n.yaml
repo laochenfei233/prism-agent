@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for schedule-consolidation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/schedule-consolidation.md
+/:
+  en: 0dbfc73b2b159a1d
+  zh: 0dbfc73b2b159a1d
+/scheduling-consolidation-upstream-schedule-wins-cron-retires:
+  en: 58da4e79ed8c29b2
+  zh: f50d4e4ca19b1697
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/report:
+  en: cdab51a84c2be881
+  zh: 2bc986cfc02d0be9
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s1-problem:
+  en: e53f84072580942e
+  zh: c99555dfcc5d0248
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s2-design/s2-1-what-stays-schedule-already-covers-cron-s-vocabulary:
+  en: 04d283dbbef52c28
+  zh: 15eb896547d0c5bd
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s2-design/s2-2-what-retires-the-whole-cron-chain-is-deleted:
+  en: 733e42dec7873bf3
+  zh: e2591046ec5c424b
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s2-design/s2-3-data-disposition-no-migration-no-deletion:
+  en: 6bcea485695c8cf1
+  zh: d480eeb0a3c31a72
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s2-design/s2-4-documentation:
+  en: eccebf6701cba518
+  zh: 47241f4c998e5836
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s3-scope:
+  en: 256a6975bd3225f5
+  zh: 0b7f7aad9f6dadb8
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/tasks:
+  en: a0e107a3476160cc
+  zh: c5716a887b40f8ac
+/scheduling-consolidation-upstream-schedule-wins-cron-retires/s4-acceptance:
+  en: 1ffaa308b954cb29
+  zh: 7706602126ce8849

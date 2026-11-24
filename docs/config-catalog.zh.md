@@ -1045,41 +1045,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-credentials-local -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-cron -->
-<a id="deepseek-aidsh-cron"></a>
-
-## `@deepseek-ai/dsh-cron`
-
-- `inject`: `storageDomain` · `timer` · `agents`
-- `source`: [`packages/cron/cron/src/config.ts:30`](../packages/cron/cron/src/config.ts)
-
-```ts config-catalog
-/**
- * Plugin config as a deployment states it in `cordis.yml`.
- *
- * Every field is a deployment choice, so none of them is decided inside the
- * plugin; the two optional ones carry a schema default and are still resolved
- * explicitly by {@link resolveCronConfig}.
- */
-export interface Config {
-  /**
-   * Path of the leadership lock file.
-   *
-   * Required, and deliberately not defaulted: a default could point somewhere
-   * other than the deployment's configured storage root, and two deployments
-   * would then each believe they lead while sharing one domain.
-   */
-  leaderLockPath: string
-  /** Delay before a follower retries leadership, in milliseconds. */
-  leaderRetryMs?: number
-  /** Finished runs each job keeps; older runs are dropped as new ones land. */
-  maxRunsPerJob?: number
-  /** Ceiling on one run, in milliseconds, when the creating caller states none. */
-  defaultMaxRunMs?: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-cron -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-cua-macos -->
 <a id="deepseek-aidsh-cua-macos"></a>
 
@@ -4969,23 +4934,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-bash-persistent -->
 
-<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-cron -->
-<a id="deepseek-aidsh-tool-cron"></a>
-
-## `@deepseek-ai/dsh-tool-cron`
-
-- `inject`: `agents` · `cron` · `sessionProjections` · `tools`
-- `source`: [`packages/cron/tool-cron/src/index.ts:44`](../packages/cron/tool-cron/src/index.ts)
-
-```ts config-catalog
-/** Deployment policy for the scheduled-task tools. */
-export interface Config {
-  /** Run ceiling, in milliseconds, for a task whose creation states none. */
-  defaultMaxRunMs?: number
-}
-```
-<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-cron -->
-
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-executor-ptc -->
 <a id="deepseek-aidsh-tool-executor-ptc"></a>
 
@@ -6040,7 +5988,6 @@ export type ImportSourceId =
   | 'hermes'
   | 'pi'
   | 'gemini'
-  | 'zcode'
 ```
 <!-- END GENERATED config-catalog:@prism/prism-session-import -->
 
@@ -6053,7 +6000,6 @@ export type ImportSourceId =
 | --- | --- | --- |
 | `@deepseek-ai/dsh-acp-app` | `cmdlineArgs` | [`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts) |
 | `@deepseek-ai/dsh-agent` | `sessionProjections` | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
-| `@deepseek-ai/dsh-api-cron-controller` | `cron` · `typert` | [`packages/api/cron-controller/src/index.ts`](../packages/api/cron-controller/src/index.ts) |
 | `@deepseek-ai/dsh-api-remote-access` | — | [`packages/api/remote-access/src/index.ts`](../packages/api/remote-access/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
@@ -6077,7 +6023,6 @@ export type ImportSourceId =
 | `@deepseek-ai/dsh-client-ui-conversation` | — | [`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-cordis` | — | [`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-creation-recommendations` | — | [`packages/client/ui-creation-recommendations/src/index.ts`](../packages/client/ui-creation-recommendations/src/index.ts) |
-| `@deepseek-ai/dsh-client-ui-cron` | — | [`packages/client/ui-cron/src/index.ts`](../packages/client/ui-cron/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-deliverables` | `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` | [`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-directory-picker-browse` | — | [`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-directory-picker-native` | — | [`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts) |

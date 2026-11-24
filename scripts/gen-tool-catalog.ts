@@ -93,9 +93,7 @@ import WorkflowEngine from '@deepseek-ai/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
-import * as ToolCron from '@deepseek-ai/dsh-tool-cron'
 import * as ToolMeetingMinutes from '@deepseek-ai/dsh-experimental-tool-meeting-minutes'
-import { CronService, type CronJob, type CronJobId, type CronJobRequest, type CronJobUpdate, type CronRunRecord } from '@deepseek-ai/dsh-cron'
 import SpeechToText, { type SpeechRequest, type SpeechSpec, type Transcript } from '@deepseek-ai/dsh-experimental-speech-to-text'
 import * as ToolWorkspaceDependencies from '@deepseek-ai/dsh-tool-workspace-dependencies'
 import { githubSlug } from './verify-md-links.ts'
@@ -133,16 +131,6 @@ class CatalogWorkflowEngine extends WorkflowEngine {
   start(_request: WorkflowStartRequest): WorkflowRun {
     throw new Error('gen-tool-catalog: workflow execution is unavailable during schema harvest')
   }
-}
-
-/** Cron provider that refuses every call: schema harvest never schedules or reads a job. */
-class CatalogCronService extends CronService {
-  override list(): readonly CronJob[] { return [] }
-  override get(_id: CronJobId): CronJob | undefined { return undefined }
-  override create(_request: CronJobRequest): Promise<CronJob> { return Promise.reject(new Error('gen-tool-catalog: cron is unreachable during schema harvest')) }
-  override update(_id: CronJobId, _update: CronJobUpdate): Promise<CronJob> { return Promise.reject(new Error('gen-tool-catalog: cron is unreachable during schema harvest')) }
-  override remove(_id: CronJobId): Promise<boolean> { return Promise.reject(new Error('gen-tool-catalog: cron is unreachable during schema harvest')) }
-  override runNow(_id: CronJobId): Promise<CronRunRecord> { return Promise.reject(new Error('gen-tool-catalog: cron is unreachable during schema harvest')) }
 }
 
 /** Recognition provider set that refuses every request: schema harvest never transcribes. */
@@ -818,19 +806,6 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
-  },
-  {
-    pkg: '@deepseek-ai/dsh-tool-cron',
-    dir: 'tool-cron',
-    source: 'packages/cron/tool-cron/src/index.ts',
-    requires: ['ctx.tools', 'ctx.cron', 'ctx.agents', 'ctx.sessionProjections'],
-    writes: ['tool/call', 'tool/result'],
-    async mount(ctx) {
-      await ctx.plugin(AgentRegistry)
-      // The tools reach ctx.cron only inside a call; harvest mounts the refusing provider.
-      await ctx.plugin(CatalogCronService)
-      await ctx.plugin(ToolCron)
-    },
   },
   {
     pkg: '@deepseek-ai/dsh-experimental-tool-meeting-minutes',

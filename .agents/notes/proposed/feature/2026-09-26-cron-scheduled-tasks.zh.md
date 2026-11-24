@@ -4,6 +4,8 @@ Status: proposed
 
 [English](2026-09-26-cron-scheduled-tasks.md) | 中文
 
+已退役：本计划未被原样采纳——[schedule-consolidation](../../../../docs/compose/specs/schedule-consolidation.zh.md) 删除了 Cron 相关包，只保留 Schedule 作为唯一的调度系统；以下内容为历史记录。
+
 ## 问题
 
 harness 只能在已经活着的会话中开始工作。[`@deepseek-ai/dsh-schedule`](../../../../packages/schedule/schedule/README.zh.md) 拥有会话本地的提醒，其规则并集是 `after`、`at` 和最短 300 秒的固定间隔 `every`；它的协议没有日历或 cron 表达式，而冷会话不执行任何工作、也不发送任何外部通知，直到它重新变活（Web 持久化 schedule）。harness 层 loop 决策 有意把基于时间的执行留作未建，并记录它「属于调度器，而不属于任一 goal 家族」。
@@ -34,7 +36,7 @@ harness 只能在已经活着的会话中开始工作。[`@deepseek-ai/dsh-sched
 - `session-persistence-jsonl` 目前拥有唯一的内核锁实现。其锁与 Win32 辅助代码迁入 `dsh-util-path-lock`，会话写租约改为消费该包。
 - `dsh-schedule` 目前拥有唯一的本地日历解析。`resolveLocalInstant` 与 `localProjection` 作为导出迁入 `dsh-util-time`，schedule 的域改为消费它们。
 
-组合以一份示例 overlay 交付，即 `apps/cli/config/examples/cron/cordis.yml`，形态对齐 [schedule overlay](../../../../apps/cli/config/examples/cron/cordis.yml)：为三个 Host 包 `insert` 行，并将 Web 组合包中以 `disabled` 交付的 `ui-cron` 行改为 `disabled: false`。
+组合以一份示例 overlay 交付，即 `apps/cli/config/examples/cron/cordis.yml`（已由 [schedule-consolidation](../../../../docs/compose/specs/schedule-consolidation.zh.md) 删除）：为三个 Host 包 `insert` 行，并将 Web 组合包中以 `disabled` 交付的 `ui-cron` 行改为 `disabled: false`。
 
 ### cron 表达式与日历语义
 
@@ -115,12 +117,12 @@ Web 面板是一个基于 `ctx.remote.cron` 的独立可选插件。禁用它，
 | 会话租约消费方 | `packages/session/session-persistence-jsonl/src/lease.ts` 保留 session 自己的策略（锁文件名、目录模式、争用映射），`src/win32.ts` 只保留持久化命名空间发布；两者都消费新包 |
 | 共享时间 | `packages/util/time/src/index.ts`、`packages/util/time/tests/`、其 README 三件套 |
 | schedule 消费方 | `packages/schedule/schedule/src/domain.ts` |
-| cron 宿主 | `packages/cron/cron/src/` — `index.ts`、`types.ts`、`domain.ts`、`store.ts`、`lease.ts`、`runtime.ts`、`delivery.ts`、`authority.ts`，外加 `tests/` 与 README 三件套 |
-| cron 工具 | `packages/cron/tool-cron/src/index.ts`、`tests/`、README 三件套 |
-| Remote | `packages/api/cron-controller/src/`、`tests/`、README 三件套 |
-| Web 面板 | `packages/client/ui-cron/src/client/`、`tests/`、README 三件套 |
-| 组合 | `apps/cli/config/examples/cron/cordis.yml`；`packages/bundle/web-app/cordis.patch.yml` 中 `disabled` 的 `ui-cron` 行及其在 `packages/bundle/web-app/package.json` 中的依赖；overlay 解析器清单所在的 `apps/cli/package.json` |
-| 注册表 | `tsconfig.host.json`、`tsconfig.client.json`、重新生成的 `tsconfig.base.json` paths、`packages/cron/README` 三件套、`packages/client/README` 成员行、`docs/subsystems/cron.md` 及其网站路由 |
+| cron 宿主 | cron 能力包——`src` 含 index/types/domain/store/lease/runtime/delivery/authority，外加 tests 与 README 三件套；均已随退役删除 |
+| cron 工具 | tool-cron 包——src/index.ts、tests、README 三件套；已随退役删除 |
+| Remote | cron-controller 包——src、tests、README 三件套；已随退役删除 |
+| Web 面板 | ui-cron 包——client src、tests、README 三件套；已随退役删除 |
+| 组合 | CLI 的 cron overlay，以及 web-app bundle 中 `disabled` 的 ui-cron 行、其依赖和 CLI 的解析器清单；均已随退役删除 |
+| 注册表 | tsconfig.host.json、tsconfig.client.json、重新生成的 tsconfig.base.json paths、cron 组 README 三件套、client README 成员行、cron 子系统页及其网站路由；均已随退役删除或更新 |
 | 生成器 | `scripts/gen-tool-catalog.ts` 的 `sources` 条目，以及下文列出的每一个重新生成的目录或图 |
 
 **任务**

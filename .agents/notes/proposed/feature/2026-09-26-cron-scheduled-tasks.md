@@ -4,6 +4,8 @@ Status: proposed
 
 English | [中文](2026-09-26-cron-scheduled-tasks.zh.md)
 
+Retired: this plan was not adopted as written — [schedule-consolidation](../../../../docs/compose/specs/schedule-consolidation.md) removed the Cron packages and kept Schedule as the only scheduling system; the proposal below is history.
+
 ## Problem
 
 The harness can start work only inside a conversation that is already live. [`@deepseek-ai/dsh-schedule`](../../../../packages/schedule/schedule/README.md) owns session-local reminders whose rule union is `after`, `at`, and fixed-rate `every` with a 300-second floor; its protocol has no calendar or Cron expression, and a cold Session performs no work and sends no external notification until it is live again (durable Web schedule). The harness-level loop decision deliberately left time-based execution unbuilt and recorded that it "belongs with a scheduler rather than either goal family".
@@ -34,7 +36,7 @@ Two existing release packages change, because each behavior gains its second con
 - `session-persistence-jsonl` currently owns the only kernel-lock implementation. Its lock and Win32 helper move to `dsh-util-path-lock`, and the session write lease consumes that package.
 - `dsh-schedule` currently owns the only local-calendar resolution. `resolveLocalInstant` and `localProjection` move to `dsh-util-time` as exports, and the Schedule domain consumes them.
 
-The composition ships as an example overlay, `apps/cli/config/examples/cron/cordis.yml`, mirroring the [Schedule overlay](../../../../apps/cli/config/examples/cron/cordis.yml): `insert` rows for the three Host packages, and `disabled: false` on a `ui-cron` row that the Web bundle ships disabled.
+The composition shipped as an example overlay, `apps/cli/config/examples/cron/cordis.yml` (deleted by [schedule-consolidation](../../../../docs/compose/specs/schedule-consolidation.md)): `insert` rows for the three Host packages, and `disabled: false` on a `ui-cron` row that the Web bundle shipped disabled.
 
 ### Cron expressions and calendar semantics
 
@@ -115,12 +117,12 @@ Run history is bounded and durable, because a scheduler whose runs leave no trac
 | Session lease consumer | `packages/session/session-persistence-jsonl/src/lease.ts` keeps the session-owned policy (lock-file name, directory mode, contention mapping) and `src/win32.ts` keeps only durable namespace publication; both consume the new package |
 | Shared time | `packages/util/time/src/index.ts`, `packages/util/time/tests/`, its README triplet |
 | Schedule consumer | `packages/schedule/schedule/src/domain.ts` |
-| Cron host | `packages/cron/cron/src/` — `index.ts`, `types.ts`, `domain.ts`, `store.ts`, `lease.ts`, `runtime.ts`, `delivery.ts`, `authority.ts`, plus `tests/` and the README triplet |
-| Cron tool | `packages/cron/tool-cron/src/index.ts`, `tests/`, README triplet |
-| Remote | `packages/api/cron-controller/src/`, `tests/`, README triplet |
-| Web panel | `packages/client/ui-cron/src/client/`, `tests/`, README triplet |
-| Composition | `apps/cli/config/examples/cron/cordis.yml`; the disabled `ui-cron` row and its dependency in `packages/bundle/web-app/cordis.patch.yml` and `packages/bundle/web-app/package.json`; `apps/cli/package.json` for the overlay's resolver manifest |
-| Registries | `tsconfig.host.json`, `tsconfig.client.json`, the regenerated `tsconfig.base.json` paths, `packages/cron/README` triplet, `packages/client/README` member row, `docs/subsystems/cron.md` with its website route |
+| Cron host | the cron capability package — `src` with index/types/domain/store/lease/runtime/delivery/authority, plus tests and the README triplet; all deleted by the retirement |
+| Cron tool | the tool-cron package — src/index.ts, tests, README triplet; deleted by the retirement |
+| Remote | the cron-controller package — src, tests, README triplet; deleted by the retirement |
+| Web panel | the ui-cron package — client src, tests, README triplet; deleted by the retirement |
+| Composition | a cron overlay for the CLI plus the disabled ui-cron row and its dependency in the web-app bundle and the CLI's resolver manifest; all deleted by the retirement |
+| Registries | tsconfig.host.json, tsconfig.client.json, the regenerated tsconfig.base.json paths, the cron group README triplet, the client README member row, and the cron subsystem page with its website route; all deleted or updated by the retirement |
 | Generators | the `sources` entry in `scripts/gen-tool-catalog.ts` and every regenerated catalog or graph named below |
 
 **Tasks**

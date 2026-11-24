@@ -70,7 +70,6 @@ The kernel packages boot and serve the page; the UI feature packages present it.
 | [`ui-subagent/`](ui-subagent/README.md) | Provides subagent navigation, child transcript states, and inline references | — |
 | [`ui-jobs/`](ui-jobs/README.md) | Lists this session's background jobs with on-demand streaming record panels | — |
 | [`ui-schedule/`](ui-schedule/README.md) | Provides the sidebar Automation tasks page and right Sidebar task tab, which create, edit, run, pause, resume, and delete Host scheduled tasks, plus the Session header clock and row mark | — |
-| [`ui-cron/`](ui-cron/README.md) | Lists and manages the deployment's scheduled tasks in a Session-header panel | — |
 | [`ui-session-panel/`](ui-session-panel/README.md) | Adds the Session header toggle and the floating Session panel whose sections plugins register, with the Environment section | — |
 | [`ui-model-selection/`](ui-model-selection/README.md) | Provides model selection in conversation surfaces | — |
 | [`ui-permission-presets/`](ui-permission-presets/README.md) | Configures default permissions and switches the current session's access | — |

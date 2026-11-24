@@ -48,9 +48,9 @@ interface SessionEventMap {
   /**
    * A user-role message on the model-visible surface: a direct human prompt
    * (the queued message claimed for this turn), a synthetic `agent.inject()`
-   * context (file-change notices, subdir AGENTS.md, skill content, cron
-   * notifications, …), or an entered goal continuation round. All three
-   * project their `content` verbatim; `source` tells them apart.
+   * context (file-change notices, subdir AGENTS.md, skill content, …), or an
+   * entered goal continuation round. All three project their `content`
+   * verbatim; `source` tells them apart.
    */
   'user/message': UserMessage
   /** An incremental agent session change admitted at the named turn and step. */

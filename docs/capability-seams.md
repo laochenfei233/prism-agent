@@ -7,12 +7,6 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
-  pkg_cron["cron"]
-  svc_cron["ctx.cron<br/>Calendar scheduled-task capability"]
-  pkg_tool_cron["tool-cron"]
-  pkg_api_cron_controller["api-cron-controller"]
-  pkg_cron_controller["cron-controller"]
-  svc_cronController["ctx.cronController<br/>Cron remote controller capability"]
   pkg_prism_meeting["prism-meeting"]
   svc_meetingMinutes["ctx.meetingMinutes<br/>Meeting minutes capability"]
   pkg_prism_microcompact["prism-microcompact"]
@@ -401,8 +395,6 @@ flowchart LR
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
-  pkg_cron --> svc_cron
-  pkg_cron_controller --> svc_cronController
   pkg_cua --> svc_cuaAccess
   pkg_cua --> svc_cuaPrograms
   pkg_deepseek_account --> svc_deepseekAccount
@@ -574,8 +566,6 @@ flowchart LR
   svc_credentials --> pkg_api_settings_controller
   svc_credentials --> pkg_deepseek_auth
   svc_credentials --> pkg_llm_pi_ai
-  svc_cron --> pkg_api_cron_controller
-  svc_cron --> pkg_tool_cron
   svc_cuaAccess --> pkg_cua
   svc_cuaPrograms --> pkg_cua_mcp
   svc_deepseekAccount --> pkg_deepseek_auth
@@ -728,8 +718,6 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ctx.cron` | `core` | [`cron`](../packages/cron/cron) | - | [`tool-cron`](../packages/cron/tool-cron), [`api-cron-controller`](../packages/api/cron-controller) | - | Owns the five-field expression vocabulary, the durable `cron` domain, the leader lease, the segmented timer runtime, and cold-Session delivery; the model and browser surfaces are separate consumers over the same service. |
-| `ctx.cronController` | `core` | `cron-controller` | - | - | - | Owns the Host Remote controller over the cron service and the generated Client `ctx.remote.cron` namespace that the browser consumes. |
 | `ctx.meetingMinutes` | `core` | [`prism-meeting`](../packages/prism/prism-meeting) | - | - | - | Owns the meeting-minutes service: session speech capture, the minutes projection, and the model-facing minutes tools. |
 | `ctx.microcompact` | `core` | [`prism-microcompact`](../packages/prism/prism-microcompact) | - | - | - | Owns the optional microcompact pass that clears stale tool results in place ahead of the compaction-basic arming threshold. |
 | `ctx.remoteConnection` | `service` | [`client-remote-connection`](../packages/client/remote-connection) | - | - | - | Owns QR invitations, approved pairing requests, Remote browser credentials and the anonymous login document; its Client provides approval controls and an independent Token-link shortcut. |
