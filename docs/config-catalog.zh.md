@@ -6040,6 +6040,7 @@ export type ImportSourceId =
   | 'hermes'
   | 'pi'
   | 'gemini'
+  | 'zcode'
 ```
 <!-- END GENERATED config-catalog:@prism/prism-session-import -->
 

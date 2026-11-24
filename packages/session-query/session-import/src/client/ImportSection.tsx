@@ -1,7 +1,7 @@
 /**
  * Settings section that imports conversation history from other coding agents.
  *
- * The page scans the ten supported stores, previews the sessions grouped by
+ * The page scans the eleven supported stores, previews the sessions grouped by
  * working folder, and requires one explicit confirmation before adding
  * sessions to projects that already exist. It calls the Host routes with
  * plain JSON and never reads a foreign store itself.

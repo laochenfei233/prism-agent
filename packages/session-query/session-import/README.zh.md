@@ -1,5 +1,5 @@
 ---
-description: "在设置中导入 Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 与 Gemini CLI 的对话历史。"
+description: "在设置中导入 Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi、Gemini CLI 与 ZCode 的对话历史。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import` 在设置中新增「导入」页，读取另外十个编码 Agent 的对话历史，并把每段对话写成本 harness 中普通的持久会话。导入的会话会出现在侧栏中其记录的工作文件夹对应的项目下，下一次提问会继续该对话。DeepSeek Harness 会话按原生日志复制，保留原会话 id 与完整事件，因此工具调用与结果不会丢失；其余九个来源会归一化成文本。来源以只读方式打开。
+`dsh-session-import` 在设置中新增「导入」页，读取另外十一个编码 Agent 的对话历史，并把每段对话写成本 harness 中普通的持久会话。导入的会话会出现在侧栏中其记录的工作文件夹对应的项目下，下一次提问会继续该对话。DeepSeek Harness 会话按原生日志复制，保留原会话 id 与完整事件，因此工具调用与结果不会丢失；其余十个来源会归一化成文本。来源以只读方式打开。
 
 ## 目录
 
@@ -52,6 +52,7 @@ kind: "package-reference"
 | Hermes | `~/.hermes` |
 | Pi | `~/.pi/agent/sessions` |
 | Gemini CLI | `~/.gemini/tmp` |
+| ZCode | `~/.zcode` |
 
 ### 配置
 
@@ -95,7 +96,7 @@ Host 半包（[`src/index.ts`](src/index.ts)）校验配置、注册两条 Fetch
 
 DeepSeek Harness 来源按原生方式复制：引擎用原会话 id 重放完整的已提交事件日志，因此工具调用、工具结果、标题事件与 request 头都会留在持久会话及其派生历史中。写入之前，日志会用存储读取器自身的事件语法校验——格式版本、事件词表、已退役结构与消息信封——因此无法读取的日志会让该会话以原因失败；它也绝不会降级成文本。第一次原生写入前，来源 home 的 `attachments/` 目录会复制到当前 home，每个复制成员都会以只读方式重新发布。
 
-其余九个来源由引擎写入顶层头（`version: 4`、`isSeeded: false`、`delegationDepth: 0`），创建时间取对话首条消息，然后每个用户输入一轮：`turn/start`、`user/message`、`stream` 为空的 `assistant/message`、`turn/end`。连续助手消息合并为一条；来源提供的标题写成 `session/title` 事件。
+其余十个来源由引擎写入顶层头（`version: 4`、`isSeeded: false`、`delegationDepth: 0`），创建时间取对话首条消息，然后每个用户输入一轮：`turn/start`、`user/message`、`stream` 为空的 `assistant/message`、`turn/end`。连续助手消息合并为一条；来源提供的标题写成 `session/title` 事件。
 
 两种路径最终都通过普通的持久化句柄追加、flush 并关闭，因此 `sessionPersistence.list()` 在下一次侧栏刷新前就会暴露该会话，下一次提问的派生历史也会包含导入的消息。
 
@@ -137,7 +138,7 @@ DeepSeek Harness 来源按原生方式复制：引擎用原会话 id 重放完�
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **转换来源仅文本**——Claude Code、Codex、Grok、MiMo Code、OpenCode、OpenClaw、Hermes、Pi 与 Gemini CLI 会丢失工具调用、工具结果、推理、图片与子 agent 记录。DeepSeek Harness 是例外：它的日志按原生方式复制，当前构建无法读取的版本或事件信封会让该会话失败，而不是回退成文本。
+- **转换来源仅文本**——Claude Code、Codex、Grok、MiMo Code、OpenCode、OpenClaw、Hermes、Pi、Gemini CLI 与 ZCode 会丢失工具调用、工具结果、推理、图片与子 agent 记录。DeepSeek Harness 是例外：它的日志按原生方式复制，当前构建无法读取的版本或事件信封会让该会话失败，而不是回退成文本。
 - **原生副本按字节复制**——导入会在写入前用存储读取器的事件语法校验日志，因此无效事件会在导入时失败。跨事件的 turn 与 step 关系只在 surface 折叠时校验，因此关系不正确的日志仍可能导入成功、随后打开失败；请在来源中修复它，或不要导入该会话。导入事件保留来源的 provider 与 model 归属，且没有导入内容标记。
 - **没有增量同步**——重复导入同一来源会话只报告重复；外部存储中的新消息不会追加到已有的 DSH 会话。
 - **未公开存储尽力而为**——OpenClaw 与 Hermes 的载荷结构随版本变化；无法识别角色与文本的事件会被跳过，没有任何可用文本的会话报告为已跳过。

@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session-query/session-import/README.md
 /:
-  en: 3fa41bc0e29532ab
-  zh: 74202b49be02c892
+  en: e9fe912c26c93d75
+  zh: ea9312d6cf7bf357
 /prism-prism-session-import:
   en: 46198e2a05ad7042
   zh: 9465d145f3f5c46e
 /prism-prism-session-import/summary:
-  en: 0b7ce12286eadd26
-  zh: e513e068ae764474
+  en: d7f0f5f72a227be6
+  zh: 7723552431cfd099
 /prism-prism-session-import/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -21,8 +21,8 @@
   en: 660678c683443aa0
   zh: b486d60cbd74c147
 /prism-prism-session-import/use-this-package/sources:
-  en: c73e02dcb1bff964
-  zh: 49714a0ef96fc710
+  en: 03242f596fac3ce5
+  zh: 5325de8052b3d454
 /prism-prism-session-import/use-this-package/configuration:
   en: 9fde05bede7e4761
   zh: 20d856e323b7e347
@@ -43,7 +43,7 @@
   zh: 44439eed9bc2066d
 /prism-prism-session-import/understand-the-implementation/session-synthesis:
   en: f338e396e25f4901
-  zh: 0102c97fafcaf579
+  zh: 8f1df8f7f335d58f
 /prism-prism-session-import/understand-the-implementation/read-only-sources:
   en: 231a63d889fba34d
   zh: 0431c1cc5d78990b
@@ -66,8 +66,8 @@
   en: 97e4c4791683d905
   zh: 029ab1b59c2ba3c9
 /prism-prism-session-import/known-limitations-and-deferred-work:
-  en: 42396458b918340f
-  zh: 8d7487689c5e74ff
+  en: addd061cf431ef52
+  zh: f515ab866dc1bf52
 /prism-prism-session-import/known-limitations-and-deferred-work/dev-note:
   en: 0a1253c6f7b5e8b9
   zh: 9f56528562c7c914

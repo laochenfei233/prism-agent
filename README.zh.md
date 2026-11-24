@@ -60,7 +60,7 @@ pnpm dsh web
 
 | 能力 | 你得到什么 |
 | --- | --- |
-| 会话导入 | 把十个编码智能体的现有对话导入会话列表：Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi、Gemini CLI。 |
+| 会话导入 | 把十一个编码智能体的现有对话导入会话列表：Claude Code、Codex、Grok、DeepSeek Harness、MiMo Code、OpenCode、OpenClaw、Hermes、Pi、Gemini CLI、ZCode。 |
 | 导出、迁移、备份 | 把项目（目录 + 会话 + 媒体）和设置导出为自描述归档并可导入还原；定时备份到 WebDAV、SMB 或 S3。 |
 | 溯源记忆 | 持久、可审计的记忆：替代链、证据指纹、`/memory verify` · `compare` · `maintain`，以及模型辅助蒸馏。 |
 | 会议与语音 | 会议页转写与纪要；本地 SenseVoice 与在线识别器（MiMo、DashScope 及九种 HTTP 线形态），长音频自动分段转写。 |
