@@ -53,6 +53,8 @@ kind: "package-reference"
 | Pi | `~/.pi/agent/sessions` |
 | Gemini CLI | `~/.gemini/tmp` |
 
+可选 bundle 可以通过 `settings.sessionImport.source` 列表插槽贡献额外的来源卡；贡献的卡片排在内置来源之前，没有贡献时页面与上表完全一致。
+
 ### 配置
 
 | 字段 | 默认值 | 含义 |

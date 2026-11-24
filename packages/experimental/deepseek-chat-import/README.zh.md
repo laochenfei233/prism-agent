@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-把 DeepSeek 官网（chat.deepseek.com）导出的会话带进 DSH 并继续对话。启用这个可选 bundle 后，“新建会话”右侧的按钮把 `deepseek_data-*.zip` 文件上传到 Host，Host 把最近的会话存为你所选工作区中的会话。导入的会话保留原始标题和时间，显示原有的提问及其附带文件、思考、联网搜索卡片、阅读链接和回答。设计与取舍见 [Agent Note](../../../.agents/notes/implemented/feature/2026-11-11-deepseek-chat-export-import.zh.md)。
+把 DeepSeek 官网（chat.deepseek.com）导出的会话带进 DSH 并继续对话。启用这个可选 bundle 后，跨 Agent 导入页的第一张来源卡把 `deepseek_data-*.zip` 文件上传到 Host，Host 把最近的会话存为你所选工作区中的会话。导入的会话保留原始标题和时间，显示原有的提问及其附带文件、思考、联网搜索卡片、阅读链接和回答。设计与取舍见 [Agent Note](../../../.agents/notes/implemented/feature/2026-11-11-deepseek-chat-export-import.zh.md)。
 
 ## 目录
 
@@ -24,7 +24,7 @@ kind: "package-bundle"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在 GUI 中打开插件页，点击“更多”进入“实验性插件”，打开“DeepSeek 会话导入”。安装包默认附带该 bundle 但处于关闭状态；“更多”列表中 bundle 的展示与启用方式见[插件管理页面](../../client/ui-plugin-manager/README.zh.md#use-this-package)。关闭后按钮与上传路由随之移除，已导入的会话保留。
+在 GUI 中打开插件页，点击“更多”进入“实验性插件”，打开“DeepSeek 会话导入”。安装包默认附带该 bundle 但处于关闭状态；“更多”列表中 bundle 的展示与启用方式见[插件管理页面](../../client/ui-plugin-manager/README.zh.md#use-this-package)。关闭后来源卡与上传路由随之移除，已导入的会话保留。
 
 该 bundle 插入一个 Host 行，显式组合也可以直接挂载：
 
@@ -33,12 +33,12 @@ kind: "package-bundle"
   name: '@deepseek-ai/dsh-deepseek-chat-import'
 ```
 
-Host 半包注入 `typert`、`connection`、`sessionPersistence` 和 `workspaceRegistry`，挂载了 `sessionProjectionCache` 与 `attachments` 时读取它们。浏览器半包注入 `remote`、`slots`、`locale` 和 `sessions`，通过 ui-sidebar 的 `sidebar.session.action` HOC 插槽包裹新建会话行：原样返回行内容并追加自己的按钮，对不能导入的 Peer 则只返回行内容。只有 owner 能导入：上传路由只接受 owner Peer，`limits()` 拒绝其他所有 principal，按钮也只对能调用 `deepseekChatImport/limits` 的 Peer 显示。
+Host 半包注入 `typert`、`connection`、`sessionPersistence` 和 `workspaceRegistry`，挂载了 `sessionProjectionCache` 与 `attachments` 时读取它们。浏览器半包注入 `remote`、`slots`、`locale` 和 `sessions`，通过 `settings.sessionImport.source` 列表插槽向跨 Agent 导入页贡献第一张来源卡；卡片打开导入对话框，对不能导入的 Peer 则不渲染卡片。只有 owner 能导入：上传路由只接受 owner Peer，`limits()` 拒绝其他所有 principal，卡片也只对能调用 `deepseekChatImport/limits` 的 Peer 显示。
 
 ### 导入会话导出
 
 1. 在 DeepSeek 官网导出全部会话，下载 `deepseek_data-*.zip` 文件。
-2. 点击“新建会话”右侧的上传箭头按钮。
+2. 打开「设置 → 数据 → 导入对话」，点击「DeepSeek 网页版导出（ZIP）」来源卡。
 3. 在“导出文件”中选择该 ZIP 文件。在“工作区”中保留预选的当前会话所在工作区，或选择其他工作区，或选择“添加工作区…”添加一个目录。
 4. 点击“导入”。在服务页面上，进度条显示上传百分比；如果页面通过自己的传输通道携带压缩包，则没有字节进度，进度条直接从 Host 读取压缩包开始。两种情况下随后都显示写入会话时的“正在导入 n/K”；关闭对话框会取消请求。
 5. 对话框报告导入了多少个会话、导入到哪个工作区、多少个较早的会话超出上限、多少个会话无法导入。无论导入以何种方式结束，会话列表都会刷新，失败或取消之前已写入的会话随之出现。
@@ -101,7 +101,7 @@ Host 半包注入 `typert`、`connection`、`sessionPersistence` 和 `workspaceR
 | [`src/conversation.ts`](src/conversation.ts) | 纯函数 `selectBranch()` 与 `convertConversation()`：消息树到种子事件 |
 | [`src/importer.ts`](src/importer.ts) | `importDeepseekChatExport()`：索引选择、图片扫描、会话扫描、写入与附加工作区 |
 | [`src/index.ts`](src/index.ts) | `DeepseekChatImportService`、它的 `Config`、单一导入槽位、路由注册与 `@Remote limits()` |
-| [`src/client/`](src/client/index.ts) | 按钮、对话框、经页面载体或 XHR 的浏览器上传，以及 locale 字典 |
+| [`src/client/`](src/client/index.ts) | 来源卡、对话框、经页面载体或 XHR 的浏览器上传，以及 locale 字典 |
 | [`cordis.patch.yml`](cordis.patch.yml) | 可选 bundle 的行 |
 
 ### 上传

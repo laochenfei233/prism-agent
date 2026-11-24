@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Bring the chats exported from the DeepSeek website (chat.deepseek.com) into DSH and continue them. After you enable this optional bundle, a button right of "New session" uploads the `deepseek_data-*.zip` file to the Host, which stores the most recent conversations as Sessions in the Workspace you choose. Imported Sessions keep their original titles and times and show the original questions with their attached files, reasoning, web search cards, read links, and answers. The [Agent Note](../../../.agents/notes/implemented/feature/2026-11-11-deepseek-chat-export-import.md) records the design and its trade-offs.
+Bring the chats exported from the DeepSeek website (chat.deepseek.com) into DSH and continue them. After you enable this optional bundle, the first source card of the cross-agent import page uploads the `deepseek_data-*.zip` file to the Host, which stores the most recent conversations as Sessions in the Workspace you choose. Imported Sessions keep their original titles and times and show the original questions with their attached files, reasoning, web search cards, read links, and answers. The [Agent Note](../../../.agents/notes/implemented/feature/2026-11-11-deepseek-chat-export-import.md) records the design and its trade-offs.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ Bring the chats exported from the DeepSeek website (chat.deepseek.com) into DSH 
 <a id="use-this-package"></a>
 ## Use this package
 
-In the GUI, open the Plugins page, click "More" to open "Experimental plugins", and switch on "DeepSeek chat import". The installation ships the bundle switched off; the [plugin manager page](../../client/ui-plugin-manager/README.md#use-this-package) owns how More bundles are listed and enabled. Switching it off removes the button and the upload route; imported Sessions stay.
+In the GUI, open the Plugins page, click "More" to open "Experimental plugins", and switch on "DeepSeek chat import". The installation ships the bundle switched off; the [plugin manager page](../../client/ui-plugin-manager/README.md#use-this-package) owns how More bundles are listed and enabled. Switching it off removes the source card and the upload route; imported Sessions stay.
 
 The bundle inserts one Host row, which an explicit composition can also mount:
 
@@ -33,12 +33,12 @@ The bundle inserts one Host row, which an explicit composition can also mount:
   name: '@deepseek-ai/dsh-deepseek-chat-import'
 ```
 
-The Host half injects `typert`, `connection`, `sessionPersistence`, and `workspaceRegistry`, and reads `sessionProjectionCache` and `attachments` when they are mounted. The browser half injects `remote`, `slots`, `locale`, and `sessions`, and wraps the ui-sidebar New Session row through its `sidebar.session.action` HOC slot: it returns the row content followed by its own button, or the content alone for a Peer that may not import. Only the owner imports: the upload route admits only owner Peers, `limits()` refuses every other principal, and the button shows only for a Peer that may call `deepseekChatImport/limits`.
+The Host half injects `typert`, `connection`, `sessionPersistence`, and `workspaceRegistry`, and reads `sessionProjectionCache` and `attachments` when they are mounted. The browser half injects `remote`, `slots`, `locale`, and `sessions`, and contributes the first source card of the cross-agent import page through its `settings.sessionImport.source` list slot; the card opens the import dialog, and a Peer that may not import renders no card. Only the owner imports: the upload route admits only owner Peers, `limits()` refuses every other principal, and the card shows only for a Peer that may call `deepseekChatImport/limits`.
 
 ### Import a chat export
 
 1. On the DeepSeek website, export all chats and download the `deepseek_data-*.zip` file.
-2. Click the upload-arrow button right of "New session".
+2. Open Settings → Data → Import conversations and click the "DeepSeek web export (ZIP)" source card.
 3. Under "Export file", choose the ZIP file. Under "Workspace", keep the preselected Workspace of the current Session, pick another one, or choose "Add workspace…" to add a directory.
 4. Click "Import". On a served page the progress bar shows the upload percentage; a page that carries the archive over its own transport has no byte progress, so the bar starts with the Host reading the archive. Both then show "Importing n/K" while Sessions are written; closing the dialog cancels the request.
 5. The dialog reports how many Sessions it imported into which Workspace, how many older conversations exceeded the limit, and how many conversations it could not import. However the attempt ends, the Session list refreshes, so Sessions written before a failure or cancellation appear.
@@ -101,7 +101,7 @@ A conversation file that is oversized, damaged, cannot be parsed or converted, o
 | [`src/conversation.ts`](src/conversation.ts) | Pure `selectBranch()` and `convertConversation()`: message tree to seed events |
 | [`src/importer.ts`](src/importer.ts) | `importDeepseekChatExport()`: index selection, the image pass, the conversation pass, writes, and Workspace attachment |
 | [`src/index.ts`](src/index.ts) | `DeepseekChatImportService`, its `Config`, the single import slot, the route registration, and `@Remote limits()` |
-| [`src/client/`](src/client/index.ts) | Button, dialog, browser upload over the page carrier or XHR, and locale dictionaries |
+| [`src/client/`](src/client/index.ts) | Source card, dialog, browser upload over the page carrier or XHR, and locale dictionaries |
 | [`cordis.patch.yml`](cordis.patch.yml) | The optional bundle row |
 
 ### Upload
