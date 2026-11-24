@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入一条自己的、只提醒而不强制的 rail。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入两条自己的、只提醒而不强制的 rail。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
+十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。第十四条 rail 是用量提醒：它统计会话的累计 token 用量，在越过配置阈值时提醒模型保持简洁。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -25,6 +25,7 @@
 | 破坏性命令 | 没有任何东西解析 shell 命令文本，`bash` 与 `pwsh` 正因此被排除在计划模式 rail 之外；沙箱管的是文件效果，管不了强推 | 命中配置模式的命令送交审批 |
 | 凭据读取 | 在其他所有 rail 眼里 `read` 与 `grep` 都是只读工具，而一次读取会永久留在会话日志里 | 读取配置的凭据路径被拒绝 |
 | 在失败上原地打转 | 没有任何东西盯着同一轮里反复同一种失败调用的轮次；模型自己的判断是唯一的刹车 | 裁判模型确认这串失败是个循环之后，下一个结果携带一句换思路的提醒 —— 调用本身永不被告决 |
+| Token 用量 | 持久化的 `tokenUsage` 投影与客户端的用量展示报告会话花了多少，但没有任何东西告诉模型会话已经变得多贵 | 累计用量首次越过配置阈值后，在轮次边界发送一句提醒 —— 它什么都不拒绝 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
 
@@ -61,7 +62,7 @@
 
 ## 配置
 
-每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。唯一的例外是卡住提醒：它什么都不拒绝、裁判只在失败重复时才被调用，因此随插件出厂开启；`stuckNudgeAfterFailures: 0` 关闭它。
+每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。两个例外：卡住提醒随插件出厂开启——它什么都不拒绝、裁判只在失败重复时才被调用，`stuckNudgeAfterFailures: 0` 关闭它；用量提醒的**空数组**就是它的关闭开关而不是加载失败，因为该 rail 出厂即关，`[]` 就是它的默认值。
 
 | 键 | 类型 | 含义 | 默认 |
 |---|---|---|---|
@@ -85,6 +86,7 @@
 | `stuckNudgeConfidence` | `(0, 1]` 区间内的数 | 裁判置信度达到多少才发送提醒 | `0.7` |
 | `stuckNudgeMaxTokens` | 整数 `>= 1` | 一次裁判调用可花费的 token 上限 | `512` |
 | `stuckNudgePerTurn` | 整数 `>= 0` | 一轮最多可收到的提醒数；`0` 关闭 | `1` |
+| `usageReminderThresholds` | 严格升序的正整数数组 | 会话累计 token 用量每越过一个阈值就向模型发送一次提醒；空数组或省略键即关闭 | `[]`（关闭） |
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
 
@@ -136,6 +138,9 @@
 | `stuckNudgeConfidence` 不在 `(0, 1]` 区间 | `stuckNudgeConfidence must be a number in (0, 1]` |
 | `stuckNudgeMaxTokens` 不是整数，或 `< 1` | `stuckNudgeMaxTokens must be an integer >= 1` |
 | `stuckNudgePerTurn` 不是整数，或 `< 0` | `stuckNudgePerTurn must be an integer >= 0` |
+| `usageReminderThresholds` 不是数组 | `usageReminderThresholds must be an array of token thresholds` |
+| 阈值为零、负数或小数 | `usageReminderThresholds entries must be positive integers, received …` |
+| 阈值列表非升序或有重复 | `usageReminderThresholds must be strictly ascending, received …` |
 | 其他任意键 | `unknown config key(s) …` |
 
 `writeTools` 与 `readTools` 两行是本 bundle 的跨字段规则：读写文件的 rail 自身不掌握任何工具知识，因此只开启 rail 而不声明工具的部署没有可执行的对象。这种情况在加载期就失败，而不是加载一条永不触发的 rail。
@@ -286,16 +291,29 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 每个 `pattern` 在加载期编译，并忽略大小写地匹配原始命令文本，因此 `bash -c "git push --force"` 同样会被抓到。判定是 `ask` 而不是 `deny`：删掉构建目录或强推个人分支有时正是想要的动作，只有人能把它和事故区分开。没有审批通道时，fail-closed 审批阶梯会拒绝该调用，这正是无人值守时的预期结果。
 
+### 用量提醒
+
+会话的累计 token 用量首次越过配置阈值后，会在它的停止边界被打断并收到一句提醒：
+
+```
+Session token usage has reached ~120k tokens. Continue with the task, but prefer concise outputs and avoid re-reading large files unnecessarily.
+```
+
+总量从每条已提交 assistant 消息携带的 `usage` 累加而来——适配器给出 `totalTokens` 时用它，否则用输入与输出之和——按会话记账并保存在内存里：插件重启即清零，也不会像持久化的 `tokenUsage` 投影那样折叠重试。它是提醒所需要的数字，不是计费记录。
+
+机制沿用完成验证闸门：在 `agent/turn-stopping` 处 steer，会让循环观察到待处理输入并再跑一步。每个阈值在每个会话最多提醒一次；同一边界越过多个阈值时，只为最高的那个发送一条提醒，并把较低的阈值一并标记——已经到 250k 的会话不需要身后再来一条 100k 的提示。这条 rail 什么都不拒绝，在 `observe` 模式下行为完全一致。
+
 ## `/guardrails`
 
 本 bundle 注册一条命令，报告该部署实际启用（armed）了哪些 rail、当前所处的模式，以及 `observe` 下看见过的判定：
 
 ```
-Guardrails: OBSERVE MODE — 12 of 12 rails armed, nothing is refused (config 3f2a9c1b).
+Guardrails: OBSERVE MODE — 14 of 14 rails armed, nothing is refused (config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
+usage reminder: ~100k, ~250k
 decisions this session: 2 (2 observed)
   observed  command guard  git push --force origin main
   observed  sensitive reads  .env.local
@@ -374,7 +392,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 144 composed unit tests
+npm test            # 152 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -388,8 +406,9 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 
 ## 已知限制与待办
 
-- **`observe` 关掉的是拒绝，不是 rail。** `deny`、`ask` 与 turn budget 的拒绝会变成记录；两处 `steer` 仍然会把一轮送回去补证据或补未完成的 todo。处于 observe 的部署对"这些拒绝本该挡住的调用"没有保护，把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
+- **`observe` 关掉的是拒绝，不是 rail。** `deny`、`ask` 与 turn budget 的拒绝会变成记录；各 `steer` rail 仍会把一轮送回去补证据、补未完成的 todo 或提醒用量。处于 observe 的部署对"这些拒绝本该挡住的调用"没有保护，把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
 - **决策记录只在内存里。** 按会话、上限 200 条、进程退出即消失，因此它只回答本次会话里 rail 做了什么。它是调参用的，不是审计日志。
+- **用量总量只在内存里，且只到提醒级精度。** 它在本 bundle 的内存里按会话累加，进程重启或 agent 被释放即清零，也不会像持久化的 `tokenUsage` 投影那样折叠重试或流错误；阈值提醒反映的是本进程看见的量，不是账单。
 - **配置版本只覆盖 rail 配置。** 它标识的是 patch 行里的这些设置，不覆盖 profile 中其他插件，因此它指向一次拒绝背后的配置，而不是整个部署。
 - **本 bundle 在仓库测试运行器之外。** 它位于 `plugins/`，检出目录的 `vitest.config.ts` 不收集该目录，因此它自带配置，也不参与 `pnpm run test` 或逐文件覆盖率门禁。它的证据是上述套件，而不是 CI。
 - **写入路径按调用写下的原样比较。** `a.ts` 与 `./a.ts` 是两条路径，会花掉写盘预算里的两个文件。要规范化它们，需要用调用的工作目录去解析文件系统，那会给这条 rail 一个它本不需要的 provider 依赖。完成验证闸门的文案报告的也是同样的字符串。

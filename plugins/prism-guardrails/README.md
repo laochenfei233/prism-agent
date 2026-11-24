@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds one rail of its own that reminds instead of enforcing.
+An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds two rails of its own that remind instead of enforcing.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
+Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The fourteenth is the usage reminder: it watches a session's cumulative token usage and reminds the model to stay concise when a configured threshold is crossed. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -25,6 +25,7 @@ Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the
 | Destructive commands | Nothing parses a shell command's text, and `bash` and `pwsh` are deliberately absent from the plan-mode rail for that reason; the sandbox covers file effects, not a force-push | A command matching a configured pattern goes to approval |
 | Credential reads | `read` and `grep` are read-only tools to every other rail, and a read lands in the session log permanently | A read of a configured credential path is refused |
 | Spinning on failures | Nothing watches for a turn that repeats one failing call; the model's own judgment is the only brake | A judge model confirms the run is a loop and the next result carries a reminder to change approach — the call itself is never refused |
+| Token usage | The durable `tokenUsage` projection and the client's usage display report what a session spent, but nothing tells the model when the session has grown expensive | A reminder at the turn boundary when cumulative usage first crosses a configured threshold — it refuses nothing |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
 
@@ -61,7 +62,7 @@ The prompt text and the workflows are maintained here rather than vendored from 
 
 ## Configuration
 
-Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. The one exception is the stuck nudge, which ships on because it refuses nothing and its judge is called only while failures repeat; `stuckNudgeAfterFailures: 0` turns it off.
+Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. Two exceptions: the stuck nudge ships on because it refuses nothing and its judge is called only while failures repeat (`stuckNudgeAfterFailures: 0` turns it off), and the usage reminder's empty array is its off switch rather than a load failure, because that rail ships off and `[]` is its default.
 
 | Key | Type | Meaning | Default |
 |---|---|---|---|
@@ -85,6 +86,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `stuckNudgeConfidence` | number in `(0, 1]` | Judge confidence at or above which the reminder is sent | `0.7` |
 | `stuckNudgeMaxTokens` | integer `>= 1` | Token cap one judge call may spend | `512` |
 | `stuckNudgePerTurn` | integer `>= 0` | Reminders one turn may receive; `0` disables | `1` |
+| `usageReminderThresholds` | strictly ascending array of positive integers | Cumulative session token totals that each send the model one reminder; an empty array or an omitted key disables | `[]` (off) |
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
@@ -136,6 +138,9 @@ Load-time rejections, each with the message asserted by the test suite:
 | `stuckNudgeConfidence` not a number in `(0, 1]` | `stuckNudgeConfidence must be a number in (0, 1]` |
 | `stuckNudgeMaxTokens` not an integer, or `< 1` | `stuckNudgeMaxTokens must be an integer >= 1` |
 | `stuckNudgePerTurn` not an integer, or `< 0` | `stuckNudgePerTurn must be an integer >= 0` |
+| `usageReminderThresholds` not an array | `usageReminderThresholds must be an array of token thresholds` |
+| a zero, negative, or fractional threshold | `usageReminderThresholds entries must be positive integers, received …` |
+| a non-ascending or duplicated threshold list | `usageReminderThresholds must be strictly ascending, received …` |
 | any other top-level key | `unknown config key(s) …` |
 
 The `writeTools` and `readTools` rows are the bundle's cross-field rule: a rail that reads a file owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.
@@ -286,16 +291,29 @@ A shell call whose text matches a configured pattern goes to approval:
 
 Each `pattern` compiles at load and is matched case-insensitively against the raw command text, so `bash -c "git push --force"` is still caught. The decision is `ask` rather than `deny`: deleting a build directory or force-pushing a personal branch is sometimes exactly the intended action, and only a human can tell that from the accident. With no approval channel the fail-closed approval ladder refuses the call, which is the intended unattended outcome.
 
+### Usage reminder
+
+A session whose cumulative token usage first crosses a configured threshold is interrupted at its stopping boundary with a reminder:
+
+```
+Session token usage has reached ~120k tokens. Continue with the task, but prefer concise outputs and avoid re-reading large files unnecessarily.
+```
+
+The total accumulates from the `usage` each committed assistant message reports — `totalTokens` when the adapter gives one, the input and output sum otherwise — keyed by session and kept in memory: a plugin restart resets it, and it does not fold retries the way the durable `tokenUsage` projection does. It is the figure a reminder needs, not a billing record.
+
+The mechanism is the verification gate's: steering at `agent/turn-stopping` makes the loop observe pending input and run another step. Each threshold reminds at most once per session, and a boundary that crosses several thresholds sends one reminder for the highest and marks the lower ones reminded — a session at 250k needs no 100k nudge behind it. The rail refuses nothing and behaves identically in `observe` mode.
+
 ## `/guardrails`
 
 The bundle registers one command that reports which rails the deployment actually has armed, the mode it is running in, and what its `observe` runs have seen:
 
 ```
-Guardrails: OBSERVE MODE — 12 of 12 rails armed, nothing is refused (config 3f2a9c1b).
+Guardrails: OBSERVE MODE — 14 of 14 rails armed, nothing is refused (config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
+usage reminder: ~100k, ~250k
 decisions this session: 2 (2 observed)
   observed  command guard  git push --force origin main
   observed  sensitive reads  .env.local
@@ -374,7 +392,7 @@ The bundle borrows the checkout's packages instead of declaring workspace depend
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 144 composed unit tests
+npm test            # 152 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -388,8 +406,9 @@ Vitest needs vite's Windows real-path probe to spawn a child process, which a co
 
 ## Known Limitations and Deferred Work
 
-- **`observe` turns the refusals off, not the rails.** A `deny`, an `ask`, and the turn-budget reject become records; the two `steer` rails still send a turn back for its evidence or its unfinished items. A deployment that is observed is not protected against the calls those refusals would have stopped, and one that mistakes this state for protection is worse off than with no rails at all. `/guardrails` therefore leads with the mode, and the key ships in no profile: a deployment that wants it writes it deliberately.
+- **`observe` turns the refusals off, not the rails.** A `deny`, an `ask`, and the turn-budget reject become records; the `steer` rails still send a turn back for evidence, unfinished items, or a usage threshold. A deployment that is observed is not protected against the calls those refusals would have stopped, and one that mistakes this state for protection is worse off than with no rails at all. `/guardrails` therefore leads with the mode, and the key ships in no profile: a deployment that wants it writes it deliberately.
 - **The decision ledger is memory-only.** It is per session, capped at 200 rows, and lost when the process exits, so it answers what the rails did in this session and nothing about last week. It is a tuning aid, not an audit log.
+- **The usage total is memory-only and reminder-grade.** It accumulates per session in this bundle's memory, resets when the process restarts or the agent is disposed, and does not fold retries or stream errors the way the durable `tokenUsage` projection does; a threshold reminder reflects what this process has seen, not what was billed.
 - **The configuration version covers the rail configuration only.** It names the settings in the patch row, not the rest of a profile's plugins, so it identifies the configuration behind a refusal rather than the deployment as a whole.
 - **The bundle is outside the repository test runner.** It lives in `plugins/`, which the checkout's `vitest.config.ts` does not collect, so it carries its own config and does not run under `pnpm run test` or the per-file coverage gate. Its evidence is the suites above, not CI.
 - **Written paths compare as the call wrote them.** `a.ts` and `./a.ts` are two paths and spend two files of the write budget. Canonicalizing them needs the filesystem resolved against the call's working directory, which would give this rail a provider dependency it does not otherwise have. The verification gate's message reports the same strings.

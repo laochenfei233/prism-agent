@@ -35,6 +35,9 @@
  *   material is refused, because the content would land in the session log.
  * - **Command guard** — a shell call whose text matches a guarded pattern goes
  *   to approval, so a force-push or a recursive delete is priced before it runs.
+ * - **Usage reminder** — a session whose cumulative token usage first crosses a
+ *   configured threshold is reminded at its turn boundary to prefer concise
+ *   outputs; it refuses nothing.
  *
  * `/guardrails` reports which of these a running deployment has armed, the mode
  * it decides in, and what an `observe` run has seen: under `observe` every rail
@@ -160,6 +163,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   installSensitiveReadDenial(ctx, resolved, ledger)
   installCommandGuard(ctx, resolved, ledger)
   installStuckNudge(ctx, resolved, ledger)
+  installUsageReminder(ctx, resolved, ledger)
   installStatusCommand(ctx, resolved, ledger, version)
 }
 
@@ -1121,6 +1125,71 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig, ledger: Dec
   })
 }
 
+/** One session's cumulative token usage and the thresholds already reminded. */
+interface UsageRecord {
+  total: number
+  readonly reminded: Set<number>
+}
+
+/**
+ * Remind a session whose cumulative token usage first crosses a threshold.
+ *
+ * The total accumulates in memory from the `usage` each committed
+ * `assistant/message` reports — `totalTokens` when the adapter gave one, the
+ * input and output sum otherwise — keyed by session, and is dropped when the
+ * agent is disposed. It is a reminder's figure, not billing: it does not fold
+ * retries the way the durable `tokenUsage` projection does, and a plugin
+ * restart resets it.
+ *
+ * The stop boundary has no veto, so the reminder steers at
+ * `agent/turn-stopping`, the verification gate's mechanism: the loop observes
+ * the pending input and runs another step. Each threshold reminds at most once
+ * per session, and a boundary that crosses several thresholds sends one
+ * reminder for the highest and marks the lower ones reminded — a session at
+ * 250k needs no 100k nudge behind it.
+ */
+function installUsageReminder(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const thresholds = resolved.usageReminderThresholds
+  if (thresholds === undefined) return
+  const records = new Map<string, UsageRecord>()
+
+  ctx.on('session/event', (session, event) => {
+    if (event.type !== 'assistant/message') return
+    const usage = event.data.usage
+    if (usage === undefined) return
+    const record = records.get(session.id) ?? { total: 0, reminded: new Set<number>() }
+    records.set(session.id, record)
+    record.total += usage.totalTokens ?? usage.inputTokens + usage.outputTokens
+  })
+
+  ctx.on('agent/turn-stopping', ({ agent }) => {
+    const record = records.get(agent.session.id)
+    if (record === undefined) return
+    const crossed = thresholds.filter(threshold => threshold <= record.total && !record.reminded.has(threshold))
+    if (crossed.length === 0) return
+    for (const threshold of crossed) record.reminded.add(threshold)
+    const reached = Math.max(...crossed)
+    note(ledger, agent, 'usage reminder', `~${formatTokens(reached)} tokens`, 'steer')
+    agent.steer(createUserMessage({
+      content: [{
+        type: 'text',
+        text: `Session token usage has reached ~${formatTokens(reached)} tokens. Continue with the task, but `
+          + 'prefer concise outputs and avoid re-reading large files unnecessarily.',
+      }],
+      source: { kind: 'prism-guardrails', form: 'instructions' },
+    }))
+  })
+
+  ctx.on('agent/disposed', ({ agent }) => {
+    records.delete(agent.session.id)
+  })
+}
+
+/** One token count as the reminder states it: 120000 reads "120k", 900 reads "900". */
+function formatTokens(tokens: number): string {
+  return tokens >= 1000 ? `${String(Math.round(tokens / 1000))}k` : String(tokens)
+}
+
 /**
  * Register `/guardrails`, which reports which rails the deployment has armed.
  *
@@ -1187,6 +1256,9 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     ['stuck nudge', resolved.stuckNudgeAfterFailures === undefined || resolved.stuckNudgePerTurn === undefined
       ? undefined
       : `after ${String(resolved.stuckNudgeAfterFailures)} consecutive failures`],
+    ['usage reminder', resolved.usageReminderThresholds === undefined
+      ? undefined
+      : resolved.usageReminderThresholds.map(threshold => `~${formatTokens(threshold)}`).join(', ')],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
   // An observing deployment is not protected, so its first line says so before

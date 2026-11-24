@@ -171,6 +171,11 @@ export interface Config {
   readonly stuckNudgeMaxTokens?: number
   /** Nudges one turn may receive. */
   readonly stuckNudgePerTurn?: number
+  /**
+   * Cumulative session token totals that each send the model one reminder;
+   * an omitted field or an empty array leaves the rail off.
+   */
+  readonly usageReminderThresholds?: readonly number[]
 }
 
 /** One writing tool after load-time validation. */
@@ -200,6 +205,7 @@ export interface ResolvedConfig {
   readonly stuckNudgeConfidence: number
   readonly stuckNudgeMaxTokens: number
   readonly stuckNudgePerTurn: number | undefined
+  readonly usageReminderThresholds: readonly number[] | undefined
 }
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
@@ -223,6 +229,7 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'stuckNudgeConfidence',
   'stuckNudgeMaxTokens',
   'stuckNudgePerTurn',
+  'usageReminderThresholds',
 ])
 
 /** Keys one `writeTools` entry reads. */
@@ -311,6 +318,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     stuckNudgeConfidence: resolveStuckNudgeConfidence(config.stuckNudgeConfidence),
     stuckNudgeMaxTokens: resolveStuckNudgeMaxTokens(config.stuckNudgeMaxTokens),
     stuckNudgePerTurn: resolveStuckNudgePerTurn(config.stuckNudgePerTurn),
+    usageReminderThresholds: resolveUsageReminderThresholds(config.usageReminderThresholds),
   }
 }
 
@@ -467,6 +475,35 @@ function resolveStuckNudgePerTurn(value: number | undefined): number | undefined
     throw new Error(`prism-guardrails: stuckNudgePerTurn must be an integer >= 0, received ${String(value)}`)
   }
   return value === 0 ? undefined : value
+}
+
+/**
+ * Check the usage-reminder thresholds into an ascending positive-integer list.
+ *
+ * The rail ships off, and its off switch is the empty array as much as the
+ * omitted field — both resolve to no rail — so unlike the other list rails an
+ * empty list here is a valid deployment rather than a load failure.
+ */
+function resolveUsageReminderThresholds(value: readonly number[] | undefined): readonly number[] | undefined {
+  if (value === undefined) return undefined
+  // Profile YAML is outside the type system: these checks are the boundary.
+  if (!Array.isArray(value)) {
+    throw new Error('prism-guardrails: usageReminderThresholds must be an array of token thresholds')
+  }
+  if (value.length === 0) return undefined
+  let previous = 0
+  for (const entry of value) {
+    if (!Number.isInteger(entry) || entry < 1) {
+      throw new Error(`prism-guardrails: usageReminderThresholds entries must be positive integers, `
+        + `received ${JSON.stringify(entry)}`)
+    }
+    if (entry <= previous) {
+      throw new Error(`prism-guardrails: usageReminderThresholds must be strictly ascending, `
+        + `received ${JSON.stringify(value)}`)
+    }
+    previous = entry
+  }
+  return [...value]
 }
 
 /**

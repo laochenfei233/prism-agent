@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-guardrails/README.md
 /prism-guardrails:
-  en: 572182f4055f0c71
-  zh: 511db76383c23061
+  en: a8aaeaf3ec0be29b
+  zh: 215b1e7bb6ff018e
 /prism-guardrails/why-this-exists:
-  en: 40b0909f2e3fba77
-  zh: 2f80f75d98d31251
+  en: d0d11c34891ae139
+  zh: 5790bd5ade086a9d
 /prism-guardrails/ponytail-mode:
   en: a3a015188eef2d2b
   zh: 24954e3d6f274975
 /prism-guardrails/configuration:
-  en: 6f6fd1ec4b8b8db1
-  zh: 8d785f2cfcde9287
+  en: 88b82e9a157ca0da
+  zh: da6619e38113c103
 /prism-guardrails/rails:
   en: 72f7891b97c27a02
   zh: ebcc7fab8b465344
@@ -53,6 +53,9 @@
 /prism-guardrails/rails/command-guard:
   en: 549affec11a149b9
   zh: 852d92c1b6c83a98
+/prism-guardrails/rails/usage-reminder:
+  en: 29b23d46837bfdb9
+  zh: 17c6fcfafc0d5171
 /prism-guardrails/guardrails:
   en: 96bd3ab2e8fde10f
   zh: 38d06328bc158678
@@ -63,5 +66,5 @@
   en: 547f3d9993484ebe
   zh: 1986d6879729b95f
 /prism-guardrails/known-limitations-and-deferred-work:
-  en: 9d606c15b75d660e
-  zh: 003583e776e6a3ab
+  en: 7a46d728aab08717
+  zh: a8c3a8256ee840ca
