@@ -1,9 +1,9 @@
 ---
 feature: prism-wiki-coverage
-status: designed
-updated: 2026-11-21
+status: delivered
+updated: 2026-11-24
 branch: feat/prism-wiki
-commits: 尚未记录；交付时记录 base..head 范围
+commits: 3db7a89e49..afaf653cc6
 ---
 
 # Prism Wiki 覆盖率
@@ -12,7 +12,17 @@ commits: 尚未记录；交付时记录 base..head 范围
 
 ## Report
 
-尚未交付。S1 中的测量值是本计划的起点。
+**建成了什么** —— `@prism/prism-wiki` 已满足仓库的逐文件覆盖率闸门：`src/` 下每个受管文件都报告 100% 的 statements、branches、functions 与 lines，`src/client/index.tsx` 保留其已记录的浏览器入口豁免。八个套件补上了已发布代码中此前无测试覆盖的状态与分支：读者的空库、失败、筛选、折叠、搜索、健康、编辑器与来源面板状态；解析器的拒绝写法与路径守卫；搜索缓存对外来、无品牌、损坏数据库的恢复与回滚路径；工具的缺参与未分类失败分支；命令的参数与错误映射分支；路由的意外失败映射；以及浏览器客户端的线上字段收窄拒绝。共享的磁盘夹具位于 `tests/fixtures/vault-fixtures.ts`。
+
+已发布代码只在分支无法运行处改动：浏览器列表删除了对已按序返回条目的冗余重排；搜索缓存删除了任何可达流程都到不了的内存路径守卫，并改为在 `closeQuietly` 内部容忍空句柄；目录重建无条件弹出尾部分隔行。其余防御性守卫都带有说明理由的 `v8 ignore` 注释；每一条信任边界上的校验都保留且有测试。
+
+**验证** —— `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出、每个受管文件 100%，在 `pnpm run clean` 之后重跑结果相同；279 个测试全部通过。`pnpm run typecheck` 以零退出。`pnpm run check:ci:coverage` 停在这台机器的 Electron 二进制步骤（Windows 上没有 `install-electron`）——即 S1 记录的既有环境缺口；逐文件阈值的证据来自验收命令本身，它在闸门阈值开启的状态下执行且未点名任何文件。`pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` 在重新记录后通过。未新增 `as unknown` 断言；diff 中唯一的 `unknown` 是既有 `outcome` 助手的签名。
+
+**历程记录** ——
+- 在 `noUncheckedIndexedAccess` 之下，对索引访问的防御性 `?? ''` 即使不可达也被类型系统强制：能在重构后证明状态不可能的就删除，否则留下带理由的 `v8 ignore`。
+- v8 的块归因会漏掉确实执行过的调用点（`discardDatabase` 调用的 `closeQuietly`）；把空检查折进被调方恢复了如实的统计。
+- 一条保存断言靠巧合通过——空草稿的 `updated` 就是当天日期，与测试输入的值相同——掩盖了一个改动从未到达输入框的字段；要断言字段本身的值，而不只是它喂给的请求。
+- 在目录树里，类型筛选胶囊与分组折叠按钮共用同一个可访问名称；用 `aria-expanded` 区分。
 
 ## [S1] Problem
 
@@ -88,23 +98,23 @@ resync 重写了套件驱动的 seam。沿用 resync 前形状的新测试要么
 
 ## Tasks
 
-- [ ] T1: 共享夹具 —— 畸形前置数据表、损坏与外来的搜索数据库、页面构造器；验收：每个助手至少被两个套件使用且带 JSDoc（依赖：无）
-- [ ] T2: `client/api.ts` 达到 100% —— 每个字段读取器一个拒绝用例（依赖：T1）
-- [ ] T3: `web.ts` 达到 100% —— 每条路由的失败分支，包括无法解析的已存页面与意外错误（依赖：T1）
-- [ ] T4: `service.ts` 达到 100% —— pre-step 的让行路径与 schema 投递开关（依赖：T1）
-- [ ] T5: `commands.ts` 达到 100% —— 经命令注册表的每个子命令与参数分支（依赖：T1）
-- [ ] T6: `tools.ts` 达到 100% —— 缺参、错误类与意外错误向上抛出（依赖：T1）
-- [ ] T7: `search.ts` 达到 100% —— 外来、不可读与空的数据库，以及摘要边界（依赖：T1）
-- [ ] T8: `vault.ts` 达到 100% —— 解析器与校验器的拒绝、不可读页面遍历、路径守卫（依赖：T1）
-- [ ] T9: `WikiPage.tsx` 达到 100% —— 读者状态：空、失败、筛选、折叠、搜索、健康、编辑器字段、来源面板（依赖：T1）
-- [ ] T10: 验证 —— 包的闸门以零退出，README 的覆盖率说明被结果替换，feature spec 记录结果（依赖：T2, T3, T4, T5, T6, T7, T8, T9）
+- [x] T1: 共享夹具 —— 畸形前置数据表、损坏与外来的搜索数据库、页面构造器；验收：每个助手至少被两个套件使用且带 JSDoc（依赖：无）
+- [x] T2: `client/api.ts` 达到 100% —— 每个字段读取器一个拒绝用例（依赖：T1）
+- [x] T3: `web.ts` 达到 100% —— 每条路由的失败分支，包括无法解析的已存页面与意外错误（依赖：T1）
+- [x] T4: `service.ts` 达到 100% —— pre-step 的让行路径与 schema 投递开关（依赖：T1）
+- [x] T5: `commands.ts` 达到 100% —— 经命令注册表的每个子命令与参数分支（依赖：T1）
+- [x] T6: `tools.ts` 达到 100% —— 缺参、错误类与意外错误向上抛出（依赖：T1）
+- [x] T7: `search.ts` 达到 100% —— 外来、不可读与空的数据库，以及摘要边界（依赖：T1）
+- [x] T8: `vault.ts` 达到 100% —— 解析器与校验器的拒绝、不可读页面遍历、路径守卫（依赖：T1）
+- [x] T9: `WikiPage.tsx` 达到 100% —— 读者状态：空、失败、筛选、折叠、搜索、健康、编辑器字段、来源面板（依赖：T1）
+- [x] T10: 验证 —— 包的闸门以零退出，README 的覆盖率说明被结果替换，feature spec 记录结果（依赖：T2, T3, T4, T5, T6, T7, T8, T9）
 
 ## [S4] Acceptance
 
-- [ ] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出，除已记录的浏览器入口豁免外，每个文件的 statements、branches、functions、lines 均为 100%。
-- [ ] `pnpm run check:ci:coverage` 不再报告任何 `packages/prism/prism-wiki` 文件。由其他包导致的红——resync 后的树已带有 `prism-transfer` 的依赖门禁发现与过期的双语记录——只记为既有状态，不算本计划的失败。
-- [ ] 测量在 `pnpm run clean` 之后进行，陈旧 `lib/` 产物或孤儿包残骸不得遮蔽源码面。
-- [ ] 没有新增只给测试用的生产 API，也没有新增 `as unknown` 断言。
-- [ ] 所有既有测试保持不变并通过；若修改，改动在对应提交中说明。
-- [ ] 包 README 的覆盖率说明从欠账改为实测结果。
-- [ ] 每个被判定为跑不到而删除的分支，其提交中写明它无法运行的类型层原因。
+- [x] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出，除已记录的浏览器入口豁免外，每个文件的 statements、branches、functions、lines 均为 100%。
+- [x] `pnpm run check:ci:coverage` 不再报告任何 `packages/prism/prism-wiki` 文件。由其他包导致的红——resync 后的树已带有 `prism-transfer` 的依赖门禁发现与过期的双语记录——只记为既有状态，不算本计划的失败。（实测：闸门在本机先行停在 Electron 二进制步骤、未点名任何文件，已记录在 Report。）
+- [x] 测量在 `pnpm run clean` 之后进行，陈旧 `lib/` 产物或孤儿包残骸不得遮蔽源码面。
+- [x] 没有新增只给测试用的生产 API，也没有新增 `as unknown` 断言。
+- [x] 所有既有测试保持不变并通过；若修改，改动在对应提交中说明。
+- [x] 包 README 的覆盖率说明从欠账改为实测结果。
+- [x] 每个被判定为跑不到而删除的分支，其提交中写明它无法运行的类型层原因。

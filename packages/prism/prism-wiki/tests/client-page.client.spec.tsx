@@ -483,9 +483,9 @@ describe('the search tab', () => {
   })
 
   it('shows the searching state, then the hits, and opens one', async () => {
-    let settle: ((value: WikiSearchValue) => void) | null = null
+    let resolveSearch: (value: WikiSearchValue) => void = () => {}
     const wikiFace = face({
-      search: vi.fn((): Promise<WikiSearchValue> => new Promise(resolve => { settle = resolve })),
+      search: vi.fn((): Promise<WikiSearchValue> => new Promise(resolve => { resolveSearch = resolve })),
     })
     renderPage(wikiFace)
     await screen.findByRole('button', { name: /Alpha/u })
@@ -494,7 +494,7 @@ describe('the search tab', () => {
     const panel = screen.getByRole('tabpanel')
     expect(await within(panel).findByText(en.searching)).toBeTruthy()
 
-    settle?.({ hits: [{ ...hit, title: 'Alpha', path: pagePath('concepts/alpha.md') }] })
+    resolveSearch({ hits: [{ ...hit, title: 'Alpha', path: pagePath('concepts/alpha.md') }] })
     expect(await within(panel).findByText(en.hitsCount.replace('{count}', '1'))).toBeTruthy()
 
     fireEvent.click(within(panel).getByRole('button', { name: /the needle excerpt/u }))
@@ -537,9 +537,9 @@ describe('the health tab', () => {
           pages: 2,
           sources: 1,
           findings: [
-            { kind: 'orphan-page', page: 'concepts/alpha.md', detail: 'no page links to this page' },
-            { kind: 'broken-link', page: 'concepts/alpha.md', detail: '[[Ghost]] resolves to no page' },
-            { kind: 'frontmatter', page: 'concepts/beta.md', detail: 'type "concept" expects the directory "wiki/concepts/"' },
+            { kind: 'orphan-page', page: pagePath('concepts/alpha.md'), detail: 'no page links to this page' },
+            { kind: 'broken-link', page: pagePath('concepts/alpha.md'), detail: '[[Ghost]] resolves to no page' },
+            { kind: 'frontmatter', page: pagePath('concepts/beta.md'), detail: 'type "concept" expects the directory "wiki/concepts/"' },
             { kind: 'unintegrated-source', page: null, detail: 'raw source "notes/note.md" is cited by no page' },
           ],
         },
@@ -553,10 +553,10 @@ describe('the health tab', () => {
     const panel = await screen.findByRole('tabpanel')
     const orphan = await within(panel).findByRole('button', { name: /Orphan page/u })
     // A finding about the vault as a whole names no page, so it is not clickable.
-    expect(within(panel).getByRole('button', { name: /Unintegrated source/u }).disabled).toBe(true)
-    expect(within(panel).getByRole('button', { name: /Broken link/u }).disabled).toBe(false)
-    expect(within(panel).getByRole('button', { name: /Frontmatter/u }).disabled).toBe(false)
-    expect(orphan.disabled).toBe(false)
+    expect(asButton(within(panel).getByRole('button', { name: /Unintegrated source/u })).disabled).toBe(true)
+    expect(asButton(within(panel).getByRole('button', { name: /Broken link/u })).disabled).toBe(false)
+    expect(asButton(within(panel).getByRole('button', { name: /Frontmatter/u })).disabled).toBe(false)
+    expect(asButton(orphan).disabled).toBe(false)
 
     fireEvent.click(orphan)
     expect(await screen.findByRole('article')).toBeTruthy()
@@ -698,9 +698,9 @@ describe('the editor', () => {
   })
 
   it('shows the saving state and reports a failed save through the notice host', async () => {
-    let settle: ((value: WikiSaveValue) => void) | null = null
+    let resolveSave: (value: WikiSaveValue) => void = () => {}
     const wikiFace = face({
-      save: vi.fn((): Promise<WikiSaveValue> => new Promise(resolve => { settle = resolve })),
+      save: vi.fn((): Promise<WikiSaveValue> => new Promise(resolve => { resolveSave = resolve })),
     })
     renderPage(wikiFace)
     await openPage('Alpha')
@@ -709,7 +709,7 @@ describe('the editor', () => {
     fireEvent.click(screen.getByRole('button', { name: en.save }))
     expect(screen.getByRole('button', { name: en.saving })).toBeTruthy()
 
-    settle?.({
+    resolveSave({
       page: { path: 'concepts/alpha.md', frontmatter: frontmatter('Alpha'), body: 'Body.', revision: 'rev-2' },
     })
     await screen.findByRole('article')
@@ -761,9 +761,9 @@ describe('the editor', () => {
   })
 
   it('shows the loading placeholder while a page read is in flight', async () => {
-    let settle: ((value: WikiReadValue) => void) | null = null
+    let resolveRead: (value: WikiReadValue) => void = () => {}
     const wikiFace = face({
-      read: vi.fn((path: string): Promise<WikiReadValue> => new Promise(resolve => { settle = resolve })),
+      read: vi.fn((_path: string): Promise<WikiReadValue> => new Promise(resolve => { resolveRead = resolve })),
     })
     renderPage(wikiFace)
     await screen.findByRole('button', { name: /Alpha/u })
@@ -771,7 +771,7 @@ describe('the editor', () => {
     fireEvent.click(screen.getByRole('button', { name: /Alpha/u }))
     expect(await screen.findByText(en.pageLoading)).toBeTruthy()
 
-    settle?.(readValue('concepts/alpha.md'))
+    resolveRead(readValue('concepts/alpha.md'))
     expect(await screen.findByRole('article')).toBeTruthy()
   })
 
@@ -943,7 +943,7 @@ describe('tree filters and groups', () => {
 
 describe('the source panel', () => {
   it('shows the reading state, the truncation hint, and dismisses', async () => {
-    let settle: ((value: WikiSourceValue) => void) | null = null
+    let resolveSource: (value: WikiSourceValue) => void = () => {}
     const wikiFace = face({
       read: vi.fn(async (path: string): Promise<WikiReadValue> => ({
         page: { path, frontmatter: frontmatter('Alpha'), body: 'Alpha body.', revision: 'rev-1' },
@@ -951,7 +951,7 @@ describe('the source panel', () => {
         backlinks: [],
         sources: ['notes/paper.md'],
       })),
-      source: vi.fn((request: WikiSourceRequest): Promise<WikiSourceValue> => new Promise(resolve => { settle = resolve })),
+      source: vi.fn((_request: WikiSourceRequest): Promise<WikiSourceValue> => new Promise(resolve => { resolveSource = resolve })),
     })
     renderPage(wikiFace)
     await openPage('Alpha')
@@ -959,7 +959,7 @@ describe('the source panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'notes/paper.md' }))
     expect(await screen.findByText(en.sourceLoading)).toBeTruthy()
 
-    settle?.({ path: 'notes/paper.md', text: 'The long source text.', truncated: true })
+    resolveSource({ path: 'notes/paper.md', text: 'The long source text.', truncated: true })
     expect(await screen.findByText('The long source text.')).toBeTruthy()
     expect(screen.getByText(en.sourceTruncated)).toBeTruthy()
 
@@ -975,7 +975,7 @@ describe('the source panel', () => {
         backlinks: [],
         sources: ['notes/paper.md'],
       })),
-      source: vi.fn(async (request: WikiSourceRequest): Promise<WikiSourceValue> => {
+      source: vi.fn(async (_request: WikiSourceRequest): Promise<WikiSourceValue> => {
         throw new Error('the source is gone')
       }),
     })
@@ -994,6 +994,12 @@ function pathField(): HTMLInputElement {
   const field = screen.getByLabelText(en.fieldPath)
   if (!(field instanceof HTMLInputElement)) throw new Error('the editor path field is not an input')
   return field
+}
+
+/** Narrow one queried element to the button every interactive row renders as. */
+function asButton(element: HTMLElement): HTMLButtonElement {
+  if (!(element instanceof HTMLButtonElement)) throw new Error('the queried element is not a button')
+  return element
 }
 
 /** The editor's title field. */

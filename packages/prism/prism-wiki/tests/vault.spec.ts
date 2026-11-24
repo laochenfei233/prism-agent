@@ -618,7 +618,7 @@ describe('frontmatter validation on write', () => {
     await files.ensureLayout()
   })
 
-  it.each([
+  const invalidFrontmatter: ReadonlyArray<[string, Record<string, unknown>]> = [
     ['an empty title', { title: '   ' }],
     ['an unknown type', { type: 'nonsense' }],
     ['an unknown status', { status: 'maybe' }],
@@ -626,9 +626,12 @@ describe('frontmatter validation on write', () => {
     ['a confidence below zero', { confidence: -0.5 }],
     ['a confidence above one', { confidence: 1.5 }],
     ['a non-finite confidence', { confidence: Number.NaN }],
-  ])('refuses a draft with %s', async (_name, overrides: Partial<WikiFrontmatter>) => {
+  ]
+
+  it.each(invalidFrontmatter)('refuses a draft with %s', async (_name, overrides) => {
+    // The table deliberately carries values the frontmatter type forbids.
     await expect(files.writePage({
-      path: page('concepts/bad.md'), frontmatter: frontmatter(overrides), body: 'Body.',
+      path: page('concepts/bad.md'), frontmatter: frontmatter(overrides as Partial<WikiFrontmatter>), body: 'Body.',
     }, 'write')).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
   })
 

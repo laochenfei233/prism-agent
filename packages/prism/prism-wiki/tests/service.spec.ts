@@ -8,7 +8,7 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
+import { agentEvents } from '@deepseek-ai/dsh-agent'
 import { Context } from '@deepseek-ai/cordis'
 import {
   callTool, createAgent, mountVault, mountWiki, proposeStep, schemaFrames, valueJson, writePage,
