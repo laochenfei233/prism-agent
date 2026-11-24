@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for prism-autonomy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/spec/prism-autonomy.md
+/:
+  en: 8ca837ead385f585
+  zh: b3e9b0f190e90823
+/autonomous-approval-presets:
+  en: fb0b462e151e2361
+  zh: bf4e2b0068dfc372
+/autonomous-approval-presets/report:
+  en: 355a41a8b4106d9f
+  zh: 355a41a8b4106d9f
+/autonomous-approval-presets/s1-problem:
+  en: fb6bdda4849c0014
+  zh: 071a39de8bb0ba60
+/autonomous-approval-presets/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/autonomous-approval-presets/s2-design/s2-1-the-autonomous-guarded-preset:
+  en: 96012e4fa8645209
+  zh: ca3a8ec98ee57e3f
+/autonomous-approval-presets/s2-design/s2-2-the-plugin-and-the-preset-mapping:
+  en: 549cca1982c0e853
+  zh: 3d44a82e2c69ffbc
+/autonomous-approval-presets/s2-design/s2-3-the-approval-answerer:
+  en: 8d071b4dd71f9039
+  zh: 8318af44f12be617
+/autonomous-approval-presets/s2-design/s2-4-model-notice-on-live-changes:
+  en: 8319d31521ebd8af
+  zh: 31049ede91a3b3d8
+/autonomous-approval-presets/s2-design/s2-5-limits:
+  en: 107853c70fc0e152
+  zh: 33627c00daed63a5
+/autonomous-approval-presets/s2-design/s2-6-tests:
+  en: f6f6997dda0f748c
+  zh: 3e8cec2e5408f7ea
+/autonomous-approval-presets/s3-scope:
+  en: fe49c57eb1c35f82
+  zh: 94bc653705fe9995
+/autonomous-approval-presets/tasks:
+  en: 9e1472eb81457859
+  zh: c7aa6df4913bef5f
+/autonomous-approval-presets/s4-acceptance:
+  en: bd471db3377b353c
+  zh: 980f927d14fde0fa

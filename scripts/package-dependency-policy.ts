@@ -61,11 +61,13 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
     'parseTunnelWorkerCommand', 'parseTunnelWorkerEvent', 'rawText', 'sendFrame', 'unsupportedFrameRefusal',
     'viewerRequestFields', 'identityFromKey', 'identityKeyOf',
   ],
-  '@deepseek-ai/dsh-llm': ['callConfigEquals'],
-  '@deepseek-ai/dsh-session': ['SessionId'],
-  '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
+  // Both build a plain, frozen value with no module-local identity: a message
+  // record, and a tool definition, cross package copies unchanged.
+  '@deepseek-ai/dsh-llm': ['callConfigEquals', 'createUserMessage'],
+  '@deepseek-ai/dsh-session': ['SessionId'],  '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
   '@deepseek-ai/dsh-storage-domain': ['defineDomain'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
+  '@deepseek-ai/dsh-tools': ['defineTool'],
   '@deepseek-ai/schemastery': ['default'],
   '@deepseek-ai/dsh-workspace-changes': ['GitRunner', 'resolveGitExecutable'],
 } as const satisfies HostDependencyExports

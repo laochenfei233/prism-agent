@@ -23,8 +23,10 @@ import type { MemoryRecord } from './domain.ts'
 import { layerOf, MEMORY_LAYERS } from './layers.ts'
 import { isLive, MEMORY_KINDS } from './memory.ts'
 import {
+  MEMORY_EDIT_PATH,
   MEMORY_OVERVIEW_PATH,
   MEMORY_REMEMBER_PATH,
+  MEMORY_RETIRE_PATH,
   MEMORY_REVIEW_PATH,
   MEMORY_SEARCH_PATH,
 } from './routes.ts'
@@ -69,6 +71,18 @@ const reviewBody = z.object({
   id: z.string().min(1),
   decision: z.enum(['approve', 'reject']),
   note: z.string().max(2000).optional(),
+})
+
+/** One operator rewrite body; the supersede semantics stay with the service. */
+const editBody = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+})
+
+/** One operator retirement body. */
+const retireBody = z.object({
+  id: z.string().min(1),
+  reason: z.string().max(2000).optional(),
 })
 
 /**
@@ -124,6 +138,20 @@ export function apply(ctx: Context): void {
       ? await memory.operatorApprove(id, note)
       : await memory.operatorReject(id, note)
     const value: MemoryReviewValue = { row: rowOf(record) }
+    return ok(value)
+  }))
+
+  route('edit', MEMORY_EDIT_PATH, json(async (body) => {
+    const { id, text } = editBody.parse(body)
+    const value: MemoryReviewValue = { row: rowOf(await memory.rewrite(id, text, undefined)) }
+    return ok(value)
+  }))
+
+  route('retire', MEMORY_RETIRE_PATH, json(async (body) => {
+    const { id, reason } = retireBody.parse(body)
+    const value: MemoryReviewValue = {
+      row: rowOf(await memory.forget(id, reason ?? 'retired on the memory page', undefined)),
+    }
     return ok(value)
   }))
 }

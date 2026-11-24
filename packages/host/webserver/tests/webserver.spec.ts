@@ -377,6 +377,53 @@ describe('real Loader composition', () => {
       .toThrow('webserver: additionalHosts requires an explicit port; port 0 binds a fresh OS port per listener')
   })
 
+  it('binds one more address at runtime on the same port and serves it', { timeout: 30_000 }, async () => {
+    const port = await freePort()
+    const composition = await loadComposition(port, false, '127.0.0.1')
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    expect(server.hosts).toEqual(['127.0.0.1'])
+    await server.bindAdditionalHost('127.0.0.2')
+    expect(server.hosts).toEqual(['127.0.0.1', '127.0.0.2'])
+    expect(server.port).toBe(port)
+    for (const address of ['127.0.0.1', '127.0.0.2']) {
+      // No route is registered in this bare composition, so the listener
+      // answers 404 on both addresses — the point is that both answer.
+      expect((await fetch(`http://${address}:${String(port)}/`)).status).toBe(404)
+    }
+  })
+
+  it('refuses a runtime bind that repeats a bound address, is a wildcard, or is no literal', { timeout: 30_000 }, async () => {
+    const port = await freePort()
+    const composition = await loadComposition(port, false, '127.0.0.1')
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    await expect(server.bindAdditionalHost('127.0.0.1')).rejects.toThrow(/is already bound/)
+    await expect(server.bindAdditionalHost('0.0.0.0')).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+    await expect(server.bindAdditionalHost('localhost')).rejects.toThrow(/is not a concrete IPv4 or IPv6 address literal/)
+  })
+
+  it('refuses a runtime bind on a port-0 deployment', async () => {
+    const composition = await loadComposition(0, false, '127.0.0.1')
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    await expect(server.bindAdditionalHost('127.0.0.2')).rejects.toThrow(/a runtime bind requires an explicit port/)
+  })
+
+  it('keeps the serving listeners when a runtime bind cannot take, and refuses one after disposal', { timeout: 30_000 }, async () => {
+    // 192.0.2.1 is TEST-NET-1: no machine holds it, so the listen fails while
+    // the primary stays up.
+    const port = await freePort()
+    const composition = await loadComposition(port, false, '127.0.0.1')
+    const server = composition.get('webServer')
+    assert(server !== undefined)
+    await expect(server.bindAdditionalHost('192.0.2.1')).rejects.toThrow()
+    expect(server.hosts).toEqual(['127.0.0.1'])
+    expect((await fetch(`http://127.0.0.1:${String(port)}/`)).status).toBe(404)
+    await composition.fiber.dispose()
+    await expect(server.bindAdditionalHost('127.0.0.2')).rejects.toThrow(/disposed/)
+  })
+
   it('classifies loopback bind addresses from the parsed value, including mapped and zone forms', () => {
     for (const host of ['127.0.0.1', '127.8.9.10', '127.5.5.5', '::1', '0:0:0:0:0:0:0:1', '::ffff:127.0.0.1', '::ffff:7f00:1', '::1%lo', '::0.0.0.1', '::0.0.0.1%lo']) {
       expect(isLoopbackHost(host)).toBe(true)

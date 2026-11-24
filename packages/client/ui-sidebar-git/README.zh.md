@@ -76,4 +76,3 @@ Host 半通过 `ctx.connection.fetch.register` 在 Connection 鉴权围栏内注
 工作台是注册到右侧边栏 tab 类型表中的一个 tab 类型；面板从单一快照 store 渲染，由 tab 按需刷新，所有 git 操作都经 harness 进程边界外调执行，而不持有长驻 git 进程。
 
 </details>
-

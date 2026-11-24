@@ -22,10 +22,16 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context, Fiber, Volatile } from '@deepseek-ai/cordis'
+// Type-only: activates the `ctx.interval`/`ctx.timeout` merges the scheduled
+// hygiene pass arms its timer through, and the `loader/volatile-update` event
+// that re-arms it when the cadence is edited live.
+import type {} from '@deepseek-ai/cordis-plugin-loader'
+import type {} from '@deepseek-ai/cordis-plugin-timer'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
+import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionQueryEngine, SessionSurfaceSnapshot } from '@deepseek-ai/dsh-session-query'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -73,7 +79,7 @@ import {
   renderReflection,
   TOPIC_TAG,
 } from './dream.ts'
-import type { TopicDigest } from './dream.ts'
+import type { Conflict, TopicDigest } from './dream.ts'
 import {
   collectMemoryFiles,
   IMPORT_SOURCE_IDS,
@@ -158,6 +164,16 @@ export type AdmissionStatus = (typeof ADMISSION_STATUSES)[number]
 
 /** Milliseconds in one day, for the day-denominated configuration bounds. */
 const DAY_MS = 86_400_000
+
+/** Milliseconds in one minute, for the scheduled hygiene cadence. */
+const MINUTE_MS = 60_000
+
+/**
+ * Delay before the first scheduled hygiene pass. A boot guard rather than a
+ * deployment choice: it keeps the pass out of the application's start-up window
+ * without postponing it by a whole interval.
+ */
+const FIRST_MAINTAIN_DELAY_MS = 60_000
 
 /**
  * Ranked candidates fetched before the already-injected filter runs. Without the
@@ -344,6 +360,12 @@ export interface DreamReport {
   readonly topics: readonly TopicDigest[]
   /** Unresolved contradictions, for a person to settle. */
   readonly conflicts: readonly { readonly left: string, readonly right: string, readonly similarity: number }[]
+  /** Contradictions this pass settled by recency: the newer claim superseded the older. */
+  readonly resolved: readonly { readonly left: string, readonly right: string, readonly similarity: number }[]
+  /** Pending claims promoted on corroboration, or that corroboration qualifies. */
+  readonly promoted: readonly string[]
+  /** The hygiene pass that ran after this one; `null` on a dry run or when `dreamAutoMaintain` is off. */
+  readonly maintenance: MaintenanceReport | null
   /** The journal record this pass wrote, or `null`. */
   readonly journalId: string | null
   /** The daily reflection record this pass wrote, or `null` when today's already stood. */
@@ -484,10 +506,12 @@ export interface PrismMemoryConfig {
 
   /** Read each turn's own text for durable claims, with no extra model call. */
   autoDistill: Volatile<boolean>
-  /** Status a distilled claim is written with. */
+  /** Status a distilled claim requests; the confidence floor decides what it lands as. */
   autoDistillStatus: Volatile<AdmissionStatus>
-  /** Confidence a distilled claim is written with. */
+  /** Confidence a distilled claim is written with when it comes from the assistant's account. */
   autoDistillConfidence: Volatile<number>
+  /** Confidence a distilled claim is written with when it comes from the person's own message. */
+  autoDistillUserConfidence: Volatile<number>
   /** Claims one turn may contribute. */
   autoDistillLimit: Volatile<number>
 
@@ -505,6 +529,16 @@ export interface PrismMemoryConfig {
   dreamClusterFloor: Volatile<number>
   /** Digests one pass writes. */
   dreamMaxTopics: Volatile<number>
+  /** Status a topic digest is written with. */
+  dreamDigestStatus: Volatile<AdmissionStatus>
+  /** Resolve contradictions automatically: the newer claim supersedes the older. */
+  dreamAutoResolveConflicts: Volatile<boolean>
+  /** Run the hygiene pass with `apply` after a committed consolidation. */
+  dreamAutoMaintain: Volatile<boolean>
+  /** Run the hygiene pass on a wall-clock schedule too, not only on the turn path. */
+  scheduledMaintain: Volatile<boolean>
+  /** Minutes between scheduled hygiene passes. */
+  scheduledMaintainMinutes: Volatile<number>
   /** Write one account of the day per local day. */
   dailyReflection: Volatile<boolean>
 
@@ -519,7 +553,7 @@ export interface PrismMemoryConfig {
 
   // --- Model-assisted distillation -----------------------------------------
 
-  /** Let a model read recent turns and propose durable claims, on a window. */
+  /** Let a model read recent turns and propose durable claims, on a window. Candidates land on the same trust tiers as the form distiller's, keyed by the message each cites. */
   assistedDistill: Volatile<boolean>
   /** Turns that close before another assisted window fires. */
   assistedDistillEveryTurns: Volatile<number>
@@ -527,8 +561,6 @@ export interface PrismMemoryConfig {
   assistedDistillBufferTurns: Volatile<number>
   /** Candidates one assisted window may write. */
   assistedDistillLimit: Volatile<number>
-  /** Confidence an assisted claim is written with. */
-  assistedDistillConfidence: Volatile<number>
   /** Provider route an assisted call takes; must be set with `assistedDistillModel`. */
   assistedDistillProvider: Volatile<string>
   /** Model id an assisted call takes; must be set with `assistedDistillProvider`. */
@@ -777,7 +809,7 @@ interface AutomaticRecordInput {
  */
 export class PrismMemoryService extends Service {
   /** Services required before memory work can activate. */
-  static readonly inject = ['storageDomain', 'systemPrompt', 'sessionProjections', 'agents'] as const
+  static readonly inject = ['storageDomain', 'systemPrompt', 'sessionProjections', 'agents', 'timer'] as const
 
   /** Deployment-owned retrieval, injection, and governance bounds. */
   static readonly Config = z.object({
@@ -809,8 +841,9 @@ export class PrismMemoryService extends Service {
     reminderWindowDays: z.number().min(0).default(7).volatile(),
     maxReminders: z.number().step(1).min(1).default(3).volatile(),
     autoDistill: z.boolean().default(true).volatile(),
-    autoDistillStatus: z.union([z.const('pending'), z.const('active')]).default('pending').volatile(),
+    autoDistillStatus: z.union([z.const('pending'), z.const('active')]).default('active').volatile(),
     autoDistillConfidence: z.number().min(0).max(1).default(0.4).volatile(),
+    autoDistillUserConfidence: z.number().min(0).max(1).default(0.7).volatile(),
     autoDistillLimit: z.number().step(1).min(1).default(3).volatile(),
     dreamEnabled: z.boolean().default(true).volatile(),
     dreamEveryWrites: z.number().step(1).min(1).default(25).volatile(),
@@ -818,15 +851,19 @@ export class PrismMemoryService extends Service {
     dreamConflictFloor: z.number().min(0).max(1).default(0.5).volatile(),
     dreamClusterFloor: z.number().step(1).min(2).default(3).volatile(),
     dreamMaxTopics: z.number().step(1).min(1).default(3).volatile(),
+    dreamDigestStatus: z.union([z.const('pending'), z.const('active')]).default('active').volatile(),
+    dreamAutoResolveConflicts: z.boolean().default(true).volatile(),
+    dreamAutoMaintain: z.boolean().default(true).volatile(),
+    scheduledMaintain: z.boolean().default(true).volatile(),
+    scheduledMaintainMinutes: z.number().step(1).min(5).max(10_080).default(360).volatile(),
     dailyReflection: z.boolean().default(true).volatile(),
     importSources: z.array(z.string()).default([]).volatile(),
-    importStatus: z.union([z.const('pending'), z.const('active')]).default('pending').volatile(),
+    importStatus: z.union([z.const('pending'), z.const('active')]).default('active').volatile(),
     importConfidence: z.number().min(0).max(1).default(0.6).volatile(),
     assistedDistill: z.boolean().default(false).volatile(),
     assistedDistillEveryTurns: z.number().step(1).min(1).default(40).volatile(),
     assistedDistillBufferTurns: z.number().step(1).min(1).default(12).volatile(),
     assistedDistillLimit: z.number().step(1).min(1).default(3).volatile(),
-    assistedDistillConfidence: z.number().min(0).max(1).default(0.5).volatile(),
     assistedDistillProvider: z.string().default('').volatile(),
     assistedDistillModel: z.string().default('').volatile(),
     bootstrapMaxSessions: z.number().step(1).min(1).default(10).volatile(),
@@ -866,6 +903,12 @@ export class PrismMemoryService extends Service {
   /** The closing turns the next assisted window reads, oldest first; memory-only, by design. */
   private readonly assistedBuffer: AssistedMessage[][] = []
 
+  /** The awaited projection registration, read for the ids one session already received. */
+  private projectionHandle: ProjectionHandle<{ injected: string[] }> | undefined
+
+  /** Whether one scheduled hygiene pass is in flight; a slow store cannot stack passes. */
+  private tidyRunning = false
+
   /** Validated deployment configuration, read through each field's `get()`. */
   private readonly config: PrismMemoryConfig
 
@@ -887,13 +930,25 @@ export class PrismMemoryService extends Service {
       await domain.close()
     }, 'prismMemory.domainClose')
 
+    // The pre-autopilot backlog parks records the tier policy now trusts by
+    // origin; only `pending` records move, so the pass is idempotent per load.
+    if (!this.config.requireApproval.get()) await this.migrateBacklog(Date.now())
+
+    // Resolving the runtime here is the load gate: an enabled channel over a
+    // context that cannot answer to `llm` fails the mount loudly. The fiber
+    // binding below still re-resolves, so a runtime that arrives later or is
+    // replaced keeps the assisted paths wired.
+    if (this.config.assistedDistill.get() && this.ctx.get('llm') === undefined) {
+      throw new Error('prism-memory assistedDistill is enabled but no llm service is mounted in this context')
+    }
+
     this.ctx.systemPrompt.section({
       name: 'prism-memory',
       order: MEMORY_SECTION_ORDER,
       text: () => this.config.protocolSection.get(),
     })
 
-    this.ctx.sessionProjections.register({
+    this.projectionHandle = await this.ctx.sessionProjections.register({
       key: 'prismMemory',
       stateVersion: 1,
       stateSchema: zod.object({ injected: zod.array(zod.string()) }),
@@ -907,6 +962,10 @@ export class PrismMemoryService extends Service {
         return { injected: [...merged].slice(-MAX_TRACKED_INJECTIONS) }
       },
     })
+
+    // The scheduled hygiene pass: the expiry, merge, and eviction half of
+    // tidying on a wall clock, so a quiet workspace still stays tidy.
+    this.armScheduledMaintain()
 
     // The optional read path behind `/memory verify`, bound the way an optional
     // service is bound anywhere else: a fiber that re-resolves when the service
@@ -1007,7 +1066,7 @@ export class PrismMemoryService extends Service {
 
   /** Recalled ids already injected into one session. */
   injectedIds(agent: Agent): Set<string> {
-    const state = this.ctx.sessionProjections.stateOf(agent.session, 'prismMemory')
+    const state = this.projectionHandle?.stateOf(agent.session)
     return new Set(state?.injected ?? [])
   }
 
@@ -1186,9 +1245,11 @@ export class PrismMemoryService extends Service {
    * Two writes may already cover the same claim. An identical one (similarity at
    * or above `dedupeReplaceJaccard`) is not stored twice: the existing record is
    * reused and its reuse count rises, which keeps the corpus a set of claims
-   * rather than a pile of paraphrases. A merely similar one is stored, and the
-   * near-duplicates it competes with come back in the result so the caller can
-   * supersede instead of leaving two live phrasings to rank against each other.
+   * rather than a pile of paraphrases. A held `pending` record counts as held —
+   * the identical write corroborates it, and a write that admits active promotes
+   * it in place. A merely similar claim is stored, and the near-duplicates it
+   * competes with come back in the result so the caller can supersede instead of
+   * leaving two live phrasings to rank against each other.
    * @param input - Text, kind, scope, tags, confidence, evidence, and optional supersede target.
    * @param agent - The calling agent, when the caller is model-facing.
    * @returns the stored record, whether it was new, and its near-duplicates.
@@ -1208,19 +1269,39 @@ export class PrismMemoryService extends Service {
       threshold: this.config.dedupeJaccard.get(),
       isEligible: admission.isEligible,
       now,
+      // A claim held only as `pending` still counts as held: the identical write
+      // is corroboration from another conversation, and a write that admits
+      // active promotes the held record instead of duplicating it. Retired
+      // statuses stay outside, so a superseded or archived claim is not
+      // resurrected by a rewrite.
+      statuses: ADMISSION_STATUSES,
     })
     const identical = near.find(entry => entry.similarity >= this.config.dedupeReplaceJaccard.get())
-    if (identical !== undefined) {
+    // An explicit supersede of the very record an identical hit names is a
+    // rewrite, not a restatement: the writer already knows the claim exists and
+    // is changing it, so the reuse path would silently drop the edit.
+    if (identical !== undefined && identical.record.id !== input.supersedes) {
       // A claim arriving again from a *different* conversation is evidence the
       // write path cannot otherwise record, and the consolidation pass reads it.
       const writer = agent?.session.id ?? null
       const independent = writer !== null && writer !== identical.record.evidence.sessionId
       const reuse = writer === null || !independent ? 0 : 1
+      const confidence = input.confidence ?? 1
+      // A held `pending` claim restated by a write that admits active has met
+      // the review's own bar: the person or the model stood behind it twice.
+      const promote = identical.record.status === 'pending'
+        && this.admissionStatus(input.status, confidence) === 'active'
       const reused = await this.records.update(identical.record.id, current => ({
         ...current,
         hits: current.hits + 1,
         corroborations: (current.corroborations ?? 0) + reuse,
         updatedAt: now,
+        ...promote ? {
+          status: 'active' as const,
+          confidence: Math.max(current.confidence, confidence),
+          reviewedAt: now,
+          reviewNote: 'auto-approved: restated at active confidence',
+        } : {},
       }))
       return {
         record: reused,
@@ -1379,6 +1460,33 @@ export class PrismMemoryService extends Service {
       updatedAt: now,
       ...reason === undefined ? {} : { evidence: { ...record.evidence, note: reason } },
     }))
+  }
+
+  /**
+   * Rewrite one record's claim from the operator surface.
+   *
+   * The new wording supersedes the old and inherits its layer, class, scope,
+   * and tags, so an edit changes the sentence and nothing else. The supersede
+   * chain is the audit story: the old record stays readable with its successor
+   * link, and `/memory restore` can roll the edit back.
+   * @param id - the record to rewrite.
+   * @param text - the new claim wording.
+   * @param agent - the calling agent, when the caller is model-facing.
+   * @returns the rewritten record.
+   */
+  async rewrite(id: string, text: string, agent: Agent | undefined): Promise<MemoryRecord> {
+    const previous = this.require(id, agent)
+    const result = await this.remember({
+      text,
+      layer: layerOf(previous),
+      kind: previous.kind,
+      scope: previous.scope,
+      tags: previous.tags,
+      origin: 'operator',
+      supersedes: id,
+      evidenceNote: 'rewritten on the memory page',
+    }, agent)
+    return result.record
   }
 
   /**
@@ -1685,6 +1793,47 @@ export class PrismMemoryService extends Service {
   // --- Automatic memory -----------------------------------------------------
 
   /**
+   * Arm the wall-clock hygiene pass.
+   *
+   * Config is read per arm, not once at load: every field is volatile, so a
+   * cadence edit re-arms the interval, because the bound it was created with is
+   * the old one. One pass runs at a time, and a failing pass is logged and left
+   * to the next tick — this pass is background hygiene, the deliberate opposite
+   * of the turn-path passes, whose storage failures stay loud because they ride
+   * a turn the model is waiting on. The pass is `maintain({ apply: true })`
+   * only: expiry, near-duplicate merging, and capacity eviction are the
+   * time-based half of tidying, while consolidation keeps its own corpus window
+   * on the turn path, where the new material it compares actually arrives.
+   */
+  private armScheduledMaintain(): void {
+    const pass = async (): Promise<void> => {
+      if (this.tidyRunning || !this.config.scheduledMaintain.get()) return
+      this.tidyRunning = true
+      try {
+        await this.maintain({ apply: true })
+      } catch (error) {
+        // Contained by policy: background hygiene never fails the process for
+        // a store condition the next pass will meet again.
+        this.ctx.logger.warn(
+          `prism-memory: scheduled maintain failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      } finally {
+        this.tidyRunning = false
+      }
+    }
+    const arm = (): (() => void) => this.ctx.interval(
+      () => { void pass() },
+      this.config.scheduledMaintainMinutes.get() * MINUTE_MS,
+    )
+    let interval = arm()
+    this.ctx.timeout(() => { void pass() }, FIRST_MAINTAIN_DELAY_MS)
+    this.ctx.on('loader/volatile-update', () => {
+      interval()
+      interval = arm()
+    })
+  }
+
+  /**
    * The turn-end pass: read the closing turn's own text, then consolidate when
    * the window has filled.
    *
@@ -1703,24 +1852,62 @@ export class PrismMemoryService extends Service {
   }
 
   /**
+   * Promote the pre-autopilot backlog the tier policy now trusts, and leave the
+   * rest parked for corroboration.
+   *
+   * An imported claim came from a file the operator chose to read. A distilled
+   * claim on the `user` or `rule` layer is the person's own voice — the form
+   * matcher files stated preferences and constraints there, while the
+   * assistant's accounts land on the other layers. Everything else — a model
+   * write, an inference distilled from an account — stays `pending` until the
+   * write path or a consolidation pass corroborates it. The pass runs on every
+   * load and is idempotent: only `pending` records move.
+   * @param now - current time in epoch milliseconds.
+   */
+  private async migrateBacklog(now: number): Promise<void> {
+    for (const record of this.all()) {
+      if (record.status !== 'pending' || isExpired(record, now)) continue
+      const own = record.origin === 'import'
+        || (record.origin === 'session' && (layerOf(record) === 'user' || layerOf(record) === 'rule'))
+      if (!own) continue
+      await this.records.update(record.id, current => ({
+        ...current,
+        status: 'active',
+        reviewedAt: now,
+        reviewNote: record.origin === 'import'
+          ? 'auto-approved on upgrade: operator-chosen import'
+          : 'auto-approved on upgrade: stated by the person',
+        updatedAt: now,
+      }))
+    }
+  }
+
+  /**
    * Read the closing turn for durable claims, without an extra model call.
    *
    * Both sides are read: the person's message carries the constraints and
    * preferences they stated, and the assistant's own account carries the causes
-   * it established. Each claim cites the message its sentence came from, with
-   * that message's write-time fingerprint, so a later `/memory verify` can
-   * re-read it. A candidate an identical claim already covers is dropped
-   * rather than written, because the write path would only raise that record's
-   * reuse count, and an automatic pass must not inflate a signal that ranking
-   * reads as evidence of use.
+   * it established. The two sources land on different trust tiers — the person's
+   * own words write at `autoDistillUserConfidence`, the account at
+   * `autoDistillConfidence` — so what the person said can go live unreviewed
+   * while an inference parks until it is corroborated. Each claim cites the
+   * message its sentence came from, with that message's write-time fingerprint,
+   * so a later `/memory verify` can re-read it. A candidate an identical claim
+   * already covers is dropped rather than written, because the write path would
+   * only raise that record's reuse count, and an automatic pass must not inflate
+   * a signal that ranking reads as evidence of use — except that the person's
+   * own words reach the write path over a held `pending` claim, whose promotion
+   * is exactly what a restatement is for.
    * @param agent - the agent whose turn is closing.
    */
   private async distillTurn(agent: Agent): Promise<void> {
     const limit = this.config.autoDistillLimit.get()
     const candidates = turnMessages(agent.session.deriveMessages()).flatMap(message => {
       const text = messageText(message)
+      const source = message.role === 'user' ? 'user' as const : 'assistant' as const
       return distillCandidates(text, { limit }).map(candidate => ({
         ...candidate,
+        source,
         evidence: { id: message.id, textHash: textFingerprint(text) },
       }))
     })
@@ -1732,18 +1919,28 @@ export class PrismMemoryService extends Service {
       if (stored.length >= limit) break
       if (stored.includes(candidate.text)) continue
       const scope: MemoryScope = candidate.layer === 'project' && admission.cwd !== null ? 'project' : 'global'
-      // Every status counts as known. A claim this pass already parked is a claim
-      // it has already read, and one an operator rejected must not be proposed
-      // again on every following turn.
-      if (this.hasIdenticalClaim(candidate.kind, scope, candidate.text, now, MEMORY_STATUSES)) continue
+      // The person's own words are the tier that can promote a held `pending`
+      // claim, so their hold check skips `pending` and lets the write path
+      // promote it; every other source counts every status as known — a claim
+      // this pass already parked is a claim it has already read, and one an
+      // operator rejected must not be proposed again on every following turn.
+      const held = candidate.source === 'user'
+        ? ['active', 'superseded', 'archived'] as const
+        : MEMORY_STATUSES
+      if (this.hasIdenticalClaim(candidate.kind, scope, candidate.text, now, held)) continue
       await this.remember({
         text: candidate.text,
         kind: candidate.kind,
         layer: candidate.layer,
         scope,
-        confidence: this.config.autoDistillConfidence.get(),
+        confidence: candidate.source === 'user'
+          ? this.config.autoDistillUserConfidence.get()
+          : this.config.autoDistillConfidence.get(),
         origin: 'session',
         status: this.config.autoDistillStatus.get(),
+        evidenceNote: candidate.source === 'user'
+          ? 'stated by the person'
+          : 'inferred from the assistant account',
         evidenceMessage: candidate.evidence,
       }, agent)
       stored.push(candidate.text)
@@ -1802,17 +1999,28 @@ export class PrismMemoryService extends Service {
     const now = Date.now()
     for (const candidate of candidates) {
       const scope: MemoryScope = candidate.layer === 'project' && admission.cwd !== null ? 'project' : 'global'
-      if (this.hasIdenticalClaim(candidate.kind, scope, candidate.text, now, MEMORY_STATUSES)) continue
       const cited = candidate.sourceMessage !== undefined ? dialogue[candidate.sourceMessage - 1] : undefined
+      // Trust is tiered by who said it, not by which producer wrote it: a
+      // candidate grounded in the person's own message writes at
+      // `autoDistillUserConfidence` and can go live, one grounded in the
+      // assistant's account parks at `autoDistillConfidence` until the write
+      // path or a consolidation pass corroborates it.
+      const userStated = cited?.role === 'user'
+      const held = userStated ? ['active', 'superseded', 'archived'] as const : MEMORY_STATUSES
+      if (this.hasIdenticalClaim(candidate.kind, scope, candidate.text, now, held)) continue
       await this.remember({
         text: candidate.text,
         kind: candidate.kind,
         ...candidate.layer !== undefined ? { layer: candidate.layer } : {},
         scope,
-        confidence: this.config.assistedDistillConfidence.get(),
+        confidence: userStated
+          ? this.config.autoDistillUserConfidence.get()
+          : this.config.autoDistillConfidence.get(),
         origin: 'session',
-        status: 'pending',
-        evidenceNote: 'assisted',
+        status: this.config.autoDistillStatus.get(),
+        evidenceNote: userStated
+          ? 'model-read extraction: stated by the person'
+          : 'model-read extraction: inferred in the discussion',
         ...cited !== undefined
           ? { evidenceMessage: { id: cited.id, textHash: textFingerprint(cited.text) } }
           : {},
@@ -1944,7 +2152,7 @@ export class PrismMemoryService extends Service {
           kind: candidate.kind,
           ...candidate.layer !== undefined ? { layer: candidate.layer } : {},
           scope: 'project',
-          confidence: this.config.assistedDistillConfidence.get(),
+          confidence: this.config.autoDistillConfidence.get(),
           origin: 'session',
           status: 'pending',
           evidenceNote: 'bootstrap',
@@ -2066,10 +2274,12 @@ export class PrismMemoryService extends Service {
    *
    * A dry run is the default, for the same reason maintenance's is: the pass
    * writes records the model will later read, so an operator must be able to see
-   * what it concluded before it is committed. What it never does is decide a
-   * contradiction — those are reported for a person.
+   * what it concluded before it is committed. When applied it also runs the
+   * automatic half of organizing: corroboration promotes a held claim, a
+   * contradiction is settled by recency under `dreamAutoResolveConflicts`, and
+   * the hygiene pass applies under `dreamAutoMaintain`.
    * @param options - whether to commit, and the clock.
-   * @returns what the pass found and, when committed, what it wrote.
+   * @returns what the pass found and, when committed, what it changed.
    */
   async dream(options: { readonly apply?: boolean, readonly now?: number } = {}): Promise<DreamReport> {
     const applied = options.apply ?? false
@@ -2093,6 +2303,9 @@ export class PrismMemoryService extends Service {
       corroborated: plan.corroborated,
       topics: plan.topics,
       conflicts: plan.conflicts,
+      resolved: [],
+      promoted: [],
+      maintenance: null,
       journalId: null,
       reflectionId: null,
     }
@@ -2103,14 +2316,71 @@ export class PrismMemoryService extends Service {
       if (record === undefined || (record.corroboratedAt ?? null) !== null) continue
       await this.records.update(entry.id, current => ({ ...current, corroboratedAt: now, updatedAt: now }))
     }
+
+    // Corroboration promotion. The plan's window holds live records only, so a
+    // held `pending` claim never reaches it and the scan runs over the store;
+    // `requireApproval` keeps its absolute hold — nothing goes live without a
+    // person while it is set, and an expired claim stays retired.
+    const promoted: string[] = []
+    if (!this.config.requireApproval.get()) {
+      for (const record of this.all()) {
+        if (record.status !== 'pending' || isExpired(record, now)) continue
+        if ((record.corroborations ?? 0) + 1 < CORROBORATION_FLOOR) continue
+        await this.records.update(record.id, current => ({
+          ...current,
+          status: 'active',
+          corroboratedAt: now,
+          reviewedAt: now,
+          reviewNote: 'auto-approved: corroborated by another conversation',
+          updatedAt: now,
+        }))
+        promoted.push(record.id)
+      }
+    }
+
+    // Contradiction settlement by recency. Both claims were live when the plan
+    // compared them; the guards re-check at apply time — still active, still
+    // unexpired, and neither already chained, so a record settled earlier in
+    // this pass or carrying a supersedes back-link from a fan-in is skipped
+    // rather than overwritten. The supersede fields keep the full chain, so a
+    // wrong recency choice is `/memory restore` away.
+    const resolved: Conflict[] = []
+    if (this.config.dreamAutoResolveConflicts.get()) {
+      for (const conflict of plan.conflicts) {
+        const older = this.records.get(conflict.left)
+        const newer = this.records.get(conflict.right)
+        if (older === undefined || newer === undefined
+          || older.status !== 'active' || newer.status !== 'active'
+          || isExpired(older, now) || isExpired(newer, now)
+          || older.supersededBy !== null || newer.supersededBy !== null || newer.supersedes !== null) continue
+        await this.records.update(older.id, current => ({
+          ...current,
+          status: 'superseded',
+          invalidAt: now,
+          supersededBy: newer.id,
+          updatedAt: now,
+          evidence: { ...current.evidence, note: 'superseded by consolidation: newer claim wins' },
+        }))
+        await this.records.update(newer.id, current => ({
+          ...current,
+          supersedes: older.id,
+          updatedAt: now,
+          evidence: { ...current.evidence, note: 'consolidation settled the contradiction by recency' },
+        }))
+        resolved.push(conflict)
+      }
+    }
+    const unresolved = plan.conflicts.filter(conflict => !resolved.includes(conflict))
+
     for (const topic of plan.topics) {
       await this.putAutomatic({
         text: topic.text,
         tags: [topic.tag, TOPIC_TAG],
-        // A digest is machine-written prose about other records. It is offered
-        // for review rather than injected, because a wrong index entry would
-        // misdirect every later recall through it.
-        status: 'pending',
+        // A digest is machine-written prose about other records; the shipped
+        // status admits it as a recall index entry, and `dreamDigestStatus:
+        // pending` restores review-first behavior. The admission gate routes
+        // both through `pending` while `requireApproval` holds.
+        status: this.admissionStatus(this.config.dreamDigestStatus.get(), 1),
         layer: 'topic',
         kind: 'fact',
         note: `topic digest over ${topic.memberIds.join(', ')}`,
@@ -2118,9 +2388,9 @@ export class PrismMemoryService extends Service {
       }, now)
     }
     const journal = window?.triggered === true || plan.corroborated.length > 0
-      || plan.topics.length > 0 || plan.conflicts.length > 0
+      || plan.topics.length > 0 || unresolved.length > 0 || resolved.length > 0 || promoted.length > 0
       ? await this.putAutomatic({
-        text: renderDreamJournal(plan),
+        text: renderDreamJournal({ ...plan, resolved, conflicts: unresolved }),
         tags: [DREAM_TAG],
         status: 'archived',
         layer: 'topic',
@@ -2140,7 +2410,21 @@ export class PrismMemoryService extends Service {
       }, now)
       reflectionId = reflection.id
     }
-    return { ...report, journalId: journal?.id ?? null, reflectionId }
+    // The hygiene pass rides the committed consolidation: expiry and duplicate
+    // merging are the mechanical half of organizing, and an operator command
+    // for them would be one more thing to remember.
+    const maintenance = this.config.dreamAutoMaintain.get()
+      ? await this.maintain({ apply: true, now })
+      : null
+    return {
+      ...report,
+      conflicts: unresolved,
+      resolved,
+      promoted,
+      maintenance,
+      journalId: journal?.id ?? null,
+      reflectionId,
+    }
   }
 
   /**

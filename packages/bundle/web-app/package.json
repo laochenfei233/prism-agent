@@ -149,6 +149,7 @@
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
     "@deepseek-ai/dsh-plugin-market": "workspace:*",
     "@deepseek-ai/dsh-schedule": "workspace:*",
+    "@prism/prism-autonomy": "workspace:~",
     "@prism/prism-backup": "workspace:~",
     "@prism/prism-data": "workspace:~",
     "@prism/prism-session-import": "workspace:~",

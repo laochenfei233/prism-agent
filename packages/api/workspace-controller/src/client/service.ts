@@ -91,6 +91,19 @@ export interface IWorkspaces {
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
   /**
+   * Archive a Workspace from grouping surfaces; its record, order, and
+   * accounting stay untouched, so restoring is the exact prior state.
+   * @param workspaceId - Workspace to archive.
+   * @throws {WorkspaceArchiveError} when the Host refuses; an unknown Workspace
+   *   fails as `workspace/not-found`.
+   */
+  archiveWorkspace(workspaceId: WorkspaceId): Promise<void>
+  /**
+   * Restore a Workspace from the archived Workspace list.
+   * @param workspaceId - Workspace to restore.
+   */
+  unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void>
+  /**
    * Pin a Session ahead of unpinned Sessions on Workspace grouping surfaces.
    * @param sessionId - Session to pin.
    */
@@ -163,6 +176,16 @@ export class WorkspaceController extends Service implements IWorkspaces {
   async unarchiveSession(sessionId: SessionId): Promise<void> {
     const result = await this.model.unarchiveSession(sessionId)
     if (!result.ok) throw commandError('session unarchive', result.error)
+  }
+
+  async archiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    const result = await this.model.archiveWorkspace(workspaceId)
+    if (!result.ok) throw new WorkspaceArchiveError(result.error)
+  }
+
+  async unarchiveWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    const result = await this.model.unarchiveWorkspace(workspaceId)
+    if (!result.ok) throw commandError('workspace unarchive', result.error)
   }
 
   async pinSession(sessionId: SessionId): Promise<void> {

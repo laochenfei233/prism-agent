@@ -326,7 +326,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `remoteAccess` · `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:37`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:40`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -5120,6 +5120,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
+
+<!-- BEGIN GENERATED config-catalog:@prism/prism-autonomy -->
+<a id="prismprism-autonomy"></a>
+
+## `@prism/prism-autonomy`
+
+- `inject`: `sessionProjections` · `permissionPresets` · `agents`
+- `source`: [`packages/autonomy/prism-autonomy/src/config.ts:32`](../packages/autonomy/prism-autonomy/src/config.ts)
+
+```ts config-catalog
+/** The autonomy plugin's configuration as the plugin receives it. */
+export interface Config {
+  /** The permission preset that engages autonomous answering. */
+  readonly preset: string
+  /** Requests matching any matcher keep their human decision; the rest auto-answer. */
+  readonly requireHuman: readonly RequireHumanMatcher[]
+}
+
+/** One require-human rule: a request matching every set field stays with the human. */
+export interface RequireHumanMatcher {
+  /** Match the asking tool's name; unset matches every tool. */
+  readonly tool?: string
+  /** Match the asker's reason by prefix; unset matches every reason. */
+  readonly reasonPrefix?: string
+}
+```
+<!-- END GENERATED config-catalog:@prism/prism-autonomy -->
 
 <!-- BEGIN GENERATED config-catalog:@prism/prism-backup -->
 <a id="prismprism-backup"></a>

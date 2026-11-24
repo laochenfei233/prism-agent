@@ -69,4 +69,3 @@ The custom-theme group gains a preset area below the accent field: a save row (t
 - Malformed preset documents are dropped at the runtime boundary; the schema rejects malformed wire values; the array caps at 16 entries. ✅
 - Old documents load unchanged; zh/en dictionaries stay complete. ✅
 - Focused specs, `typecheck`, `build` (incl. build:check), catalog gates, and the review subagent pass. ✅
-

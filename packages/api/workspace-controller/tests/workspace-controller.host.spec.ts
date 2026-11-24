@@ -7,8 +7,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError, type PeerId, type Principal, type RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
-import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
-import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import WorkspaceRegistry, { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import RemoteAccessService, { type RemoteAccessCondition, type RemoteAccessRole } from '@deepseek-ai/dsh-api-remote-access'
 import WorkspaceController from '../src/index.ts'
 import { DEFAULT_WORKSPACE_DIRECTORY } from '../src/default-workspace.ts'
@@ -303,6 +302,26 @@ describe('WorkspaceController commands', () => {
       .resolves.toEqual({ archivedSessionIds: [] })
   })
 
+  it('archives and restores a Workspace without touching its record, and refuses unknown ones', async () => {
+    const { controller, ctx, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'workspace-archive') })
+    const id = created.workspace.workspaceId
+
+    await expect(controller.archiveWorkspace({ workspaceId: id }))
+      .resolves.toEqual({ archivedWorkspaceIds: [id] })
+    // The record survives hidden; a repeat archive writes nothing new.
+    expect(ctx.workspaceRegistry.get(id)).toBeDefined()
+    await expect(controller.archiveWorkspace({ workspaceId: id }))
+      .resolves.toEqual({ archivedWorkspaceIds: [id] })
+    await expect(controller.archiveWorkspace({ workspaceId: WorkspaceId('no-such-workspace') }))
+      .rejects.toMatchObject({ code: 'workspace/not-found' })
+    await expect(controller.unarchiveWorkspace({ workspaceId: id }))
+      .resolves.toEqual({ archivedWorkspaceIds: [] })
+    // Restoring an id that is not archived — or does not exist — is a no-op.
+    await expect(controller.unarchiveWorkspace({ workspaceId: WorkspaceId('no-such-workspace') }))
+      .resolves.toEqual({ archivedWorkspaceIds: [] })
+  })
+
   it('pins only known unarchived Sessions and unpins idempotently', async () => {
     const { controller, ctx, root } = await harness()
     const created = await controller.create({ path: stageDir(root, 'pins') })
@@ -381,7 +400,7 @@ describe('WorkspaceController follow', () => {
     const iterator = controller.follow(abort.signal)[Symbol.asyncIterator]()
     await expect(nextFrame(iterator)).resolves.toEqual({
       type: 'baseline',
-      value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] },
+      value: { items: [], archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [] },
     })
 
     const first = await controller.create({ path: stageDir(root, 'first') })
@@ -433,6 +452,15 @@ describe('WorkspaceController follow', () => {
     await expect(nextFrame(iterator)).resolves.toEqual({
       type: 'pinned', pinnedSessionIds: [],
     })
+    await controller.archiveWorkspace({ workspaceId: second.workspace.workspaceId })
+    await expect(nextFrame(iterator)).resolves.toEqual({
+      type: 'archived-workspaces', archivedWorkspaceIds: [second.workspace.workspaceId],
+    })
+    // Restore rides the same complete-set increment: no new frame type.
+    await controller.unarchiveWorkspace({ workspaceId: second.workspace.workspaceId })
+    await expect(nextFrame(iterator)).resolves.toEqual({
+      type: 'archived-workspaces', archivedWorkspaceIds: [],
+    })
     await controller.delete({ workspaceId: second.workspace.workspaceId })
     await expect(nextFrame(iterator)).resolves.toEqual({
       type: 'order', workspaceIds: [first.workspace.workspaceId],
@@ -477,6 +505,7 @@ describe('WorkspaceController follow', () => {
         items: [expect.objectContaining({ workspaceId: shownId, sessionIds: [shared.id] })],
         archivedSessionIds: [],
         pinnedSessionIds: [shared.id],
+        archivedWorkspaceIds: [],
       },
     })
 

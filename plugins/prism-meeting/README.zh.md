@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-这个 bundle 为基于 base 的 `dsh` profile 加入会议记录能力：持久会议存储、实时麦克风转写、一个用于摘要和提问的配置化模型路由、面向模型的会议工具，以及 Web 会议页面。目前没有随包发布的 profile 包含它，profile 通过安装这个包并重启来获得它。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务，以及用于识别的语音提供者密钥。没有 Web Connection 的 profile 会让页面那一行保持 pending 而不是失败；这个包是可安装的层，而不是一个库。
+这个 bundle 为基于 base 的 `dsh` profile 加入会议记录能力：持久会议存储、实时麦克风转写、一个用于摘要和提问的配置化模型路由、面向模型的会议工具，以及 Web 会议页面。本仓库的 `dsh-base` 已经组合了这三行，因此基于 base 的 profile 无需本包也具备会议能力；只有 base 不含这三行的 profile 才需要安装它。该 profile 需要 base 的 LLM、storage-domain、speech-to-text 和 tools 服务，以及用于识别的语音提供者密钥。没有 Web Connection 的 profile 会让页面那一行保持 pending 而不是失败；这个包是可安装的层，而不是一个库。
 
 ## 目录
 

@@ -75,10 +75,12 @@ const workspaceState = (
   items: readonly WorkspaceView[],
   archivedSessionIds: readonly SessionId[] = [],
   pinnedSessionIds: readonly SessionId[] = [],
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
 ): WorkspaceSnapshot => ({
   items,
   archivedSessionIds,
   pinnedSessionIds,
+  archivedWorkspaceIds,
   state: 'idle',
   phase: 'ready',
   error: null,
@@ -476,6 +478,25 @@ describe('WorkspaceBrowser', () => {
       if (previous === null) localStorage.removeItem(key)
       else localStorage.setItem(key, previous)
     }
+  })
+
+  it('hides an archived Workspace section and its Sessions from every grouping', () => {
+    const sessions = sessionState([summary('alpha-s', 2), summary('beta-s', 1)])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s'])],
+        [], [], [wid('alpha')],
+      )),
+    })
+    expect(screen.getByText('beta')).toBeTruthy()
+    expect(screen.queryByText('alpha')).toBeNull()
+    // The flat list reads the same filtered inventory.
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    expect(screen.getByText('beta-s')).toBeTruthy()
+    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(b.store.getSnapshot().groupBy).toBe('flat')
   })
 
   it('renders the grouped tree by default and switches to the flat list via Group by', () => {

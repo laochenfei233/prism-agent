@@ -446,6 +446,11 @@
       "@prism/prism-meeting/web": ["./packages/prism/prism-meeting/src/web.ts"],
       "@prism/prism-meeting/client": ["./packages/prism/prism-meeting/src/client/index.tsx"],
       "@prism/prism-meeting": ["./packages/prism/prism-meeting/src"],
+      "@prism/prism-wiki/tools": ["./packages/prism/prism-wiki/src/tools.ts"],
+      "@prism/prism-wiki/commands": ["./packages/prism/prism-wiki/src/commands.ts"],
+      "@prism/prism-wiki/web": ["./packages/prism/prism-wiki/src/web.ts"],
+      "@prism/prism-wiki/client": ["./packages/prism/prism-wiki/src/client/index.tsx"],
+      "@prism/prism-wiki": ["./packages/prism/prism-wiki/src/index.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],

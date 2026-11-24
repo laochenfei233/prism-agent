@@ -13,7 +13,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { join } from 'node:path'
-import { POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from './routes.ts'
+import { POCKET_LAN_BIND_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from './routes.ts'
 import { encryptPushPayload } from './push/encrypt.ts'
 import { loadOrCreateVapidKeys, type VapidMaterial } from './push/keys.ts'
 import { deliverBark, deliverWebPush } from './push/sender.ts'
@@ -22,6 +22,7 @@ import { SubscriptionStore } from './push/store.ts'
 import { detectTailscale } from './tailscale.ts'
 import { detectCloudflared } from './tunnel.ts'
 import { detectLanAddress } from './lan.ts'
+import { applyLanBind } from './lan-bind.ts'
 import { RemotePrefsStore, readRemotePrefs } from './remote-prefs.ts'
 import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
 import { lanAccess, phoneAccess, probeVerdict, tunnelAccess } from './commands.ts'
@@ -35,11 +36,12 @@ import { InboundDedup } from './bots/shared/dedup.ts'
 import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, runBotAction, type BotRouteDeps } from './bots/routes.ts'
 import type { BotChannelId, BotInbound } from './bots/types.ts'
 
-export { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
+export { POCKET_ICON_PATH, POCKET_LAN_BIND_PATH, POCKET_MANIFEST_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH, POCKET_SW_PATH } from './routes.ts'
 export { isOriginTrusted, lanAccess, lanCommands, phoneAccess, phoneTarget, remoteCommands, tunnelAccess, tunnelCommands } from './remote-status.ts'
 export { detectTailscale, parseTailscaleStatus } from './tailscale.ts'
 export { detectCloudflared, versionOf } from './tunnel.ts'
 export { detectLanAddress } from './lan.ts'
+export { applyLanBind } from './lan-bind.ts'
 export { RemotePrefsStore, readRemotePrefs, readTunnelUrl } from './remote-prefs.ts'
 export { encryptPushPayload } from './push/encrypt.ts'
 export { generateVapidKeys, loadOrCreateVapidKeys, vapidAuthorization } from './push/keys.ts'
@@ -96,9 +98,9 @@ interface WebStartupLike {
 
 /** Everything `apply` resolved once, shared by the routes and the deliverer. */
 interface PocketRuntime {
-  surface: PocketServerSurface
   connection: ConnectionRoute
   webserver: WebServerLike
+  webStartup: WebStartupLike
   material: Promise<VapidMaterial>
   store: SubscriptionStore
   prefs: RemotePrefsStore
@@ -118,17 +120,9 @@ export function apply(ctx: Context, config: Config = {}): void {
   const webserver = ctx.get('webServer') as WebServerLike
   const webStartup = ctx.get('webStartup') as WebStartupLike
   const runtime: PocketRuntime = {
-    surface: {
-      host: webStartup.host ?? '127.0.0.1',
-      ...(webStartup.additionalHosts !== undefined && webStartup.additionalHosts.length > 0
-        ? { additionalHosts: [...webStartup.additionalHosts] }
-        : {}),
-      port: webStartup.port ?? 3080,
-      ...(webStartup.publicUrl !== undefined ? { publicUrl: webStartup.publicUrl } : {}),
-      trustedHosts: [...(webStartup.trustedHosts ?? [])],
-    },
     connection,
     webserver,
+    webStartup,
     material: loadOrCreateVapidKeys(join(homeOf(ctx), 'pocket', 'keys.json')),
     store: new SubscriptionStore(join(homeOf(ctx), 'pocket', 'subscriptions.json')),
     prefs: new RemotePrefsStore(join(homeOf(ctx), 'pocket', 'remote.json')),
@@ -141,6 +135,13 @@ export function apply(ctx: Context, config: Config = {}): void {
     requestBody: 'buffered',
     fetch: async request => remoteResponse(request, runtime),
   }), 'pocket: remote status')
+
+  ctx.effect(() => connection.fetch.register({
+    path: POCKET_LAN_BIND_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async request => lanBindResponse(request, runtime),
+  }), 'pocket: lan bind')
 
   ctx.effect(() => connection.fetch.register({
     path: POCKET_PUSH_SUBSCRIBE_PATH,
@@ -351,20 +352,40 @@ async function remoteResponse(request: Request, runtime: PocketRuntime): Promise
   return jsonResponse(await statusOf(runtime))
 }
 
+/** Answer one LAN bind request: bind the LAN address, then report the fresh status. */
+export async function lanBindResponse(_request: Request, runtime: PocketRuntime): Promise<Response> {
+  const result = await applyLanBind(runtime.webserver)
+  if (!result.ok) return jsonResponse({ error: result.error }, result.status)
+  return jsonResponse(await statusOf(runtime))
+}
+
+/** The live server surface: the addresses and port the listener actually serves. */
+function surfaceOf(runtime: PocketRuntime): PocketServerSurface {
+  const [host = runtime.webStartup.host ?? '127.0.0.1', ...additionalHosts] = runtime.webserver.hosts
+  return {
+    host,
+    ...(additionalHosts.length > 0 ? { additionalHosts } : {}),
+    port: runtime.webserver.port ?? runtime.webStartup.port ?? 3080,
+    ...(runtime.webStartup.publicUrl !== undefined ? { publicUrl: runtime.webStartup.publicUrl } : {}),
+    trustedHosts: [...(runtime.webStartup.trustedHosts ?? [])],
+  }
+}
+
 /** Assemble the remote-status body: surface facts, the probes, and the selected transport. */
 async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
   const [tailscale, cloudflared] = await Promise.all([detectTailscale(), detectCloudflared()])
   const lan = detectLanAddress()
   const remote = runtime.prefs.read()
-  const tunnelUrl = remote.tunnelUrl ?? runtime.surface.publicUrl
+  const surface = surfaceOf(runtime)
+  const tunnelUrl = remote.tunnelUrl ?? surface.publicUrl
   const access = remote.provider === 'tunnel'
-    ? tunnelAccess(runtime.surface, tunnelUrl)
+    ? tunnelAccess(surface, tunnelUrl)
     : remote.provider === 'lan'
-      ? lanAccess(runtime.surface, lan.ipv4)
-      : phoneAccess(runtime.surface, tailscale)
+      ? lanAccess(surface, lan.ipv4)
+      : phoneAccess(surface, tailscale)
   const phone = await resolvePhone(access)
   return {
-    server: runtime.surface,
+    server: surface,
     lan,
     tailscale,
     cloudflared,

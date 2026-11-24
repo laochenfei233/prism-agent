@@ -3,21 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Prism plugin that archives top-level conversations idle for a configurable number of days (30 by default) into the Workspace archive set on a schedule",
+  "description": "Prism plugin that archives top-level conversations idle for a configurable number of days (30 by default) and projects holding no visible conversation for longer (14 by default) into the Workspace archive sets on a schedule",
   "license": "MIT",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
   },
   "files": [
     "lib/**/*.js",
+    "lib/*.js.map",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -36,5 +41,8 @@
     "@deepseek-ai/dsh-session": "0.2.2-rc.1",
     "@deepseek-ai/dsh-session-persistence": "0.2.2-rc.1",
     "@deepseek-ai/dsh-workspace": "0.2.2-rc.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28"
   }
 }

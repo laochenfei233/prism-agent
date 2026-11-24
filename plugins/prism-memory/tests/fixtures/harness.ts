@@ -9,6 +9,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import TimerPlugin from '@deepseek-ai/cordis-plugin-timer'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
@@ -89,6 +90,8 @@ export interface HarnessOptions {
   readonly tools?: boolean
   /** Mount the operator command registrant. */
   readonly commands?: boolean
+  /** Durable backend path; the default keeps the store in memory. */
+  readonly storagePath?: string
   /** Mount the stub session-query engine, so `/memory verify` has a reader. */
   readonly sessionQuery?: boolean
   /** Mount the stub llm runtime, so the assisted distillation paths have a seam. */
@@ -103,10 +106,12 @@ export interface HarnessOptions {
 export async function mountMemory(options: HarnessOptions = {}): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(Storage)
-  await ctx.plugin(StorageSqlite, { path: ':memory:' })
+  await ctx.plugin(StorageSqlite, { path: options.storagePath ?? ':memory:' })
   await ctx.plugin(StorageDomain, { backend: 'sqlite' })
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  // The kernel timer the scheduled hygiene pass arms its interval through.
+  await ctx.plugin(TimerPlugin)
   if (options.sessionQuery === true) await ctx.plugin(StubSessionQuery)
   if (options.llm === true) installLlmStub(ctx)
   if (options.commands === true) await ctx.plugin(CommandRuntime)
