@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for deepseek-import-entry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/deepseek-import-entry.md
+/:
+  en: a12079056fe10421
+  zh: c973338c49f1291e
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card:
+  en: 250a374140cbc5a3
+  zh: 65bf72b3aa59c294
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/report:
+  en: ac6697f77ffa5cf7
+  zh: 11e2fdfcda86ed2f
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s1-problem:
+  en: 28b8932728acb09f
+  zh: 534b2730798e3c0b
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design/s2-1-remove-the-sidebar-entry:
+  en: d80014d5bc78d6aa
+  zh: 912446c0dba4ef64
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design/s2-2-session-import-gains-an-ordered-extension-slot-for-sources:
+  en: 4f426bc0d4e4cbe5
+  zh: 7e82f2abecb1d5ba
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design/s2-3-deepseek-contributes-the-first-card:
+  en: c801877329697141
+  zh: 966f48d86d55d934
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design/s2-4-dependency-direction-and-gates:
+  en: 7655f26a5e5ccff4
+  zh: b13e601006703a8c
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s2-design/s2-5-tests-and-documentation:
+  en: 69fcda59a5f8ced6
+  zh: 3ce49583311fde0c
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s3-scope:
+  en: c59929fadd8c56e4
+  zh: a409dad6ac01aaeb
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/tasks:
+  en: 44a01e809c84601e
+  zh: 99d09d92058ffb2d
+/move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s4-acceptance:
+  en: 961b233b1eedaccd
+  zh: d9ada63664e8846b
