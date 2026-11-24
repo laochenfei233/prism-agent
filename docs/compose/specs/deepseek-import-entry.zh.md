@@ -1,18 +1,25 @@
 ---
 feature: deepseek-import-entry
-status: designed
+status: delivered
 updated: 2026-11-24
 branch: feat/deepseek-import-entry
-commits: 待交付时回填
+commits: f0d6f11402..d99a063c8a
 ---
 
 # DeepSeek 导出导入入口迁入"导入对话"页并置首
 
 English | [中文](deepseek-import-entry.md)
 
-## Report
+## 报告
 
-待实施后回填。
+**做了什么** —— DeepSeek 会话导入不再挂在侧边栏。可选 bundle 现在通过 session-import 新增的 `settings.sessionImport.source` 列表插槽，向跨 Agent 导入页贡献第一张来源卡（渲染在内置来源之前）；点击卡片打开同一个导入对话框（文件选择、工作区选择、上传/导入进度、结果），无导入权限的 Peer 不渲染卡片。侧边栏的 `sidebar.session.action` 不再有任何 DeepSeek 贡献。
+
+**验证** —— 两包 vitest：177 通过 / 2 失败，2 个失败是 master 上既有的 `cache-checkpoint.host.spec.ts` 基线红灯；四个相关 tsconfig face 的 `tsc --noEmit` 全部通过；`verify-client-packages`、`verify-client-catalog`（目录已再生成）、`verify-plugin-packages`、`verify-config-catalog`、`verify-upgrade-guides` 通过；`verify-translation-pairing` 与 `verify-md-links` 仅报告无关文件的既有失败。
+
+**历程记录** ——
+- 扩展点就是一个渲染在现有 shelf 内的有序列表插槽：没有贡献时页面不多出容器，贡献的卡片直接继承 shelf 的网格。
+- 复用对话框靠放宽其 props 面（`ImportDialogProps`）而不是搬移对话框，侧边栏动作的 21 个对话框测试因此原样通过。
+- 生成的客户端插槽目录与 `pnpm-lock.yaml` 是改动的随附债务：忘了它们，`verify-client-catalog` 门禁与冻结锁文件安装都会红。
 
 ## [S1] Problem
 
@@ -54,15 +61,15 @@ deepseek-chat-import 的 client 在启用时向 `settings.sessionImport.source` 
 
 ## Tasks
 
-- [ ] T1: session-import 增加 `settings.sessionImport.source` 有序槽与前置渲染 (depends: none)
-- [ ] T2: deepseek-chat-import mount 改造——删侧边栏注入、加槽位贡献卡（order 置首） (depends: T1)
-- [ ] T3: 双方测试更新（mount 断言、section 顺序用例） (depends: T2)
-- [ ] T4: README/升级指南入口描述更新 + pairing 重录 (depends: T2)
+- [x] T1: session-import 增加 `settings.sessionImport.source` 有序槽与前置渲染 (depends: none)
+- [x] T2: deepseek-chat-import mount 改造——删侧边栏注入、加槽位贡献卡（order 置首） (depends: T1)
+- [x] T3: 双方测试更新（mount 断言、section 顺序用例） (depends: T2)
+- [x] T4: README/升级指南入口描述更新 + pairing 重录 (depends: T2)
 
 ## [S4] Acceptance
 
-- [ ] 侧边栏 "New session" 旁不再有 DeepSeek 导入按钮（`sidebar.session.action` 无 deepseek-chat-import 贡献）。
-- [ ] 启用该 bundle 后，"导入对话"页第一张来源卡是 DeepSeek 网页版导出（ZIP），点击打开原导入对话框并能完成一次真实上传导入。
-- [ ] 未启用 bundle 时导入页与现状一致（十来源、无空容器）。
-- [ ] session-import 源码无对 deepseek-chat-import 的 import；verify-client-packages 通过。
-- [ ] 两个包的 typecheck、测试与 doc-sync（含 pairing）通过。
+- [x] 侧边栏 "New session" 旁不再有 DeepSeek 导入按钮（`sidebar.session.action` 无 deepseek-chat-import 贡献）。
+- [x] 启用该 bundle 后，"导入对话"页第一张来源卡是 DeepSeek 网页版导出（ZIP），点击打开原导入对话框并能完成一次真实上传导入。
+- [x] 未启用 bundle 时导入页与现状一致（十来源、无空容器）。
+- [x] session-import 源码无对 deepseek-chat-import 的 import；verify-client-packages 通过。
+- [x] 两个包的 typecheck、测试与 doc-sync（含 pairing）通过。

@@ -1,9 +1,9 @@
 ---
 feature: deepseek-import-entry
-status: designed
+status: delivered
 updated: 2026-11-24
 branch: feat/deepseek-import-entry
-commits: backfill on delivery
+commits: f0d6f11402..d99a063c8a
 ---
 
 # Move the DeepSeek export import entry into the "Import conversations" page as its first card
@@ -12,7 +12,14 @@ English | [中文](deepseek-import-entry.zh.md)
 
 ## Report
 
-To backfill after delivery.
+**What was built** — The DeepSeek chat import no longer hangs off the sidebar. The optional bundle now contributes the first source card of the cross-agent import page through the new `settings.sessionImport.source` list slot that session-import declares and renders ahead of its built-in stores; clicking the card opens the same import dialog (file choice, workspace choice, upload/import progress, result), and a peer without import permission renders no card. The sidebar's `sidebar.session.action` keeps no DeepSeek contribution.
+
+**Verification** — Both packages' vitest suites: 177 passed / 2 failed, the 2 being the pre-existing `cache-checkpoint.host.spec.ts` baseline failures on master; `tsc --noEmit` on all four touched package faces passes; `verify-client-packages`, `verify-client-catalog` (catalog regenerated), `verify-plugin-packages`, `verify-config-catalog`, and `verify-upgrade-guides` pass; `verify-translation-pairing` and `verify-md-links` report only pre-existing failures in unrelated files.
+
+**Journey log** —
+- The extension point is a plain ordered list slot rendered inside the existing shelf, so a deployment without contributions gains no container and contributed cards inherit the shelf's grid.
+- The dialog was reused by widening its props face (`ImportDialogProps`) instead of moving it, so the sidebar action's 21 dialog tests kept passing untouched.
+- The generated client slot catalog and `pnpm-lock.yaml` are part of a change's debt: both the `verify-client-catalog` gate and a frozen-lockfile install fail when either is forgotten.
 
 ## [S1] Problem
 
@@ -54,15 +61,15 @@ When enabled, the deepseek-chat-import client contributes one source card to `se
 
 ## Tasks
 
-- [ ] T1: session-import adds the ordered `settings.sessionImport.source` slot and renders it first (depends: none)
-- [ ] T2: deepseek-chat-import mount rework — drop the sidebar injection, contribute the first card through the slot (depends: T1)
-- [ ] T3: update both packages' tests (mount assertions, section order cases) (depends: T2)
-- [ ] T4: README/upgrade-guide entry descriptions + pairing re-record (depends: T2)
+- [x] T1: session-import adds the ordered `settings.sessionImport.source` slot and renders it first (depends: none)
+- [x] T2: deepseek-chat-import mount rework — drop the sidebar injection, contribute the first card through the slot (depends: T1)
+- [x] T3: update both packages' tests (mount assertions, section order cases) (depends: T2)
+- [x] T4: README/upgrade-guide entry descriptions + pairing re-record (depends: T2)
 
 ## [S4] Acceptance
 
-- [ ] No DeepSeek import button next to "New session" in the sidebar (`sidebar.session.action` has no deepseek-chat-import contribution).
-- [ ] With the bundle enabled, the first source card of the "Import conversations" page is DeepSeek web export (ZIP), and clicking it opens the original import dialog and completes one real upload import.
-- [ ] Without the bundle, the import page matches the current behavior (the built-in sources, no empty container).
-- [ ] session-import source imports nothing from deepseek-chat-import; `verify-client-packages` passes.
-- [ ] Both packages' typecheck, tests, and doc-sync (including pairing) pass.
+- [x] No DeepSeek import button next to "New session" in the sidebar (`sidebar.session.action` has no deepseek-chat-import contribution).
+- [x] With the bundle enabled, the first source card of the "Import conversations" page is DeepSeek web export (ZIP), and clicking it opens the original import dialog and completes one real upload import.
+- [x] Without the bundle, the import page matches the current behavior (the built-in sources, no empty container).
+- [x] session-import source imports nothing from deepseek-chat-import; `verify-client-packages` passes.
+- [x] Both packages' typecheck, tests, and doc-sync (including pairing) pass.

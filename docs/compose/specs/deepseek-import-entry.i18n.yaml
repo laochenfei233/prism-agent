@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/deepseek-import-entry.md
 /:
-  en: a12079056fe10421
-  zh: c973338c49f1291e
+  en: a594e0cc5b385644
+  zh: a594e0cc5b385644
 /move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card:
   en: 250a374140cbc5a3
   zh: 65bf72b3aa59c294
 /move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/report:
-  en: ac6697f77ffa5cf7
-  zh: 11e2fdfcda86ed2f
+  en: 2695609f25f122c2
+  zh: 9ff8e76529573832
 /move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s1-problem:
   en: 28b8932728acb09f
   zh: 534b2730798e3c0b
@@ -36,8 +36,8 @@
   en: c59929fadd8c56e4
   zh: a409dad6ac01aaeb
 /move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/tasks:
-  en: 44a01e809c84601e
-  zh: 99d09d92058ffb2d
+  en: 1122d602aaf90b36
+  zh: 7297414a9455d9bd
 /move-the-deepseek-export-import-entry-into-the-import-conversations-page-as-its-first-card/s4-acceptance:
-  en: 961b233b1eedaccd
-  zh: d9ada63664e8846b
+  en: 65084922e319126c
+  zh: d8d890c8d143fd3c
