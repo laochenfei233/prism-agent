@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SESSION_IMPORT_CANDIDATES_ROUTE, SESSION_IMPORT_ROUTE } from '../routes.ts'
 import { isImportSourceId } from '../source-ids.ts'
 import type {
@@ -35,8 +35,10 @@ import {
 } from './state.ts'
 import css from './ImportSection.module.css'
 
-/** Props bound by the settings renderer: copy only, as a leaf page inside the 数据 section's tab. */
-export type ImportSectionProps = PropsLocale<'settings.sessionImport'>
+/** Props bound by the settings renderer: copy, the contributed source cards, and the leaf-page seat inside the 数据 section's tab. */
+export type ImportSectionProps =
+  PropsLocale<'settings.sessionImport'>
+  & PropsRenderSlots<'settings.sessionImport.source'>
 
 type Phase = 'sources' | 'planning' | 'preview' | 'importing' | 'done'
 
@@ -194,7 +196,7 @@ const EMPTY_RESULT: ImportApplyResult = { results: [], workspaces: [] }
  * @param props - localized copy and the settings section runtime.
  * @returns the source shelf, project preview, confirmation dialog, and result.
  */
-export function ImportSection({ t }: ImportSectionProps) {
+export function ImportSection({ t, renderSlot }: ImportSectionProps) {
   const [candidates, setCandidates] = useState<readonly SourceCandidate[] | null>(null)
   const [selectedSource, setSelectedSource] = useState<ImportSourceId | null>(null)
   const [plan, setPlan] = useState<ImportPlan | null>(null)
@@ -314,6 +316,7 @@ export function ImportSection({ t }: ImportSectionProps) {
     </div>}
 
     <div className={css.shelf}>
+      {renderSlot('settings.sessionImport.source', {})}
       {candidates === null
         ? <div className={css.loading}><StateDot state="ongoing" />{t('loading')}</div>
         : candidates.map(candidate => <button
