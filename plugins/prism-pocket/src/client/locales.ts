@@ -28,6 +28,9 @@ export type PocketLocaleKey =
   | 'phone.steps'
   | 'step.bind'
   | 'step.bind.hint'
+  | 'phone.bind.action'
+  | 'phone.bind.working'
+  | 'phone.bind.done'
   | 'step.serve'
   | 'step.run'
   | 'step.quick'
@@ -145,7 +148,10 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.pairing.hint': 'Send /start <code> from your chat to bind the bot to you.',
   'phone.steps': 'Still needed',
   'step.bind': 'Bind the server to the local-network address',
-  'step.bind.hint': 'The desktop app always starts on loopback. Run this command from the CLI, then open the link again.',
+  'step.bind.hint': 'Bind the running server to this address — the button above does it live, no restart — then open the link again.',
+  'phone.bind.action': 'Bind now',
+  'phone.bind.working': 'Binding…',
+  'phone.bind.done': 'The local-network address is bound; the link is live.',
   'step.serve': 'Proxy the port to Tailscale',
   'step.run': 'Run the named tunnel',
   'step.quick': 'Or start a quick test tunnel (random hostname)',
@@ -264,7 +270,10 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.pairing.hint': '在你的聊天里发送 /start <配对码>，即可把 bot 绑定到你。',
   'phone.steps': '还需要做到',
   'step.bind': '把服务绑定到局域网地址',
-  'step.bind.hint': '桌面版固定启动在本机回环上；请用命令行执行这条命令，再重新打开链接。',
+  'step.bind.hint': '把运行中的服务绑定到该地址——上方按钮可直接完成、无需重启——然后重新打开链接。',
+  'phone.bind.action': '立即绑定',
+  'phone.bind.working': '绑定中……',
+  'phone.bind.done': '局域网地址已绑定，链接已生效。',
   'step.serve': '把这个端口代理到 Tailscale',
   'step.run': '运行命名隧道',
   'step.quick': '或先起一个临时测试隧道（域名随机）',

@@ -49,7 +49,7 @@ export const zh = {
   'menu.copyRelative': '复制相对路径',
   'menu.copyAbsolute': '复制绝对路径',
   'menu.copied': '已复制',
-  'menu.copyFailed': '无法复制，请检查内容是否可用后重试'
+  'menu.copyFailed': '无法复制，请检查内容是否可用后重试',
 } satisfies Record<string, string>
 
 /** Files dictionary key union. */
@@ -85,7 +85,7 @@ export const en = {
   'menu.copyRelative': 'Copy relative path',
   'menu.copyAbsolute': 'Copy absolute path',
   'menu.copied': 'Copied',
-  'menu.copyFailed': 'Could not copy. Check that the content is available, then retry.'
+  'menu.copyFailed': 'Could not copy. Check that the content is available, then retry.',
 } satisfies Record<SidebarFilesKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -118,7 +118,7 @@ export const ja = {
   'menu.copyRelative': '相対パスをコピー',
   'menu.copyAbsolute': '絶対パスをコピー',
   'menu.copied': 'コピーしました',
-  'menu.copyFailed': 'コピーできません。内容を確認して再試行してください。'
+  'menu.copyFailed': 'コピーできません。内容を確認して再試行してください。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -151,7 +151,7 @@ export const es = {
   'menu.copyRelative': 'Copiar ruta relativa',
   'menu.copyAbsolute': 'Copiar ruta absoluta',
   'menu.copied': 'Copiado',
-  'menu.copyFailed': 'No se pudo copiar. Compruebe que el contenido esté disponible e inténtelo de nuevo.'
+  'menu.copyFailed': 'No se pudo copiar. Compruebe que el contenido esté disponible e inténtelo de nuevo.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -184,7 +184,7 @@ export const fr = {
   'menu.copyRelative': 'Copier le chemin relatif',
   'menu.copyAbsolute': 'Copier le chemin absolu',
   'menu.copied': 'Copié',
-  'menu.copyFailed': 'Impossible de copier. Vérifiez que le contenu est disponible, puis réessayez.'
+  'menu.copyFailed': 'Impossible de copier. Vérifiez que le contenu est disponible, puis réessayez.',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -217,7 +217,7 @@ export const de = {
   'menu.copyRelative': 'Relativen Pfad kopieren',
   'menu.copyAbsolute': 'Absoluten Pfad kopieren',
   'menu.copied': 'Kopiert',
-  'menu.copyFailed': 'Kopieren fehlgeschlagen. Prüfen Sie, ob der Inhalt verfügbar ist, und versuchen Sie es erneut.'
+  'menu.copyFailed': 'Kopieren fehlgeschlagen. Prüfen Sie, ob der Inhalt verfügbar ist, und versuchen Sie es erneut.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -250,7 +250,7 @@ export const ru = {
   'menu.copyRelative': 'Копировать относительный путь',
   'menu.copyAbsolute': 'Копировать абсолютный путь',
   'menu.copied': 'Скопировано',
-  'menu.copyFailed': 'Не удалось скопировать. Проверьте доступность содержимого и повторите попытку.'
+  'menu.copyFailed': 'Не удалось скопировать. Проверьте доступность содержимого и повторите попытку.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -283,5 +283,5 @@ export const pt = {
   'menu.copyRelative': 'Copiar caminho relativo',
   'menu.copyAbsolute': 'Copiar caminho absoluto',
   'menu.copied': 'Copiado',
-  'menu.copyFailed': 'Não foi possível copiar. Verifique se o conteúdo está disponível e tente novamente.'
+  'menu.copyFailed': 'Não foi possível copiar. Verifique se o conteúdo está disponível e tente novamente.',
 } satisfies Record<keyof typeof en, string>

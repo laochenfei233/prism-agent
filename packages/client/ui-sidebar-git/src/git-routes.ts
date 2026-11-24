@@ -334,15 +334,15 @@ export function registerGitRoutes(host: GitRouteHost, config: GitRoutesConfig): 
     await Promise.allSettled(pending)
   })
   const deps: GitRouteDeps = {
-    cwdOf: (sessionId) => host.cwdOf(sessionId),
+    cwdOf: sessionId => host.cwdOf(sessionId),
     operations: () => host.operations(lifetime.signal),
   }
   const routes: readonly [string, readonly ConnectionFetchMethod[], (request: Request) => Promise<Response>][] = [
-    [GIT_STATUS_PATH, ['GET'], (request) => handleStatus(deps, request).catch(error => failure(error))],
-    [GIT_DIFF_PATH, ['GET'], (request) => handleDiff(deps, request).catch(error => failure(error))],
-    [GIT_STAGE_PATH, ['POST'], (request) => handleStage(deps, request).catch(error => failure(error))],
-    [GIT_UNSTAGE_PATH, ['POST'], (request) => handleUnstage(deps, request).catch(error => failure(error))],
-    [GIT_COMMIT_PATH, ['POST'], (request) => handleCommit(deps, request, config.maxMessageBytes).catch(error => failure(error))],
+    [GIT_STATUS_PATH, ['GET'], request => handleStatus(deps, request).catch(error => failure(error))],
+    [GIT_DIFF_PATH, ['GET'], request => handleDiff(deps, request).catch(error => failure(error))],
+    [GIT_STAGE_PATH, ['POST'], request => handleStage(deps, request).catch(error => failure(error))],
+    [GIT_UNSTAGE_PATH, ['POST'], request => handleUnstage(deps, request).catch(error => failure(error))],
+    [GIT_COMMIT_PATH, ['POST'], request => handleCommit(deps, request, config.maxMessageBytes).catch(error => failure(error))],
   ]
   for (const [path, methods, handler] of routes) {
     host.register({

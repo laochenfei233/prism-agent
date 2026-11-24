@@ -49,10 +49,10 @@ export function apply(ctx: Context, config: Config): void {
   let resolved: Promise<GitOperations | undefined> | undefined
   registerGitRoutes({
     effect: (dispose) => { ctx.effect(dispose) },
-    cwdOf: (sessionId) => ctx.sessions.get(sessionId as SessionId)?.header.cwd,
+    cwdOf: sessionId => ctx.sessions.get(sessionId as SessionId)?.header.cwd,
     operations: (signal) => {
       // One resolution per plugin lifetime: a missing git stays missing until the plugin reloads.
-      resolved ??= resolveGitExecutable(ctx, signal).then((executable) => executable === null
+      resolved ??= resolveGitExecutable(ctx, signal).then(executable => executable === null
         ? undefined
         : gitOperations(new GitRunner(ctx.subprocess, executable, {
           timeoutMs: config.timeoutMs, outputMaxBytes: config.outputMaxBytes,

@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { POCKET_BOTS_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
+import { POCKET_BOTS_PATH, POCKET_LAN_BIND_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
 import { lanCommands, remoteCommands, tunnelCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
@@ -61,6 +61,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [installEvent, setInstallEvent] = useState<Event | null>(null)
   const [tunnelDraft, setTunnelDraft] = useState('')
   const [tunnelNote, setTunnelNote] = useState<string | null>(null)
+  const [bindNote, setBindNote] = useState<string | null>(null)
+  const [binding, setBinding] = useState(false)
   const requestSeq = useRef(0)
 
   /** Apply a bots-list response body to the channel list and the pairing code. */
@@ -181,6 +183,19 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
         setTunnelNote(t('tunnel.saved'))
       })
       .catch((cause: unknown) => { setTunnelNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
+  /** Bind the LAN address on the running listener; the refreshed status clears the blocker. */
+  const bindLan = (): void => {
+    setBindNote(null)
+    setBinding(true)
+    void requestJson(POCKET_LAN_BIND_PATH, { method: 'POST' })
+      .then((value) => {
+        setStatus(readStatus(value))
+        setBindNote(t('phone.bind.done'))
+      })
+      .catch((cause: unknown) => { setBindNote(cause instanceof Error ? cause.message : String(cause)) })
+      .finally(() => { setBinding(false) })
   }
 
   if (error !== null) return <p className='prism-page-message' data-tone='error'>{error}</p>
@@ -312,6 +327,19 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
                 </button>
               </div>
             )}
+            {chosen === 'lan' && phone.blocker === 'not-bound' && (
+              <div className='prism-actions'>
+                <button
+                  type='button'
+                  className='prism-button prism-button-primary'
+                  disabled={binding}
+                  onClick={bindLan}
+                >
+                  {binding ? t('phone.bind.working') : t('phone.bind.action')}
+                </button>
+              </div>
+            )}
+            {bindNote !== null && <p className='prism-note'>{bindNote}</p>}
             {steps.length > 0 && (
               <div className='prism-steps'>
                 <h4 className='prism-steps-title'>{t('phone.steps')}</h4>

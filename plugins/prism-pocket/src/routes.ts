@@ -9,6 +9,9 @@
 /** Server surface, tailscale facts, and pocket feature state. */
 export const POCKET_REMOTE_PATH = '/api/pocket/remote'
 
+/** Bind the machine's LAN address on the running listener; answers the fresh status. */
+export const POCKET_LAN_BIND_PATH = '/api/pocket/lan/bind'
+
 /** The bot channels' list/action route. */
 export const POCKET_BOTS_PATH = '/api/pocket/bots'
 

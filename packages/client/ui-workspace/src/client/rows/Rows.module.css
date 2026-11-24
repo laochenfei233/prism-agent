@@ -129,9 +129,13 @@
   margin: 0 6px 0 var(--dsh-sidebar-label-gap);
 }
 
+/* PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5). */
 /* A row holding a pending interaction grows a second full-width line. The
    first line keeps the single-line cell layout, and the pending line starts at
-   the title's left edge, so the wait reads as part of the Session it blocks. */
+   the title's left edge, so the wait reads as part of the Session it blocks.
+   The wrap follows the interaction, not the occupant's DOM: a question or plan
+   review owns its own composer UI and renders nothing here, and the empty
+   line below collapses instead of adding height. */
 .sessionRow.withPending {
   flex-wrap: wrap;
   height: auto;
@@ -140,10 +144,20 @@
   row-gap: 2px;
 }
 
+/* border-box keeps the title-aligned indent inside the row: a content-box
+   100% basis plus the indent overflows the list's scroll clip. */
 .pendingLine {
   flex: 0 0 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding-inline-start: 20px;
+}
+
+/* The outlet anchor is always present and layout-neutral (`display: contents`),
+   so the seat's emptiness is read from it: an occupant that renders nothing
+   leaves the anchor empty, and the line collapses. */
+.pendingLine:has(> [data-slot='sidebar.workspaces.session.pending']:empty) {
+  display: none;
 }
 
 .slot {

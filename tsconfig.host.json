@@ -564,6 +564,7 @@
     { "path": "./packages/experimental/webhook" },
     { "path": "./packages/experimental/webhook-github" },
     { "path": "./packages/prism/prism-meeting/tsconfig.host.json" },
+    { "path": "./packages/prism/prism-wiki/tsconfig.host.json" },
     { "path": "./packages/todo/tool-todo" },
     { "path": "./packages/plan/plan-mode" },
     { "path": "./packages/preset/agent-preset-registry" },
