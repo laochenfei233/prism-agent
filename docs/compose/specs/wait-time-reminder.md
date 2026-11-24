@@ -3,7 +3,7 @@ feature: wait-time-reminder
 status: designed
 updated: 2026-11-25
 branch: feat/wait-time-reminder
-commits: 待交付时回填
+commits: 7abf808b6c (master)
 ---
 
 # 按实际等待时长的静默提醒
