@@ -1,9 +1,9 @@
 ---
 feature: tauri-rust-upgrade
-status: in-progress
+status: delivered
 updated: 2026-11-24
 branch: chore/tauri-rust-latest
-commits: f9433f3732..HEAD
+commits: f9433f3732..7b4ae7086a
 ---
 
 # Tauri 与 Rust 升级：2.12.6 / 1.100.0
@@ -12,17 +12,16 @@ commits: f9433f3732..HEAD
 
 ## Report
 
-**当前状态** —— master 的桌面壳使用 `tauri = "2"`，当前解析到 2.11.5；CLI 固定为 `@tauri-apps/cli@2.11.4`，`rust-version = "1.77"`，`webview2-com = "0.38"`，NSIS 模板来自 tauri-cli-v2.11.4。旧的 `chore/tauri-rust-upgrade` 分支没有任何升级提交：它的 tip 与 `feat/usage-billing` 是同一个 folder-drag-drop 提交，WIP 在基于 `0.2.1-rc.4-alpha5` 的 `stash@{0}` 里。那个 stash 是参考，不是合并基线。
+**完成内容** —— 桌面壳现在构建在 Tauri 2.12.6 上：`apps/desktop/package.json` 把 `@tauri-apps/cli` 固定到 2.12.6，`Cargo.toml` 声明 `rust-version = "1.90"`（Tauri 2.12.6 的 MSRV）与 `webview2-com = "0.39"`，`Cargo.lock` 把 `tauri` 精确解析到 2.12.6，同时解析出 `webview2-com 0.39.1`、`windows 0.62.2`、`wry 0.57.3`、`tao 0.37.3`、`tauri-build 2.7.6`，`dsh-desktop` 仍为 `0.2.2-rc.1`。vendored NSIS 模板已从 `tauri-cli-v2.12.6`（tauri-bundler 2.10.6，现位于 `crates/tauri-bundler/`）重新同步：上游已自带 `Win\RestartManager.nsh`，fork 旧的 include delta 消失，仅剩的 delta 是 Reinstall 页的就地升级优先行为（与上游 diff 共 30 行，PageReinstall 与 PageLeaveReinstall 两处镜像）。
 
-**版本目标** —— 2026-11-21 的最新稳定版是 `tauri` crate 2.12.6、`tauri-cli` 2.12.6、`@tauri-apps/cli` 2.12.6；`tauri-cli` 2.12.6 固定 `tauri-bundler = 2.10.6`，它的 NSIS 模板就是要 vendored 的那份。Tauri 3.0.0-alpha.6 已存在，但属于预发布，不在范围内。Tauri 2.12.6 声明 `rust-version = "1.90"`，依赖 `webview2-com 0.39`，并使用 `windows` 0.62 crate。Rust stable 是 1.100.0。
+**验证** —— `pnpm run build` 通过 9/9 个 gate；`cargo check` 与 `cargo build` 在新依赖图上通过（`--quit` 命名事件路径仍用 `windows-sys 0.61`，与 `windows 0.62` 共存）；`node apps/desktop/scripts/smoke-bridge.mjs` 通过。安装器用固定 CLI（`npx @tauri-apps/cli@2.12.6 build`，本地 `createUpdaterArtifacts:false`）加文档记载的 makensis junction 变通构建，产物为 `Prism Agent_0.2.2-rc.1_x64-setup.exe`（123 MB）。静默安装（`/UPDATE /S`）覆盖旧安装替换了壳（exe 哈希 `F82B0BA3…` → `1BF0D82E…`，runtime 18757 → 18851 个文件），装机后的壳能启动，`prism-agent.exe --quit` 能干净退出；完整卸载（注册表项与卸载器移除）后再全新静默安装也成功。旧分支 `chore/tauri-rust-upgrade`（无升级提交；其 folder-drop 工作已经通过其他提交进入 master）已删除，`stash@{0}` 在归档到 `.artifacts/stash-archives/2026-11-08-tauri-2.12.4-wip.patch` 后已 drop。本轮未覆盖（需要人在机器前）：托盘图标目视检查、mac proxy 会话、麦克风/语音输入、真实 updater 下载。
 
-**本机工具链** —— rustup 从 1.29.1 升到 1.29.3；rustc 与 cargo 从 1.99.1 升到 1.100.0。`cargo tauri` 原为 2.11.5，现为 2.12.6。本机没有全局 npm `@tauri-apps/cli`；桌面脚本使用 `npx` 固定版本，因此 npm CLI 在构建时解析，而不是机器级安装。
-
-**分支** —— `chore/tauri-rust-latest` 从 master `f9433f3732` 创建。它不继承旧分支，也不重放其 folder-drop 历史。旧分支和 stash 在本分支落地前保持不动。
-
-**验证** —— 本次只写计划并升级本机工具链。本机工具链已验证：`rustc` 与 `cargo` 报告 1.100.0，rustup 报告 1.29.3，`cargo tauri` 报告 2.12.6。项目清单、lockfile、NSIS 模板和安装器尚未改动；它们的验证在下面的任务里。
-
-**进度（2026-11-24）** —— `apps/desktop/package.json` 已固定 `@tauri-apps/cli@2.12.6`；`Cargo.toml` 已设 `rust-version = "1.90"`、`webview2-com = "0.39"`。`Cargo.lock` 已重新解析并把 `tauri` 精确固定在 2.12.6（`webview2-com 0.39.1`、`windows 0.62.2`、`wry 0.57.3`、`tao 0.37.3`、`tauri-build 2.7.6`，`dsh-desktop` 仍为 `0.2.2-rc.1`）。NSIS 模板已从 `tauri-cli-v2.12.6`（tauri-bundler 2.10.6，现位于 `crates/tauri-bundler/...`）重新 vendored：上游已自带 `Win\RestartManager.nsh`，旧的 include delta 消失，仅保留就地升级优先的 delta（与上游 diff 共 30 行变更）。旧 stash 已导出为 `.artifacts/stash-archives/2026-11-08-tauri-2.12.4-wip.patch`（在 gitignore 内）；drop 推迟到安装器验证通过之后。构建与安装器验证（T9）进行中。
+**历程记录** ——
+- 所有"静默安装什么都没做"的现象都是自己造成的：Git Bash 的 MSYS 路径转换把 `/S` 改写成 `S:/`，而 `cmd //c` 的引号处理压根没启动 exe。用 `MSYS_NO_PATHCONV=1` 加无空格的 exe 路径启动，NSIS 就会按文档静默安装。
+- `makensis` 依然会在 inspector 的长路径 `.md` 上失败；C:\prism-nsis junction + installer.nsi 前缀改写仍然必需，且 junction 必须改指到当前 checkout（旧的指到了主仓库）。
+- tauri monorepo 在 2.11.4 到 2.12.x 之间把 bundler 模板从 `tooling/` 挪到了 `crates/` —— 模板要从 `crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi` 取。
+- tauri 的 NSIS 欢迎页在 passive（非 silent）运行时也会显示；只有真正的 `/S` 才隐藏页面。updater 自己的 `/UPDATE` 调用不受影响。
+- Lefthook 的 msys 崩溃（0xc0000142）在本环境仍存在；手动跑受影响的 gate，并用 `LEFTHOOK=0` 提交（已写进提交信息）。
 
 ## [S1] 问题
 
@@ -95,9 +94,9 @@ Tauri 3.0.0-alpha.6 是预发布，不能被宽松的 `"2"` 要求意外选中�
 - [ ] T6：在 `Cargo.toml` 设置 `rust-version = "1.90"` 与 `webview2-com = "0.39"`（依赖：T5）
 - [ ] T7：重新生成 `Cargo.lock` 并验证解析图（依赖：T6）
 - [ ] T8：从 tauri-bundler 2.10.6 重新同步 NSIS 模板（依赖：T5）
-- [ ] T9：构建、安装、升级、卸载并冒烟测试桌面壳（依赖：T7、T8）
-- [ ] T10：把旧 stash 导出为 patch，并退役旧分支/stash（依赖：T9）
-- [ ] T11：如果安装器或 updater 行为对外可见，补 changelog 或升级指南（依赖：T9）
+- [x] T9：构建、安装、升级、卸载并冒烟测试桌面壳（依赖：T7、T8）
+- [x] T10：把旧 stash 导出为 patch，并退役旧分支/stash（依赖：T9）
+- [x] T11：如果安装器或 updater 行为对外可见，补 changelog 或升级指南（依赖：T9）
 
 ## [S4] 验收
 
@@ -106,5 +105,6 @@ Tauri 3.0.0-alpha.6 是预发布，不能被宽松的 `"2"` 要求意外选中�
 - [x] `apps/desktop/package.json` 固定 `@tauri-apps/cli@2.12.6`。
 - [x] `Cargo.lock` 解析出 `tauri 2.12.6`、`webview2-com 0.39`、`windows 0.62`，且 `dsh-desktop` 仍为 `0.2.2-rc.1`。
 - [x] vendored NSIS 模板匹配 tauri-bundler 2.10.6，并保留 fork 的就地升级 delta。
-- [ ] `cargo build` 与安装器构建通过；安装、升级、卸载、托盘/`--quit`、mac proxy、语音/麦克风、updater 验证通过。
+- [x] `cargo build` 与安装器构建通过；安装、升级、卸载、`--quit` 冒烟通过。
+- [ ] 托盘图标目视、mac proxy 会话、语音/麦克风、真实 updater 下载由人工在装机上确认。
 - [ ] 只有 stash patch 已归档且新安装器验证通过后，才退役旧分支和 stash。

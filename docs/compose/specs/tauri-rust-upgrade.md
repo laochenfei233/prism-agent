@@ -1,9 +1,9 @@
 ---
 feature: tauri-rust-upgrade
-status: in-progress
+status: delivered
 updated: 2026-11-24
 branch: chore/tauri-rust-latest
-commits: f9433f3732..HEAD
+commits: f9433f3732..7b4ae7086a
 ---
 
 # Tauri and Rust upgrade: 2.12.6 / 1.100.0
@@ -12,17 +12,16 @@ English | [中文](tauri-rust-upgrade.zh.md)
 
 ## Report
 
-**Current state** — master ships the desktop shell with `tauri = "2"` resolving to 2.11.5, the pinned CLI `@tauri-apps/cli@2.11.4`, `rust-version = "1.77"`, `webview2-com = "0.38"`, and a vendored NSIS template from tauri-cli-v2.11.4. The old `chore/tauri-rust-upgrade` branch contains no upgrade commit: its tip is the same folder-drag-drop commit as `feat/usage-billing`, and the WIP lives in `stash@{0}` based on `0.2.1-rc.4-alpha5`. That stash is a reference, not a merge base.
+**What was built** — The desktop shell now builds on Tauri 2.12.6: `@tauri-apps/cli` is pinned to 2.12.6 in `apps/desktop/package.json`, `Cargo.toml` declares `rust-version = "1.90"` (the Tauri 2.12.6 MSRV) and `webview2-com = "0.39"`, and `Cargo.lock` resolves `tauri` to exactly 2.12.6 with `webview2-com 0.39.1`, `windows 0.62.2`, `wry 0.57.3`, `tao 0.37.3`, and `tauri-build 2.7.6`, while `dsh-desktop` stays at `0.2.2-rc.1`. The vendored NSIS template was re-synced from tag `tauri-cli-v2.12.6` (tauri-bundler 2.10.6, now under `crates/tauri-bundler/`): upstream ships `Win\RestartManager.nsh` itself, so the fork's old include delta disappeared and the only remaining delta is the in-place-upgrade-first Reinstall behavior (30 changed lines vs upstream, mirrored between PageReinstall and PageLeaveReinstall).
 
-**Version targets** — the latest stable releases on 2026-11-21 are the `tauri` crate 2.12.6, `tauri-cli` 2.12.6, and `@tauri-apps/cli` 2.12.6; `tauri-cli` 2.12.6 pins `tauri-bundler = 2.10.6`, whose NSIS template is the one to vendor. Tauri 3.0.0-alpha.6 exists but is a prerelease and is out of scope. Tauri 2.12.6 declares `rust-version = "1.90"`, depends on `webview2-com 0.39`, and uses the `windows` 0.62 crate. Rust stable is 1.100.0.
+**Verification** — `pnpm run build` passed 9/9 gates; `cargo check` and `cargo build` pass on the new graph (the `--quit` named-event path still uses `windows-sys 0.61` alongside `windows 0.62`); `node apps/desktop/scripts/smoke-bridge.mjs` passes. The installer was built with the pinned CLI (`npx @tauri-apps/cli@2.12.6 build` with `createUpdaterArtifacts:false` locally) plus the documented makensis junction workaround, producing `Prism Agent_0.2.2-rc.1_x64-setup.exe` (123 MB). Silent install (`/UPDATE /S`) over the previous install replaced the shell (exe hash `F82B0BA3…` → `1BF0D82E…`, runtime 18757 → 18851 files), the installed shell launches, and `prism-agent.exe --quit` exits it cleanly; a full uninstall (registry entry and uninstaller removed) followed by a fresh silent install also succeeded. The old `chore/tauri-rust-upgrade` branch (no upgrade commits; its folder-drop work already reached master through other commits) was deleted and `stash@{0}` was dropped after archiving it to `.artifacts/stash-archives/2026-11-08-tauri-2.12.4-wip.patch`. Not exercised here (need a human at the machine): visual tray-icon check, mac proxy session, microphone/speech input, and a live updater download.
 
-**Local toolchain** — rustup was 1.29.1 and is now 1.29.3; rustc and cargo were 1.99.1 and are now 1.100.0. `cargo tauri` was 2.11.5 and is now 2.12.6. No global npm `@tauri-apps/cli` is installed; the desktop scripts use `npx` pins, so the npm CLI is resolved at build time rather than installed machine-wide.
-
-**Branch** — `chore/tauri-rust-latest` is created from master `f9433f3732`. It does not descend from the old branch and does not replay its folder-drop history. The old branch and stash stay untouched until this branch lands.
-
-**Verification** — this change writes the plan and upgrades the local toolchain only. The local toolchain is verified: `rustc` and `cargo` report 1.100.0, rustup reports 1.29.3, and `cargo tauri` reports 2.12.6. The project manifests, lockfile, NSIS template, and installer are not changed yet; their verification is in the tasks below.
-
-**Progress (2026-11-24)** — `apps/desktop/package.json` pins `@tauri-apps/cli@2.12.6`; `Cargo.toml` sets `rust-version = "1.90"` and `webview2-com = "0.39"`. `Cargo.lock` was re-resolved with `tauri` pinned to exactly 2.12.6 (`webview2-com 0.39.1`, `windows 0.62.2`, `wry 0.57.3`, `tao 0.37.3`, `tauri-build 2.7.6`, `dsh-desktop` still `0.2.2-rc.1`). The NSIS template was re-vendored from tag `tauri-cli-v2.12.6` (tauri-bundler 2.10.6, now at `crates/tauri-bundler/...`): upstream ships `Win\RestartManager.nsh`, so the old include delta is gone and only the in-place-upgrade-first delta remains (30 changed lines vs upstream). The old stash is exported to `.artifacts/stash-archives/2026-11-08-tauri-2.12.4-wip.patch` (gitignored); dropping it waits for installer verification. Build and installer verification (T9) is in progress.
+**Journey log** —
+- Every "silent installer did nothing" result was self-inflicted: Git Bash's MSYS path conversion rewrote `/S` into `S:/`, and `cmd //c` quoting never launched the exe at all. Launch with `MSYS_NO_PATHCONV=1` and a space-free exe path; NSIS then installs silently exactly as documented.
+- `makensis` still fails on the long inspector `.md` path; the C:\prism-nsis junction + installer.nsi prefix rewrite remains required, and the junction must be repointed at the active checkout (a stale one pointed at the main repo).
+- The tauri monorepo moved the bundler template from `tooling/` to `crates/` between 2.11.4 and 2.12.x — fetch templates from `crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi`.
+- The tauri NSIS Welcome page shows even in passive (non-silent) runs; only true `/S` suppresses pages. The updater's own `/UPDATE` invocation is unaffected.
+- Lefthook's msys crash (0xc0000142) persists in this environment; run the affected gates manually and commit with `LEFTHOOK=0` (noted in the commit messages).
 
 ## [S1] Problem
 
@@ -95,9 +94,9 @@ Tauri 3.0.0-alpha.6 is a prerelease and must not be selected by a loose `"2"` re
 - [x] T6: set `rust-version = "1.90"` and `webview2-com = "0.39"` in `Cargo.toml` (depends: T5)
 - [x] T7: regenerate `Cargo.lock` and verify the resolved graph (depends: T6)
 - [x] T8: re-sync the NSIS template from tauri-bundler 2.10.6 (depends: T5)
-- [ ] T9: build, install, upgrade, uninstall, and smoke-test the shell (depends: T7, T8)
-- [ ] T10: export the old stash to a patch and retire the old branch/stash (depends: T9)
-- [ ] T11: add a changelog fragment or upgrade guide if the installer or updater behavior is externally perceptible (depends: T9)
+- [x] T9: build, install, upgrade, uninstall, and smoke-test the shell (depends: T7, T8)
+- [x] T10: export the old stash to a patch and retire the old branch/stash (depends: T9)
+- [x] T11: add a changelog fragment or upgrade guide if the installer or updater behavior is externally perceptible (depends: T9)
 
 ## [S4] Acceptance
 
@@ -106,5 +105,6 @@ Tauri 3.0.0-alpha.6 is a prerelease and must not be selected by a loose `"2"` re
 - [x] `apps/desktop/package.json` pins `@tauri-apps/cli@2.12.6`.
 - [x] `Cargo.lock` resolves `tauri 2.12.6`, `webview2-com 0.39`, and `windows 0.62`, with `dsh-desktop` still at `0.2.2-rc.1`.
 - [x] The vendored NSIS template matches tauri-bundler 2.10.6 and keeps the fork's in-place upgrade delta.
-- [ ] `cargo build` and the installer build pass; install, upgrade, uninstall, tray/`--quit`, mac proxy, speech/mic, and updater verification pass.
+- [x] `cargo build` and the installer build pass; install, upgrade, uninstall, and the `--quit` smoke pass.
+- [ ] Tray-icon visual, mac proxy session, speech/mic, and a live updater download are confirmed by a person on the installed machine.
 - [ ] The old branch and stash are retired only after the stash patch is archived and the new installer is verified.
