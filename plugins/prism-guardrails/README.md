@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds three rails of its own that refuse nothing: the stuck-run nudge, the usage reminder, and the unknown-tool name hint.
+An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds four rails of its own that refuse nothing: the stuck-run nudge, the usage reminder, the wait-time reminder, and the unknown-tool name hint.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The fourteenth is the usage reminder: it watches a session's cumulative token usage and reminds the model to stay concise when a configured threshold is crossed. The fifteenth appends the visible tools a missed name probably meant to the unknown-tool refusal. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
+Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The fourteenth is the usage reminder: it watches a session's cumulative token usage and reminds the model to stay concise when a configured threshold is crossed. The fifteenth is the wait-time reminder: it measures how long one foreground tool call actually blocked the turn and reminds the model to background or split work that waits too long. The sixteenth appends the visible tools a missed name probably meant to the unknown-tool refusal. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -26,6 +26,7 @@ Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the
 | Credential reads | `read` and `grep` are read-only tools to every other rail, and a read lands in the session log permanently | A read of a configured credential path is refused |
 | Spinning on failures | Nothing watches for a turn that repeats one failing call; the model's own judgment is the only brake | A judge model confirms the run is a loop and the next result carries a reminder to change approach — the call itself is never refused |
 | Token usage | The durable `tokenUsage` projection and the client's usage display report what a session spent, but nothing tells the model when the session has grown expensive | A reminder at the turn boundary when cumulative usage first crosses a configured threshold — it refuses nothing |
+| Wait time | Nothing measures how long one foreground tool call blocked the turn; the base timeout converts a call to background only at its hard cap | A reminder on the result of any call that actually waited past the configured threshold, suggesting background execution or splitting — it refuses nothing |
 | Unknown tool names | The pipeline refuses a miss with bare `unknown tool "x"`, which a model can only retry blindly | The failure names the visible tools it probably meant, closest first, and keeps the refusal's structured identity |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
@@ -63,7 +64,7 @@ The prompt text and the workflows are maintained here rather than vendored from 
 
 ## Configuration
 
-Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. Three exceptions: the stuck nudge ships on because it refuses nothing and its judge is called only while failures repeat (`stuckNudgeAfterFailures: 0` turns it off), the usage reminder's empty array is its off switch rather than a load failure, because that rail ships off and `[]` is its default, and the error-text improvements (`skillInvocationGuidance`, `toolNameSuggestions`) ship on because they only improve a message.
+Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. Four exceptions: the stuck nudge and the wait-time reminder ship on because they refuse nothing (the stuck nudge's judge is called only while failures repeat; `stuckNudgeAfterFailures: 0` and `waitReminderAfterMs: 0` turn them off), the usage reminder's empty array is its off switch rather than a load failure, because that rail ships off and `[]` is its default, and the error-text improvements (`skillInvocationGuidance`, `toolNameSuggestions`) ship on because they only improve a message.
 
 | Key | Type | Meaning | Default |
 |---|---|---|---|
@@ -89,6 +90,8 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `stuckNudgeMaxTokens` | integer `>= 1` | Token cap one judge call may spend | `512` |
 | `stuckNudgePerTurn` | integer `>= 0` | Reminders one turn may receive; `0` disables | `1` |
 | `usageReminderThresholds` | strictly ascending array of positive integers | Cumulative session token totals that each send the model one reminder; an empty array or an omitted key disables | `[]` (off) |
+| `waitReminderAfterMs` | integer `>= 0` | Actual wait time in milliseconds before a tool call result gets a reminder; `0` disables | `60000` |
+| `waitReminderPerTurn` | integer `>= 0` | Max reminders one turn may inject; `0` disables | `2` |
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
@@ -144,6 +147,8 @@ Load-time rejections, each with the message asserted by the test suite:
 | `usageReminderThresholds` not an array | `usageReminderThresholds must be an array of token thresholds` |
 | a zero, negative, or fractional threshold | `usageReminderThresholds entries must be positive integers, received …` |
 | a non-ascending or duplicated threshold list | `usageReminderThresholds must be strictly ascending, received …` |
+| `waitReminderAfterMs` not an integer, or `< 0` | `waitReminderAfterMs must be an integer >= 0` |
+| `waitReminderPerTurn` not an integer, or `< 0` | `waitReminderPerTurn must be an integer >= 0` |
 | any other top-level key | `unknown config key(s) …` |
 
 The `writeTools` and `readTools` rows are the bundle's cross-field rule: a rail that reads a file owns no tool knowledge of its own, so a deployment that turns one on without naming the tools has nothing to enforce against. It fails at load rather than loading a rail that can never fire.
@@ -306,6 +311,20 @@ The total accumulates from the `usage` each committed assistant message reports 
 
 The mechanism is the verification gate's: steering at `agent/turn-stopping` makes the loop observe pending input and run another step. Each threshold reminds at most once per session, and a boundary that crosses several thresholds sends one reminder for the highest and marks the lower ones reminded — a session at 250k needs no 100k nudge behind it. The rail refuses nothing and behaves identically in `observe` mode.
 
+### Wait-time reminder
+
+A tool call whose actual elapsed time crosses `waitReminderAfterMs` (60 seconds by default; `0` turns the rail off) receives an `additionalContexts` reminder on its result:
+
+```
+The call to `bash` waited 65s. For long waits, prefer background execution (`run_in_background: true`), split the task, or check whether you are waiting for input that will not arrive. This is a reminder only — the result is unchanged.
+```
+
+The rail wraps `tools/execute` to measure the real elapsed time of each call. It does not modify `exec.signal` (avoiding signal-fuse entanglement with the caller's own timeout), and the reminder is injected via `additionalContexts` — the call itself is never refused, and the original result content is unchanged.
+
+A per-turn quota (`waitReminderPerTurn`, default `2`) prevents reminder spam. The quota resets at each `agent/pre-step` turn boundary, so a long task spanning turns gets a fresh allowance each turn.
+
+The rail refuses nothing and behaves identically in `observe` mode (the ledger records a `steer`).
+
 ### Unknown tool names
 
 A call to a name no visible tool registers comes back with the near names it probably meant:
@@ -323,12 +342,14 @@ Distance is Levenshtein over case-folded names, with one character of credit for
 The bundle registers one command that reports which rails the deployment actually has armed, the mode it is running in, and what its `observe` runs have seen:
 
 ```
-Guardrails: OBSERVE MODE — 14 of 14 rails armed, nothing is refused (config 3f2a9c1b).
+Guardrails: OBSERVE MODE — 15 of 15 rails armed, nothing is refused (config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
+stuck nudge: after 3 consecutive failures
 usage reminder: ~100k, ~250k
+wait reminder: after 60s, max 2/turn
 decisions this session: 2 (2 observed)
   observed  command guard  git push --force origin main
   observed  sensitive reads  .env.local

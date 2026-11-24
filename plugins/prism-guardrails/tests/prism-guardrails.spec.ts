@@ -155,6 +155,8 @@ describe('configuration validation', () => {
       stuckNudgeMaxTokens: 512,
       stuckNudgePerTurn: 1,
       usageReminderThresholds: undefined,
+      waitReminderAfterMs: 60000,
+      waitReminderPerTurn: 2,
     })
   })
 
@@ -1786,8 +1788,8 @@ describe('/guardrails status', () => {
     const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
     const text = execution?.result.text ?? ''
 
-    expect(text).toContain('Guardrails: 4 of 14 rails armed (mode: enforce, config ')
-    expect(text.split('\n').slice(1, 15)).toEqual([
+    expect(text).toContain('Guardrails: 5 of 15 rails armed (mode: enforce, config ')
+    expect(text.split('\n').slice(1, 16)).toEqual([
       'plan-mode denial: off',
       'repeat approval: off',
       'turn budget: 20 steps',
@@ -1802,6 +1804,7 @@ describe('/guardrails status', () => {
       'command guard: off',
       'stuck nudge: after 3 consecutive failures',
       'usage reminder: off',
+      'wait reminder: after 60s, max 2/turn',
     ])
     // Nothing was observed and nothing was refused, so the ledger has no rows
     // beyond the count an observing deployment would need.
@@ -1816,7 +1819,7 @@ describe('/guardrails status', () => {
     const second = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
 
     expect(first?.result.text.split('\n')[0])
-      .toMatch(/^Guardrails: \d+ of 14 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
+      .toMatch(/^Guardrails: \d+ of 15 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
     expect(second?.result.text).toEqual(first?.result.text)
   })
 
@@ -2197,5 +2200,164 @@ describe('tool suggestion helpers', () => {
     expect(toolNameHint(['bash'])).toBe('did you mean "bash"?')
     expect(toolNameHint(['bash', 'read'])).toBe('similar tools: "bash", "read"')
     expect(toolNameHint([])).toBe('')
+  })
+})
+
+describe('wait-time reminder', () => {
+  /** A tool fixture that delays its execution by `delayMs`. */
+  function slowFixture(name: string, delayMs: number) {
+    return defineTool({
+      name,
+      description: `${name} fixture`,
+      parameters: {},
+      output: {
+        schema: { type: 'string' },
+        render: (_args, value) => [{ type: 'text' as const, text: value }],
+      },
+      async execute() {
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        return `${name} ran after ${delayMs}ms`
+      },
+    })
+  }
+
+  /** Boot a harness with the wait-time reminder config and a scripted model. */
+  async function waitHarness(
+    session: string,
+    config: { waitReminderAfterMs: number; waitReminderPerTurn?: number },
+    responses: ReturnType<typeof textResponse>[],
+  ): Promise<{ ctx: Context; agent: Agent; adapter: MockAdapter }> {
+    const ctx = await harness(config)
+    const agent = await newAgent(ctx, session)
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, adapter }
+  }
+
+  /** The text the model was sent in one request, across every content block. */
+  function requestText(request: GenerateOptions): string {
+    return request.messages
+      .map(message => message.content.map(block => block.type === 'text' ? block.text : '').join(''))
+      .join('\n')
+  }
+
+  it('stays out of the loop entirely when the rail is off', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-off', { waitReminderAfterMs: 0 }, [textResponse('done')])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('sends one reminder when a call exceeds the threshold, once per call', async () => {
+    // First call: fast fixture (under the threshold) -> no reminder.
+    // Second call: 100ms (over the 60ms threshold) -> reminder injected.
+    const { ctx, agent, adapter } = await waitHarness('wait-first', { waitReminderAfterMs: 60 }, [
+      toolCallResponse('c0', 'fast', {}),
+      toolCallResponse('c1', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(fixture('fast', []))
+    ctx.tools.register(slowFixture('slow', 100))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(3)
+    const steered = adapter.requests[2]
+    if (steered === undefined) throw new Error('the third request carries the reminder')
+    expect(requestText(steered)).toContain('The call to `slow` waited')
+    expect(requestText(steered)).toContain('prefer background execution')
+    // Original result unchanged
+    expect(requestText(steered)).toContain('slow ran after 100ms')
+  })
+
+  it('respects the per-turn quota', async () => {
+    // Three slow calls in one turn, quota = 2 -> only first two get reminders.
+    // Reminders are durable session text, so the final request carries the
+    // accumulated copies: exactly two, not three.
+    const { ctx, agent, adapter } = await waitHarness('wait-quota', { waitReminderAfterMs: 50, waitReminderPerTurn: 2 }, [
+      toolCallResponse('c0', 'slow', {}),
+      toolCallResponse('c1', 'slow', {}),
+      toolCallResponse('c2', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 60))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(4)
+    const finalText = requestText(adapter.requests[3])
+    if (finalText === undefined) throw new Error('the final request closes the turn')
+    expect(finalText.split('The call to `slow` waited').length - 1).toBe(2)
+  })
+
+  it('resets the quota on a new turn', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-next-turn', { waitReminderAfterMs: 50, waitReminderPerTurn: 1 }, [
+      toolCallResponse('c0', 'slow', {}),
+      toolCallResponse('c1', 'slow', {}),
+      textResponse('interim'),
+      toolCallResponse('c2', 'slow', {}),
+      toolCallResponse('c3', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 100))
+
+    await userTurn(ctx, agent, 'go')
+    await userTurn(ctx, agent, 'continue')
+
+    // One reminder per turn, so two reminders total across two turns
+    expect(adapter.requests).toHaveLength(6)
+    expect(requestText(adapter.requests[1])).toContain('The call to `slow` waited')
+    expect(requestText(adapter.requests[4])).toContain('The call to `slow` waited')
+  })
+
+  it('formats the wait time in whole seconds once it reaches a minute scale', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-format', { waitReminderAfterMs: 100 }, [
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 1100))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(requestText(adapter.requests[1])).toContain('waited 1s')
+  })
+
+  it('arms the rail row in the status report under enforce', async () => {
+    const ctx = await commandHarness({ waitReminderAfterMs: 50, waitReminderPerTurn: 2 })
+    ctx.tools.register(slowFixture('slow', 60))
+    const agent = await ctx.agentLoop.create(SessionId('wait-ledger'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Enforce prints no decisions block; the armed row is what an operator reads.
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('wait reminder: after 50ms, max 2/turn')
+    expect(status).not.toContain('decisions this session')
+  })
+
+  it('works in observe mode too, and the steer lands in the ledger', async () => {
+    const ctx = await commandHarness({ mode: 'observe', waitReminderAfterMs: 50, waitReminderPerTurn: 2 })
+    ctx.tools.register(slowFixture('slow', 60))
+    const agent = await ctx.agentLoop.create(SessionId('wait-observe'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('wait reminder: after 50ms, max 2/turn')
+    // A steer is recorded but is not an observation — the same asymmetry the
+    // stuck nudge reports.
+    expect(status).toContain('decisions this session: 1 (0 observed)')
   })
 })

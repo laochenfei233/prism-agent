@@ -178,6 +178,13 @@ export interface Config {
    * an omitted field or an empty array leaves the rail off.
    */
   readonly usageReminderThresholds?: readonly number[]
+  /**
+   * Actual wait time in milliseconds before a tool call result gets a reminder;
+   * `0` = off.
+   */
+  readonly waitReminderAfterMs?: number
+  /** Max reminders one turn may inject. */
+  readonly waitReminderPerTurn?: number
 }
 
 /** One writing tool after load-time validation. */
@@ -209,6 +216,8 @@ export interface ResolvedConfig {
   readonly stuckNudgeMaxTokens: number
   readonly stuckNudgePerTurn: number | undefined
   readonly usageReminderThresholds: readonly number[] | undefined
+  readonly waitReminderAfterMs: number | undefined
+  readonly waitReminderPerTurn: number | undefined
 }
 
 /** Configuration keys this bundle reads; anything else is a typo and fails load. */
@@ -234,6 +243,8 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'stuckNudgeMaxTokens',
   'stuckNudgePerTurn',
   'usageReminderThresholds',
+  'waitReminderAfterMs',
+  'waitReminderPerTurn',
 ])
 
 /** Keys one `writeTools` entry reads. */
@@ -324,6 +335,8 @@ export function resolveConfig(config: Config): ResolvedConfig {
     stuckNudgeMaxTokens: resolveStuckNudgeMaxTokens(config.stuckNudgeMaxTokens),
     stuckNudgePerTurn: resolveStuckNudgePerTurn(config.stuckNudgePerTurn),
     usageReminderThresholds: resolveUsageReminderThresholds(config.usageReminderThresholds),
+    waitReminderAfterMs: resolveWaitReminderAfterMs(config.waitReminderAfterMs),
+    waitReminderPerTurn: resolveWaitReminderPerTurn(config.waitReminderPerTurn),
   }
 }
 
@@ -440,6 +453,9 @@ const DEFAULT_STUCK_NUDGE_MAX_TOKENS = 512
 /** Nudges one turn may receive. */
 const DEFAULT_STUCK_NUDGE_PER_TURN = 1
 
+/** Actual wait milliseconds before a tool result carries a wait reminder. */
+const DEFAULT_WAIT_REMINDER_AFTER_MS = 60000
+
 /**
  * Check the stuck-nudge threshold. The rail ships on, so an omitted field
  * takes the default; `0` is the off switch, and one failure is not stuck.
@@ -509,6 +525,31 @@ function resolveUsageReminderThresholds(value: readonly number[] | undefined): r
     previous = entry
   }
   return [...value]
+}
+
+/**
+ * Check the wait-time reminder threshold; `0` = off.
+ *
+ * The rail ships on — like the stuck nudge, it is a reminder that refuses
+ * nothing — so an omitted field takes the 60s default.
+ */
+function resolveWaitReminderAfterMs(value: number | undefined): number | undefined {
+  if (value === undefined) return DEFAULT_WAIT_REMINDER_AFTER_MS
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`prism-guardrails: waitReminderAfterMs must be an integer >= 0, received ${String(value)}`)
+  }
+  return value === 0 ? undefined : value
+}
+
+/**
+ * Check the per-turn wait-reminder quota; `0` = off.
+ */
+function resolveWaitReminderPerTurn(value: number | undefined): number | undefined {
+  if (value === undefined) return 2
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`prism-guardrails: waitReminderPerTurn must be an integer >= 0, received ${String(value)}`)
+  }
+  return value === 0 ? undefined : value
 }
 
 /**

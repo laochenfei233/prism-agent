@@ -38,6 +38,9 @@
  * - **Usage reminder** — a session whose cumulative token usage first crosses a
  *   configured threshold is reminded at its turn boundary to prefer concise
  *   outputs; it refuses nothing.
+ * - **Wait-time reminder** — a tool call whose actual elapsed wait crosses a
+ *   configured threshold carries a reminder on its result to background or
+ *   split the work; it refuses nothing.
  * - **Unknown tool names** — a call to a name no visible tool registers comes
  *   back with the nearest registered names instead of a bare `unknown tool`
  *   the model can only retry blindly.
@@ -168,6 +171,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   installCommandGuard(ctx, resolved, ledger)
   installStuckNudge(ctx, resolved, ledger)
   installUsageReminder(ctx, resolved, ledger)
+  installWaitTimeReminder(ctx, resolved, ledger)
   installToolNameSuggestions(ctx, resolved)
   installStatusCommand(ctx, resolved, ledger, version)
 }
@@ -1190,6 +1194,81 @@ function installUsageReminder(ctx: Context, resolved: ResolvedConfig, ledger: De
   })
 }
 
+/**
+ * Remind a model when a tool call's actual wait time exceeds a threshold.
+ *
+ * The hook wraps `tools/execute` to measure the real elapsed time of each call.
+ * When the elapsed time reaches `waitReminderAfterMs`, the tool result receives
+ * an `additionalContexts` entry reminding the model of the wait cost and suggesting
+ * background execution or task splitting. This is a soft nudge — it never refuses
+ * the call, and the original result content is unchanged.
+ *
+ * Per-turn quota (`waitReminderPerTurn`, default 2) prevents reminder spam.
+ * The quota resets at each `agent/pre-step` turn boundary.
+ *
+ * In `observe` mode the rail records the decision and delegates; the reminder is
+ * still injected (a steer is not a refusal).
+ */
+function installWaitTimeReminder(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const threshold = resolved.waitReminderAfterMs
+  const quota = resolved.waitReminderPerTurn
+  if (threshold === undefined || quota === undefined) return
+
+  // `agent/pre-step` fires per step, not per turn, so the quota resets only
+  // when the loop opens a turn the record has not seen — the stuck nudge's
+  // turnSeen pattern.
+  const turnSeen = new WeakMap<Agent, number>()
+  const usedThisTurn = new WeakMap<Agent, number>()
+
+  ctx.on('agent/pre-step', ({ agent, turn }, next): Promise<PreStepDecision> => {
+    if (turnSeen.get(agent) !== turn) {
+      turnSeen.set(agent, turn)
+      usedThisTurn.set(agent, 0)
+    }
+    return next()
+  })
+
+  ctx.on('tools/execute', async (exec, next): Promise<ToolExecutionResult> => {
+    const agent = exec.agent
+    if (agent === undefined) return next()
+
+    const used = usedThisTurn.get(agent) ?? 0
+    if (used >= quota) return next()
+
+    const t0 = Date.now()
+    const result = await next()
+    const elapsed = Date.now() - t0
+
+    if (elapsed < threshold) return result
+
+    usedThisTurn.set(agent, used + 1)
+    note(ledger, agent, 'wait reminder', `~${formatMs(elapsed)}`, 'steer')
+
+    const reminder = createUserMessage({
+      content: [{
+        type: 'text',
+        text: `The call to \`${exec.name}\` waited ${formatMs(elapsed)}. For long waits, prefer background execution `
+          + '(`run_in_background: true`), split the task, or check whether you are waiting for input that will not arrive. '
+          + 'This is a reminder only — the result is unchanged.',
+      }],
+      source: { kind: 'prism-guardrails', form: 'instructions' },
+    })
+
+    return {
+      ...result,
+      additionalContexts: [...(result.additionalContexts ?? []), reminder],
+    }
+  })
+}
+
+/** One millisecond count as the reminder states it: 65000 reads "65s", 60000 reads "60s", an hour reads "60m". */
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${String(ms)}ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 3600) return `${String(seconds)}s`
+  return `${String(Math.round(seconds / 60))}m`
+}
+
 /** One token count as the reminder states it: 120000 reads "120k", 900 reads "900". */
 function formatTokens(tokens: number): string {
   return tokens >= 1000 ? `${String(Math.round(tokens / 1000))}k` : String(tokens)
@@ -1322,6 +1401,9 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     ['usage reminder', resolved.usageReminderThresholds === undefined
       ? undefined
       : resolved.usageReminderThresholds.map(threshold => `~${formatTokens(threshold)}`).join(', ')],
+    ['wait reminder', resolved.waitReminderAfterMs === undefined || resolved.waitReminderPerTurn === undefined
+      ? undefined
+      : `after ${formatMs(resolved.waitReminderAfterMs)}, max ${String(resolved.waitReminderPerTurn)}/turn`],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
   // An observing deployment is not protected, so its first line says so before
