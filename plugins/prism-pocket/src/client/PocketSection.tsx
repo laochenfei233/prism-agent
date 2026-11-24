@@ -53,6 +53,7 @@ async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
 export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [status, setStatus] = useState<PocketRemoteStatus | null>(null)
   const [bots, setBots] = useState<readonly BotView[]>([])
+  const [connectorPhases, setConnectorPhases] = useState<Readonly<Record<string, string>>>({})
   const [pairingCode, setPairingCode] = useState('')
   const [pairingNote, setPairingNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +69,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   /** Apply a bots-list response body to the channel list and the pairing code. */
   const applyList = useCallback((body: unknown): void => {
     setBots(readBots(body))
+    setConnectorPhases(readConnectorPhases(body))
     setPairingCode(readPairingCode(body))
   }, [])
 
@@ -384,13 +386,14 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
         <h3 className='prism-panel-title'>{t('bots.title')}</h3>
         <p className='prism-note'>{t('bots.intro')}</p>
         <div className='prism-channels'>
-          {bots.map(bot => {
-            const meta = CHANNEL_META.find(entry => entry.id === bot.channel)
-            return meta === undefined ? null : (
+          {CHANNEL_META.map(meta => {
+            if (meta.connector === true) return <ConnectorCard key={meta.id} meta={meta} t={t} phase={connectorPhases[meta.id] ?? 'unknown'} />
+            const view = bots.find(bot => bot.channel === meta.id)
+            return view === undefined ? null : (
               <ChannelCard
-                key={bot.channel}
+                key={meta.id}
                 meta={meta}
-                view={bot}
+                view={view}
                 t={t}
                 copied={copied}
                 onCopy={copy}
@@ -450,7 +453,6 @@ function ChannelCard(props: {
   const { meta, view, t, copied, onCopy, act, publicOrigin } = props
   const [expanded, setExpanded] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
-  const [region, setRegion] = useState<'feishu' | 'lark'>(view.values.region === 'lark' ? 'lark' : 'feishu')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -471,9 +473,8 @@ function ChannelCard(props: {
   const save = (): void => {
     if (busy) return
     setNote(null)
-    const config: Record<string, unknown> = meta.id === 'feishu' ? { region } : {}
+    const config: Record<string, unknown> = {}
     const complete = meta.fields.every(field => {
-      if (field.region) return true
       const value = values[field.name]
       if (typeof value === 'string' && value.trim().length > 0) {
         config[field.name] = value.trim()
@@ -536,19 +537,7 @@ function ChannelCard(props: {
               <a className='prism-channel-link' href={meta.consoleUrl} target='_blank' rel='noreferrer'>{t('bots.console')}</a>
             </p>
           )}
-          {meta.fields.map(field => field.region ? (
-            <label key={field.name} className='prism-field'>
-              <span className='prism-field-label'>{t('field.region')}</span>
-              <select
-                className='prism-input'
-                value={region}
-                onChange={(event) => { setRegion(event.target.value === 'lark' ? 'lark' : 'feishu') }}
-              >
-                <option value='feishu'>{t('field.region.feishu')}</option>
-                <option value='lark'>{t('field.region.lark')}</option>
-              </select>
-            </label>
-          ) : (
+          {meta.fields.map(field => (
             <label key={field.name} className='prism-field'>
               <span className='prism-field-label'>
                 {t(`field.${field.name}` as PocketLocaleKey)}
@@ -584,6 +573,49 @@ function ChannelCard(props: {
       )}
     </article>
   )
+}
+
+/** One connector channel card: the implementation note and the account status, with no credentials to store. */
+function ConnectorCard(props: {
+  readonly meta: BotChannelMeta
+  readonly t: (key: PocketLocaleKey) => string
+  readonly phase: string
+}): ReactElement {
+  const { meta, t, phase } = props
+  const statusKey = CONNECTOR_PHASE_KEYS[phase] ?? 'bots.connector.unknown'
+  return (
+    <article className='prism-channel'>
+      <header className='prism-channel-head'>
+        <span className='prism-channel-chip' style={{ background: meta.color }} aria-hidden='true'>{meta.chip}</span>
+        <div className='prism-channel-name'>
+          <span className='prism-channel-title'>{t(meta.label)}</span>
+          <span className='prism-channel-tag'>{t('bots.connector.tag')}</span>
+        </div>
+        <span className='prism-channel-status' data-tone={CONNECTOR_PHASE_TONES[phase] ?? 'off'}>{t(statusKey)}</span>
+      </header>
+      <div className='prism-channel-form'>
+        <p className='prism-channel-hint'>{t(meta.hint)}</p>
+      </div>
+    </article>
+  )
+}
+
+/** The status label key per connector account phase. */
+const CONNECTOR_PHASE_KEYS: Record<string, PocketLocaleKey> = {
+  connected: 'bots.connector.connected',
+  disconnected: 'bots.connector.disconnected',
+  checking: 'bots.connector.checking',
+  connecting: 'bots.connector.connecting',
+  unavailable: 'bots.connector.unavailable',
+}
+
+/** The status tone per connector account phase. */
+const CONNECTOR_PHASE_TONES: Record<string, 'off' | 'starting' | 'online' | 'error'> = {
+  connected: 'online',
+  disconnected: 'off',
+  checking: 'starting',
+  connecting: 'starting',
+  unavailable: 'error',
 }
 
 /** The status label key per wire status. */
@@ -713,6 +745,25 @@ function readValues(value: unknown): Readonly<Record<string, string>> {
 function readPairingCode(value: unknown): string {
   const code = objectOf(value)?.pairingCode
   return typeof code === 'string' && code.length > 0 ? code : ''
+}
+
+/**
+ * Narrow the connector channels' account phases out of a bots-list body; a
+ * malformed body reads as no status, which the cards render as unknown.
+ * @param value - the list route's response body.
+ * @returns the channel → account phase map for the connector cards.
+ */
+function readConnectorPhases(value: unknown): Readonly<Record<string, string>> {
+  const connectors = objectOf(value)?.connectors
+  if (!Array.isArray(connectors)) return {}
+  const phases: Record<string, string> = {}
+  for (const entry of connectors) {
+    const record = objectOf(entry)
+    const channel = stringOf(record?.channel)
+    const phase = stringOf(record?.phase)
+    if (channel !== undefined && phase !== undefined) phases[channel] = phase
+  }
+  return phases
 }
 
 /** Narrow the bots list body; a malformed body reads as an empty list. */

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-口袋里的 Prism：把 Web 表面变成手机可用的远程控制台，让九个 IM 渠道的聊天机器人驱动工作区，agent 也能主动叫你回来。
+口袋里的 Prism：把 Web 表面变成手机可用的远程控制台，让六个 IM 渠道的聊天机器人驱动工作区（另外三个渠道交给上游 connector），agent 也能主动叫你回来。
 
 一个纯客户端补丁插件——不改 Web 应用本体。所有适配只锚定应用自己声明的 `[data-slot]` 接缝，锚点缺失时按特性降级，桌面端体验完全不受影响。
 
@@ -21,12 +21,13 @@
 - 页面关闭后走 Web Push（RFC 8291/8292，`node:crypto` 实现，不引入推送库），覆盖批准、提问、回合完成与运行失败。订阅与 VAPID 密钥对存于 DSH home 的 `pocket/` 目录。
 - 可选 Bark 通道（`barkUrl` 配置），为未安装 PWA 的 iOS 提供推送。
 
-**Bot 渠道**（九个渠道，在「口袋」设置页配置）：
+**Bot 渠道**（六个 bot 渠道，在「口袋」设置页配置；另有三张卡片委托给上游 connector）：
 
-- Telegram、Discord、Slack、飞书/Lark、钉钉、QQ 走出站连接——本机发起的 WebSocket 长连接或轮询，无需公网 IP、无需隧道。
-- 微信（公众号/测试号）、企业微信（自建应用）、WhatsApp（Cloud API）经插件在 webserver 上注册的签名回调路由接收；页面给出需登记的回调地址与可达性提示（Tailscale Funnel 或你自己的反向代理）。
+- Telegram、Discord、Slack、QQ 走出站连接——本机发起的 WebSocket 长连接或轮询，无需公网 IP、无需隧道。
+- 微信（公众号/测试号）、WhatsApp（Cloud API）经插件在 webserver 上注册的签名回调路由接收；页面给出需登记的回调地址与可达性提示（Tailscale Funnel 或你自己的反向代理）。
+- 飞书/Lark、钉钉、企业微信由上游 CLI connector 实现（`dsh-feishu`/`dsh-dingtalk`/`dsh-wecom`，分别封装 lark-cli/dws/wecom-cli）：卡片只标注实现来源、不保存任何凭据，账号在 Plugins 页连接，模型经 connector 的技能收发消息，口袋不再把它们收到的消息投递进会话。
 - 每个 bot 绑定一个会话，且绑定只认操作者：在你的聊天里发送 `/start <配对码>`（配对码显示在口袋页面二维码旁，渠道不会再因第一条消息而自动绑定），`/new` 从你已操作的任意聊天重绑，`/stop` 在 agent 暴露中止入口时中止回合，`/help` 列出命令。回复按渠道限制分块回到绑定的聊天；待处理的审批和提问以编号选项送达——`1`/`y` 批准、`2`/`n` 拒绝、数字选择提问选项，120 秒沉默则交回应用自身界面。
-- 凭据存于 DSH home 的 `pocket/bots.json`（mode 0600），绝不出现在任何路由响应里；渠道卡片逐字段报告是否已保存值。`测试` 只做最便宜的凭据探测，不发消息。
+- 凭据存于 DSH home 的 `pocket/bots.json`（mode 0600），绝不出现在任何路由响应里；渠道卡片逐字段报告是否已保存值。`测试` 只做最便宜的凭据探测，不发消息。在飞书/钉钉/企业微信还是 bot 渠道时写下的文件，会在下次加载时丢掉这三条记录。
 
 **远程访问：局域网优先，Tailscale 或稳定隧道兜底**：
 

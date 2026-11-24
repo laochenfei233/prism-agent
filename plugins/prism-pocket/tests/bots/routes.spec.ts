@@ -56,19 +56,15 @@ describe('listView', () => {
     expect(body).toContain('plain-app-id')
   })
 
-  it('masks the wecom token and the whatsapp verify token too', () => {
+  it('masks the whatsapp secrets too', () => {
     const deps = routeDeps()
-    deps.store.setConfig(readBotConfig('wecom', {
-      corpId: 'corp', agentId: '1', corpSecret: 'wecom-corp-secret', token: 'wecom-callback-token', encodingAesKey: 'k'.repeat(43),
-    }))
     deps.store.setConfig(readBotConfig('whatsapp', {
       accessToken: 'whatsapp-access-token', phoneNumberId: '1', verifyToken: 'whatsapp-verify-token', appSecret: 'whatsapp-app-secret',
     }))
     const body = JSON.stringify(listView(deps))
-    for (const secret of ['wecom-callback-token', 'wecom-corp-secret', 'whatsapp-access-token', 'whatsapp-verify-token', 'whatsapp-app-secret']) {
+    for (const secret of ['whatsapp-access-token', 'whatsapp-verify-token', 'whatsapp-app-secret']) {
       expect(body).not.toContain(secret)
     }
-    expect(listView(deps).bots.find(bot => bot.channel === 'wecom')?.values).toEqual({ corpId: 'corp', agentId: '1' })
     expect(listView(deps).bots.find(bot => bot.channel === 'whatsapp')?.values).toEqual({ phoneNumberId: '1' })
   })
 

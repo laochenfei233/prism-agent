@@ -1,6 +1,6 @@
 /**
  * Bot routes: one authenticated list/action endpoint on the `/api` channel,
- * plus the three callback channels' unauthenticated webserver routes whose
+ * plus the two callback channels' unauthenticated webserver routes whose
  * requests the platforms sign. The action endpoint fails loud: unknown
  * channels, unknown actions, and configs that fail validation answer 400
  * with the offending field named.
@@ -16,9 +16,9 @@ import type { BotStore } from './store.ts'
 import type { BotSupervisor } from './supervisor.ts'
 import { mergeBotConfig, readBotConfig, summarizeConfig } from './validate.ts'
 import { readWechatCallback, verifyWechatCallback, resolveWechatVerifyEcho } from './adapters/wechat.ts'
-import { readWecomCallback, resolveWecomVerifyEcho } from './adapters/wecom.ts'
 import { readWhatsappMessages, resolveWhatsappVerifyChallenge, verifyWhatsappSignature } from './adapters/whatsapp.ts'
-import type { BotInbound, WechatConfig, WecomConfig, WhatsappConfig } from './types.ts'
+import type { ConnectorStatus } from './connectors.ts'
+import type { BotInbound, WechatConfig, WhatsappConfig } from './types.ts'
 import { callbackSignature, timestampFresh, timingSafeStringEquals } from './shared/sign.ts'
 import { readXmlField } from './shared/xml.ts'
 
@@ -45,6 +45,8 @@ export interface BotListView {
   readonly bots: readonly BotChannelView[]
   /** The active pairing code the page displays beside the QR. */
   readonly pairingCode: string
+  /** The connector channels' account status, in page order; empty when the connector registry is absent. */
+  readonly connectors: readonly ConnectorStatus[]
 }
 
 /** How the routes deliver inbound chat messages (ask relay already consumed). */
@@ -53,12 +55,15 @@ export interface BotRouteDeps {
   readonly supervisor: BotSupervisor
   readonly deliverInbound: (channel: BotChannelId, message: Pick<BotInbound, 'chatId' | 'senderId' | 'messageId' | 'text'>) => Promise<void>
   readonly warn: (detail: string) => void
+  /** The connector channels' current account status; absent without the connector registry. */
+  readonly connectorStatus?: () => readonly ConnectorStatus[]
 }
 
 /** Build every channel's view for the list route. */
-export function listView(deps: Pick<BotRouteDeps, 'store' | 'supervisor'>): BotListView {
+export function listView(deps: Pick<BotRouteDeps, 'store' | 'supervisor'> & Partial<Pick<BotRouteDeps, 'connectorStatus'>>): BotListView {
   return {
     pairingCode: deps.store.pairingCode(),
+    connectors: deps.connectorStatus?.() ?? [],
     bots: BOT_CHANNELS.map(channel => {
       const entry = deps.store.entry(channel)
       const state = deps.supervisor.state(channel)
@@ -189,7 +194,7 @@ function reply(res: ServerResponse, status: number, body: string): void {
 }
 
 /**
- * Register the three callback channels' webserver routes. Every route
+ * Register the two callback channels' webserver routes. Every route
  * validates its platform's signature before processing; a channel without a
  * stored config answers 404, and a failed verification answers 403.
  * @param ctx - host context; registration rides `ctx.effect`.
@@ -229,31 +234,6 @@ export function registerBotCallbackRoutes(
     return { status: 200, body: 'success' }
   })
 
-  const wecomHandler = callbackHandler('wecom', deps.warn, async (request, url, body) => {
-    const config = deps.store.config('wecom')?.fields as WecomConfig | undefined
-    if (config === undefined) return { status: 404, body: 'not configured' }
-    const msgSignature = url.searchParams.get('msg_signature') ?? ''
-    const timestamp = url.searchParams.get('timestamp') ?? ''
-    const nonce = url.searchParams.get('nonce') ?? ''
-    if (request.method === 'GET') {
-      const echo = url.searchParams.get('echostr') ?? ''
-      const encrypt = echo
-      if (!timingSafeStringEquals(callbackSignatureOf(config.token, timestamp, nonce, encrypt), msgSignature) || !timestampFresh(timestamp)) {
-        return { status: 403, body: 'signature mismatch' }
-      }
-      const decrypted = resolveWecomVerifyEcho(config, echo)
-      if (decrypted === undefined) return { status: 403, body: 'decrypt failed' }
-      return { status: 200, body: decrypted }
-    }
-    const encrypt = readXmlField(body, 'Encrypt') ?? ''
-    if (!timingSafeStringEquals(callbackSignatureOf(config.token, timestamp, nonce, encrypt), msgSignature) || !timestampFresh(timestamp)) {
-      return { status: 403, body: 'signature mismatch' }
-    }
-    const message = readWecomCallback(config, encrypt)
-    if (message !== undefined) await deps.deliverInbound('wecom', { chatId: message.from, senderId: message.from, messageId: message.msgId ?? '', text: message.content })
-    return { status: 200, body: 'success' }
-  })
-
   const whatsappHandler = callbackHandler('whatsapp', deps.warn, async (request, url, body) => {
     const config = deps.store.config('whatsapp')?.fields as WhatsappConfig | undefined
     if (config === undefined) return { status: 404, body: 'not configured' }
@@ -278,11 +258,10 @@ export function registerBotCallbackRoutes(
   })
 
   ctx.effect(() => webserver.register({ kind: 'exact', path: botCallbackPath('wechat'), handler: wechatHandler }), 'pocket: wechat callback')
-  ctx.effect(() => webserver.register({ kind: 'exact', path: botCallbackPath('wecom'), handler: wecomHandler }), 'pocket: wecom callback')
   ctx.effect(() => webserver.register({ kind: 'exact', path: botCallbackPath('whatsapp'), handler: whatsappHandler }), 'pocket: whatsapp callback')
 }
 
-/** The WeChat-family 4-part signature used by encrypted POSTs and WeCom. */
+/** The WeChat-family 4-part signature used by encrypted POSTs. */
 function callbackSignatureOf(token: string, timestamp: string, nonce: string, encrypt: string): string {
   return callbackSignature(token, timestamp, nonce, encrypt)
 }

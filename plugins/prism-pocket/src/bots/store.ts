@@ -28,25 +28,38 @@ function generatePairingCode(): string {
   return code
 }
 
-/** Read a store body without trusting it; corrupt or missing yields empty. */
-function readBody(file: string): BotStoreBody {
+/**
+ * Read a store body without trusting it; corrupt or missing yields empty.
+ * Entries of a channel this build no longer carries (the retired feishu,
+ * dingtalk, and wecom bot channels) are dropped and reported as `purged`, so
+ * the caller can rewrite the file without their credentials.
+ */
+function readBody(file: string): { body: BotStoreBody; purged: boolean } {
   try {
     const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
-    if (typeof parsed !== 'object' || parsed === null) return { version: 1, bots: {} }
+    if (typeof parsed !== 'object' || parsed === null) return { body: { version: 1, bots: {} }, purged: false }
     const root = parsed as { version?: unknown; bots?: unknown; pairingCode?: unknown }
-    if (typeof root.bots !== 'object' || root.bots === null) return { version: 1, bots: {} }
+    if (typeof root.bots !== 'object' || root.bots === null) return { body: { version: 1, bots: {} }, purged: false }
     const bots: Partial<Record<BotChannelId, BotEntry>> = {}
+    let purged = false
     for (const [channel, entry] of Object.entries(root.bots as Record<string, unknown>)) {
+      if (!BOT_CHANNELS.includes(channel as BotChannelId)) {
+        purged = true
+        continue
+      }
       const revived = reviveEntry(entry)
       if (revived !== undefined) bots[channel as BotChannelId] = revived
     }
     return {
-      version: 1,
-      bots,
-      ...(typeof root.pairingCode === 'string' && root.pairingCode.length > 0 ? { pairingCode: root.pairingCode } : {}),
+      body: {
+        version: 1,
+        bots,
+        ...(typeof root.pairingCode === 'string' && root.pairingCode.length > 0 ? { pairingCode: root.pairingCode } : {}),
+      },
+      purged,
     }
   } catch {
-    return { version: 1, bots: {} }
+    return { body: { version: 1, bots: {} }, purged: false }
   }
 }
 
@@ -81,7 +94,10 @@ export class BotStore {
    * @param file - absolute path of the bots JSON file; created on first persist.
    */
   constructor(private readonly file: string) {
-    this.body = readBody(file)
+    const { body, purged } = readBody(file)
+    this.body = body
+    // The retired channels' stored credentials must not linger on disk.
+    if (purged) this.persist()
   }
 
   /** The stored entry of one channel, when present. */

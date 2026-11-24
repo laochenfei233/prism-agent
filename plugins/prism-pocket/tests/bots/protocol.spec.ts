@@ -10,19 +10,15 @@ import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { chunkText } from '../../src/bots/shared/chunk.ts'
 import { DEDUP_CAPACITY, DEDUP_TTL_MS, InboundDedup } from '../../src/bots/shared/dedup.ts'
-import { decodeLarkFrame, encodeLarkFrame } from '../../src/bots/shared/protobuf.ts'
 import { callbackSignature, decryptWechatMessage, encryptWechatMessage, timestampFresh, timingSafeStringEquals } from '../../src/bots/shared/sign.ts'
 import { buildEncryptedReply, readXmlField } from '../../src/bots/shared/xml.ts'
 import { nextTelegramOffset, readTelegramUpdate, telegramApiBase } from '../../src/bots/adapters/telegram.ts'
 import { buildDiscordIdentify, parseDiscordFrame, readDiscordMessage } from '../../src/bots/adapters/discord.ts'
 import { buildSlackAck, parseSlackEnvelope, readSlackMessage } from '../../src/bots/adapters/slack.ts'
-import { buildLarkEndpointRequest, buildLarkPing, readLarkEventEnvelope, LarkChunkMerger } from '../../src/bots/adapters/feishu.ts'
-import { buildDingtalkAck, buildDingtalkOpenRequest, parseDingtalkFrame, readDingtalkMessage } from '../../src/bots/adapters/dingtalk.ts'
 import { buildQqIdentify, buildQqSendBody, qqSendUrl, readQqMessage } from '../../src/bots/adapters/qq.ts'
 import { verifyWechatCallback, readWechatCallback, resolveWechatVerifyEcho } from '../../src/bots/adapters/wechat.ts'
-import { verifyWecomCallback, readWecomCallback, resolveWecomVerifyEcho } from '../../src/bots/adapters/wecom.ts'
 import { readWhatsappMessages, resolveWhatsappVerifyChallenge, verifyWhatsappSignature } from '../../src/bots/adapters/whatsapp.ts'
-import type { WechatConfig, WecomConfig } from '../../src/bots/types.ts'
+import type { WechatConfig } from '../../src/bots/types.ts'
 
 const AES_KEY = 'a'.repeat(43)
 
@@ -105,71 +101,6 @@ describe('slack', () => {
   })
 })
 
-describe('lark frames', () => {
-  it('round-trips the protobuf frame', () => {
-    const payload = new TextEncoder().encode('{"hello":"world"}')
-    const wire = encodeLarkFrame({
-      seqId: 5, logId: 9, service: 3, method: 1,
-      headers: [{ key: 'type', value: 'event' }, { key: 'message_id', value: 'm1' }],
-      payload,
-    })
-    const decoded = decodeLarkFrame(wire)
-    expect(decoded).toMatchObject({ seqId: 5, logId: 9, service: 3, method: 1 })
-    expect(Object.fromEntries(decoded?.headers.map(header => [header.key, header.value]) ?? [])).toMatchObject({ type: 'event', message_id: 'm1' })
-    expect(new TextDecoder().decode(decoded?.payload)).toBe('{"hello":"world"}')
-  })
-
-  it('builds the ping control frame and the endpoint request', () => {
-    expect(decodeLarkFrame(buildLarkPing(2))?.headers).toEqual([{ key: 'type', value: 'ping' }])
-    expect(buildLarkEndpointRequest('cli', 'sec', 'https://open.feishu.cn')).toMatchObject({
-      url: 'https://open.feishu.cn/callback/ws/endpoint',
-      body: '{"AppID":"cli","AppSecret":"sec"}',
-    })
-  })
-
-  it('merges fragmented event payloads in order', () => {
-    const merger = new LarkChunkMerger()
-    const first = new TextEncoder().encode('{"he')
-    const second = new TextEncoder().encode('llo":1}')
-    expect(merger.merge('m1', 0, 2, first)).toBeUndefined()
-    expect(merger.merge('m1', 1, 2, second)).toBe('{"hello":1}')
-  })
-
-  it('narrows im.message.receive_v1 text and strips the group mention', () => {
-    const event = {
-      header: { event_type: 'im.message.receive_v1' },
-      event: {
-        sender: { sender_id: { open_id: 'ou1' } },
-        message: { chat_id: 'oc1', chat_type: 'group', message_id: 'om1', message_type: 'text', content: JSON.stringify({ text: '@Bot hi' }) },
-      },
-    }
-    expect(readLarkEventEnvelope(event)).toMatchObject({ chatId: 'oc1', senderId: 'ou1', messageId: 'om1', text: 'hi' })
-    expect(readLarkEventEnvelope({ header: { event_type: 'other' } })).toBeUndefined()
-    expect(readLarkEventEnvelope({
-      header: { event_type: 'im.message.receive_v1' },
-      event: { message: { chat_id: 'oc1', message_type: 'image', content: '{}' } },
-    })).toBeUndefined()
-  })
-})
-
-describe('dingtalk', () => {
-  it('acks every frame with its messageId and routes robot messages', () => {
-    const frame = defined(parseDingtalkFrame(JSON.stringify({
-      type: 'CALLBACK',
-      headers: { messageId: 'mid', contentType: 'application/json', topic: '/v1.0/im/bot/messages/get' },
-      data: JSON.stringify({ conversationId: 'cid', text: { content: ' hello ' }, senderNick: 'C', senderStaffId: 'staff-1', msgId: 'msg-1', sessionWebhook: 'https://w' }),
-    })))
-    expect(buildDingtalkAck(frame)).toContain('"messageId":"mid"')
-    expect(readDingtalkMessage(JSON.parse(frame?.data ?? '{}'))).toEqual({
-      chatId: 'cid', senderId: 'staff-1', messageId: 'msg-1', senderName: 'C', text: 'hello', webhook: 'https://w',
-    })
-    expect(buildDingtalkOpenRequest('c', 's')).toMatchObject({
-      clientId: 'c',
-      subscriptions: [{ type: 'CALLBACK', topic: '/v1.0/im/bot/messages/get' }],
-    })
-  })
-})
-
 describe('qq', () => {
   it('identifies with the QQBot prefix and the C2C intents bit', () => {
     expect(JSON.parse(buildQqIdentify('tok'))).toMatchObject({ op: 2, d: { token: 'QQBot tok', intents: 1 << 25 } })
@@ -189,7 +120,6 @@ describe('qq', () => {
 
 describe('wechat family crypto', () => {
   const wechat: WechatConfig = { appId: 'wx-app', appSecret: 's', token: 'tok', encodingAesKey: AES_KEY }
-  const wecom: WecomConfig = { corpId: 'corp', agentId: '1', corpSecret: 's', token: 'tok', encodingAesKey: AES_KEY }
 
   it('round-trips the AES envelope and pins the receive id', () => {
     const cipher = defined(encryptWechatMessage(AES_KEY, '<xml>hello</xml>', 'wx-app'))
@@ -202,10 +132,6 @@ describe('wechat family crypto', () => {
     const signature = callbackSignature('tok', '111', 'nonce')
     expect(verifyWechatCallback('tok', signature, '111', 'nonce')).toBe(true)
     expect(verifyWechatCallback('tok', 'deadbeef', '111', 'nonce')).toBe(false)
-    const encrypt = defined(encryptWechatMessage(AES_KEY, '<xml/>', 'corp'))
-    const fourPart = callbackSignature('tok', '111', 'nonce', encrypt)
-    expect(verifyWecomCallback('tok', fourPart, '111', 'nonce', encrypt)).toBe(true)
-    expect(verifyWecomCallback('tok', signature, '111', 'nonce', encrypt)).toBe(false)
   })
 
   it('decrypts callback bodies and refuses foreign receive ids', () => {
@@ -218,18 +144,12 @@ describe('wechat family crypto', () => {
     expect(message).toMatchObject({ from: 'openid-1', msgType: 'text', content: 'hello', msgId: '9001' })
     expect(encrypt).toBeDefined()
     expect(readWechatCallback({ ...wechat, appId: 'other' }, body)).toBeUndefined()
-
-    const wecomXml = wechatBody('userid-1', 'corp', 'ping')
-    const wecomEncrypt = defined(encryptWechatMessage(AES_KEY, wecomXml, 'corp'))
-    expect(readWecomCallback(wecom, wecomEncrypt)).toEqual({ from: 'userid-1', content: 'ping', msgId: '9001' })
-    expect(readWecomCallback(wecom, defined(encryptWechatMessage(AES_KEY, wecomXml, 'elsewhere')))).toBeUndefined()
   })
 
   it('resolves the verification echoes: plaintext or decryptable cipher', () => {
     expect(resolveWechatVerifyEcho(wechat, 'plain-echo')).toBe('plain-echo')
     const cipherEcho = defined(encryptWechatMessage(AES_KEY, 'secret-echo', 'wx-app'))
     expect(resolveWechatVerifyEcho(wechat, cipherEcho)).toBe('secret-echo')
-    expect(resolveWecomVerifyEcho(wecom, defined(encryptWechatMessage(AES_KEY, 'wecom-echo', 'corp')))).toBe('wecom-echo')
   })
 })
 

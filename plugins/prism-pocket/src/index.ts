@@ -33,6 +33,7 @@ import { BotConversations, operatorAuthorized, readBotHostServices } from './bot
 import { BotOutbox, assistantTextOf } from './bots/outbox.ts'
 import { BotAskRelay } from './bots/asks.ts'
 import { InboundDedup } from './bots/shared/dedup.ts'
+import { connectorAccountsOf, trackConnectorStatus } from './bots/connectors.ts'
 import { POCKET_BOTS_PATH, listView, readBotAction, registerBotCallbackRoutes, runBotAction, type BotRouteDeps } from './bots/routes.ts'
 import type { BotChannelId, BotInbound } from './bots/types.ts'
 
@@ -226,7 +227,11 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
     }
   }
 
-  const routeDeps: BotRouteDeps = { store, supervisor, deliverInbound, warn }
+  // The connector channels' account status rides the bots list response; the
+  // registry is optional (the web-app bundle's connector-account row).
+  const accounts = connectorAccountsOf(ctx)
+  const connectorStatus = accounts === undefined ? undefined : trackConnectorStatus(ctx, accounts)
+  const routeDeps: BotRouteDeps = { store, supervisor, deliverInbound, warn, ...(connectorStatus !== undefined ? { connectorStatus } : {}) }
   ctx.effect(() => runtime.connection.fetch.register({
     path: POCKET_BOTS_PATH,
     methods: ['GET', 'POST'],

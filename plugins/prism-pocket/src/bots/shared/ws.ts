@@ -2,9 +2,9 @@
  * Reconnecting WebSocket for the outbound bot channels: capped exponential
  * backoff, reset on a successful open, and a heartbeat timer the adapter
  * arms per platform. `connect` runs per attempt — platforms that mint
- * one-time or short-lived URLs (Slack Socket Mode, DingTalk and Feishu
- * stream tickets, QQ gateways) re-mint inside it. IO only — every frame
- * transformation stays in the adapter's pure functions.
+ * one-time or short-lived URLs (Slack Socket Mode, QQ gateways) re-mint
+ * inside it. IO only — every frame transformation stays in the adapter's
+ * pure functions.
  *
  * @module @prism/prism-pocket/bots/shared
  */

@@ -3,11 +3,11 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/prism-pocket/README.md
 /prism-prism-pocket:
-  en: b5ba632135bcbf2b
-  zh: cd8abd22b9bc1c9f
+  en: 20962ef46029fb77
+  zh: 1c4e0aa5e77c7019
 /prism-prism-pocket/features:
-  en: a551e266ac348108
-  zh: 8bcbe27e800d48cf
+  en: 7d0227a1ee44e939
+  zh: 0d7ba6d7f559757f
 /prism-prism-pocket/install:
   en: 0ad53abfff8abce6
   zh: cc5b9c0689f725bf

@@ -54,6 +54,13 @@ export type PocketLocaleKey =
   | 'bots.title'
   | 'bots.intro'
   | 'bots.tag.callback'
+  | 'bots.connector.tag'
+  | 'bots.connector.connected'
+  | 'bots.connector.disconnected'
+  | 'bots.connector.checking'
+  | 'bots.connector.connecting'
+  | 'bots.connector.unavailable'
+  | 'bots.connector.unknown'
   | 'bots.configure'
   | 'bots.fold'
   | 'bots.save'
@@ -87,14 +94,7 @@ export type PocketLocaleKey =
   | 'field.appToken'
   | 'field.appId'
   | 'field.appSecret'
-  | 'field.region'
-  | 'field.region.feishu'
-  | 'field.region.lark'
-  | 'field.clientId'
   | 'field.clientSecret'
-  | 'field.corpId'
-  | 'field.agentId'
-  | 'field.corpSecret'
   | 'field.token'
   | 'field.encodingAesKey'
   | 'field.accessToken'
@@ -173,8 +173,15 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.blocked.noLan': 'No local-network address was found on this machine',
   'phone.blocked.noTunnelUrl': 'No tunnel hostname yet: enter the https address your tunnel serves',
   'bots.title': 'Bot channels',
-  'bots.intro': 'Connect a chat bot on any channel below; messages you send the bot drive this workspace, replies come back to the chat, and pending approvals or questions reach you as numbered choices.',
+  'bots.intro': 'Connect a chat bot on any channel below; messages you send the bot drive this workspace, replies come back to the chat, and pending approvals or questions reach you as numbered choices. The channels marked as upstream connectors are connected on the Plugins page instead.',
   'bots.tag.callback': 'callback',
+  'bots.connector.tag': 'upstream connector',
+  'bots.connector.connected': 'Connected',
+  'bots.connector.disconnected': 'Not connected',
+  'bots.connector.checking': 'Checking',
+  'bots.connector.connecting': 'Connecting',
+  'bots.connector.unavailable': 'Unavailable',
+  'bots.connector.unknown': 'Unknown',
   'bots.configure': 'Configure',
   'bots.fold': 'Collapse',
   'bots.save': 'Save',
@@ -208,14 +215,7 @@ export const en: Record<PocketLocaleKey, string> = {
   'field.appToken': 'App-level token',
   'field.appId': 'App ID',
   'field.appSecret': 'App secret',
-  'field.region': 'Region',
-  'field.region.feishu': 'Feishu (China)',
-  'field.region.lark': 'Lark (Global)',
-  'field.clientId': 'Client ID',
   'field.clientSecret': 'Client secret',
-  'field.corpId': 'Corp ID',
-  'field.agentId': 'Agent ID',
-  'field.corpSecret': 'Corp secret',
   'field.token': 'Callback token',
   'field.encodingAesKey': 'Encoding AES key',
   'field.accessToken': 'Access token',
@@ -224,10 +224,10 @@ export const en: Record<PocketLocaleKey, string> = {
   'hint.telegram': 'Create a bot with @BotFather and paste the token it returns.',
   'hint.discord': 'Create an application in the Developer Portal, enable the Message Content intent, and paste the bot token.',
   'hint.slack': 'Create a Slack app with Socket Mode and the Messages event enabled; paste the bot token (xoxb-) and the app-level token (xapp-).',
-  'hint.feishu': 'Create a custom app on the open platform, enable the long connection and im:message scopes, and paste the App ID and App Secret.',
-  'hint.dingtalk': 'Create an internal app robot on the open platform (Stream Mode) and paste the client ID and secret.',
+  'hint.feishu': 'This channel is implemented by the upstream connector around lark-cli: connect the account on the Plugins page. Pocket no longer delivers this channel\'s messages into a session.',
+  'hint.dingtalk': 'This channel is implemented by the upstream connector around dws: connect the account on the Plugins page. Pocket no longer delivers this channel\'s messages into a session.',
   'hint.qq': 'Create a bot on q.qq.com, set up the sandbox, and paste the AppID and AppSecret.',
-  'hint.wecom': 'Create a self-built app in the WeCom console, configure the message callback with the URL below, and fill every field.',
+  'hint.wecom': 'This channel is implemented by the upstream connector around wecom-cli: connect the account on the Plugins page. Pocket no longer delivers this channel\'s messages into a session.',
   'hint.wechat': 'Use an Official Account (or the sandbox test account) in encrypted mode with the callback URL below, and fill every field.',
   'hint.whatsapp': 'Create a Meta app with WhatsApp Cloud API, register the webhook below, and fill every field.',
   'push.title': 'Notifications',
@@ -295,8 +295,15 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.blocked.noLan': '这台机器上没有找到局域网地址',
   'phone.blocked.noTunnelUrl': '还没有隧道域名：填入隧道对外提供的 https 地址',
   'bots.title': 'Bot 渠道',
-  'bots.intro': '在下面的任一渠道接入聊天机器人：你在聊天里发的消息会驱动这个工作区，回复直接回到聊天，待处理的审批和提问会以编号选项送达。',
+  'bots.intro': '在下面的任一渠道接入聊天机器人：你在聊天里发的消息会驱动这个工作区，回复直接回到聊天，待处理的审批和提问会以编号选项送达。标注为「上游 connector」的渠道改为在 Plugins 页连接。',
   'bots.tag.callback': '回调',
+  'bots.connector.tag': '上游 connector',
+  'bots.connector.connected': '已连接',
+  'bots.connector.disconnected': '未连接',
+  'bots.connector.checking': '检查中',
+  'bots.connector.connecting': '连接中',
+  'bots.connector.unavailable': '不可用',
+  'bots.connector.unknown': '未知',
   'bots.configure': '配置',
   'bots.fold': '收起',
   'bots.save': '保存',
@@ -330,14 +337,7 @@ export const zh: Record<PocketLocaleKey, string> = {
   'field.appToken': 'App-Level Token',
   'field.appId': 'App ID',
   'field.appSecret': 'App Secret',
-  'field.region': '区域',
-  'field.region.feishu': '飞书（中国）',
-  'field.region.lark': 'Lark（全球）',
-  'field.clientId': 'Client ID',
   'field.clientSecret': 'Client Secret',
-  'field.corpId': '企业 ID',
-  'field.agentId': 'AgentId',
-  'field.corpSecret': '应用 Secret',
   'field.token': '回调 Token',
   'field.encodingAesKey': 'EncodingAESKey',
   'field.accessToken': 'Access Token',
@@ -346,10 +346,10 @@ export const zh: Record<PocketLocaleKey, string> = {
   'hint.telegram': '在 @BotFather 创建机器人，把它返回的 token 粘贴到下面。',
   'hint.discord': '在 Developer Portal 创建应用，开启 Message Content Intent，把 Bot Token 粘贴到下面。',
   'hint.slack': '创建 Slack 应用：启用 Socket Mode 与 Messages 事件，粘贴 Bot Token（xoxb-）与 App-Level Token（xapp-）。',
-  'hint.feishu': '在开放平台创建企业自建应用，开通长连接与 im:message 权限，粘贴 App ID 与 App Secret。',
-  'hint.dingtalk': '在开放平台创建企业内部应用机器人（Stream 模式），粘贴 Client ID 与 Client Secret。',
+  'hint.feishu': '此通道由上游基于 lark-cli 的 connector 实现：到 Plugins 页连接账号。口袋不再把这个通道的消息投递到会话。',
+  'hint.dingtalk': '此通道由上游基于 dws 的 connector 实现：到 Plugins 页连接账号。口袋不再把这个通道的消息投递到会话。',
   'hint.qq': '在 q.qq.com 创建机器人，配置沙箱环境，粘贴 AppID 与 AppSecret。',
-  'hint.wecom': '在企业微信后台创建自建应用，用下面的地址配置接收消息回调，并填齐全部字段。',
+  'hint.wecom': '此通道由上游基于 wecom-cli 的 connector 实现：到 Plugins 页连接账号。口袋不再把这个通道的消息投递到会话。',
   'hint.wechat': '使用公众号（或测试号），消息加密设为安全模式，用下面的地址配置服务器，并填齐全部字段。',
   'hint.whatsapp': '在 Meta 开发者平台创建应用并接入 WhatsApp Cloud API，用下面的地址配置 Webhook，并填齐全部字段。',
   'push.title': '通知',
