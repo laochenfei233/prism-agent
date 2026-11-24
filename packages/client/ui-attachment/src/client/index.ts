@@ -13,6 +13,18 @@ import { MessageImages, MessageImagesContent } from './MessageImages.tsx'
 
 type MessageImagesInjected = SlotFactoryMap['conversation.images.content']['inject']
 
+/** Minimal workspace-registration face used to adopt a dropped folder. */
+interface WorkspaceProjectRegistration {
+  /** Register or resolve the workspace over an existing directory. */
+  create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
+}
+
+/** Minimal workspace-navigation face used to open the adopted project. */
+interface WorkspaceProjectNavigation {
+  /** Connect the workspace and open a session in it. */
+  openWorkspace(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
+}
+
 /** Slot registry required by the attachment presentation plugin. */
 export const inject = ['slots', 'fileDrag']
 
@@ -29,7 +41,16 @@ export function apply(ctx: ClientContext): void {
   }, MessageImagesContent)
   ctx.slots.inject('conversation.input.attachments', () => ctx.slots.register({
     name: 'conversation.input.attachments',
-    inject: (): ComposerAttachmentsInjected => ({ readFileDrag: ctx.fileDrag.read }),
+    inject: (): ComposerAttachmentsInjected => ({
+      readFileDrag: ctx.fileDrag.read,
+      // A dropped folder becomes an independent project through the same
+      // create-then-open pair the sidebar's add-workspace flow uses.
+      createProjectFromDirectory: async (path: string) => {
+        const workspaces = ctx.get('workspaces') as WorkspaceProjectRegistration
+        const workspace = await workspaces.create({ path })
+        await (ctx.get('uiWorkspace') as WorkspaceProjectNavigation).openWorkspace(workspace.workspaceId)
+      },
+    }),
     locale: 'conversation',
   }, ComposerAttachments))
   ctx.slots.inject('conversation.chat.message.images', () => ctx.slots.register({

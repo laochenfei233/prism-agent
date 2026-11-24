@@ -47,6 +47,8 @@ Internal Web image drags do not show the full-page overlay. A foreign or expired
 
 While an external file drag is over the page, the full-viewport overlay announces the drop: illustration, title, and a limits line when drops are accepted. The overlay only shows state — the owner's document-level listeners decide accept or reject, and the drop handler reports which dropped members are directories through the entry API so the owner can cite or refuse them.
 
+On the desktop shell, a drop that carries a directory asks whether to register it as an independent project: confirming creates the workspace over the folder's original path and opens it, while the reference choice keeps the composer's citation chip. A browser drop has no host path and keeps the desktop-only guidance.
+
 -----
 
 <a id="understand-the-implementation"></a>
