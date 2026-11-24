@@ -1,4 +1,4 @@
-/** Sidebar action that imports a DeepSeek chat export uploaded from the browser into a chosen Workspace. */
+/** The DeepSeek export import dialog, the sidebar action wrapper that opens it, and their types. */
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
@@ -51,8 +51,8 @@ export type ImportSessionsActionProps =
 type Translate = ImportSessionsActionProps['t']
 
 /**
- * Props the import dialog reads. Shared by the sidebar action and the
- * import-page source card, which both open this dialog.
+ * Props the import dialog reads. The import-page source card supplies them;
+ * the retired sidebar action keeps the same face for its dialog tests.
  */
 export type ImportDialogProps =
   & InjectFace<DeepseekChatImportInjected>
