@@ -2,8 +2,8 @@
 feature: schedule-consolidation
 status: delivered
 updated: 2026-11-24
-branch: feat/schedule-consolidation
-commits: 待交付时回填
+branch: master
+commits: c74c424c37
 ---
 
 # Scheduling consolidation: upstream Schedule wins, Cron retires
