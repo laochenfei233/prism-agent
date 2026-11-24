@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** The Remote namespace and the sidebar action leave with the plugin; imports check limits, upload, then always refresh. */
+/** The Remote namespace and the import-page source card leave with the plugin; imports check limits, upload, then always refresh. */
 import assert from 'node:assert/strict'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -49,7 +49,13 @@ async function fixture(
   ctx.provide('sessions', { refresh } as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   await ctx.plugin(SlotRegistry)
-  ctx.slots.register({ name: 'root', children: { 'sidebar.session.action': { kind: 'hoc', scope: 'root' } } } as never, () => null)
+  ctx.slots.register({
+    name: 'root',
+    children: {
+      'sidebar.session.action': { kind: 'hoc', scope: 'root' },
+      'settings.sessionImport.source': { kind: 'list', scope: 'root' },
+    },
+  } as never, () => null)
   return { ctx, unmount, refresh }
 }
 
@@ -58,7 +64,7 @@ function importFace(value: Record<string, unknown>): asserts value is Record<str
 }
 
 function injected(ctx: Context): DeepseekChatImportInjected {
-  const entry = ctx.slots.entries('sidebar.session.action')[0]
+  const entry = ctx.slots.entries('settings.sessionImport.source')[0]
   assert(entry !== undefined && typeof entry.inject === 'function')
   const face = entry.inject()
   importFace(face)
@@ -72,15 +78,17 @@ const answer = (value: UploadAnswer) => { upload.answer = value }
 it('uploads within the limit, refreshes the Session list, and withdraws both contributions', async () => {
   const b = await fixture()
   const dispose = await mountImport(b.ctx, contribution)
-  expect(b.ctx.slots.spec('sidebar.session.action')).toEqual({ kind: 'hoc', scope: 'root' })
-  expect(b.ctx.slots.entries('sidebar.session.action').map(entry => [entry.options.id, entry.locale]))
-    .toEqual([['deepseek-chat-import', 'deepseekChatImport']])
+  expect(b.ctx.slots.spec('settings.sessionImport.source')).toEqual({ kind: 'list', scope: 'root' })
+  expect(b.ctx.slots.entries('settings.sessionImport.source').map(entry => [entry.options.id, entry.locale]))
+    .toEqual([['deepseek-export', 'deepseekChatImport']])
+  expect(b.ctx.slots.entries('sidebar.session.action')).toEqual([])
   answer({ ok: true, value: RESULT })
   expect(await run(b.ctx)).toEqual({ ok: true, result: RESULT })
   expect(uploadArchive).toHaveBeenCalledWith(expect.any(File), W1, expect.any(Function), expect.any(AbortSignal))
   expect(b.refresh).toHaveBeenCalledOnce()
   expect(b.ctx.locale.bind('deepseekChatImport')('action.label')).toBe('Import DeepSeek chats')
   await dispose()
+  expect(b.ctx.slots.entries('settings.sessionImport.source')).toEqual([])
   expect(b.ctx.slots.entries('sidebar.session.action')).toEqual([])
   expect(b.unmount).toHaveBeenCalledOnce()
 })
@@ -124,8 +132,10 @@ it('loads the browser entry through its generated Remote contribution', async ()
   expect(browser.inject).toEqual(inject)
   const fiber = b.ctx.plugin({ inject: [...browser.inject], apply: browser.apply })
   await fiber
-  expect(b.ctx.slots.entries('sidebar.session.action')).toHaveLength(1)
+  expect(b.ctx.slots.entries('settings.sessionImport.source')).toHaveLength(1)
+  expect(b.ctx.slots.entries('sidebar.session.action')).toEqual([])
   await fiber.dispose()
+  expect(b.ctx.slots.entries('settings.sessionImport.source')).toEqual([])
   expect(b.ctx.slots.entries('sidebar.session.action')).toEqual([])
   expect(b.unmount).toHaveBeenCalledOnce()
 })
