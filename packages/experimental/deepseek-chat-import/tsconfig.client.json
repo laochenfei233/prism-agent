@@ -21,6 +21,7 @@
     { "path": "../../client/ui-sidebar" },
     { "path": "../../client/ui-workspace/tsconfig.client.json" },
     { "path": "../../client/ui-slots" },
+    { "path": "../../session-query/session-import/tsconfig.client.json" },
     { "path": "../../typert/protocol" }
   ]
 }

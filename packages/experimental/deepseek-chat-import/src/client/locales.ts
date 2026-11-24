@@ -6,6 +6,8 @@ export const NS = 'deepseekChatImport'
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'action.label': '导入 DeepSeek 会话',
+  'source.name': 'DeepSeek 网页版导出（ZIP）',
+  'source.description': '导入 chat.deepseek.com 导出的 deepseek_data-*.zip，保留原标题、时间、推理与搜索卡片，可继续对话。',
   'dialog.title': '导入 DeepSeek 会话记录',
   'dialog.description': '选择从 DeepSeek 官网导出的 ZIP 文件（deepseek_data-*.zip），以及接收这些会话的工作区。',
   'dialog.file': '导出文件',
@@ -44,6 +46,8 @@ export type DeepseekChatImportKey = keyof typeof zh
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
   'action.label': 'Import DeepSeek chats',
+  'source.name': 'DeepSeek web export (ZIP)',
+  'source.description': 'Import a deepseek_data-*.zip exported from chat.deepseek.com; titles, times, reasoning, and search cards are kept, and the conversations continue.',
   'dialog.title': 'Import DeepSeek chat history',
   'dialog.description': 'Choose the ZIP file exported from the DeepSeek website (deepseek_data-*.zip) and the workspace that receives the sessions.',
   'dialog.file': 'Export file',
@@ -79,6 +83,8 @@ export const en = {
 /** Japanese dictionary, checked complete against the zh key set. */
 export const ja = {
   'action.label': 'DeepSeek のチャットをインポート',
+  'source.name': 'DeepSeek ウェブエクスポート（ZIP）',
+  'source.description': 'chat.deepseek.com からエクスポートした deepseek_data-*.zip をインポートします。タイトル・日時・推論・検索カードを保持し、会話を続けられます。',
   'dialog.title': 'DeepSeek のチャット履歴をインポート',
   'dialog.description': 'DeepSeek の Web サイトからエクスポートした ZIP ファイル（deepseek_data-*.zip）と、セッションを受け取るワークスペースを選択してください。',
   'dialog.file': 'エクスポートファイル',
@@ -114,6 +120,8 @@ export const ja = {
 /** Spanish dictionary, checked complete against the zh key set. */
 export const es = {
   'action.label': 'Importar chats de DeepSeek',
+  'source.name': 'Exportación web de DeepSeek (ZIP)',
+  'source.description': 'Importa un deepseek_data-*.zip exportado desde chat.deepseek.com; conserva títulos, tiempos, razonamiento y tarjetas de búsqueda, y las conversaciones pueden continuar.',
   'dialog.title': 'Importar el historial de chats de DeepSeek',
   'dialog.description': 'Elige el archivo ZIP exportado desde el sitio web de DeepSeek (deepseek_data-*.zip) y el espacio de trabajo que recibirá las sesiones.',
   'dialog.file': 'Archivo exportado',
@@ -149,6 +157,8 @@ export const es = {
 /** French dictionary, checked complete against the zh key set. */
 export const fr = {
   'action.label': 'Importer des discussions DeepSeek',
+  'source.name': 'Export web DeepSeek (ZIP)',
+  'source.description': 'Importez un deepseek_data-*.zip exporté depuis chat.deepseek.com ; titres, horodatages, raisonnement et cartes de recherche sont conservés, et les conversations peuvent continuer.',
   'dialog.title': 'Importer l’historique des discussions DeepSeek',
   'dialog.description': 'Choisissez le fichier ZIP exporté depuis le site DeepSeek (deepseek_data-*.zip) et l’espace de travail qui recevra les sessions.',
   'dialog.file': 'Fichier exporté',
@@ -184,6 +194,8 @@ export const fr = {
 /** German dictionary, checked complete against the zh key set. */
 export const de = {
   'action.label': 'DeepSeek-Chats importieren',
+  'source.name': 'DeepSeek-Web-Export (ZIP)',
+  'source.description': 'Importiere eine von chat.deepseek.com exportierte deepseek_data-*.zip; Titel, Zeiten, Reasoning und Suchkarten bleiben erhalten, und die Unterhaltungen können fortgesetzt werden.',
   'dialog.title': 'DeepSeek-Chatverlauf importieren',
   'dialog.description': 'Wähle die von der DeepSeek-Website exportierte ZIP-Datei (deepseek_data-*.zip) und den Arbeitsbereich, der die Sitzungen erhält.',
   'dialog.file': 'Exportdatei',
@@ -219,6 +231,8 @@ export const de = {
 /** Russian dictionary, checked complete against the zh key set. */
 export const ru = {
   'action.label': 'Импортировать чаты DeepSeek',
+  'source.name': 'Веб-экспорт DeepSeek (ZIP)',
+  'source.description': 'Импортируйте deepseek_data-*.zip, экспортированный с chat.deepseek.com; сохраняются заголовки, время, рассуждения и карточки поиска, а беседы можно продолжить.',
   'dialog.title': 'Импорт истории чатов DeepSeek',
   'dialog.description': 'Выберите ZIP-файл, экспортированный с сайта DeepSeek (deepseek_data-*.zip), и рабочее пространство, в которое попадут сеансы.',
   'dialog.file': 'Файл экспорта',
@@ -254,6 +268,8 @@ export const ru = {
 /** Portuguese dictionary, checked complete against the zh key set. */
 export const pt = {
   'action.label': 'Importar conversas do DeepSeek',
+  'source.name': 'Exportação web do DeepSeek (ZIP)',
+  'source.description': 'Importe um deepseek_data-*.zip exportado do chat.deepseek.com; títulos, horários, raciocínio e cartões de busca são preservados, e as conversas podem continuar.',
   'dialog.title': 'Importar histórico de conversas do DeepSeek',
   'dialog.description': 'Escolha o arquivo ZIP exportado do site do DeepSeek (deepseek_data-*.zip) e o espaço de trabalho que receberá as sessões.',
   'dialog.file': 'Arquivo exportado',

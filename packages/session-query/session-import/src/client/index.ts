@@ -25,6 +25,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Cross-agent import page copy. */
     'settings.sessionImport': ImportLocaleKey
   }
+  interface SlotMap {
+    /**
+     * One foreign-source card shown ahead of the built-in stores on the
+     * cross-agent import page. Contributions are optional feature packages;
+     * the page orders them by `order` before its own list.
+     */
+    'settings.sessionImport.source': { kind: 'list'; scope: 'root' }
+  }
 }
 
 /** Dictionary namespace owned by this plugin. */
@@ -43,5 +51,6 @@ export function apply(ctx: Context): void {
     name: 'settings.data.page',
     id: 'cross-agent',
     locale: NS,
+    children: { 'settings.sessionImport.source': { kind: 'list', scope: 'root' } },
   }, ImportSection))
 }

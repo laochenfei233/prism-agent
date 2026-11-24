@@ -164,3 +164,69 @@
   margin-top: 16px;
   accent-color: var(--dsw-alias-state-business-primary);
 }
+
+/* Import-page source card: mirrors the cross-agent shelf's card language so
+   the contributed store reads like the built-in ones. */
+.sourceCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-xl);
+  background: var(--dsw-alias-settings-card-fill);
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s, background .16s;
+}
+
+@media (hover: hover) {
+  .sourceCard:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.sourceCard:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+}
+
+.sourceCard > svg {
+  flex: none;
+  margin-left: auto;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.sourceMark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.sourceBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sourceName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sourceDescription {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow-wrap: anywhere;
+}

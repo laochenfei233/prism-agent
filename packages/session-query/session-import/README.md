@@ -54,6 +54,8 @@ The package looks for each store at its documented root under the OS home. A sou
 | Gemini CLI | `~/.gemini/tmp` |
 | ZCode | `~/.zcode` |
 
+Optional bundles can contribute additional source cards through the `settings.sessionImport.source` list slot; contributed cards render ahead of the built-in stores, and a deployment without contributions keeps the page exactly as listed above.
+
 ### Configuration
 
 | Field | Default | Meaning |

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ImportSection, type ImportSectionProps } from '../src/client/ImportSection.tsx'
@@ -50,11 +51,19 @@ function requestInput(input: RequestInfo | URL): string {
   return input instanceof URL ? input.href : input.url
 }
 
-const props = { close: () => {}, t: translate } as ImportSectionProps
+/** The contributed source card a test installs, standing in for the extension slot. */
+let extension: ReactNode = null
+
+const props = {
+  close: () => {},
+  t: translate,
+  renderSlot: (key: string) => key === 'settings.sessionImport.source' ? extension : null,
+} as ImportSectionProps
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  extension = null
 })
 
 describe('ImportSection', () => {
@@ -106,5 +115,22 @@ describe('ImportSection', () => {
     await waitFor(() => { expect(screen.getByText(en.resultTitle)).toBeTruthy() })
     expect(screen.queryByRole('dialog', { name: en.mergeTitle })).toBeNull()
     expect(calls.at(-1)).not.toContain('"confirmMerge":true')
+  })
+
+  it('renders a contributed source card ahead of the built-in sources and nothing extra without one', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(candidates))))
+
+    extension = <button type="button">DeepSeek 网页版导出（ZIP）</button>
+    render(<ImportSection {...props} />)
+    await screen.findByText('Claude Code')
+    const contributed = screen.getByText('DeepSeek 网页版导出（ZIP）')
+    const builtIn = screen.getByText('Claude Code')
+    expect(contributed.compareDocumentPosition(builtIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    cleanup()
+    extension = null
+    render(<ImportSection {...props} />)
+    await screen.findByText('Claude Code')
+    expect(screen.queryByText('DeepSeek 网页版导出（ZIP）')).toBeNull()
   })
 })
