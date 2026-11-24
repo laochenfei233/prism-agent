@@ -326,7 +326,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `remoteAccess` · `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:37`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:40`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -2088,7 +2088,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-host-webserver`
 
-- `source`: [`packages/host/webserver/src/index.ts:97`](../packages/host/webserver/src/index.ts)
+- `source`: [`packages/host/webserver/src/index.ts:98`](../packages/host/webserver/src/index.ts)
 
 ```ts config-catalog
 /** Web server listen, TLS, and response-compression config. */
@@ -2103,6 +2103,20 @@ export interface Config {
    * load: it would expose the port on every interface at once.
    */
   host: string
+  /**
+   * Extra concrete addresses that bind the same port next to `host`: a phone
+   * on the machine's network reaches `additionalHosts` while the primary keeps
+   * serving its own audience. Each entry follows the `host` rules (concrete
+   * IPv4/IPv6 literal, wildcard rejected) and must not repeat `host` or another
+   * entry — duplicates fail the load. A listen on one entry can still fail
+   * after the load — the address left the machine between composition and
+   * listen (DHCP), or another socket holds the port — and that failure logs a
+   * warning and drops only that address: the primary listener and the entries
+   * that did bind keep serving. Requires an explicit `port`, because port 0
+   * asks the OS for a fresh port per listener and the addresses would then
+   * serve different ports.
+   */
+  additionalHosts?: string[]
   /** Listen port; zero requests an OS-assigned port. */
   port: number
   /**
@@ -5106,6 +5120,33 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
+
+<!-- BEGIN GENERATED config-catalog:@prism/prism-autonomy -->
+<a id="prismprism-autonomy"></a>
+
+## `@prism/prism-autonomy`
+
+- `inject`: `sessionProjections` · `permissionPresets` · `agents`
+- `source`: [`packages/autonomy/prism-autonomy/src/config.ts:32`](../packages/autonomy/prism-autonomy/src/config.ts)
+
+```ts config-catalog
+/** The autonomy plugin's configuration as the plugin receives it. */
+export interface Config {
+  /** The permission preset that engages autonomous answering. */
+  readonly preset: string
+  /** Requests matching any matcher keep their human decision; the rest auto-answer. */
+  readonly requireHuman: readonly RequireHumanMatcher[]
+}
+
+/** One require-human rule: a request matching every set field stays with the human. */
+export interface RequireHumanMatcher {
+  /** Match the asking tool's name; unset matches every tool. */
+  readonly tool?: string
+  /** Match the asker's reason by prefix; unset matches every reason. */
+  readonly reasonPrefix?: string
+}
+```
+<!-- END GENERATED config-catalog:@prism/prism-autonomy -->
 
 <!-- BEGIN GENERATED config-catalog:@prism/prism-backup -->
 <a id="prismprism-backup"></a>
