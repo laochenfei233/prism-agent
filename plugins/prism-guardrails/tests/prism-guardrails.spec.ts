@@ -17,6 +17,7 @@ import { resolveConfig, configVersion } from '../src/config.ts'
 import type { Config } from '../src/config.ts'
 import { createLedger } from '../src/decision.ts'
 import * as Guardrails from '../src/index.ts'
+import { suggestToolNames, toolNameHint } from '../src/tool-hints.ts'
 
 /**
  * Behavior suite for the capability-hardening bundle.
@@ -139,6 +140,7 @@ describe('configuration validation', () => {
       maxStepsPerTurn: undefined,
       unfinishedTodoContinuations: undefined,
       skillInvocationGuidance: true,
+      toolNameSuggestions: true,
       writeTools: undefined,
       maxWrittenFilesPerTurn: undefined,
       requirePonytailUpgradePaths: false,
@@ -163,6 +165,7 @@ describe('configuration validation', () => {
       maxStepsPerTurn: 20,
       unfinishedTodoContinuations: 2,
       skillInvocationGuidance: false,
+      toolNameSuggestions: false,
       writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }],
       maxWrittenFilesPerTurn: 4,
       requirePonytailUpgradePaths: true,
@@ -182,6 +185,7 @@ describe('configuration validation', () => {
     expect(resolved.maxStepsPerTurn).toBe(20)
     expect(resolved.unfinishedTodoContinuations).toBe(2)
     expect(resolved.skillInvocationGuidance).toBe(false)
+    expect(resolved.toolNameSuggestions).toBe(false)
     expect(resolved.writeTools?.get('write')).toEqual({ pathArgument: 'path', contentArgument: 'content' })
     expect(resolved.maxWrittenFilesPerTurn).toBe(4)
     expect(resolved.requirePonytailUpgradePaths).toBe(true)
@@ -252,6 +256,7 @@ describe('configuration validation', () => {
     ['a negative todo-continuation count', { unfinishedTodoContinuations: -1 }, 'integer >= 0'],
     ['a fractional todo-continuation count', { unfinishedTodoContinuations: 1.5 }, 'integer >= 0'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
+    ['a non-boolean suggestion switch', { toolNameSuggestions: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
     ['an unknown mode', { mode: 'dry-run' }, 'mode must be "enforce" or "observe"'],
     ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
@@ -2057,5 +2062,140 @@ describe('stuck nudge', () => {
     // One judge call per turn: the quota resets when the loop opens a turn,
     // whatever message claimed it.
     expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(2)
+  })
+})
+
+describe('unknown tool name suggestions', () => {
+  /** Every tool result the loop committed, in call order. */
+  function recordCommittedResults(ctx: Context): ToolExecutionResult[] {
+    const results: ToolExecutionResult[] = []
+    ctx.on('tools/post-execute', (_exec, result, next) => {
+      results.push(result)
+      return next()
+    })
+    return results
+  }
+
+  /** Drive one turn whose model makes exactly one tool call and then stops. */
+  async function turnCalling(ctx: Context, agent: Agent, tool: string, callId: string): Promise<void> {
+    const adapter = new MockAdapter([toolCallResponse(callId, tool, {}), textResponse('done')])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+  }
+
+  it('tells the model the near names for a missed tool call', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    ctx.tools.register(fixture('read', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-hit'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — did you mean "bash"?')
+    expect(missed !== undefined && textOf(missed)).toBe('Error: unknown tool "bashh" — did you mean "bash"?')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+    expect(missed?.error.info?.name).toBe('ToolNotFoundError')
+    expect(runs).toEqual([])
+  })
+
+  it('lists several near names closest first and stops at three', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    for (const name of ['bash', 'bashx', 'bashy', 'push']) ctx.tools.register(fixture(name, runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-many'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — similar tools: "bash", "bashx", "bashy"')
+  })
+
+  it('keeps the original message when nothing registered is near', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-none'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'zzzzzz', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "zzzzzz"')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+  })
+
+  it('leaves a correctly named call untouched', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-exact'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bash', 'c1')
+
+    const hit = results.find(result => !result.isError)
+    expect(textOf(hit)).toBe('bash ran')
+    expect(runs).toEqual(['bash'])
+  })
+
+  it('keeps the pipeline message and info when the switch is off', async () => {
+    const ctx = await harness({ toolNameSuggestions: false })
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-off'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh"')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+    expect(missed?.error.info?.name).toBe('ToolNotFoundError')
+  })
+
+  it('enhances a miss a downstream listener rethrows as an error', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-thrown'), { provider: 'mock', model: 'mock' })
+    ctx.on('tools/execute', async (_exec, next) => {
+      const result = await next()
+      if (!result.isError || result.error.info?.code !== 'UNKNOWN_TOOL') return result
+      const rethrown = new Error(result.error.message)
+      rethrown.name = 'ToolNotFoundError'
+      throw rethrown
+    })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — did you mean "bash"?')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+  })
+})
+
+describe('tool suggestion helpers', () => {
+  it('ranks candidates by distance and caps the list at three', () => {
+    expect(suggestToolNames('bashh', ['push', 'bashy', 'bashx', 'bash'])).toEqual(['bash', 'bashy', 'bashx'])
+  })
+
+  it('credits a case-insensitive substring overlap', () => {
+    expect(suggestToolNames('WebFetch', ['webfetch'])).toEqual(['webfetch'])
+    expect(suggestToolNames('web_fetch', ['fetch'])).toEqual(['fetch'])
+  })
+
+  it('returns nothing when every candidate is outside the budget', () => {
+    expect(suggestToolNames('totally-unrelated-name', ['bash', 'read', 'write'])).toEqual([])
+  })
+
+  it('renders one candidate as a did-you-mean and several as a list', () => {
+    expect(toolNameHint(['bash'])).toBe('did you mean "bash"?')
+    expect(toolNameHint(['bash', 'read'])).toBe('similar tools: "bash", "read"')
+    expect(toolNameHint([])).toBe('')
   })
 })

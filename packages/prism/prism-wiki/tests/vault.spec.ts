@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import { MALFORMED_PAGES, writeWikiFile } from './fixtures/vault-fixtures.ts'
 import {
   VaultFiles, WikiVaultError, extractWikiLinks, lintVault, parsePageText, revisionOf,
   serializePageText,
@@ -522,5 +523,385 @@ describe('a malformed page', () => {
 
   it('is still refused by readPage', async () => {
     await expect(files.readPage(page('concepts/broken.md'))).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+  })
+})
+
+describe('layout adoption edges', () => {
+  it('refuses a root that is a file', async () => {
+    const filePath = join(root, 'not-a-vault')
+    await writeFile(filePath, 'plain file\n', 'utf8')
+
+    await expect(new VaultFiles(filePath).ensureLayout()).rejects.toMatchObject({ code: 'WIKI_ROOT_NOT_VAULT' })
+  })
+
+  it('refuses to read a schema the vault does not hold', async () => {
+    await files.ensureLayout()
+    await rm(join(root, 'AGENTS.md'), { force: true })
+
+    await expect(files.readSchema()).rejects.toMatchObject({ code: 'WIKI_ROOT_NOT_VAULT' })
+  })
+})
+
+describe('page text edges', () => {
+  it('rejects a frontmatter block that is never closed', () => {
+    const text = '---\ntitle: Open\ntype: concept\ntags: [x]\nupdated: 2026-10-07\nstatus: current\n\nBody without a close.\n'
+
+    expect(() => parsePageText(text, page('concepts/open.md'))).toThrow(/closed/u)
+  })
+
+  it.each(MALFORMED_PAGES)('rejects a page with $name', ({ text, field }) => {
+    expect(() => parsePageText(text, page('concepts/malformed.md'))).toThrow(new RegExp(field, 'u'))
+  })
+
+  it('skips link targets that carry no name', () => {
+    expect(extractWikiLinks('See [[#anchor]], [[|display]], and [[ ]].')).toEqual([])
+  })
+
+  it('serializes an empty body with no gap below the block', () => {
+    const text = serializePageText(frontmatter(), '')
+
+    expect(text.endsWith('---\n')).toBe(true)
+    expect(parsePageText(text, page('concepts/empty.md')).body).toBe('')
+  })
+
+  it('quotes scalars the parser would otherwise misread', () => {
+    const text = serializePageText(frontmatter({ title: 'Alpha: "the" first' }), 'Body.')
+
+    expect(parsePageText(text, page('concepts/quoted.md')).frontmatter.title).toBe('Alpha: "the" first')
+  })
+})
+
+describe('page path and source path guards', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+  })
+
+  it('refuses page paths that leave the vault or lack the suffix', async () => {
+    for (const bad of ['../outside.md', 'C:/evil.md', 'concepts/./x.md', 'concepts/../evil.md', 'concepts/x.txt', '']) {
+      await expect(files.readPage(page(bad))).rejects.toMatchObject({ code: 'WIKI_PAGE_NOT_FOUND' })
+      expect(await files.hasPage(page(bad))).toBe(false)
+    }
+  })
+
+  it('refuses a draft whose path is not a vault page path', async () => {
+    await expect(files.writePage({ path: page('concepts/../evil.md'), frontmatter: frontmatter(), body: 'Body.' }, 'write'))
+      .rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+    await expect(files.writePage({ path: page(''), frontmatter: frontmatter(), body: 'Body.' }, 'write'))
+      .rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+  })
+
+  it('refuses unusable raw source paths', async () => {
+    for (const bad of ['', 'assets/picture.png', '../evil.md', '/abs.md', 'C:/evil.md', '..\\evil.md']) {
+      await expect(files.addSource(source(bad), 'text')).rejects.toMatchObject({ code: 'WIKI_SOURCE_NOT_FOUND' })
+      await expect(files.readSource(source(bad), 10)).rejects.toMatchObject({ code: 'WIKI_SOURCE_NOT_FOUND' })
+    }
+  })
+
+  it('reads a source slice that ends between surrogate pairs', async () => {
+    await files.addSource(source('pairs.md'), `${'x'.repeat(99)}𝌆${'y'.repeat(50)}`)
+
+    const { text, truncated } = await files.readSource(source('pairs.md'), 100)
+
+    expect(truncated).toBe(true)
+    expect(text).toHaveLength(99)
+  })
+
+  it('lists no sources when raw/ is absent', async () => {
+    await rm(join(root, 'raw'), { recursive: true, force: true })
+
+    expect(await files.listSources()).toEqual([])
+  })
+})
+
+describe('frontmatter validation on write', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+  })
+
+  const invalidFrontmatter: ReadonlyArray<[string, Record<string, unknown>]> = [
+    ['an empty title', { title: '   ' }],
+    ['an unknown type', { type: 'nonsense' }],
+    ['an unknown status', { status: 'maybe' }],
+    ['a non-ISO date', { updated: 'October 7' }],
+    ['a confidence below zero', { confidence: -0.5 }],
+    ['a confidence above one', { confidence: 1.5 }],
+    ['a non-finite confidence', { confidence: Number.NaN }],
+  ]
+
+  it.each(invalidFrontmatter)('refuses a draft with %s', async (_name, overrides) => {
+    // The table deliberately carries values the frontmatter type forbids.
+    await expect(files.writePage({
+      path: page('concepts/bad.md'), frontmatter: frontmatter(overrides as Partial<WikiFrontmatter>), body: 'Body.',
+    }, 'write')).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+  })
+
+  it('refuses a write over a page path held by a directory and leaves no temporary', async () => {
+    await mkdir(join(root, 'wiki', 'concepts', 'solid.md'))
+
+    await expect(files.writePage({
+      path: page('concepts/solid.md'), frontmatter: frontmatter(), body: 'Body.',
+    }, 'write')).rejects.toThrow()
+
+    const names = await readdir(join(root, 'wiki', 'concepts'))
+    expect(names.filter(name => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('reports a read of a directory held under a page path', async () => {
+    await mkdir(join(root, 'wiki', 'concepts', 'solid.md'))
+
+    await expect(files.readPage(page('concepts/solid.md'))).rejects.toMatchObject({ code: 'EISDIR' })
+  })
+})
+
+describe('the vault walk', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+  })
+
+  it('skips dotfiles and files without the page suffix', async () => {
+    await writeWikiFile(root, 'concepts/.secret.md', '---\ntitle: S\ntype: concept\ntags: []\nupdated: 2026-10-07\nstatus: current\n---\n\nS.\n')
+    await writeWikiFile(root, 'concepts/notes.txt', 'not a page\n')
+
+    const paths = (await files.listPageEntries()).map(entry => entry.page.path)
+
+    expect(paths).not.toContain('concepts/.secret.md')
+    expect(paths).not.toContain('concepts/notes.txt')
+  })
+
+  it('refuses to enumerate a vault whose wiki directory is gone', async () => {
+    await rm(join(root, 'wiki'), { recursive: true, force: true })
+
+    await expect(files.listPageEntries()).rejects.toMatchObject({ code: 'WIKI_ROOT_NOT_VAULT' })
+  })
+
+  it('names an unparsable page in the catalog under Needs attention', async () => {
+    await writeWikiFile(root, 'concepts/broken.md', 'not a page at all\n')
+
+    await files.rebuildIndex()
+
+    const index = await readFile(join(root, 'index.md'), 'utf8')
+    expect(index).toContain('Needs attention')
+    expect(index).toContain('concepts/broken.md')
+  })
+
+  it('quotes no summary for a body that opens with nothing quotable', async () => {
+    await files.writePage({
+      path: page('concepts/heading.md'),
+      frontmatter: frontmatter({ title: 'Headed' }),
+      body: ' \n\n# Only a heading\n',
+    }, 'write')
+
+    const index = await readFile(join(root, 'index.md'), 'utf8')
+
+    expect(index).toContain('Headed')
+    expect(index).not.toContain('Only a heading')
+  })
+
+  it('clips a long summary at a word boundary', async () => {
+    await files.writePage({
+      path: page('concepts/wordy.md'), frontmatter: frontmatter({ title: 'Wordy' }), body: 'word '.repeat(60),
+    }, 'write')
+
+    expect(await readFile(join(root, 'index.md'), 'utf8')).toMatch(/word word[^\n]*\.\.\./u)
+  })
+
+  it('clips a summary that is one unbroken word', async () => {
+    await files.writePage({
+      path: page('concepts/unbroken.md'), frontmatter: frontmatter({ title: 'Unbroken' }), body: 'x'.repeat(300),
+    }, 'write')
+
+    expect(await readFile(join(root, 'index.md'), 'utf8')).toContain(`${'x'.repeat(157)}...`)
+  })
+})
+
+describe('the derived log', () => {
+  beforeEach(async () => {
+    await files.ensureLayout()
+  })
+
+  it('seeds the log heading when appending to an emptied log', async () => {
+    await writeFile(join(root, 'log.md'), '   \n', 'utf8')
+
+    await files.appendLog('note', 'first entry')
+
+    expect(await readFile(join(root, 'log.md'), 'utf8')).toMatch(/^# Log\n\n## \[/u)
+  })
+
+  it('returns no headings for a non-positive limit or an absent log', async () => {
+    await files.writePage({ path: page('concepts/one.md'), frontmatter: frontmatter(), body: 'One.\n' }, 'write')
+    expect(await files.logTail(0)).toEqual([])
+
+    await rm(join(root, 'log.md'), { force: true })
+    expect(await files.logTail(3)).toEqual([])
+  })
+})
+
+describe('lint report edges', () => {
+  it('ignores a link a page writes to itself', () => {
+    const report = lintVault([parsed('concepts/alpha.md', 'See [[Alpha]].')], [])
+
+    expect(report.findings.filter(finding => finding.kind === 'broken-link')).toEqual([])
+    expect(report.findings.some(finding => finding.kind === 'orphan-page')).toBe(true)
+  })
+
+  it('resolves links written as paths, suffixes, and aliases', () => {
+    const pages = [
+      parsed('concepts/alpha.md', 'Body.', { title: 'Alpha', aliases: ['Alpha One'] }),
+      parsed('concepts/beta.md', 'See [[Alpha One]], [[concepts/alpha]], [[Alpha.md]], [[wiki/concepts/alpha.md]], [[./alpha]].', { title: 'Beta' }),
+    ]
+
+    const report = lintVault(pages, [])
+
+    expect(report.findings.filter(finding => finding.kind === 'broken-link')).toEqual([])
+    expect(report.findings.some(finding => finding.kind === 'orphan-page' && finding.page === 'concepts/alpha.md')).toBe(false)
+    expect(report.findings.some(finding => finding.kind === 'orphan-page' && finding.page === 'concepts/beta.md')).toBe(true)
+  })
+
+  it('skips empty alias keys and repeated stems', () => {
+    const pages = [
+      parsed('concepts/dup.md', 'Body.', { title: 'Dup', aliases: [''] }),
+      parsed('entities/dup.md', 'Body.', { title: 'Dup two' }),
+    ]
+
+    const report = lintVault(pages, [])
+
+    expect(report.pages).toBe(2)
+    expect(report.findings.filter(finding => finding.kind === 'broken-link')).toEqual([])
+  })
+
+  it('orders same-kind findings by page whichever way they were built', () => {
+    const pages = [
+      parsed('concepts/zulu.md', 'Body.'),
+      parsed('concepts/mike.md', 'Body.'),
+      parsed('concepts/alpha.md', 'Body.'),
+    ]
+
+    const report = lintVault(pages, [])
+
+    const orphans = report.findings.filter(finding => finding.kind === 'orphan-page')
+    expect(orphans.map(finding => finding.page)).toEqual(['concepts/alpha.md', 'concepts/mike.md', 'concepts/zulu.md'])
+  })
+
+  it('deduplicates repeated and empty source citations', () => {
+    const pages = [parsed('concepts/a.md', 'Body.', { sources: ['raw/one.md', 'raw/one.md', ''] })]
+
+    const report = lintVault(pages, [source(''), source('one.md')])
+
+    expect(report.findings.filter(finding => finding.kind === 'missing-source')).toEqual([])
+  })
+
+  it('reports contradictions that resolve nowhere, target self, repeat, or lack reciprocity', () => {
+    const ghost = lintVault([parsed('concepts/a.md', 'Body.', { contradicts: ['concepts/ghost.md'] })], [])
+    expect(ghost.findings.some(finding => finding.detail.includes('resolves to no page'))).toBe(true)
+
+    const self = lintVault([parsed('concepts/a.md', 'Body.', { contradicts: ['concepts/a.md'] })], [])
+    expect(self.findings.filter(finding => finding.kind === 'contradiction')).toEqual([])
+
+    const twice = lintVault([
+      parsed('concepts/a.md', 'Body.', { contradicts: ['concepts/b.md', 'concepts/b.md'] }),
+      parsed('concepts/b.md', 'Body.', { contradicts: ['concepts/a.md'] }),
+    ], [])
+    expect(twice.findings.filter(finding => finding.kind === 'contradiction')).toEqual([])
+
+    const oneSided = lintVault([
+      parsed('concepts/a.md', 'Body.', { contradicts: ['concepts/b.md'] }),
+      parsed('concepts/b.md', 'Body.', { contradicts: ['concepts/ghost.md'] }),
+    ], [])
+    expect(oneSided.findings.some(finding => finding.detail.includes('does not name this page back'))).toBe(true)
+  })
+
+  it('matches overview pages at the root and reports misfiled ones', () => {
+    const good = lintVault([parsed('overview.md', 'Body.', { type: 'overview' })], [])
+    expect(good.findings.filter(finding => finding.kind === 'frontmatter')).toEqual([])
+
+    const misfiled = lintVault([parsed('concepts/overview.md', 'Body.', { type: 'overview' })], [])
+    expect(misfiled.findings.some(finding => finding.detail.includes('"wiki/"'))).toBe(true)
+
+    const loose = lintVault([parsed('loose.md', 'Body.')], [])
+    expect(loose.findings.some(finding => finding.kind === 'frontmatter')).toBe(true)
+  })
+
+  it('resolves a page whose path carries no suffix', () => {
+    const pages = [parsed('concepts/bare', 'Body.'), parsed('concepts/linker.md', 'See [[bare]].')]
+
+    const report = lintVault(pages, [])
+
+    expect(report.findings.filter(finding => finding.kind === 'broken-link')).toEqual([])
+  })
+})
+
+describe('frontmatter reader edges', () => {
+  it('ignores comments and unrecognized lines, and reads block lists', () => {
+    const text = [
+      '---',
+      '# a comment line',
+      'title: Commented',
+      'just some prose',
+      'type: concept',
+      'tags:',
+      '  - one',
+      'updated: 2026-10-07',
+      'status: current',
+      '---',
+      '',
+      'Body.',
+      '',
+    ].join('\n')
+
+    const { frontmatter: read } = parsePageText(text, page('concepts/commented.md'))
+
+    expect(read.title).toBe('Commented')
+    expect(read.tags).toEqual(['one'])
+    expect(read.confidence).toBeNull()
+  })
+
+  it('reads a bare key with no items as an empty scalar', () => {
+    const text = '---\ntitle:\ntype: concept\ntags: [x]\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+
+    expect(() => parsePageText(text, page('concepts/bare.md'))).toThrow(/"title"/u)
+  })
+
+  it('reads an unclosed bracket as a scalar and refuses it as a list', () => {
+    const text = '---\ntitle: Bracket\ntype: concept\ntags: [one, two\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+
+    expect(() => parsePageText(text, page('concepts/bracket.md'))).toThrow(/"tags"/u)
+  })
+
+  it('splits quoted list items on commas and removes one quote layer', () => {
+    const text = '---\ntitle: Quoted\ntype: concept\ntags: ["a, b", \'c\', d, "e\\"f", x, , y]\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+
+    const { frontmatter: read } = parsePageText(text, page('concepts/quoted-list.md'))
+
+    expect(read.tags).toEqual(['a, b', 'c', 'd', 'e"f', 'x', 'y'])
+  })
+
+  it('reads a bare list key with no items as an empty list', () => {
+    const text = '---\ntitle: Bare list\ntype: concept\ntags:\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+
+    const { frontmatter: read } = parsePageText(text, page('concepts/bare-list.md'))
+
+    expect(read.tags).toEqual([])
+  })
+
+  it('keeps a mismatched quote as written', () => {
+    const text = '---\ntitle: Mixed\ntype: concept\ntags: ["a\']\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+
+    const { frontmatter: read } = parsePageText(text, page('concepts/mixed-quote.md'))
+
+    expect(read.tags).toEqual(['"a\''])
+  })
+
+  it('refuses a confidence written as a list', () => {
+    const text = '---\ntitle: Listed\ntype: concept\ntags: [x]\nupdated: 2026-10-07\nstatus: current\nconfidence: [0.5]\n---\n\nBody.\n'
+
+    expect(() => parsePageText(text, page('concepts/listed.md'))).toThrow(/"confidence"/u)
+  })
+
+  it('refuses a title written as a list and missing tags', () => {
+    const listed = '---\ntitle: [A, B]\ntype: concept\ntags: [x]\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+    expect(() => parsePageText(listed, page('concepts/title-list.md'))).toThrow(/"title"/u)
+
+    const noTags = '---\ntitle: No tags\ntype: concept\nupdated: 2026-10-07\nstatus: current\n---\n\nBody.\n'
+    expect(() => parsePageText(noTags, page('concepts/no-tags.md'))).toThrow(/"tags"/u)
   })
 })

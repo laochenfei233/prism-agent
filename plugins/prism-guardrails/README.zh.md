@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入两条自己的、只提醒而不强制的 rail。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入三条自己的、什么都不拒绝的 rail：卡住提醒、用量提醒与未知工具名建议。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。第十四条 rail 是用量提醒：它统计会话的累计 token 用量，在越过配置阈值时提醒模型保持简洁。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
+十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。第十四条 rail 是用量提醒：它统计会话的累计 token 用量，在越过配置阈值时提醒模型保持简洁。第十五条把模型大概想用的可见工具名追加到未知工具的报错里。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -26,6 +26,7 @@
 | 凭据读取 | 在其他所有 rail 眼里 `read` 与 `grep` 都是只读工具，而一次读取会永久留在会话日志里 | 读取配置的凭据路径被拒绝 |
 | 在失败上原地打转 | 没有任何东西盯着同一轮里反复同一种失败调用的轮次；模型自己的判断是唯一的刹车 | 裁判模型确认这串失败是个循环之后，下一个结果携带一句换思路的提醒 —— 调用本身永不被告决 |
 | Token 用量 | 持久化的 `tokenUsage` 投影与客户端的用量展示报告会话花了多少，但没有任何东西告诉模型会话已经变得多贵 | 累计用量首次越过配置阈值后，在轮次边界发送一句提醒 —— 它什么都不拒绝 |
+| 未知工具名 | 流水线只以光杆 `unknown tool "x"` 拒绝，模型只能盲目重试 | 报错列出它大概想用的可见工具名（按接近程度排序），并保留原拒绝的结构化身份 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
 
@@ -62,7 +63,7 @@
 
 ## 配置
 
-每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。两个例外：卡住提醒随插件出厂开启——它什么都不拒绝、裁判只在失败重复时才被调用，`stuckNudgeAfterFailures: 0` 关闭它；用量提醒的**空数组**就是它的关闭开关而不是加载失败，因为该 rail 出厂即关，`[]` 就是它的默认值。
+每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。三个例外：卡住提醒随插件出厂开启——它什么都不拒绝、裁判只在失败重复时才被调用，`stuckNudgeAfterFailures: 0` 关闭它；用量提醒的**空数组**就是它的关闭开关而不是加载失败，因为该 rail 出厂即关，`[]` 就是它的默认值；报错文案改进（`skillInvocationGuidance`、`toolNameSuggestions`）随插件开启，因为它们只是改善一条消息。
 
 | 键 | 类型 | 含义 | 默认 |
 |---|---|---|---|
@@ -72,6 +73,7 @@
 | `maxStepsPerTurn` | 整数 `>= 1` | 一轮最多可开启的步骤数 | rail 关闭 |
 | `unfinishedTodoContinuations` | 整数 `>= 0` | 一轮因为模型自己的 todo 清单仍有未完成项而被送回继续的次数；`0` 表示关闭 | rail 关闭 |
 | `skillInvocationGuidance` | 布尔 | 模型调用"仅用户可调用"的 skill 被拒时，是否指出可行出路 | `true` |
+| `toolNameSuggestions` | 布尔 | 未知工具的报错是否列出它大概想用的可见工具名 | `true` |
 | `writeTools` | 非空的 `{ tool, pathArgument, contentArgument? }` 数组 | 该部署的写文件工具；所有需要读取写入内容的 rail 都以它为前置 | 由这些 rail 要求 |
 | `maxWrittenFilesPerTurn` | 整数 `>= 0` | 一轮可写入的不同文件数；超出后下一条新路径送交审批，`0` 表示关闭 | rail 关闭 |
 | `requirePonytailUpgradePaths` | 布尔 | 写入的 `shortcut:` 注释（较早的 `ponytail:`）是否必须给出上限与升级路径 | `false` |
@@ -110,6 +112,7 @@
 | `maxStepsPerTurn` 非整数或 `< 1` | `maxStepsPerTurn must be an integer >= 1` |
 | `unfinishedTodoContinuations` 非整数或 `< 0` | `unfinishedTodoContinuations must be an integer >= 0` |
 | `skillInvocationGuidance` 非布尔 | `skillInvocationGuidance must be a boolean` |
+| `toolNameSuggestions` 非布尔 | `toolNameSuggestions must be a boolean` |
 | `writeTools` 不是数组或为空 | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
 | 条目没有给出工具名或路径参数 | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
 | `contentArgument` 为空白 | `writeTools entry "write" must name a non-empty contentArgument or omit it` |
@@ -302,6 +305,18 @@ Session token usage has reached ~120k tokens. Continue with the task, but prefer
 总量从每条已提交 assistant 消息携带的 `usage` 累加而来——适配器给出 `totalTokens` 时用它，否则用输入与输出之和——按会话记账并保存在内存里：插件重启即清零，也不会像持久化的 `tokenUsage` 投影那样折叠重试。它是提醒所需要的数字，不是计费记录。
 
 机制沿用完成验证闸门：在 `agent/turn-stopping` 处 steer，会让循环观察到待处理输入并再跑一步。每个阈值在每个会话最多提醒一次；同一边界越过多个阈值时，只为最高的那个发送一条提醒，并把较低的阈值一并标记——已经到 250k 的会话不需要身后再来一条 100k 的提示。这条 rail 什么都不拒绝，在 `observe` 模式下行为完全一致。
+
+### 未知工具名
+
+调用没有任何可见工具注册的名字时，报错会给出它大概想用的相近名字：
+
+```
+Error: unknown tool "bashh" — did you mean "bash"?
+```
+
+多个候选时读作 `unknown tool "bashh" — similar tools: "bash", "bashx", "bashy"`，按接近程度排序，至多三个。提示搭在流水线自己的拒绝上：结果仍是携带完整结构化身份的 `UNKNOWN_TOOL` 错误；没有任何相近候选时保持原文案，其余失败原样返回。包装位于 `tools/execute`，因此流水线分发中任何位置解析出的未知工具——包括把未知名重新抛成错误的监听器——都被覆盖。
+
+距离按大小写折叠后的 Levenshtein 计算，大小写不敏感的子串重叠记一字符优惠；预算为被错名字长度的 `max(2, ⌊len/3⌋)`。`toolNameSuggestions: false` 恢复光杆文案。
 
 ## `/guardrails`
 

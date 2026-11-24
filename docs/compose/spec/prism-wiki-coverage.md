@@ -1,9 +1,9 @@
 ---
 feature: prism-wiki-coverage
-status: designed
-updated: 2026-11-21
+status: delivered
+updated: 2026-11-24
 branch: feat/prism-wiki
-commits: not recorded; delivery records the base..head range
+commits: 3db7a89e49..afaf653cc6
 ---
 
 # Prism Wiki Coverage
@@ -12,7 +12,17 @@ English | [中文](prism-wiki-coverage.zh.md)
 
 ## Report
 
-Not delivered. The measurement in S1 is the state this plan starts from.
+**What was built** — `@prism/prism-wiki` now meets the repository's per-file coverage gate: every gated file under `src/` reports 100% statements, branches, functions, and lines, and `src/client/index.tsx` keeps its recorded browser-entry exemption. The eight suites gained the states and branches the shipped code already had but no test reached: the reader's empty, failed, filtered, collapsed, search, health, editor, and source-panel states; the parser's rejected spellings and path guards; the search cache's foreign, unbranded, and corrupted-database recoveries and its rollback paths; the tools' missing-argument and unclassified-failure arms; the command's argument and error-mapping arms; the routes' unexpected-failure mappings; and the browser client's wire-narrowing rejections. Shared disk fixtures live in `tests/fixtures/vault-fixtures.ts`.
+
+Shipped code changed only where a branch could not run: the browser listing dropped a redundant re-sort of entries that arrive ordered, the search cache lost a memory-path guard no reachable flow could hit and now closes a null handle inside `closeQuietly`, and the catalog rebuild pops its trailing separator unconditionally. The remaining defensive guards carry `v8 ignore` comments with their reasons; every trust-boundary rejection stays and is now tested.
+
+**Verification** — `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` exits 0 with every gated file at 100%, re-run after `pnpm run clean` with the same result; 279 tests pass. `pnpm run typecheck` exits 0. `pnpm run check:ci:coverage` stops at this machine's Electron-binary step (`install-electron` is unavailable on Windows) — the pre-existing environment gap S1 records; the per-file threshold evidence is the acceptance run itself, which executes with the gate's thresholds active and names no file. `pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` passes after re-recording. No `as unknown` assertion was added; the only `unknown` in the diff is the pre-existing `outcome` helper's signature.
+
+**Journey log** —
+- Under `noUncheckedIndexedAccess`, a defensive `?? ''` over an index access is type-forced even when unreachable: delete it where a restructure proves the state impossible, otherwise leave a `v8 ignore` reason.
+- v8 block attribution can miss a call site that demonstrably ran (`closeQuietly` from `discardDatabase`); folding the null check into the callee restored honest accounting.
+- A save assertion passed on a coincidence — the empty draft's `updated` is today's date, the same value the test typed — and hid a field whose change never reached the input; assert the field's own value, not only the request it feeds.
+- In the vault tree, a type filter pill and its group toggle share an accessible name; `aria-expanded` tells them apart.
 
 ## [S1] Problem
 
@@ -88,23 +98,23 @@ Cheapest first, so the gate's remaining surface shrinks with every commit: `clie
 
 ## Tasks
 
-- [ ] T1: Shared fixtures — a malformed-frontmatter table, a corrupt and a foreign search database, and a page builder; acceptance: each helper is used by at least two suites and carries JSDoc (depends: none)
-- [ ] T2: `client/api.ts` at 100% — one rejection case per field reader (depends: T1)
-- [ ] T3: `web.ts` at 100% — each route's failure arms, including an unparsable stored page and an unexpected error (depends: T1)
-- [ ] T4: `service.ts` at 100% — the pre-step decline paths and the schema-delivery switches (depends: T1)
-- [ ] T5: `commands.ts` at 100% — every subcommand and argument arm through the command registry (depends: T1)
-- [ ] T6: `tools.ts` at 100% — missing arguments, error classes, and unexpected-error propagation (depends: T1)
-- [ ] T7: `search.ts` at 100% — foreign, unreadable, and empty databases plus the excerpt edges (depends: T1)
-- [ ] T8: `vault.ts` at 100% — parser and validator rejections, the unreadable-page walk, and the path guards (depends: T1)
-- [ ] T9: `WikiPage.tsx` at 100% — the reader's states: empty, failed, filtered, collapsed, search, health, editor fields, source panel (depends: T1)
-- [ ] T10: Verification — the gate exits zero for the package, the README's coverage note is replaced by the result, and the feature spec records it (depends: T2, T3, T4, T5, T6, T7, T8, T9)
+- [x] T1: Shared fixtures — a malformed-frontmatter table, a corrupt and a foreign search database, and a page builder; acceptance: each helper is used by at least two suites and carries JSDoc (depends: none)
+- [x] T2: `client/api.ts` at 100% — one rejection case per field reader (depends: T1)
+- [x] T3: `web.ts` at 100% — each route's failure arms, including an unparsable stored page and an unexpected error (depends: T1)
+- [x] T4: `service.ts` at 100% — the pre-step decline paths and the schema-delivery switches (depends: T1)
+- [x] T5: `commands.ts` at 100% — every subcommand and argument arm through the command registry (depends: T1)
+- [x] T6: `tools.ts` at 100% — missing arguments, error classes, and unexpected-error propagation (depends: T1)
+- [x] T7: `search.ts` at 100% — foreign, unreadable, and empty databases plus the excerpt edges (depends: T1)
+- [x] T8: `vault.ts` at 100% — parser and validator rejections, the unreadable-page walk, and the path guards (depends: T1)
+- [x] T9: `WikiPage.tsx` at 100% — the reader's states: empty, failed, filtered, collapsed, search, health, editor fields, source panel (depends: T1)
+- [x] T10: Verification — the gate exits zero for the package, the README's coverage note is replaced by the result, and the feature spec records it (depends: T2, T3, T4, T5, T6, T7, T8, T9)
 
 ## [S4] Acceptance
 
-- [ ] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` exits zero, with every file at 100% statements, branches, functions, and lines except the recorded browser-registrant exemption.
-- [ ] `pnpm run check:ci:coverage` reports no `packages/prism/prism-wiki` file. A red run caused by another package — the resynced tree already carries `prism-transfer` dependency-gate findings and stale bilingual records — is recorded as such, not treated as this plan's failure.
-- [ ] The measurement is taken after `pnpm run clean`, so no stale `lib/` output or orphan package residue can shadow the source plane.
-- [ ] No test-only production API was added and no new `as unknown` assertion appears.
-- [ ] Every existing test still passes unchanged, or its change is explained in the commit that changes it.
-- [ ] The package README's coverage note states the measured result instead of the debt.
-- [ ] Any branch deleted as unreachable is named in its commit with the type-level reason it cannot run.
+- [x] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` exits zero, with every file at 100% statements, branches, functions, and lines except the recorded browser-registrant exemption.
+- [x] `pnpm run check:ci:coverage` reports no `packages/prism/prism-wiki` file. A red run caused by another package — the resynced tree already carries `prism-transfer` dependency-gate findings and stale bilingual records — is recorded as such, not treated as this plan's failure. (Measured: the gate stops at this machine's Electron-binary step before naming any file; recorded in the Report.)
+- [x] The measurement is taken after `pnpm run clean`, so no stale `lib/` output or orphan package residue can shadow the source plane.
+- [x] No test-only production API was added and no new `as unknown` assertion appears.
+- [x] Every existing test still passes unchanged, or its change is explained in the commit that changes it.
+- [x] The package README's coverage note states the measured result instead of the debt.
+- [x] Any branch deleted as unreachable is named in its commit with the type-level reason it cannot run.

@@ -383,6 +383,7 @@ export class WikiVaultService extends Service {
   }
 
   private requireIndex(): WikiSearchIndex {
+    /* v8 ignore next -- ready() opens the cache before either caller reaches this guard. */
     if (this.index === undefined) throw new WikiError('the search cache is not open', 'PRISM_WIKI_NOT_READY')
     return this.index
   }

@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds two rails of its own that remind instead of enforcing.
+An out-of-tree DeepSeek Harness bundle that turns twelve **advisory** capabilities into **enforced** ones, and adds three rails of its own that refuse nothing: the stuck-run nudge, the usage reminder, and the unknown-tool name hint.
 
 It is a bundle in the shape of a published plugin (`dsh.bundle.patch` + a Loader-loadable Host half), not a change to the Harness checkout: every rail registers on a documented extension point, and no upstream package is rewritten.
 
-Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The fourteenth is the usage reminder: it watches a session's cumulative token usage and reminds the model to stay concise when a configured threshold is crossed. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
+Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the rules of three method packs — **Ponytail** (the laziness ladder: reuse before writing, the standard library before a dependency, a marked shortcut over an unmarked one), **Aegis** (route before you act, verify before you claim), and **Compose Next** (finish the plan you wrote before reporting) — from text the model is asked to follow into decisions the tool pipeline makes. The last two cover destructive commands and credential reads, which neither the tool pipeline nor the sandbox refuses: `SandboxMode` governs file effects, and network and process policy are outside its vocabulary (`packages/sandbox/sandbox-policy/README.md`). The thirteenth rail is the stuck nudge: it refuses nothing, and judges whether a run of failures is a loop worth naming. The fourteenth is the usage reminder: it watches a session's cumulative token usage and reminds the model to stay concise when a configured threshold is crossed. The fifteenth appends the visible tools a missed name probably meant to the unknown-tool refusal. The rails read what the model does; the Ponytail mode itself is part of this bundle (see Ponytail mode below), while the Aegis and Compose Next skills stay where their method packs installed them.
 
 ## Why this exists
 
@@ -26,6 +26,7 @@ Four of the twelve are hardenings of DeepSeek Harness's own advice. Six turn the
 | Credential reads | `read` and `grep` are read-only tools to every other rail, and a read lands in the session log permanently | A read of a configured credential path is refused |
 | Spinning on failures | Nothing watches for a turn that repeats one failing call; the model's own judgment is the only brake | A judge model confirms the run is a loop and the next result carries a reminder to change approach — the call itself is never refused |
 | Token usage | The durable `tokenUsage` projection and the client's usage display report what a session spent, but nothing tells the model when the session has grown expensive | A reminder at the turn boundary when cumulative usage first crosses a configured threshold — it refuses nothing |
+| Unknown tool names | The pipeline refuses a miss with bare `unknown tool "x"`, which a model can only retry blindly | The failure names the visible tools it probably meant, closest first, and keeps the refusal's structured identity |
 
 The bundle is independent of the packages and method packs it hardens. It reads plan-mode state through the controller's public `get()`, the skill catalog through the public registry, and the tool pipeline, the turn boundary, and the session log through documented extension points, so it composes with a stock checkout and degrades to a no-op when a service is absent.
 
@@ -62,7 +63,7 @@ The prompt text and the workflows are maintained here rather than vendored from 
 
 ## Configuration
 
-Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. Two exceptions: the stuck nudge ships on because it refuses nothing and its judge is called only while failures repeat (`stuckNudgeAfterFailures: 0` turns it off), and the usage reminder's empty array is its off switch rather than a load failure, because that rail ships off and `[]` is its default.
+Every rail is **off** until its key names a value, and a key that is present but unusable **fails plugin load**. Omitting a key is therefore the only way to disable its rail, so a misspelled key cannot pass as an intentional omission. Three exceptions: the stuck nudge ships on because it refuses nothing and its judge is called only while failures repeat (`stuckNudgeAfterFailures: 0` turns it off), the usage reminder's empty array is its off switch rather than a load failure, because that rail ships off and `[]` is its default, and the error-text improvements (`skillInvocationGuidance`, `toolNameSuggestions`) ship on because they only improve a message.
 
 | Key | Type | Meaning | Default |
 |---|---|---|---|
@@ -72,6 +73,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `maxStepsPerTurn` | integer `>= 1` | Steps one turn may open | rail off |
 | `unfinishedTodoContinuations` | integer `>= 0` | Times one turn is sent back because the agent's own todo list still has open items; `0` disables | rail off |
 | `skillInvocationGuidance` | boolean | Whether a user-only skill's model-invocation denial names the way forward | `true` |
+| `toolNameSuggestions` | boolean | Whether an unknown-tool failure names the visible tools it probably meant | `true` |
 | `writeTools` | non-empty array of `{ tool, pathArgument, contentArgument? }` | The deployment's file-writing tools; required by every rail that reads written content | required by those rails |
 | `maxWrittenFilesPerTurn` | integer `>= 0` | Distinct files one turn may write before the next new path goes to approval; `0` disables | rail off |
 | `requirePonytailUpgradePaths` | boolean | Whether a written `shortcut:` comment (older `ponytail:`) must name its ceiling and upgrade path | `false` |
@@ -110,6 +112,7 @@ Load-time rejections, each with the message asserted by the test suite:
 | `maxStepsPerTurn` not an integer, or `< 1` | `maxStepsPerTurn must be an integer >= 1` |
 | `unfinishedTodoContinuations` not an integer, or `< 0` | `unfinishedTodoContinuations must be an integer >= 0` |
 | `skillInvocationGuidance` not a boolean | `skillInvocationGuidance must be a boolean` |
+| `toolNameSuggestions` not a boolean | `toolNameSuggestions must be a boolean` |
 | `writeTools` not an array, or empty | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
 | an entry naming no tool or no path argument | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
 | a blank `contentArgument` | `writeTools entry "write" must name a non-empty contentArgument or omit it` |
@@ -302,6 +305,18 @@ Session token usage has reached ~120k tokens. Continue with the task, but prefer
 The total accumulates from the `usage` each committed assistant message reports — `totalTokens` when the adapter gives one, the input and output sum otherwise — keyed by session and kept in memory: a plugin restart resets it, and it does not fold retries the way the durable `tokenUsage` projection does. It is the figure a reminder needs, not a billing record.
 
 The mechanism is the verification gate's: steering at `agent/turn-stopping` makes the loop observe pending input and run another step. Each threshold reminds at most once per session, and a boundary that crosses several thresholds sends one reminder for the highest and marks the lower ones reminded — a session at 250k needs no 100k nudge behind it. The rail refuses nothing and behaves identically in `observe` mode.
+
+### Unknown tool names
+
+A call to a name no visible tool registers comes back with the near names it probably meant:
+
+```
+Error: unknown tool "bashh" — did you mean "bash"?
+```
+
+Several candidates read `unknown tool "bashh" — similar tools: "bash", "bashx", "bashy"`, closest first, at most three. The hint rides the pipeline's own refusal: the result is still the `UNKNOWN_TOOL` error with its structured identity intact, a name with no near match keeps the original message verbatim, and every other failure is returned unchanged. The wrapper sits on `tools/execute`, so a miss resolved anywhere in the pipeline's dispatch — including a listener that rethrows the miss as an error — is covered.
+
+Distance is Levenshtein over case-folded names, with one character of credit for a case-insensitive substring overlap; the budget is `max(2, ⌊len/3⌋)` over the missed name's length. `toolNameSuggestions: false` restores the bare message.
 
 ## `/guardrails`
 

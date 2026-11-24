@@ -7,7 +7,7 @@
  * removal on disposal is asserted alongside its results.
  */
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -173,5 +173,99 @@ describe('the /wiki command', () => {
     await fiber.dispose()
 
     expect(ctx.commands.list(agent)).toEqual([])
+  })
+})
+
+describe('the /wiki command on an empty vault', () => {
+  it('reports zero counts with no log entry, a clean bill, and an empty log', async () => {
+    const { ctx } = await boot()
+    const agent = createAgent('commands-empty')
+
+    const status = commandText(await runCommand(ctx, agent, '/wiki status'))
+    expect(status).toContain('pages: 0')
+    expect(status).toContain('newest log entry: none')
+
+    const lint = commandText(await runCommand(ctx, agent, '/wiki lint'))
+    expect(lint).toContain('the vault is clean.')
+
+    const log = commandText(await runCommand(ctx, agent, '/wiki log'))
+    expect(log).toContain('The log is empty')
+  })
+})
+
+describe('the /wiki log count', () => {
+  it('lists the requested number of entries, newest first', async () => {
+    const { ctx } = await boot()
+    const agent = createAgent('commands-log-count')
+    for (const name of ['one', 'two', 'three']) {
+      await writePage(ctx, agent, { path: `concepts/${name}.md`, title: name, type: 'concept', body: 'Body.' })
+    }
+
+    const text = commandText(await runCommand(ctx, agent, '/wiki log 2'))
+
+    expect(text.match(/^  ## \[/gmu)).toHaveLength(2)
+    expect(text).toContain('three')
+  })
+
+  it.each(['notanumber', '0', '-3'])('falls back to the default count for %s', async (count) => {
+    const { ctx } = await boot()
+    const agent = createAgent(`commands-log-fallback-${count}`)
+    for (const name of ['one', 'two', 'three']) {
+      await writePage(ctx, agent, { path: `concepts/${name}.md`, title: name, type: 'concept', body: 'Body.' })
+    }
+
+    const text = commandText(await runCommand(ctx, agent, `/wiki log ${count}`))
+
+    expect(text.match(/^  ## \[/gmu)).toHaveLength(3)
+  })
+})
+
+describe('the /wiki open report', () => {
+  it('lists every relation the page carries', async () => {
+    const { ctx } = await boot()
+    const agent = createAgent('commands-open-rich')
+    await callTool(ctx, 'wiki_source', { action: 'add', path: 'notes/note.md', text: 'A note.' }, agent)
+    await callTool(ctx, 'wiki_write', {
+      path: 'concepts/rich.md',
+      title: 'Rich',
+      type: 'concept',
+      body: 'See [[Beta]].',
+      tags: ['one', 'two'],
+      aliases: ['Rich Page'],
+      sources: ['notes/note.md'],
+      contradicts: ['concepts/beta.md'],
+      confidence: 0.5,
+    }, agent)
+    await writePage(ctx, agent, { path: 'concepts/beta.md', title: 'Beta', type: 'concept', body: 'See [[Rich Page]].' })
+
+    const text = commandText(await runCommand(ctx, agent, '/wiki open concepts/rich.md'))
+
+    expect(text).toContain('concepts/rich.md — Rich')
+    expect(text).toContain('confidence 0.5')
+    expect(text).toContain('tags: one, two')
+    expect(text).toContain('aliases: Rich Page')
+    expect(text).toContain('cites: notes/note.md')
+    expect(text).toContain('contradicts: concepts/beta.md')
+    expect(text).toContain('links to: concepts/beta.md')
+    expect(text).toContain('linked from: concepts/beta.md')
+  })
+
+  it('reports a vault refusal as the command error', async () => {
+    const { ctx } = await boot()
+    const agent = createAgent('commands-open-ghost')
+
+    const refused = await runCommand(ctx, agent, '/wiki open concepts/ghost.md')
+
+    expect(refused.kind).toBe('error')
+    expect(commandText(refused)).toContain('WIKI_PAGE_NOT_FOUND')
+  })
+
+  it('propagates a failure the vault does not classify', async () => {
+    const { ctx, root } = await boot()
+    const agent = createAgent('commands-open-broken')
+    await ctx.wikiVault.ready()
+    await mkdir(join(root, 'wiki', 'concepts', 'solid.md'))
+
+    await expect(runCommand(ctx, agent, '/wiki open concepts/solid.md')).rejects.toThrow(/EISDIR|directory/iu)
   })
 })

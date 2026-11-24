@@ -168,7 +168,8 @@ export function apply(ctx: Context): void {
   }
 
   // The vault tree comes from the file layer the service itself lists for
-  // `lint()` and `status()`, because a search hit carries no tags.
+  // `lint()` and `status()`, because a search hit carries no tags. The entries
+  // arrive ordered by path, so the listing needs no sort of its own.
   route('list', `${BASE}/list`, async () => {
     const files = await ctx.wikiVault.ready()
     const pages: readonly WikiPageSummary[] = (await files.listPageEntries())
@@ -180,7 +181,6 @@ export function apply(ctx: Context): void {
         updated: entry.page.frontmatter.updated,
         tags: entry.page.frontmatter.tags,
       }))
-      .sort(byPath)
     const value: WikiListValue = { pages }
     return ok(value)
   })
@@ -321,15 +321,6 @@ function fail(code: string, message: string, current?: WikiPagePayload): Respons
 }
 
 /**
- * Operator-readable text for one thrown value.
- * @param error - One thrown value.
- * @returns The error's own message, or the value rendered as text.
- */
-function reasonOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-/**
  * Project one stored page onto its wire payload.
  * @param page - The stored page.
  * @returns The payload the browser renders, with plain-string identity fields.
@@ -344,13 +335,11 @@ function pagePayload(page: WikiPage): WikiPagePayload {
 }
 
 /**
- * Order two page rows by vault path, code unit ascending, so a listing does not
- * follow the directory read order.
- * @param left - One row.
- * @param right - The other row.
- * @returns A negative number, zero, or a positive number.
+ * Operator-readable text for one thrown value.
+ * @param error - One thrown value.
+ * @returns The error's own message, or the value rendered as text.
  */
-function byPath(left: WikiPageSummary, right: WikiPageSummary): number {
-  if (left.path === right.path) return 0
-  return left.path < right.path ? -1 : 1
+function reasonOf(error: unknown): string {
+  /* v8 ignore next -- every failure a route or the vault raises is an Error instance. */
+  return error instanceof Error ? error.message : String(error)
 }

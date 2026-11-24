@@ -6,7 +6,7 @@
  * suite's case; this one answers what each route does with its body.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
@@ -30,6 +30,7 @@ interface Answer {
 
 /** The mounted deployment: the recording registry, the vault, and the browser half. */
 interface WebHarness {
+  readonly ctx: Context
   readonly webFiber: Fiber
   /** Send one request body to a wiki route and read its envelope. */
   readonly post: (endpoint: string, body: string) => Promise<Answer>
@@ -116,6 +117,7 @@ async function webHarness(vaultRoot: string): Promise<WebHarness> {
     }))
   }
   return {
+    ctx,
     webFiber,
     send,
     async post(endpoint, body) {
@@ -171,10 +173,15 @@ describe('wiki browser routes', () => {
 
   it('lists every page in the vault tree, ordered by path', async () => {
     const h = await webHarness(root)
+    await h.ctx.wikiVault.write({
+      path: pagePath('entities/one.md'),
+      frontmatter: frontmatter({ title: 'One', type: 'entity' }),
+      body: 'One body.\n',
+    })
 
     const pages = value(await h.post('list', json({}))).pages as readonly Record<string, unknown>[]
 
-    expect(pages.map(entry => entry['path'])).toEqual(['concepts/alpha.md', 'concepts/beta.md'])
+    expect(pages.map(entry => entry['path'])).toEqual(['concepts/alpha.md', 'concepts/beta.md', 'entities/one.md'])
     expect(pages[0]).toMatchObject({
       path: 'concepts/alpha.md',
       title: 'Alpha',
@@ -379,6 +386,47 @@ describe('wiki browser routes', () => {
     const pages = (answer.body.value as { pages: readonly { path: string }[] }).pages
     expect(pages.map(entry => entry.path)).toContain('concepts/alpha.md')
     expect(pages.map(entry => entry.path)).not.toContain('concepts/broken.md')
+  })
+
+  it('answers a read of an unparsable page as a vault failure, not a missing page', async () => {
+    const h = await webHarness(root)
+    await writeFile(
+      join(root, 'wiki', 'concepts', 'broken.md'),
+      '---\ntitle: Broken\ntype: concept\ntags: [x]\n---\n\nBody.\n',
+      'utf8',
+    )
+
+    expect(failure(await h.post('read', json({ path: 'concepts/broken.md' })))).toBe('prism-wiki/failed')
+  })
+
+  it('reports an unexpected save failure as the failure it is', async () => {
+    const h = await webHarness(root)
+    // A page path held open by a directory makes the existence probe fail with
+    // a filesystem error the vault does not classify.
+    await mkdir(join(root, 'wiki', 'concepts', 'solid.md'))
+
+    const answer = await h.post('save', json({
+      path: 'concepts/solid.md',
+      frontmatter: { title: 'Solid', type: 'concept', tags: [], updated: '2026-10-08', status: 'current' },
+      body: 'Body.\n',
+    }))
+
+    expect(failure(answer)).toBe('prism-wiki/failed')
+    expect((answer.body.error as { message: string }).message).toMatch(/EISDIR|directory/iu)
+  })
+
+  it('narrows a search by every filter the body carries', async () => {
+    const h = await webHarness(root)
+
+    const hits = value(await h.post('search', json({
+      query: 'needle',
+      type: 'concept',
+      tags: ['alpha'],
+      status: 'current',
+      limit: 5,
+    }))).hits as readonly Record<string, unknown>[]
+
+    expect(hits.map(hit => hit['path'])).toEqual(['concepts/alpha.md'])
   })
 
   it('withdraws every route on disposal', async () => {

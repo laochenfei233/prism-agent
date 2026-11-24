@@ -138,12 +138,12 @@ pnpm run test:docs
 pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md
 ```
 
-- `pnpm run test` 运行单元测试套件：针对真实临时知识库目录的 `tests/vault.spec.ts`、针对真实 FTS5 数据库文件的 `tests/search.spec.ts`、经真实注册表的 `tests/tools.spec.ts` 与 `tests/commands.spec.ts`、经真实 Connection Fetch 注册表的 `tests/web.spec.ts`、覆盖浏览器客户端的 `tests/client-api.client.spec.ts`、在 jsdom 中覆盖页面的 `tests/client-page.client.spec.tsx`，以及经 vendored Loader 启动随包行的 `tests/composition.host.spec.ts`。
+- `pnpm run test` 运行单元测试套件：针对真实临时知识库目录的 `tests/vault.spec.ts`、针对真实 FTS5 数据库文件的 `tests/search.spec.ts`、经真实注册表的 `tests/tools.spec.ts` 与 `tests/commands.spec.ts`、覆盖知识库服务自身接缝的 `tests/service.spec.ts`、经真实 Connection Fetch 注册表的 `tests/web.spec.ts`、覆盖浏览器客户端的 `tests/client-api.client.spec.ts`、在 jsdom 中覆盖页面的 `tests/client-page.client.spec.tsx`，以及经 vendored Loader 启动随包行的 `tests/composition.host.spec.ts`。
 - `pnpm run typecheck` 以当前检出编译 host 和 client 程序。
 - `pnpm run test:docs` 运行文档闸门：配对、换行、链接、字数预算和包 README 检查。
 - `pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` 只检查这一对 README。
 
-本包尚未满足仓库的逐文件覆盖率闸门：`test:coverage` 仍报告未覆盖分支，其中最多的是 `src/client/WikiPage.tsx`、`src/vault.ts` 和 `src/search.ts`。
+本包已满足仓库的逐文件覆盖率闸门：`test:coverage` 对 `src/` 下每个文件报告 100% 的 statements、branches、functions 与 lines，其中 `src/client/index.tsx` 作为浏览器入口豁免。
 
 -----
 

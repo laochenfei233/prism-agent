@@ -38,6 +38,9 @@
  * - **Usage reminder** — a session whose cumulative token usage first crosses a
  *   configured threshold is reminded at its turn boundary to prefer concise
  *   outputs; it refuses nothing.
+ * - **Unknown tool names** — a call to a name no visible tool registers comes
+ *   back with the nearest registered names instead of a bare `unknown tool`
+ *   the model can only retry blindly.
  *
  * `/guardrails` reports which of these a running deployment has armed, the mode
  * it decides in, and what an `observe` run has seen: under `observe` every rail
@@ -58,11 +61,12 @@ import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ContextFormed, GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
-import type { PostToolDecision, PreToolDecision, ToolExecutionFailure } from '@deepseek-ai/dsh-tools'
+import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionFailure, ToolExecutionResult, ToolFailure } from '@deepseek-ai/dsh-tools'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import { configVersion, resolveConfig } from './config.ts'
 import { createLedger } from './decision.ts'
 import { PONYTAIL_MARKER } from './marker.ts'
+import { suggestToolNames, toolNameHint } from './tool-hints.ts'
 import type { Config, Mode, ResolvedConfig, ResolvedWriteTool } from './config.ts'
 import type { Decision, DecisionLedger, DecisionOutcome } from './decision.ts'
 
@@ -164,6 +168,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   installCommandGuard(ctx, resolved, ledger)
   installStuckNudge(ctx, resolved, ledger)
   installUsageReminder(ctx, resolved, ledger)
+  installToolNameSuggestions(ctx, resolved)
   installStatusCommand(ctx, resolved, ledger, version)
 }
 
@@ -1188,6 +1193,64 @@ function installUsageReminder(ctx: Context, resolved: ResolvedConfig, ledger: De
 /** One token count as the reminder states it: 120000 reads "120k", 900 reads "900". */
 function formatTokens(tokens: number): string {
   return tokens >= 1000 ? `${String(Math.round(tokens / 1000))}k` : String(tokens)
+}
+
+/**
+ * Answer an unknown-tool failure with the visible names it probably meant.
+ *
+ * The pipeline resolves the miss inside the `tools/execute` waterfall, so the
+ * wrapper rewrites only the failure's text: the refusal outcome, the error
+ * envelope, and the structured identity (`UNKNOWN_TOOL`, plus any routing
+ * detail) stay the pipeline's own. A name with no near match keeps the
+ * original message verbatim, and every other failure is returned unchanged.
+ */
+function installToolNameSuggestions(ctx: Context, resolved: ResolvedConfig): void {
+  if (!resolved.toolNameSuggestions) return
+  ctx.on('tools/execute', async (exec, next): Promise<ToolExecutionResult> => {
+    try {
+      const result = await next()
+      if (!result.isError || !isUnknownToolFailure(result.error)) return result
+      return toolFailureWithSuggestions(ctx, exec, result.error)
+    } catch (error) {
+      // A downstream `tools/execute` listener may surface the same miss as a
+      // thrown error; the shipped pipeline resolves it as a failure result.
+      if (!isUnknownToolError(error)) throw error
+      return toolFailureWithSuggestions(ctx, exec, {
+        message: error.message,
+        info: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' },
+      })
+    }
+  })
+}
+
+/** Whether a failure carries the pipeline's unknown-tool identity. */
+function isUnknownToolFailure(failure: ToolFailure): boolean {
+  return failure.info?.name === 'ToolNotFoundError' || failure.info?.code === 'UNKNOWN_TOOL'
+}
+
+/** Whether a thrown value is the pipeline's unknown-tool miss. */
+function isUnknownToolError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'ToolNotFoundError'
+}
+
+/**
+ * Rebuild one unknown-tool failure with its nearest-name hint appended.
+ *
+ * @param ctx - plugin context, read for the calling agent's visible tools.
+ * @param exec - the failed call, whose name is the miss.
+ * @param failure - the pipeline's own failure detail.
+ * @returns the failure result with the hint in its text and the original
+ *   structured `info` preserved.
+ */
+function toolFailureWithSuggestions(ctx: Context, exec: ToolExecution, failure: ToolFailure): ToolExecutionResult {
+  const candidates = ctx.tools.schemas(exec.agent ?? undefined).map(schema => schema.name)
+  const hint = toolNameHint(suggestToolNames(exec.name, candidates))
+  const message = hint === '' ? failure.message : `${failure.message} — ${hint}`
+  return {
+    content: [{ type: 'text', text: `Error: ${message}` }],
+    isError: true,
+    error: { message, ...failure.info !== undefined ? { info: failure.info } : {} },
+  }
 }
 
 /**

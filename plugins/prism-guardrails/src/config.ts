@@ -137,6 +137,8 @@ export interface Config {
   readonly unfinishedTodoContinuations?: number
   /** Whether a user-only skill's model-invocation denial names the way forward. Defaults to `true`. */
   readonly skillInvocationGuidance?: boolean
+  /** Whether an unknown-tool failure names the visible tools it probably meant. Defaults to `true`. */
+  readonly toolNameSuggestions?: boolean
   /** The deployment's file-writing tools; required by every rail that reads written content. */
   readonly writeTools?: readonly WriteTool[]
   /**
@@ -192,6 +194,7 @@ export interface ResolvedConfig {
   readonly maxStepsPerTurn: number | undefined
   readonly unfinishedTodoContinuations: number | undefined
   readonly skillInvocationGuidance: boolean
+  readonly toolNameSuggestions: boolean
   readonly writeTools: ReadonlyMap<string, ResolvedWriteTool> | undefined
   readonly maxWrittenFilesPerTurn: number | undefined
   readonly requirePonytailUpgradePaths: boolean
@@ -216,6 +219,7 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'maxStepsPerTurn',
   'unfinishedTodoContinuations',
   'skillInvocationGuidance',
+  'toolNameSuggestions',
   'writeTools',
   'maxWrittenFilesPerTurn',
   'requirePonytailUpgradePaths',
@@ -305,6 +309,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     maxStepsPerTurn: resolveMaxStepsPerTurn(config.maxStepsPerTurn),
     unfinishedTodoContinuations: resolveUnfinishedTodoContinuations(config.unfinishedTodoContinuations),
     skillInvocationGuidance: resolveSkillInvocationGuidance(config.skillInvocationGuidance),
+  toolNameSuggestions: resolveToolNameSuggestions(config.toolNameSuggestions),
     writeTools,
     maxWrittenFilesPerTurn,
     requirePonytailUpgradePaths,
@@ -526,6 +531,15 @@ function resolveSkillInvocationGuidance(value: boolean | undefined): boolean {
   if (value === undefined) return true
   if (typeof value !== 'boolean') {
     throw new Error(`prism-guardrails: skillInvocationGuidance must be a boolean, received ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
+/** Check the suggestion switch; a pure error-text improvement, so its default is on. */
+function resolveToolNameSuggestions(value: boolean | undefined): boolean {
+  if (value === undefined) return true
+  if (typeof value !== 'boolean') {
+    throw new Error(`prism-guardrails: toolNameSuggestions must be a boolean, received ${JSON.stringify(value)}`)
   }
   return value
 }
