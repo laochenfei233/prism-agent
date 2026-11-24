@@ -1,4 +1,4 @@
-/** Browser half: the import action after New session and its Remote calls. */
+/** Browser half: the DeepSeek export source card on the import page and its Remote calls. */
 import type { Context } from '@deepseek-ai/cordis'
 import remote from '@deepseek-ai/dsh-deepseek-chat-import/remote'
 import { mountImport } from './mount.ts'

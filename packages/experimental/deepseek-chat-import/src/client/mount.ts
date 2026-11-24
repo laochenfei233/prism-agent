@@ -1,12 +1,14 @@
-/** Remote contribution mounting and the `sidebar.session.action` layer. */
+/** Remote contribution mounting and the import-page source card. */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-deepseek-chat-import/remote'
 import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import { ImportSessionsAction } from './ImportSessions.tsx'
+// Type-only: the `settings.sessionImport.source` SlotMap merge declared by the
+// import page's browser half; this package only contributes an entry to it.
+import type {} from '@prism/prism-session-import/client'
+import { DeepseekImportSource } from './ImportSourceCard.tsx'
 import type { DeepseekChatImportInjected, DeepseekChatImportOutcome } from './ImportSessions.tsx'
 import { de, en, es, fr, ja, NS, pt, ru, zh } from './locales.ts'
 import { uploadArchive } from './upload.ts'
@@ -15,7 +17,7 @@ import { uploadArchive } from './upload.ts'
 export const inject = ['remote', 'slots', 'locale', 'sessions']
 
 /**
- * Register the dictionaries and the `sidebar.session.action` layer.
+ * Register the dictionaries and the import-page source card.
  * @param ctx - Context injecting the mounted `deepseekChatImport` Remote namespace.
  */
 function registerUi(ctx: Context): void {
@@ -40,12 +42,13 @@ function registerUi(ctx: Context): void {
       }
     },
   }
-  ctx.slots.inject('sidebar.session.action', () => ctx.slots.register({
-    name: 'sidebar.session.action',
-    id: 'deepseek-chat-import',
+  ctx.slots.inject('settings.sessionImport.source', () => ctx.slots.register({
+    name: 'settings.sessionImport.source',
+    id: 'deepseek-export',
+    order: -1,
     locale: NS,
     inject: () => injected,
-  }, ImportSessionsAction))
+  }, DeepseekImportSource))
 }
 
 /**

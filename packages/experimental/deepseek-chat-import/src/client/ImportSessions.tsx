@@ -51,6 +51,15 @@ export type ImportSessionsActionProps =
 type Translate = ImportSessionsActionProps['t']
 
 /**
+ * Props the import dialog reads. Shared by the sidebar action and the
+ * import-page source card, which both open this dialog.
+ */
+export type ImportDialogProps =
+  & InjectFace<DeepseekChatImportInjected>
+  & Pick<ImportSessionsActionProps, 'renderFactorySlot' | 'useSessions' | 'useWorkspaces'>
+  & PropsLocale<'deepseekChatImport'>
+
+/**
  * Wrap the New-session row content with the import trigger after it and, while
  * open, its dialog.
  * @param props - the row content, column width, global hooks, the import callback, and the locale seat.
@@ -85,8 +94,14 @@ type DialogState =
   | { readonly phase: 'running'; readonly progress: UploadProgress }
   | { readonly phase: 'done'; readonly result: DeepseekChatImportResult; readonly workspace: string }
 
-function ImportDialog(
-  { importArchive, renderFactorySlot, useSessions, useWorkspaces, onClose, t }: ImportSessionsActionProps & { onClose: () => void },
+/**
+ * Render the import dialog: file choice, workspace choice, upload and import
+ * progress, then the summary.
+ * @param props - the import callback, global hooks, the locale seat, and close.
+ * @returns the dialog modal.
+ */
+export function ImportDialog(
+  { importArchive, renderFactorySlot, useSessions, useWorkspaces, onClose, t }: ImportDialogProps & { onClose: () => void },
 ) {
   const workspaces = useWorkspaces(state => state.items)
   const currentSessionId = useSessions(state => Object.values(state.byId)

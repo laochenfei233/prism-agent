@@ -108,6 +108,7 @@
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/dsh-web": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
+    "@prism/prism-session-import": "workspace:*",
     "@testing-library/react": "^16.3.3",
     "clsx": "^2.0.0",
     "react": "^18.2.0",
