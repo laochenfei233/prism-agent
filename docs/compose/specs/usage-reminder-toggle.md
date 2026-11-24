@@ -3,7 +3,7 @@ feature: usage-reminder-toggle
 status: designed
 updated: 2026-11-24
 branch: feat/usage-reminder-toggle
-commits: 待交付时回填
+commits: 38749f9739 (master)
 ---
 
 # 令牌用量提醒开关（默认关闭）
