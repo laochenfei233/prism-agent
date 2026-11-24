@@ -6,7 +6,7 @@ description = "Prism Agent desktop shell (Tauri 2)"
 authors = ["dsh-desktop contributors"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.90"
 
 [lib]
 name = "dsh_desktop_lib"
@@ -41,7 +41,7 @@ serde_yaml = "0.9"
 # unless the host answers `PermissionRequested`; the callback types come from
 # the same crate version tauri links against.
 [target.'cfg(windows)'.dependencies]
-webview2-com = "0.38"
+webview2-com = "0.39"
 # Named event/mutex for the installer's `--quit` path. tauri already links
 # windows-sys; these features make the synchronization calls available here.
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Threading"] }
