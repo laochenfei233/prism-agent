@@ -13,15 +13,34 @@ function cdata(value: string): string {
 
 /**
  * Read one field from a flat XML envelope.
+ *
+ * The scan is linear on purpose: callback bodies arrive unauthenticated before
+ * the signature check, and the previous lazy-quantifier regex spent quadratic
+ * time on a body full of unclosed openers, stalling the shared event loop.
+ * The semantics are the old regex's: the first opener that has a closer after
+ * it wins, the content runs to the first closer after that opener, and a
+ * CDATA opener is only taken when `]]>` is immediately followed by the closer.
  * @param xml - the callback body.
  * @param tag - the element name.
  * @returns the field value, or undefined when absent.
  */
 export function readXmlField(xml: string, tag: string): string | undefined {
-  const pattern = new RegExp(`<${tag}>(?:<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>|([\\s\\S]*?))</${tag}>`, 'u')
-  const match = pattern.exec(xml)
-  if (match === null) return undefined
-  const value = match[1] ?? match[2] ?? ''
+  const opener = `<${tag}>`
+  const closer = `</${tag}>`
+  const openerStart = xml.indexOf(opener)
+  if (openerStart === -1) return undefined
+  const valueStart = openerStart + opener.length
+  const cdataStart = valueStart + '<![CDATA['.length
+  if (xml.startsWith('<![CDATA[', valueStart)) {
+    const cdataEnd = xml.indexOf(']]>', cdataStart)
+    if (cdataEnd !== -1 && xml.startsWith(closer, cdataEnd + ']]>'.length)) {
+      const value = xml.slice(cdataStart, cdataEnd)
+      return value.trim().length > 0 ? value : undefined
+    }
+  }
+  const end = xml.indexOf(closer, valueStart)
+  if (end === -1) return undefined
+  const value = xml.slice(valueStart, end)
   return value.trim().length > 0 ? value : undefined
 }
 

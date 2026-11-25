@@ -233,6 +233,30 @@ describe('wechat family crypto', () => {
   })
 })
 
+describe('readXmlField', () => {
+  it('reads CDATA and plain values and trims emptiness to undefined', () => {
+    expect(readXmlField('<xml><Encrypt><![CDATA[cipher]]></Encrypt></xml>', 'Encrypt')).toBe('cipher')
+    expect(readXmlField('<xml><Encrypt>plain</Encrypt></xml>', 'Encrypt')).toBe('plain')
+    expect(readXmlField('<xml><Encrypt>   </Encrypt></xml>', 'Encrypt')).toBeUndefined()
+    expect(readXmlField('<xml><FromUserName><![CDATA[u1]]></FromUserName></xml>', 'Encrypt')).toBeUndefined()
+  })
+
+  it('keeps scanning past an unclosed opener to the first closable one', () => {
+    expect(readXmlField('<Encrypt>a<Encrypt>b</Encrypt>', 'Encrypt')).toBe('a<Encrypt>b')
+    expect(readXmlField('<Encrypt>a', 'Encrypt')).toBeUndefined()
+  })
+
+  it('falls back to the plain scan when the CDATA section never closes properly', () => {
+    expect(readXmlField('<Encrypt><![CDATA[partial', 'Encrypt')).toBeUndefined()
+    expect(readXmlField('<Encrypt><![CDATA[x]]>junk</Encrypt>', 'Encrypt')).toBe('<![CDATA[x]]>junk')
+  })
+
+  it('stays linear on a body of unclosed openers', () => {
+    const hostile = '<Encrypt>'.repeat(200_000)
+    expect(readXmlField(hostile, 'Encrypt')).toBeUndefined()
+  })
+})
+
 describe('whatsapp', () => {
   it('verifies the HMAC signature over the raw body', () => {
     const body = '{"entry":[]}'
