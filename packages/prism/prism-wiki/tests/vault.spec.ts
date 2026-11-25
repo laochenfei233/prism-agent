@@ -199,6 +199,34 @@ describe('writing pages', () => {
     }, 'write')).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
   })
 
+  it('refuses a title carrying a newline instead of persisting an unparsable page', async () => {
+    await expect(files.writePage({
+      path: page('concepts/broken.md'),
+      frontmatter: frontmatter({ title: 'Broken\n---\nstatus: archived' }),
+      body: 'Body.\n',
+    }, 'write')).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+
+    await expect(files.hasPage(page('concepts/broken.md'))).resolves.toBe(false)
+  })
+
+  it('refuses a newline in a frontmatter list item', async () => {
+    await expect(files.writePage({
+      path: page('concepts/tagged.md'),
+      frontmatter: frontmatter({ tags: ['alpha\nbeta'] }),
+      body: 'Body.\n',
+    }, 'write')).rejects.toMatchObject({ code: 'WIKI_FRONTMATTER_INVALID' })
+
+    await expect(files.hasPage(page('concepts/tagged.md'))).resolves.toBe(false)
+  })
+
+  it('round-trips titles with quotes and backslashes', () => {
+    const original = frontmatter({ title: 'Quote " and backslash \\' })
+    const text = serializePageText(original, 'Body.\n')
+    const { frontmatter: parsedBack } = parsePageText(text, page('concepts/quoted.md'))
+
+    expect(parsedBack.title).toBe(original.title)
+  })
+
   it('refuses a stale revision and leaves the page untouched', async () => {
     const first = await files.writePage({ path: page('concepts/alpha.md'), frontmatter: frontmatter({ title: 'Alpha' }), body: 'Original.\n' }, 'write')
 

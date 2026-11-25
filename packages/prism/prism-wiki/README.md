@@ -78,7 +78,7 @@ The `./tools` row registers five definitions. Each call marks the session as owi
 |---|---|---|
 | `wiki_search` | `query` (required), `type`, `tags`, `status`, `limit` | Ranked hits (path, title, type, status, updated, and an excerpt around the first matching term), best `bm25()` match first, never more than `maxSearchResults`. |
 | `wiki_read` | `path` (required) | One page in full: its frontmatter fields, body, outgoing links, backlinks, and the raw sources it cites. |
-| `wiki_write` | `path`, `title`, `type`, `body` (required); `status`, `tags`, `sources`, `aliases`, `contradicts`, `confidence`, `expectedRevision` | The stored path, its new SHA-256 revision, and whether the write created the page. A stale `expectedRevision` is refused with `WIKI_REVISION_CONFLICT`. |
+| `wiki_write` | `path`, `title`, `type`, `body` (required); `status`, `tags`, `sources`, `aliases`, `contradicts`, `confidence`, `expectedRevision` | The stored path, its new SHA-256 revision, and whether the write created the page. A stale `expectedRevision` is refused with `WIKI_REVISION_CONFLICT`. Frontmatter text carrying a newline is refused with `WIKI_FRONTMATTER_INVALID` before anything is written. |
 | `wiki_source` | `action` (required: `list`, `read`, `add`, or `integrate`); `path`, `text`, `maxChars` | Per action: every source with the pages that cite it, one source's bounded text and whether the bound truncated it, the registered path, or the pages citing one source. |
 | `wiki_lint` | none | The pages and sources examined, and every finding with its kind, its page (or null for a vault-wide finding), and its detail. |
 

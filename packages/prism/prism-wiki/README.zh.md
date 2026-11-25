@@ -78,7 +78,7 @@ kind: "package-bundle"
 |---|---|---|
 | `wiki_search` | `query`（必填）、`type`、`tags`、`status`、`limit` | 排好序的命中（路径、标题、类型、状态、更新日期，以及首个匹配词周围的摘录），`bm25()` 最优者在前，数量不超过 `maxSearchResults`。 |
 | `wiki_read` | `path`（必填） | 一整页：它的前置数据字段、正文、出链、反向链接，以及它引用的原始来源。 |
-| `wiki_write` | `path`、`title`、`type`、`body`（必填）；`status`、`tags`、`sources`、`aliases`、`contradicts`、`confidence`、`expectedRevision` | 存储路径、新的 SHA-256 修订号，以及本次写入是否新建了页面。过期的 `expectedRevision` 以 `WIKI_REVISION_CONFLICT` 拒绝。 |
+| `wiki_write` | `path`、`title`、`type`、`body`（必填）；`status`、`tags`、`sources`、`aliases`、`contradicts`、`confidence`、`expectedRevision` | 存储路径、新的 SHA-256 修订号，以及本次写入是否新建了页面。过期的 `expectedRevision` 以 `WIKI_REVISION_CONFLICT` 拒绝。前置数据文本含有换行时，写入发生前即以 `WIKI_FRONTMATTER_INVALID` 拒绝。 |
 | `wiki_source` | `action`（必填：`list`、`read`、`add` 或 `integrate`）；`path`、`text`、`maxChars` | 按 action 分别为：每个来源及其引用页面，单个来源的有界文本及是否被截断，登记后的路径，或引用某个来源的页面。 |
 | `wiki_lint` | 无 | 检查过的页面数和来源数，以及每条发现及其种类、页面（知识库级发现为 null）和说明。 |
 

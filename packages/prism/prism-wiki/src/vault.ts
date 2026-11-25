@@ -660,9 +660,12 @@ export class VaultFiles {
       }
     }
     const text = serializePageText(draft.frontmatter, draft.body)
-    await writeAtomically(target, text)
+    // Round-trip the serialization before anything lands: a draft the vault
+    // cannot parse back (a scalar that survived validation but still breaks
+    // the block) must fail the write, not persist a phantom unparsable page.
     const { frontmatter, body } = parsePageText(text, draft.path)
     const page: WikiPage = { path: draft.path, frontmatter, body, revision: revisionOf(text) }
+    await writeAtomically(target, text)
     await this.rebuildIndex()
     await this.appendLogLocked(logKind, `${page.path} ${page.frontmatter.title}`)
     return page
@@ -1137,6 +1140,16 @@ function assertFrontmatter(frontmatter: WikiFrontmatter, path: WikiPagePath): vo
   const confidence = frontmatter.confidence
   if (confidence !== null && (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)) {
     throw invalidField(path, 'confidence', 'must be a number between 0 and 1')
+  }
+  // A newline inside a scalar is written raw into the quoted value, where an
+  // embedded `---` line closes the frontmatter block and a bare newline
+  // mangles the value on read-back, so no frontmatter string may carry one.
+  for (const [field, value] of Object.entries(frontmatter)) {
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (typeof item === 'string' && /[\r\n]/u.test(item)) {
+        throw invalidField(path, field, 'must not contain a newline')
+      }
+    }
   }
 }
 
