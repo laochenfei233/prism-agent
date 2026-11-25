@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for tool-name-suggestions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/tool-name-suggestions.md
+/:
+  en: 5a1e2ffe7d7cdecb
+  zh: 5a1e2ffe7d7cdecb
+/similar-name-suggestions-for-unknown-tool-names:
+  en: 088674be4977f6df
+  zh: a433f0811d1093b1
+/similar-name-suggestions-for-unknown-tool-names/report:
+  en: dfbe2ef422067c90
+  zh: 4c2b1a6929e54f30
+/similar-name-suggestions-for-unknown-tool-names/s1-problem:
+  en: 086a3bedfa28cfff
+  zh: 6909e589c0db2cb0
+/similar-name-suggestions-for-unknown-tool-names/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/similar-name-suggestions-for-unknown-tool-names/s2-design/s2-1-hook-the-tools-execute-waterfall-wrapper:
+  en: 196a1565b313349d
+  zh: 84b50a2e213b75e0
+/similar-name-suggestions-for-unknown-tool-names/s2-design/s2-2-the-suggestion-algorithm-new-src-tool-hints-ts:
+  en: bdcb2b5919cfc1d5
+  zh: 7fc547947f77ba91
+/similar-name-suggestions-for-unknown-tool-names/s2-design/s2-3-return-shape-no-rethrow-return-the-enhanced-error-result:
+  en: 75a5869d64f3a286
+  zh: 5773ced0cead1c51
+/similar-name-suggestions-for-unknown-tool-names/s2-design/s2-4-configuration:
+  en: 09c78f10cba8c5d3
+  zh: 217da5c16998e4a0
+/similar-name-suggestions-for-unknown-tool-names/s3-scope:
+  en: c3283766b36ac9f6
+  zh: b742ad97ef67a310
+/similar-name-suggestions-for-unknown-tool-names/tasks:
+  en: 154bb185b68f2e5d
+  zh: 039b94345a4cfd03
+/similar-name-suggestions-for-unknown-tool-names/s4-acceptance:
+  en: 70e609a672f9ab21
+  zh: 70186e5986819410

@@ -21299,6 +21299,12 @@ importers:
       '@deepseek-ai/dsh-error':
         specifier: workspace:*
         version: link:../../packages/util/error
+      '@deepseek-ai/dsh-experimental-speech-to-text':
+        specifier: workspace:*
+        version: link:../../packages/experimental/speech-to-text
+      '@deepseek-ai/dsh-experimental-speech-to-text-dashscope':
+        specifier: workspace:*
+        version: link:../../packages/experimental/speech-to-text-dashscope
       '@deepseek-ai/dsh-file-reference':
         specifier: workspace:*
         version: link:../../packages/context/file-reference

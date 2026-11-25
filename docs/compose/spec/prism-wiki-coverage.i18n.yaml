@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/prism-wiki-coverage.md
 /:
-  en: f661a532c110256a
-  zh: 17294f0b72cfbd67
+  en: 7403bff33cc33496
+  zh: 7403bff33cc33496
 /prism-wiki-coverage:
   en: cb8f1ec95f4faa6e
   zh: 28d153bc75da8577
 /prism-wiki-coverage/report:
-  en: 89cb24c30cd4ef9d
-  zh: 1c1c9244a4e743e8
+  en: 7f455a2ceca636c5
+  zh: 53ca734c35c61180
 /prism-wiki-coverage/s1-problem:
   en: 3592afac707d0d28
   zh: 1b4eb818442b6ff4
@@ -39,8 +39,8 @@
   en: 5f3bbbba8cc1712e
   zh: f93cec46f9edaa8c
 /prism-wiki-coverage/tasks:
-  en: fda69981317abba5
-  zh: ccc5b6e0425dc478
+  en: 4113daa68459955d
+  zh: 4f0e700c4a22d9a6
 /prism-wiki-coverage/s4-acceptance:
-  en: 834b8795182176bb
-  zh: b1723cf1e6cfa09a
+  en: 199626f444a0a24b
+  zh: 536f2219f561f84f

@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for wait-time-reminder.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/wait-time-reminder.md
+/:
+  en: 5a836bfeebe814cb
+  zh: 5a836bfeebe814cb
+/silent-reminders-by-actual-wait-time:
+  en: 78c07115401bad0f
+  zh: bcf5e047f4faef1b
+/silent-reminders-by-actual-wait-time/report:
+  en: cde61d0106e0d312
+  zh: 81a3f85cb2bbcece
+/silent-reminders-by-actual-wait-time/s1-problem:
+  en: f4fc58c75ec19344
+  zh: af959687a943e422
+/silent-reminders-by-actual-wait-time/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/silent-reminders-by-actual-wait-time/s2-design/s2-1-hook-wrap-tools-execute-with-timing:
+  en: d43e35c9d87d51c6
+  zh: 7496fcd2569766a4
+/silent-reminders-by-actual-wait-time/s2-design/s2-2-injection-append-additionalcontexts-to-the-result:
+  en: 35e235ce8c999db6
+  zh: d24b1f8d3d7e0baa
+/silent-reminders-by-actual-wait-time/s2-design/s2-3-configuration:
+  en: 9a9a0b9e7b9bb224
+  zh: a8bb07b3ab5c1612
+/silent-reminders-by-actual-wait-time/s2-design/s2-4-ledger:
+  en: e7014aa24d844d58
+  zh: e1e8cd5a67bb2f88
+/silent-reminders-by-actual-wait-time/s3-scope:
+  en: 1ce8c2b3c6dc5a2b
+  zh: b570408bc64c6932
+/silent-reminders-by-actual-wait-time/tasks:
+  en: d9153a2bc8d472b0
+  zh: 8c4a70e0a3c67bd1
+/silent-reminders-by-actual-wait-time/s4-acceptance:
+  en: 5ea0a0a9f48412a7
+  zh: 8074f9a9a38e0b0a

@@ -16,4 +16,10 @@
         mode: enforce
         worktree: true
         maxReports: 200
-        writeTools: [write, edit, str_replace_editor]
+        writeTools:
+          - tool: write
+            pathArgument: file_path
+          - tool: edit
+            pathArgument: file_path
+          - tool: str_replace_editor
+            pathArgument: path

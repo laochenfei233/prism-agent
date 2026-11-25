@@ -6,67 +6,69 @@ branch: feat/wait-time-reminder
 commits: 7abf808b6c (master)
 ---
 
-# 按实际等待时长的静默提醒
+# Silent reminders by actual wait time
+
+English | [中文](wait-time-reminder.zh.md)
 
 ## Report
 
-已实现（2026-11-25，`plugins/prism-guardrails`）：
+Delivered (2026-11-25, `plugins/prism-guardrails`):
 
-- T1：`waitReminderAfterMs`、`waitReminderPerTurn` 进入 `Config`/`ResolvedConfig`/`KNOWN_KEYS`；`waitReminderAfterMs` 出厂默认 60000（与 stuck nudge 同款"纯提醒出厂开启"），`0` = 关闭；`waitReminderPerTurn` 默认 2，`0` = 关闭；非整数或负数加载即 throw。
-- T2：`installWaitTimeReminder` 包装 `tools/execute`（t0 → `next()` → elapsed），不触碰 `exec.signal`；`elapsed >= 阈值` 时在该结果上追加一条 `additionalContexts`（`createUserMessage`，stuck-nudge 同款形态），原结果 content 不变；每轮配额沿用 guardrails 既有 `agent/pre-step` turnSeen 轮次机制重置；经 `note()` 记 `wait reminder`（`steer`，observe/enforce 行为一致）；`/guardrails` 报告新增一行（共 15 条 rail）。
-- T3：新增 8 项用例——`0` 关闭零注入、超阈值恰一条提醒且原结果不变、每轮限频 2、新一轮配额重置、时长格式化、enforce 状态行、observe 下台账可见 `wait reminder` steer；套件 181 项全绿。
-- T4：README.md 与 README.zh.md 同步（rail 总表、配置表、加载期拒绝项表、`/guardrails` 示例、rail 小节），package.json 描述更新，README.i18n.yaml 重新录制。
-- 验证：`npm run typecheck`（tsc --noEmit）通过；`npm run build` + `npm run smoke` 通过；`npm test`（vitest，181 项）全绿；`verify-translation-pairing` 一致。
+- T1: `waitReminderAfterMs` and `waitReminderPerTurn` join `Config`/`ResolvedConfig`/`KNOWN_KEYS`; `waitReminderAfterMs` ships at 60000 (the same "pure reminder ships on" posture as the stuck nudge), `0` disables; `waitReminderPerTurn` defaults to 2, `0` disables; a non-integer or negative value throws at load.
+- T2: `installWaitTimeReminder` wraps `tools/execute` (t0 → `next()` → elapsed) without touching `exec.signal`; when `elapsed >=` the threshold it appends one `additionalContexts` entry to that result (`createUserMessage`, the stuck-nudge shape) leaving the result's content unchanged; the per-turn quota reuses guardrails' existing `agent/pre-step` turnSeen turn mechanics; the ledger records `wait reminder` via `note()` (`steer`, identical under observe/enforce); the `/guardrails` report gains one line (15 rails total).
+- T3: 8 new cases — `0` disables with zero injections, an over-threshold call adds exactly one reminder with the result unchanged, the per-turn limit of 2, a new turn resets the quota, duration formatting, the enforce status line, and the ledger showing the `wait reminder` steer under observe; the suite is 181/181 green.
+- T4: README.md and README.zh.md updated together (the rail table, the config table, the load-time rejection table, the `/guardrails` example, the rail section), the package.json description updated, README.i18n.yaml re-recorded.
+- Verification: `npm run typecheck` (tsc --noEmit) passes; `npm run build` + `npm run smoke` pass; `npm test` (vitest, 181 tests) all green; `verify-translation-pairing` consistent.
 
 ## [S1] Problem
 
-ZCode v3.19.1："静默提醒改为按实际等待时间触发，提示更及时"。prism 没有对应机制：`packages/schedule` 是日历/周期调度、`repeat-tool-reminder` 按重复次数、`timeout-policy` 是超时截断——都没有"这次调用实际让模型等了多久"的度量与提醒。
+ZCode v3.19.1: "silent reminders now fire by actual wait time, so the nudge arrives earlier". prism has no equivalent: `packages/schedule` is calendar/recurrence scheduling, `repeat-tool-reminder` fires by repetition count, and `timeout-policy` is a cut-off — none measures "how long this call actually made the model wait" or reminds about it.
 
-**语义假设（请确认）**：本 spec 把该条实现为——前台工具调用**实际等待时长**超过阈值时，在该调用的结果上附加一句提醒（模型下一步可见），提示等待成本并建议后台化/拆分。它与基库的前台超时（默认 120s、封顶 600s，到点转后台，`packages/shell/tool-bash/src/index.ts:336-356`）互补：阈值低于超时，提前给出软提示而不是等到硬截断。日历式"定时提醒"已有 `schedule` 包承担，不在本 spec 范围。若你想要的是"用户/模型设定 N 分钟后提醒"的相对定时器，请在确认时说明，spec 将改为 timer + `agent.followup` 方案（cron 已有同款先例）。
+**Semantic assumption (please confirm)**: this spec implements it as — when a foreground tool call's **actual wait time** exceeds the threshold, attach one reminder sentence to that call's result (visible to the model's next step) naming the wait cost and suggesting backgrounding/splitting. It complements the base's foreground timeout (default 120s, capped at 600s, moves to background at the limit, `packages/shell/tool-bash/src/index.ts:336-356`): the threshold sits below the timeout and gives a soft nudge before the hard cut. Calendar-style "remind me at a time" is already owned by the `schedule` package and stays out of scope. If you wanted "a relative timer the user/model sets for N minutes from now", say so in the confirmation and the spec will become timer + `agent.followup` (cron already has that precedent).
 
 ## [S2] Design
 
-### S2.1 挂点：`tools/execute` 环绕计时
+### S2.1 Hook: wrap `tools/execute` with timing
 
-- guardrails 新增 `tools/execute` 监听（模板 `packages/guard/timeout-policy/src/index.ts:52-76`）：`t0 = Date.now()`；`const result = await next()`；`elapsed = Date.now() - t0`。不修改 `exec.signal`（避免与 caller 信号 fuse 语义纠缠，`pipeline.ts:262-284`）。
-- 到点即"触发"：实际等待时长就是本次调用的真实阻塞时长，无需额外定时器，也就没有"等待中途注入"的时序问题（工具返回前模型本就看不到任何注入点）。
+- guardrails adds a `tools/execute` listener (template `packages/guard/timeout-policy/src/index.ts:52-76`): `t0 = Date.now()`; `const result = await next()`; `elapsed = Date.now() - t0`. It does not modify `exec.signal` (avoiding the fuse semantics of merging with the caller's signal, `pipeline.ts:262-284`).
+- Reaching the threshold IS the trigger: the actual wait is the call's true blocking duration, so no extra timer exists and there is no "inject mid-wait" timing problem (the model cannot see any injection point before the tool returns anyway).
 
-### S2.2 注入：结果附加 `additionalContexts`
+### S2.2 Injection: append `additionalContexts` to the result
 
-- `elapsed >= waitReminderAfterMs` 时，向该结果追加一条 `createUserMessage`（stuck-nudge 同款形态，`plugins/prism-guardrails/src/index.ts:743-757`；管线合并 `pipeline.ts:486-525`；最终 splice 进下一步 inbox，`packages/core/agent-loop/src/agent.ts:594-596`）。
-- 文本（英文，与现有 steer 文本同语言）：说明该调用实际等待了约 X 秒/分钟，建议：长等待改用后台运行（`run_in_background`）、拆分任务，或检查是否在等待不可能完成的输入。语气与 stuck-nudge 一致：只提示，不判定失败。
-- 每个调用至多一条；每轮至多 `waitReminderPerTurn` 条（默认 `2`），由 `agent/turn-stopping` 轮次边界重置计数（guardrails 既有轮次机制）。
+- When `elapsed >= waitReminderAfterMs`, append one `createUserMessage` to that result (the stuck-nudge shape, `plugins/prism-guardrails/src/index.ts:743-757`; the pipeline merges `pipeline.ts:486-525`; the final splice lands in the next step's inbox, `packages/core/agent-loop/src/agent.ts:594-596`).
+- The text (English, same language as the existing steers): states that the call waited roughly X seconds/minutes and suggests moving the long wait to a background run (`run_in_background`), splitting the task, or checking whether the call awaits input that cannot complete. The tone matches the stuck nudge: a hint, never a verdict of failure.
+- At most one per call; at most `waitReminderPerTurn` per turn (default `2`), the counter reset at the `agent/turn-stopping` turn boundary (guardrails' existing turn mechanics).
 
-### S2.3 配置
+### S2.3 Configuration
 
-| 键 | 默认 | 含义 |
+| Key | Default | Meaning |
 |---|---|---|
-| `waitReminderAfterMs` | `60000` | 触发阈值的实际等待毫秒数；`0` = 关闭 |
-| `waitReminderPerTurn` | `2` | 每轮最多注入条数 |
+| `waitReminderAfterMs` | `60000` | Actual waited milliseconds that trigger the reminder; `0` disables |
+| `waitReminderPerTurn` | `2` | Maximum injections per turn |
 
-- 两键加入 `KNOWN_KEYS`（`config.ts:206-226`），整数/区间校验，非法值加载即 throw；`configVersion` 自动覆盖。
+- Both keys join `KNOWN_KEYS` (`config.ts:206-226`) with integer/range validation; an illegal value throws at load; `configVersion` covers them automatically.
 
-### S2.4 台账
+### S2.4 Ledger
 
-触发时经 `note()`（`index.ts:208-216`）记 `wait reminder`（纯提醒，不拦截，observe/enforce 行为一致）。
+On trigger the rail records `wait reminder` via `note()` (`index.ts:208-216`) — a pure reminder that intercepts nothing, identical under observe and enforce.
 
 ## [S3] Scope
 
-- In scope: guardrails 内 `tools/execute` 计时包装、阈值/限频配置、`additionalContexts` 注入、台账记录、测试、README。
-- Out of scope: 等待后台子任务/用户输入期间的提醒（无注入点）；`schedule` 包的日历提醒；基库超时/转后台行为改动；对流式中间结果的注入。
+- In scope: the `tools/execute` timing wrapper in guardrails, the threshold/rate configuration, the `additionalContexts` injection, the ledger record, tests, and the README.
+- Out of scope: reminders while waiting on a background subtask or user input (no injection point); the `schedule` package's calendar reminders; changes to the base timeout/background behavior; injection into streaming intermediate results.
 
 ## Tasks
 
-- [x] T1: config 两键 + 校验 + KNOWN_KEYS（depends: none）
-- [x] T2: `tools/execute` 计时 + 注入 + 每轮限频 + 台账（depends: T1）
-- [x] T3: 测试——快调用不注入、超阈值注入一条、限频、`0` 关闭、轮次重置、observe 一致（depends: T2）
-- [x] T4: README 补充说明（depends: T2）
+- [x] T1: the two config keys + validation + KNOWN_KEYS (depends: none)
+- [x] T2: the `tools/execute` timing + injection + per-turn limit + ledger (depends: T1)
+- [x] T3: tests — a fast call injects nothing, an over-threshold call injects exactly one, the per-turn limit, `0` disables, the turn reset, enforce status line, observe ledger parity (depends: T2)
+- [x] T4: README updates (depends: T2)
 
 ## [S4] Acceptance
 
-- [x] 默认 60s 阈值下，<60s 的调用结果无附加内容
-- [x] ≥60s 的调用结果恰好多一条提醒 context，原结果 content 不变
-- [x] 同一轮第 3 次超阈值不再注入（限频 2）；新一轮计数重置
-- [x] `waitReminderAfterMs: 0` 时全程无注入
-- [x] observe 与 enforce 行为一致（纯提醒）；台账可见 `wait reminder` 记录
-- [x] guardrails 既有测试全绿；新增用例覆盖上述路径
+- [x] With the default 60s threshold, a call under 60s returns a result with no addition
+- [x] A call of 60s or more returns exactly one extra reminder context with the original content unchanged
+- [x] The third over-threshold call in one turn is not injected (limit 2); a new turn resets the count
+- [x] `waitReminderAfterMs: 0` injects nothing anywhere
+- [x] observe and enforce behave identically (pure reminder); the ledger shows the `wait reminder` rows
+- [x] guardrails' existing tests stay green; the new cases cover the paths above

@@ -16,6 +16,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import * as Ponytail from '../src/ponytail.ts'
 
@@ -45,6 +46,7 @@ async function harness(
 ): Promise<{ ctx: Context; agent: Agent; inject: ReturnType<typeof vi.fn> }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(Ponytail, config)
@@ -106,6 +108,7 @@ describe('ponytail mode section', () => {
   it('refuses to load with a level the mode cannot run', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(CommandRuntime)
     await expect(ctx.plugin(Ponytail, { level: 'turbo' as Ponytail.PonytailLevel }))
@@ -164,12 +167,14 @@ describe('automatic switching', () => {
   it('rejects automatic rules the deployment cannot mean', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SystemPrompt, {})
     await ctx.plugin(CommandRuntime)
 
     await expect(ctx.plugin(Ponytail, { autoLongTaskSteps: -1 })).rejects.toThrow('autoLongTaskSteps must be an integer >= 0')
     const second = new Context()
     await second.plugin(SessionStore)
+    await second.plugin(SessionProjectionRegistry)
     await second.plugin(SystemPrompt, {})
     await second.plugin(CommandRuntime)
     await expect(second.plugin(Ponytail, { autoCodingPresets: [''] })).rejects.toThrow('autoCodingPresets must be an array')

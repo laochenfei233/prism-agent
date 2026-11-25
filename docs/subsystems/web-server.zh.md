@@ -138,7 +138,7 @@ interface TlsConfig {
 
 ## 服务
 
-嵌套服务 `connection.authentication` 通过注册的 Provider 选择 Peer；Connection 执行来源策略，WebServer 将选定 Peer 传给各次调用。[Token 插件](../../packages/host/authentication-token/README.zh.md)贡献签名登录 URL；WebApp 拥有启动打印和浏览器打开行为。[Desktop](../../apps/desktop/README.zh.md#application-overview)使用父进程与 Host 之间私有 IPC 通道交付的凭据，注册独立 Provider；其 ready 消息携带普通 Host 地址和启动注入。
+嵌套服务 `connection.authentication` 通过注册的 Provider 选择 Peer；Connection 执行来源策略，WebServer 将选定 Peer 传给各次调用。[Token 插件](../../packages/host/authentication-token/README.zh.md)贡献签名登录 URL；WebApp 拥有启动打印和浏览器打开行为。[Desktop](../../apps/desktop/README.zh.md)使用父进程与 Host 之间私有 IPC 通道交付的凭据，注册独立 Provider；其 ready 消息携带普通 Host 地址和启动注入。
 
 `WebServer`（`ctx.webServer`）在激活时立即监听；监听失败（EADDRINUSE 等）会使初始化被拒绝，启动进程会报告失败的 fiber。`tls` 证书对在监听器绑定前读取一次；文件不可读、为空或二者不匹配时同样会使初始化被拒绝，而不是回退到 HTTP。`register(route)` 添加一条具名路由并返回其 disposer；重复的 `(kind, path)` 抛出异常，因为路由模式是组合层约定，冲突即配置错误。Gzip 在服务器内部包装符合条件且基于 socket 的响应，因此 handler 继续直接持有 `ServerResponse`，resource 则把 `Response` 交给服务写回。已有内容编码、`Cache-Control: no-transform`、范围响应、SSE、ZIP 与打包后的 `.gz` Worker 镜像均保持 identity 响应。`collectIndexInjections(peer)` 经一次传入页面所代表 Peer 的 `webserver/index-inject` emit 收集结构化 `IndexInjection` 行，`renderIndex(html, peer)` 把它们渲染进成功的根路径和配置 index 响应，随后再按注册顺序应用原始的 `tapIndex(transform)` 逃生口转换；[dsh-client-modules](../../packages/client/modules) 以启动 manifest（元数据清单）行回应该事件。`port` 读取监听端口，包括 `config.port` 为 0 时操作系统分配的端口，`protocol` 则报告监听器提供的协议（`http:` 或 `https:`）。
 
