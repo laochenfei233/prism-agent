@@ -156,6 +156,12 @@ export interface Config {
   readonly verificationGate?: VerificationGateConfig
   /** The deployment's file-reading tools, whose paths the sensitive-read rail matches. */
   readonly readTools?: readonly ReadTool[]
+  /**
+   * The deployment's shell tools whose command text the sensitive-read rail
+   * matches, so reading a credential file through a shell command is covered
+   * the same way a path-argument read is.
+   */
+  readonly readCommandTools?: readonly CommandTool[]
   /** Path segments treated as credential material; omit to disable the sensitive-read rail. */
   readonly sensitivePaths?: readonly string[]
   /** Whether a shell command matching a guarded pattern goes to approval; omit to disable this rail. */
@@ -209,6 +215,7 @@ export interface ResolvedConfig {
   readonly routingContract: ReadonlySet<string> | undefined
   readonly verificationGate: ReadonlySet<string> | undefined
   readonly readTools: ReadonlyMap<string, string> | undefined
+  readonly readCommandTools: ReadonlyMap<string, string> | undefined
   readonly sensitivePaths: readonly string[] | undefined
   readonly commandGuard: ResolvedCommandGuard | undefined
   readonly stuckNudgeAfterFailures: number | undefined
@@ -236,6 +243,7 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'routingContract',
   'verificationGate',
   'readTools',
+  'readCommandTools',
   'sensitivePaths',
   'commandGuard',
   'stuckNudgeAfterFailures',
@@ -289,6 +297,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
   const routingContract = resolveRoutingContract(config.routingContract)
   const verificationGate = resolveVerificationGate(config.verificationGate)
   const readTools = resolveReadTools(config.readTools)
+  const readCommandTools = resolveReadCommandTools(config.readCommandTools)
   const sensitivePaths = resolveSensitivePaths(config.sensitivePaths)
   const commandGuard = resolveCommandGuard(config.commandGuard)
 
@@ -308,9 +317,10 @@ export function resolveConfig(config: Config): ResolvedConfig {
       + 'writeTools entry must name its contentArgument')
   }
   // Same rule for the reading side: a sensitive-path list with no tool to check
-  // it against would load a rail that can never fire.
-  if (sensitivePaths !== undefined && readTools === undefined) {
-    throw new Error('prism-guardrails: sensitivePaths reads file paths — name readTools as well')
+  // it against would load a rail that can never fire. Either kind of reading
+  // tool arms the rail.
+  if (sensitivePaths !== undefined && readTools === undefined && readCommandTools === undefined) {
+    throw new Error('prism-guardrails: sensitivePaths reads file paths — name readTools or readCommandTools as well')
   }
 
   return {
@@ -328,6 +338,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     routingContract,
     verificationGate,
     readTools,
+    readCommandTools,
     sensitivePaths,
     commandGuard,
     stuckNudgeAfterFailures: resolveStuckNudgeAfterFailures(config.stuckNudgeAfterFailures),
@@ -753,6 +764,48 @@ function resolveReadTools(value: readonly ReadTool[] | undefined): ReadonlyMap<s
   }
   if (tools.size === 0) {
     throw new Error('prism-guardrails: readTools must not be empty — omit the key to disable the sensitive-read rail')
+  }
+  return tools
+}
+
+/**
+ * Check the command-reading tool list into a lookup by tool name.
+ *
+ * Keyed the same way as `readTools`: the sensitive-read rail asks "is this call
+ * a shell call whose command names a credential path?", and a duplicated name
+ * would make the answer depend on position.
+ */
+function resolveReadCommandTools(value: readonly CommandTool[] | undefined): ReadonlyMap<string, string> | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    throw new Error('prism-guardrails: readCommandTools must be an array of { tool, commandArgument } entries')
+  }
+  const tools = new Map<string, string>()
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`prism-guardrails: readCommandTools entries must be objects, received ${JSON.stringify(entry)}`)
+    }
+    const unknown = Object.keys(entry).filter(key => !COMMAND_TOOL_KEYS.has(key))
+    if (unknown.length > 0) {
+      throw new Error(`prism-guardrails: unknown readCommandTools key(s) ${unknown.join(', ')} — an entry is `
+        + `{ ${[...COMMAND_TOOL_KEYS].join(', ')} }`)
+    }
+    const tool = entry.tool
+    const commandArgument = entry.commandArgument
+    if (typeof tool !== 'string' || tool.trim() === '') {
+      throw new Error(`prism-guardrails: readCommandTools entries must name a tool, received ${JSON.stringify(tool)}`)
+    }
+    if (typeof commandArgument !== 'string' || commandArgument.trim() === '') {
+      throw new Error(`prism-guardrails: readCommandTools entry "${tool}" must name its commandArgument`)
+    }
+    if (tools.has(tool)) {
+      throw new Error(`prism-guardrails: readCommandTools names "${tool}" twice`)
+    }
+    tools.set(tool, commandArgument)
+  }
+  if (tools.size === 0) {
+    throw new Error('prism-guardrails: readCommandTools must not be empty — omit the key to keep the '
+      + 'sensitive-read rail path-only')
   }
   return tools
 }

@@ -1056,24 +1056,32 @@ function sortJsonValue(value: unknown): unknown {
  * needs — ask the user for the value — never needs the file's contents, so
  * there is nothing for an approval to price.
  *
- * The rail matches the path the call names, not the file it resolves to, so a
- * symlink or a relative detour around a guarded directory is not covered.
+ * The rail matches what the call names, not the file it resolves to, so a
+ * symlink or a relative detour around a guarded directory is not covered. A
+ * `readTools` entry names a path argument; a `readCommandTools` entry names a
+ * shell command whose text is matched segment by segment, so
+ * `bash cat .env` is covered the same way `read .env` is.
  */
 function installSensitiveReadDenial(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
   const readTools = resolved.readTools
+  const readCommandTools = resolved.readCommandTools
   const segments = resolved.sensitivePaths
-  if (readTools === undefined || segments === undefined) return
+  if ((readTools === undefined && readCommandTools === undefined) || segments === undefined) return
 
   ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
-    const pathArgument = readTools.get(exec.name)
-    if (pathArgument === undefined) return next()
-    const path = stringArgument(exec.arguments, pathArgument)
-    if (path === undefined) return next()
-    const matched = sensitiveSegment(path, segments)
+    const pathArgument = readTools?.get(exec.name)
+    const commandArgument = readCommandTools?.get(exec.name)
+    const candidate = pathArgument !== undefined
+      ? stringArgument(exec.arguments, pathArgument)
+      : commandArgument !== undefined
+        ? stringArgument(exec.arguments, commandArgument)
+        : undefined
+    if (candidate === undefined) return next()
+    const matched = sensitiveSegment(candidate, segments)
     if (matched === undefined) return next()
-    return decide(ledger, resolved.mode, exec.agent, 'sensitive reads', path, {
+    return decide(ledger, resolved.mode, exec.agent, 'sensitive reads', candidate, {
       kind: 'deny',
-      reason: `\`${exec.name}\` targets ${JSON.stringify(path)}, which this deployment treats as credential `
+      reason: `\`${exec.name}\` targets ${JSON.stringify(candidate)}, which this deployment treats as credential `
         + `material (matched ${JSON.stringify(matched)}); reading it would write the secret into the session log `
         + 'permanently. Ask the user for the specific value if it is needed.',
     }, next)

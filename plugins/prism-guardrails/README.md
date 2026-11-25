@@ -82,6 +82,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 | `routingContract.readOnlyTools` | non-empty array of distinct, non-blank tool names | The tools that only read; the first call to any other is the contract's trigger | rail off |
 | `verificationGate.verifyTools` | non-empty array of distinct, non-blank tool names | The tools whose completed call is accepted as verification | rail off |
 | `readTools` | non-empty array of `{ tool, pathArgument }` | The deployment's file-reading tools; required by the sensitive-read rail | required by that rail |
+| `readCommandTools` | non-empty array of `{ tool, commandArgument }` | The deployment's shell tools whose command text the sensitive-read rail also matches | optional extension of that rail |
 | `sensitivePaths` | non-empty array of distinct, non-blank path segments | Path segments treated as credential material | rail off |
 | `commandGuard.tools` | non-empty array of `{ tool, commandArgument }` | The tools whose call carries a command line | required by that rail |
 | `commandGuard.deny` | non-empty array of `{ pattern, reason }` | Regular expressions a command is matched against, and why an approver should care | required by that rail |
@@ -95,7 +96,7 @@ Every rail is **off** until its key names a value, and a key that is present but
 
 `writeTools` entries name the tool's **own** argument keys, so a profile whose writing tool calls them something else is configured rather than special-cased. For DeepSeek Harness's own tool set that is `{ tool: write, pathArgument: file_path, contentArgument: content }` and `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`; `contentArgument` is omitted for a tool that carries no text.
 
-`readTools` works the same way: `{ tool: read, pathArgument: file_path }`, `{ tool: read_image, pathArgument: file_path }`, and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's three tools that read by path.
+`readTools` works the same way: `{ tool: read, pathArgument: file_path }`, `{ tool: read_image, pathArgument: file_path }`, and `{ tool: grep, pathArgument: path }` cover DeepSeek Harness's three tools that read by path. `readCommandTools` adds the shell side of the same rail: `{ tool: bash, commandArgument: command }` and `{ tool: pwsh, commandArgument: command }` make `bash cat .env` refuse the way `read .env` does, so a credential file cannot be read into the log through a shell command instead.
 
 `mode` is the only key that applies to every rail at once, and it is the only way to see a rail before arming it: under `observe` each rail decides exactly as it would under `enforce`, records the decision, and lets the call through. `/guardrails` lists what it would have stopped. A `deny` and an `ask` are both observations; a `steer` is not, because sending a turn back for evidence is a request to finish work rather than a refusal, and observing must not switch it off.
 
@@ -132,8 +133,11 @@ Load-time rejections, each with the message asserted by the test suite:
 | `readTools` not an array, or empty | `readTools must be an array of { tool, pathArgument } entries` / `readTools must not be empty — omit the key to disable the sensitive-read rail` |
 | a read entry naming no path argument | `readTools entry "read" must name its pathArgument` |
 | a repeated read tool, or an unknown entry key | `readTools names "read" twice` / `unknown readTools key(s) …` |
+| `readCommandTools` not an array, or empty | `readCommandTools must be an array of { tool, commandArgument } entries` / `readCommandTools must not be empty — omit the key to keep the sensitive-read rail path-only` |
+| a command-read entry naming no tool or no argument | `readCommandTools entries must name a tool` / `readCommandTools entry "bash" must name its commandArgument` |
+| a repeated command-read tool, or an unknown entry key | `readCommandTools names "bash" twice` / `unknown readCommandTools key(s) …` |
 | `sensitivePaths` empty, blank, or repeated | `sensitivePaths must not be empty — omit the key to disable the sensitive-read rail`, `… entries must be non-empty path segments`, `… names ".env" twice` |
-| `sensitivePaths` without `readTools` | `sensitivePaths reads file paths — name readTools as well` |
+| `sensitivePaths` without either reading-tool list | `sensitivePaths reads file paths — name readTools or readCommandTools as well` |
 | `commandGuard` not an object, or an unknown key | `commandGuard must be an object { tools, deny }`, `unknown commandGuard key(s) …` |
 | an empty `tools` or `deny` list | `commandGuard.tools must be a non-empty array of { tool, commandArgument } entries`, `commandGuard.deny must be a non-empty array of { pattern, reason } entries` |
 | a command tool naming no argument | `commandGuard.tools entry "bash" must name its commandArgument` |
@@ -285,6 +289,8 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 A segment matches by equality or by a dotted extension of the configured name, ignoring case, under either separator: `.env` guards `.env` and `.env.local`, and leaves `environment.ts` alone.
 
+When the deployment arms `readCommandTools`, the same match runs over a shell tool's command text, so `bash cat .env` is refused exactly like `read .env` — a shell command is otherwise a way around the rail, since its output reaches the log through the same `tool/result` event.
+
 The decision is `deny` rather than `ask`. A read lands in the session log, and no later approval removes it from there; the useful alternative — the user pastes the value — never needs the file's contents, so there is nothing for an approval to price.
 
 The rail matches the path the call names, not the file it resolves to, so a symlink or a relative detour around a guarded directory is not covered.
@@ -396,6 +402,9 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           - { tool: read, pathArgument: file_path }
           - { tool: read_image, pathArgument: file_path }
           - { tool: grep, pathArgument: path }
+        readCommandTools:
+          - { tool: bash, commandArgument: command }
+          - { tool: pwsh, commandArgument: command }
         sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519]
         commandGuard:
           tools:

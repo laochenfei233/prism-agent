@@ -82,6 +82,7 @@
 | `routingContract.readOnlyTools` | 非空、互不相同、非空白的工具名数组 | 只做读取的工具；调用其他任何工具即为契约触发点 | rail 关闭 |
 | `verificationGate.verifyTools` | 非空、互不相同、非空白的工具名数组 | 其成功调用被认可为验证的工具 | rail 关闭 |
 | `readTools` | 非空的 `{ tool, pathArgument }` 数组 | 该部署的读文件工具；敏感读取 rail 以它为前置 | 由该 rail 要求 |
+| `readCommandTools` | 非空的 `{ tool, commandArgument }` 数组 | 该部署的 shell 工具，其命令文本也参与敏感读取 rail 的匹配 | 该 rail 的可选扩展 |
 | `sensitivePaths` | 非空、互不相同、非空白的路径段数组 | 被视为凭据材料的路径段 | rail 关闭 |
 | `commandGuard.tools` | 非空的 `{ tool, commandArgument }` 数组 | 调用中携带命令行文本的工具 | 由该 rail 要求 |
 | `commandGuard.deny` | 非空的 `{ pattern, reason }` 数组 | 命令文本要匹配的正则，以及审批人需要知道的理由 | 由该 rail 要求 |
@@ -95,7 +96,7 @@
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
 
-`readTools` 同理：`{ tool: read, pathArgument: file_path }`、`{ tool: read_image, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取的三个工具。
+`readTools` 同理：`{ tool: read, pathArgument: file_path }`、`{ tool: read_image, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取的三个工具。`readCommandTools` 补上同一条 rail 的 shell 一侧：`{ tool: bash, commandArgument: command }` 与 `{ tool: pwsh, commandArgument: command }` 让 `bash cat .env` 与 `read .env` 一样被拒绝，凭据文件便无法改道 shell 命令落进日志。
 
 `mode` 是唯一同时作用于全部 rail 的键，也是唯一能在武装之前看见某条 rail 的办法：`observe` 下每条 rail 的判定与 `enforce` 完全一致，只是记下这次判定并放行。`/guardrails` 会列出它本来会挡住什么。`deny` 与 `ask` 都算观察结果；`steer` 不算——把一轮送回补证据是要求把活干完，不是拒绝，观察模式不该把它一起关掉。
 
@@ -132,8 +133,11 @@
 | `readTools` 不是数组或为空 | `readTools must be an array of { tool, pathArgument } entries` / `readTools must not be empty — omit the key to disable the sensitive-read rail` |
 | 读取条目没有给出路径参数 | `readTools entry "read" must name its pathArgument` |
 | 重复的读工具或未知条目键 | `readTools names "read" twice` / `unknown readTools key(s) …` |
+| `readCommandTools` 不是数组或为空 | `readCommandTools must be an array of { tool, commandArgument } entries` / `readCommandTools must not be empty — omit the key to keep the sensitive-read rail path-only` |
+| 命令读取条目没有给出工具名或参数名 | `readCommandTools entries must name a tool` / `readCommandTools entry "bash" must name its commandArgument` |
+| 重复的命令读取工具或未知条目键 | `readCommandTools names "bash" twice` / `unknown readCommandTools key(s) …` |
 | `sensitivePaths` 为空、空白或重复 | `sensitivePaths must not be empty — omit the key to disable the sensitive-read rail`、`… entries must be non-empty path segments`、`… names ".env" twice` |
-| 只给 `sensitivePaths` 而没有 `readTools` | `sensitivePaths reads file paths — name readTools as well` |
+| 只给 `sensitivePaths` 而两类读取工具都没给 | `sensitivePaths reads file paths — name readTools or readCommandTools as well` |
 | `commandGuard` 不是对象或含未知键 | `commandGuard must be an object { tools, deny }`、`unknown commandGuard key(s) …` |
 | `tools` 或 `deny` 为空 | `commandGuard.tools must be a non-empty array of { tool, commandArgument } entries`、`commandGuard.deny must be a non-empty array of { pattern, reason } entries` |
 | 命令工具条目没有给出参数名 | `commandGuard.tools entry "bash" must name its commandArgument` |
@@ -285,6 +289,8 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 路径段按相等匹配，或按"配置名 + `.` 前缀"匹配，忽略大小写，两种分隔符都认：`.env` 能挡住 `.env` 与 `.env.local`，而放过 `environment.ts`。
 
+部署启用 `readCommandTools` 后，同样的匹配也会跑在 shell 工具的命令文本上，因此 `bash cat .env` 与 `read .env` 一样被拒绝——否则 shell 命令就是绕过这条 rail 的通路，其输出同样经由 `tool/result` 事件落进日志。
+
 判定是 `deny` 而不是 `ask`。一次读取会落进会话日志，之后再怎么批准也删不掉；而模型真正需要的替代路径——请用户把值贴出来——根本不需要文件内容，也就没有什么可供审批定价。
 
 这条 rail 匹配的是调用写出来的路径，而不是它最终解析到的文件，因此符号链接或绕道相对路径不在覆盖范围内。
@@ -396,6 +402,9 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless --patch plugins/pri
           - { tool: read, pathArgument: file_path }
           - { tool: read_image, pathArgument: file_path }
           - { tool: grep, pathArgument: path }
+        readCommandTools:
+          - { tool: bash, commandArgument: command }
+          - { tool: pwsh, commandArgument: command }
         sensitivePaths: [.env, .ssh, .aws, .gnupg, .npmrc, id_rsa, id_ed25519]
         commandGuard:
           tools:
