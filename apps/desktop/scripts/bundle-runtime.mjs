@@ -56,6 +56,18 @@ function hostPlatform() {
 
 // execFileSync on Windows cannot resolve `.cmd` shims (corepack's pnpm)
 // without shell interpretation; route through cmd.exe there.
+/**
+ * The JS entry pnpm executes. `which pnpm` may resolve to the `.bin` shell
+ * wrapper (a `basedir=$(dirname …)` shim), which the bundled node cannot
+ * parse; the wrapper's own convention points one level up at the real
+ * `pnpm/bin/pnpm.cjs`.
+ */
+function pnpmJsEntry() {
+  const resolved = realpathSync(execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim());
+  const candidate = join(dirname(resolved), '..', 'pnpm', 'bin', 'pnpm.cjs');
+  return existsSync(candidate) ? candidate : resolved;
+}
+
 function runPnpm(args, opts) {
   const env = pnpmEnv();
   if (crossArchBundle()) {
@@ -64,7 +76,7 @@ function runPnpm(args, opts) {
     // ordering cannot change. Drive the pnpm entry (a JS shim) with the
     // bundled target-arch node so a cross-arch bundle installs the target's
     // prebuilds, not the host's.
-    const pnpmEntry = realpathSync(execFileSync('which', ['pnpm'], { encoding: 'utf8' }).trim());
+    const pnpmEntry = pnpmJsEntry();
     step(`cross-arch bundle (${process.arch} host -> ${ARCH} target): running pnpm under ${bundledNodeExe()}`);
     execFileSync(bundledNodeExe(), [pnpmEntry, ...args], { ...opts, stdio: 'inherit', env });
   } else if (process.platform === 'win32') {
@@ -385,7 +397,7 @@ function patchDesktopBrowserAuth() {
     DSH_DIR,
     'node_modules',
     '@deepseek-ai',
-    'dsh-client-connection',
+    'dsh-host-authentication-token',
     'lib',
     'index.js',
   );
