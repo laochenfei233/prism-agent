@@ -151,7 +151,7 @@ Prism 长期记忆：持久、按作用域与层过滤、带 supersede 追踪的
 
 这次巡检得出四件事：
 
-- **印证。** 由不止一个会话写出的主张，经历过不止一次出错的机会。写入路径在一条相同的主张来自不同会话时记下这一点 —— 包括越过一条挂起的 `pending` 记录：那是一次印证而不是重复；巡检通过盖上 `corroboratedAt` 确认已印证的主张，并把一条被印证的 `pending` 主张升为 `active`（审阅注记 `auto-approved: corroborated by another conversation`）。印证即审批。它不碰 `confidence`：一条主张携带的确定性是其作者的陈述，后台巡检抬高它等于在编造证据。
+- **印证。** 由不止一个会话写出的主张，经历过不止一次出错的机会。写入路径按会话去重地记下这一点——一条相同主张来自尚未附议过的会话才算一次——包括越过一条挂起的 `pending` 记录：那是一次印证而不是重复；巡检通过盖上 `corroboratedAt` 确认已印证的主张，并把一条被印证的 `pending` 主张升为 `active`（审阅注记 `auto-approved: corroborated by another conversation`）。印证即审批。它不碰 `confidence`：一条主张携带的确定性是其作者的陈述，后台巡检抬高它等于在编造证据。
 - **主题摘要。** 持续在同一个召回标签下返回的主张，会变成一条列出它们的 `topic` 记录，于是后续召回只有一个入口而不是 N 个。摘要把它的成员主张作为结构化的 `parents` 带上，因此这条派生关系可审计，而一个后来被逐出存储的成员会由 `/memory maintain` 上报。摘要是机器写的、关于其他记录的散文；`dreamDigestStatus`（默认 `active`）决定它是直接进入召回，还是先挂起待审。
 - **日志。** 每次巡检写一条归档条目，记下它发现了什么；每完成一个有活动的本地日写一条反思。两者都是确定性的，因此日志读起来像一份 diff。
 - **矛盾按新旧裁决。** 两条共用召回标签、措辞重叠但说的不是同一件事的在库主张即构成矛盾；在 `dreamAutoResolveConflicts`（默认开）下，较新的主张取代较旧的 —— 这是部署在配置里一次性做出的判断，而不是逐案判断，取代链与 `/memory restore` 让它始终可回滚。设为 `false` 则矛盾回到日志里，作为留给人的未决问题。
@@ -326,7 +326,8 @@ reviewedAt    epoch ms, or null
 reviewNote    operator note, or null
 mergedInto    memory id this record was folded into, or null
 restoredAt    epoch ms, or null
-corroborations  times an identical claim arrived from another conversation
+corroborations  distinct conversations an identical claim arrived from
+corroboratedBy  those conversations' session ids, in first-agreement order, or absent
 corroboratedAt  epoch ms a consolidation pass confirmed it, or null
 parents       ids this record was derived from (a digest's member claims), or absent
 evidence      { sessionId, messageId, textHash, note }

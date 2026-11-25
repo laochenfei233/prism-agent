@@ -30,41 +30,35 @@
   en: cd1e6047c70c60c0
   zh: b0a04eda488c22b8
 /prism-prism-memory/automatic-memory:
-  en: e80375e232dbb885
-  zh: d9ff522cb925cdea
+  en: bcdc51d6fade0587
+  zh: 6a2f50071a53df5f
 /prism-prism-memory/automatic-memory/distillation-on-the-turn-s-own-path:
-  en: 7dbf3f0bf5f6ae2b
-  zh: 996b16feaf62ac6d
+  en: 8af69de2e02e28f7
+  zh: 695e87d18cb42aae
 /prism-prism-memory/automatic-memory/model-assisted-distillation-on-a-window:
-  en: 1b235595b7651eda
-  zh: 1d8526a0132d1b7a
+  en: 8fd342014fe9bc4c
+  zh: 1c6c18f88318a208
 /prism-prism-memory/automatic-memory/bootstrap-on-demand:
   en: 2288db3718d61364
   zh: 99bcc80efc64a1e9
 /prism-prism-memory/automatic-memory/consolidation-on-a-window:
-  en: 43820440194bc5f9
-  zh: 016badd10ddebcdb
-/prism-prism-memory/automatic-memory/the-scheduled-tidy-up:
-  en: c5dd9a6b2827287f
-  zh: fa35fdabec54a062
+  en: 8162417bc57b136a
+  zh: 6bdd1c0520973387
 /prism-prism-memory/automatic-memory/dates:
   en: 5abe3062fc3a5dff
   zh: 70e4c5c4112c6d3f
 /prism-prism-memory/automatic-memory/importing-another-tool-s-memory:
-  en: cf2efdf8a2c0eaa2
+  en: 7371962a8e964227
   zh: ae0e83a62c0ea266
 /prism-prism-memory/governance-and-library-hygiene:
-  en: d570aef08b6d14d7
-  zh: 8345c32c5ea7a14d
+  en: 8bf91996bd4a88e3
+  zh: 831eb80f4c7f244f
 /prism-prism-memory/governance-and-library-hygiene/verifying-cited-evidence:
   en: d12fb497edb54f15
   zh: b16516a4b101dbee
 /prism-prism-memory/governance-and-library-hygiene/comparing-two-claims:
   en: 845ca7c9f487a6ee
   zh: ef6babfb5c9cdc99
-/prism-prism-memory/governance-and-library-hygiene/editing-and-retiring-from-the-page:
-  en: 4e18a6e497462eba
-  zh: ab8613705e43dfd4
 /prism-prism-memory/the-second-layer-a-durable-session-history-index:
   en: 59e50235fc51fea8
   zh: eb398facca3abdba
@@ -72,11 +66,11 @@
   en: 09cf4a23971fae0b
   zh: 534fcae1c1ea76ca
 /prism-prism-memory/the-second-layer-a-durable-session-history-index/configuration:
-  en: 67e8e7d1863585fb
-  zh: 9acc49a6fa307b4d
+  en: 4a999b7f7be71161
+  zh: 05cd6ae1865ff70b
 /prism-prism-memory/record-model:
-  en: 2838e525c099d386
-  zh: f34738b42dfabedf
+  en: d74d16db6d06da2c
+  zh: 94db8672e973193d
 /prism-prism-memory/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -99,11 +93,11 @@
   en: f15a9ae5ebacab3f
   zh: 5332098695d8c6e7
 /prism-prism-memory/verification:
-  en: 15860e5c02276ae8
-  zh: ce5266ec00f680ca
+  en: 0da2971187a1bfd3
+  zh: 11e4b6df6e2a1150
 /prism-prism-memory/known-limitations-and-deferred-work:
-  en: 3f91f6dbd5107746
-  zh: f9f0a155a42cfd87
+  en: 41678962084baee5
+  zh: 3d14b124aed76774
 /prism-prism-memory/installation:
   en: 69521c4de892670f
   zh: c2565d8a06956085

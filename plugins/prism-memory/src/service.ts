@@ -1281,28 +1281,57 @@ export class PrismMemoryService extends Service {
     // rewrite, not a restatement: the writer already knows the claim exists and
     // is changing it, so the reuse path would silently drop the edit.
     if (identical !== undefined && identical.record.id !== input.supersedes) {
+      // An identical restatement that names a different predecessor still
+      // retires it: the stored claim survives as the survivor, and the named
+      // record leaves the live corpus pointing at it. Unknown and out-of-scope
+      // ids fail exactly as on the store path.
+      let retired: MemoryRecord | undefined
+      if (input.supersedes !== undefined) {
+        const previous = this.records.get(input.supersedes)
+        if (previous === undefined) {
+          throw new PrismMemoryError(`unknown memory id: ${input.supersedes}`, 'PRISM_MEMORY_NOT_FOUND')
+        }
+        if (!admission.isEligible(previous)) {
+          throw new PrismMemoryError(`memory ${input.supersedes} is outside the caller's scope`, 'PRISM_MEMORY_OUT_OF_SCOPE')
+        }
+        retired = previous
+      }
       // A claim arriving again from a *different* conversation is evidence the
       // write path cannot otherwise record, and the consolidation pass reads it.
+      // The count and its session list move together, so one echoing
+      // conversation cannot manufacture independent agreement.
       const writer = agent?.session.id ?? null
-      const independent = writer !== null && writer !== identical.record.evidence.sessionId
-      const reuse = writer === null || !independent ? 0 : 1
       const confidence = input.confidence ?? 1
       // A held `pending` claim restated by a write that admits active has met
       // the review's own bar: the person or the model stood behind it twice.
       const promote = identical.record.status === 'pending'
         && this.admissionStatus(input.status, confidence) === 'active'
-      const reused = await this.records.update(identical.record.id, current => ({
-        ...current,
-        hits: current.hits + 1,
-        corroborations: (current.corroborations ?? 0) + reuse,
-        updatedAt: now,
-        ...promote ? {
-          status: 'active' as const,
-          confidence: Math.max(current.confidence, confidence),
-          reviewedAt: now,
-          reviewNote: 'auto-approved: restated at active confidence',
-        } : {},
-      }))
+      const reused = await this.records.update(identical.record.id, current => {
+        const seen = current.corroboratedBy ?? []
+        const independent = writer !== null && writer !== current.evidence.sessionId && !seen.includes(writer)
+        return {
+          ...current,
+          hits: current.hits + 1,
+          corroborations: (current.corroborations ?? 0) + (independent ? 1 : 0),
+          corroboratedBy: independent ? [...seen, writer] : current.corroboratedBy,
+          updatedAt: now,
+          ...promote ? {
+            status: 'active' as const,
+            confidence: Math.max(current.confidence, confidence),
+            reviewedAt: now,
+            reviewNote: 'auto-approved: restated at active confidence',
+          } : {},
+        }
+      })
+      if (retired !== undefined) {
+        await this.records.put(retired.id, {
+          ...retired,
+          status: 'superseded',
+          invalidAt: now,
+          supersededBy: identical.record.id,
+          updatedAt: now,
+        })
+      }
       return {
         record: reused,
         outcome: 'existing',

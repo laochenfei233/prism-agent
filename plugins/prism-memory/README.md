@@ -151,7 +151,7 @@ An `agent/turn-stopping` listener also runs a consolidation pass once the corpus
 
 The pass concludes four things:
 
-- **Corroboration.** A claim written from more than one conversation has survived more than one chance to be wrong. The write path records this when an identical claim arrives from a different session — including over a held `pending` record, which it corroborates instead of duplicating; the pass confirms confirmed claims by stamping `corroboratedAt`, and promotes a corroborated `pending` claim to `active` (review note `auto-approved: corroborated by another conversation`). Corroboration is the approval. It does not touch `confidence`: the certainty a claim carries is its author's statement, and a background pass raising it would be inventing evidence.
+- **Corroboration.** A claim written from more than one conversation has survived more than one chance to be wrong. The write path records this once per conversation — an identical claim from a session that has not already agreed — including over a held `pending` record, which it corroborates instead of duplicating; the pass confirms confirmed claims by stamping `corroboratedAt`, and promotes a corroborated `pending` claim to `active` (review note `auto-approved: corroborated by another conversation`). Corroboration is the approval. It does not touch `confidence`: the certainty a claim carries is its author's statement, and a background pass raising it would be inventing evidence.
 - **Topic digests.** Claims that keep returning under one recall tag become a single `topic` record listing them, so later recall has one entry point instead of N. The digest carries its member claims as structured `parents`, so the derivation is auditable, and a member later evicted from the store is reported by `/memory maintain`. A digest is machine-written prose about other records; `dreamDigestStatus` (default `active`) decides whether it joins recall directly or parks for review first.
 - **A journal.** Each pass writes one archived entry naming what it found, and each completed local day with activity writes one reflection. Both are deterministic, so the journal reads as a diff.
 - **Contradictions are settled by recency.** Two live claims that share a recall tag and overlap in wording without saying the same thing are a contradiction; under `dreamAutoResolveConflicts` (default on) the newer claim supersedes the older — a judgement the deployment has made once in configuration rather than per case, kept reversible by the supersede chain and `/memory restore`. Setting it to `false` returns contradictions to the journal as open questions for a person.
@@ -326,7 +326,8 @@ reviewedAt    epoch ms, or null
 reviewNote    operator note, or null
 mergedInto    memory id this record was folded into, or null
 restoredAt    epoch ms, or null
-corroborations  times an identical claim arrived from another conversation
+corroborations  distinct conversations an identical claim arrived from
+corroboratedBy  those conversations' session ids, in first-agreement order, or absent
 corroboratedAt  epoch ms a consolidation pass confirmed it, or null
 parents       ids this record was derived from (a digest's member claims), or absent
 evidence      { sessionId, messageId, textHash, note }

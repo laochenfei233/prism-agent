@@ -99,6 +99,13 @@ export const memoryRecordSchema = zod.object({
   /** When a consolidation pass confirmed this record's corroboration. */
   corroboratedAt: zod.number().nullable().optional(),
   /**
+   * The sessions whose identical restatement corroborated this claim, in the
+   * order they first agreed. The write path raises `corroborations` only for a
+   * session absent here, so one echoing conversation cannot manufacture
+   * independent agreement. Absent on a record written before this field existed.
+   */
+  corroboratedBy: zod.array(zod.string()).optional(),
+  /**
    * Records this claim was derived from, in the order the derivation listed
    * them. Written only by a consolidation digest over its member claims, so a
    * cycle cannot form and none is checked. Absent on a claim written by any

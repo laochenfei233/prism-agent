@@ -97,6 +97,66 @@ describe('write and read', () => {
     expect(ctx.prismMemory.all()).toHaveLength(1)
   })
 
+  it('retires the predecessor an identical restatement names, pointing at the surviving claim', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'dedupe-supersede')
+    const survivor = await ctx.prismMemory.remember({ text: 'the retry budget is three attempts' }, agent)
+    const other = await ctx.prismMemory.remember({ text: 'the deploy window is friday' }, agent)
+
+    const again = await ctx.prismMemory.remember({
+      text: 'the retry budget is three attempts',
+      supersedes: other.record.id,
+    }, agent)
+
+    expect(again.outcome).toBe('existing')
+    expect(again.record.id).toBe(survivor.record.id)
+    const retired = ctx.prismMemory.all().find(record => record.id === other.record.id)
+    expect(retired?.status).toBe('superseded')
+    expect(retired?.supersededBy).toBe(survivor.record.id)
+    expect(retired?.invalidAt).not.toBeNull()
+    expect(survivor.record.status).toBe('active')
+  })
+
+  it('rejects an identical restatement naming an unknown or out-of-scope predecessor', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'dedupe-check')
+    await ctx.prismMemory.remember({ text: 'the cache key is the session id' }, agent)
+
+    const unknown = await errorOf(ctx.prismMemory.remember({
+      text: 'the cache key is the session id',
+      supersedes: 'mem_missing',
+    }, agent))
+    expect(unknown.code).toBe('PRISM_MEMORY_NOT_FOUND')
+
+    const foreign = await createAgent(ctx, 'foreign')
+    const privateClaim = await ctx.prismMemory.remember({
+      text: 'the private note is conversation scoped',
+      scope: 'conversation',
+    }, foreign)
+    const outOfScope = await errorOf(ctx.prismMemory.remember({
+      text: 'the cache key is the session id',
+      supersedes: privateClaim.record.id,
+    }, agent))
+    expect(outOfScope.code).toBe('PRISM_MEMORY_OUT_OF_SCOPE')
+  })
+
+  it('counts one corroboration per distinct conversation, not per repeated write', async () => {
+    const ctx = await boot()
+    const first = await createAgent(ctx, 'writer-a')
+    const second = await createAgent(ctx, 'writer-b')
+    const original = await ctx.prismMemory.remember({ text: 'the cache key is the session id' }, first)
+
+    // The original writer repeating adds nothing; the second conversation
+    // counts once, however many times it restates the claim.
+    await ctx.prismMemory.remember({ text: 'the cache key is the session id' }, first)
+    await ctx.prismMemory.remember({ text: 'the cache key is the session id' }, second)
+    await ctx.prismMemory.remember({ text: 'the cache key is the session id' }, second)
+
+    const stored = ctx.prismMemory.all().find(record => record.id === original.record.id)
+    expect(stored?.corroborations).toBe(1)
+    expect(stored?.corroboratedBy).toEqual(['session-writer-b'])
+  })
+
   it('reports a paraphrase as a near-duplicate instead of silently storing both', async () => {
     const ctx = await boot({ dedupeJaccard: 0.4, dedupeReplaceJaccard: 0.99 })
     const agent = await createAgent(ctx, 'near')
