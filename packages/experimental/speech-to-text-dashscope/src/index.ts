@@ -13,6 +13,7 @@ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import { DASHSCOPE_DEFAULT_MODEL, DASHSCOPE_DEFAULT_URL } from './protocol.ts'
+import { recognitionEndpoint } from './protocol.ts'
 import { DashScopeSpeechProvider } from './provider.ts'
 
 export {
@@ -20,7 +21,7 @@ export {
   DASHSCOPE_DEFAULT_URL,
   DASHSCOPE_SAMPLE_RATE,
   RecognitionProtocolError,
-  authorizedUrl,
+  recognitionEndpoint,
   finishTaskFrame,
   parseRecognitionEvent,
   runTaskFrame,
@@ -85,6 +86,10 @@ export const Config = z.object({
  * @param config - validated endpoint, model, limits, and key reference.
  */
 export function apply(ctx: Context, config: Config): void {
+  const endpoint = new URL(recognitionEndpoint(config.url))
+  if (endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') {
+    throw new Error(`Service ${config.providerId} endpoint must be a ws:// or wss:// WebSocket URL, received ${config.url}`)
+  }
   const apiKeyEnv = credentialRef(config.apiKeyEnv)
   const literalApiKey = config.apiKey !== undefined && config.apiKey.length > 0 ? config.apiKey : undefined
   ctx.effect(() => ctx.speechToText.register(new DashScopeSpeechProvider({

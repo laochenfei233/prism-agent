@@ -245,7 +245,7 @@ export class HttpSpeechProvider implements SpeechProvider {
     }
     if (this.mode === 'google-speech') {
       const response = await this.doFetch(this.endpoint, googleSpeechRequest(
-        { ...(this.model === undefined ? {} : { model: this.model }) }, input, signal))
+        { ...(this.model === undefined ? {} : { model: this.model }) }, input, apiKey, signal))
       return { text: await readGoogleResult(response, this.info.name) }
     }
     if (this.mode === 'azure-fasttranscribe') {

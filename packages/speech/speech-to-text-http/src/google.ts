@@ -24,13 +24,14 @@ export interface GoogleSpeechOptions {
  * configured endpoint URL, so it never enters the body.
  * @param options - deployment-selected recognition model.
  * @param input - complete canonical WAV bytes and the resolved language hint.
+ * @param apiKey - resolved Google API key.
  * @param signal - deadline signal covering the request.
  * @returns the fetch request descriptor.
  */
-export function googleSpeechRequest(options: GoogleSpeechOptions, input: SpeechInput, signal: AbortSignal): RequestInit {
+export function googleSpeechRequest(options: GoogleSpeechOptions, input: SpeechInput, apiKey: string, signal: AbortSignal): RequestInit {
   return {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       config: {
         encoding: 'LINEAR16',

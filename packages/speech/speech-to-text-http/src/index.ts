@@ -215,6 +215,11 @@ function registerService(ctx: Context, service: HttpServiceConfig): void {
       || (literalSecretId === undefined && service.secretIdEnv === undefined))) {
       throw new Error(`Service ${service.providerId} speaks aws-transcribe and must configure a region, a bucket, and an access key id`)
     }
+    if (service.mode === 'google-speech' && endpointKey(service.endpoint) !== null) {
+      // The key rides the X-Goog-Api-Key header; a URL key would leak it into
+      // every intermediary and access log on the way to the endpoint.
+      throw new Error(`Service ${service.providerId} speaks google-speech: name the key through apiKeyEnv, not a key parameter in the endpoint URL`)
+    }
     const dispose = ctx.speechToText.register(new HttpSpeechProvider({
       id: service.providerId,
       ...(service.name === undefined ? {} : { name: service.name }),
@@ -247,4 +252,13 @@ function registerService(ctx: Context, service: HttpServiceConfig): void {
 /** @returns the non-empty string, or `undefined` when the value is blank. */
 function nonEmpty(value: string | undefined): string | undefined {
   return value !== undefined && value.length > 0 ? value : undefined
+}
+
+/** @returns the endpoint URL's `key` query parameter, or `null` when absent or unparsable. */
+function endpointKey(endpoint: string): string | null {
+  try {
+    return new URL(endpoint).searchParams.get('key')
+  } catch {
+    return null
+  }
 }

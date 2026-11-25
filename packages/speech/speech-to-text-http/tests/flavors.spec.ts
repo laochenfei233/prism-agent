@@ -262,6 +262,20 @@ describe('flavor configuration', () => {
     } finally { await ctx.fiber.dispose() }
   })
 
+  it('loudly rejects a google-speech entry whose endpoint URL carries the key', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SpeechToText, { defaultProvider: 'g-bad', language: 'auto' })
+      const mounted = ctx.plugin(Plugin, { services: [
+        {
+          providerId: 'g-bad', endpoint: 'https://speech.example/v1/speech:recognize?key=secret',
+          apiKeyEnv: 'G_KEY', mode: 'google-speech',
+        },
+      ] })
+      await expect(mounted).rejects.toThrow('not a key parameter in the endpoint URL')
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('registers a tencent service with a credential-referenced SecretId', async () => {
     const stub = fetchOf(200, JSON.stringify({ Response: { Result: 'from config' } }))
     vi.stubGlobal('fetch', stub.doFetch)

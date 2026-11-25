@@ -53,10 +53,10 @@ describe('google-speech', () => {
       ],
     }))
     const service = new HttpSpeechProvider({
-      id: 'google-test', endpoint: 'https://speech.example/v1/speech:recognize?key=api-key',
+      id: 'google-test', endpoint: 'https://speech.example/v1/speech:recognize',
       mode: 'google-speech', model: 'latest_long', languages: ['auto', 'zh'],
       textField: 'text', maxAudioBytes: 25 * 1024 * 1024, maxDurationSeconds: 7200,
-      timeoutMs: 1_000, resolveApiKey: async () => 'unused', doFetch: stub.doFetch,
+      timeoutMs: 1_000, resolveApiKey: async () => 'api-key', doFetch: stub.doFetch,
     })
     const result = await service.transcribe({ audio: canonicalWav(1), language: 'zh' }, new AbortController().signal)
     expect(result).toMatchObject({ text: 'first sentence\nsecond sentence' })
@@ -69,7 +69,10 @@ describe('google-speech', () => {
     expect(body.config.languageCode).toBe('zh-CN')
     expect(body.config.model).toBe('latest_long')
     expect(body.audio.content).toBe(Buffer.from(canonicalWav(1)).toString('base64'))
-    expect(stub.calls[0]?.url).toContain('key=api-key')
+    // The key rides the documented header, never the URL.
+    const headers = stub.calls[0]?.init.headers as Record<string, string>
+    expect(headers['x-goog-api-key']).toBe('api-key')
+    expect(stub.calls[0]?.url).not.toContain('key=')
   })
 
   it('answers empty results as no speech and reports service errors', async () => {

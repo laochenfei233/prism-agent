@@ -114,18 +114,15 @@ export function finishTaskFrame(taskId: string): string {
 }
 
 /**
- * Append the API key as an `authorization` query parameter. A browser-shaped
- * WebSocket cannot set request headers, so the endpoint reads the bearer token
- * from the query instead.
+ * Upgrade the configured endpoint to its WebSocket scheme. The API key does
+ * not ride the URL: the session presents it as an `authorization` header on
+ * the WebSocket handshake, so it stays out of intermediary and endpoint
+ * access logs.
  * @param baseUrl - configured endpoint in WebSocket or HTTP form.
- * @param apiKey - resolved bearer token.
- * @returns the endpoint to connect to, with scheme and authorization applied.
+ * @returns the endpoint to connect to, with the scheme upgraded.
  */
-export function authorizedUrl(baseUrl: string, apiKey: string): string {
-  const upgraded = baseUrl.replace(/^http(s?):/, 'ws$1:')
-  const url = new URL(upgraded)
-  url.searchParams.set('authorization', `Bearer ${apiKey}`)
-  return url.toString()
+export function recognitionEndpoint(baseUrl: string): string {
+  return baseUrl.replace(/^http(s?):/, 'ws$1:')
 }
 
 /**

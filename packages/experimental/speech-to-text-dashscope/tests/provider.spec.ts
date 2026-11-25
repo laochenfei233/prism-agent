@@ -157,7 +157,9 @@ describe('DashScopeSpeechProvider', () => {
       { audio: waveRecording(1), language: 'zh' },
       new AbortController().signal,
     )
-    const rejection = expect(pending).rejects.toThrow(/connection (failed|closed early)/)
+    // undici's WebSocket reports an abnormal close as an error event; `ws`
+    // reports only the close. Both must fail the transcription.
+    const rejection = expect(pending).rejects.toThrow(/connection (failed|closed early)|the connection closed/)
     await waitUntil(() => service.requests.some(frame => frame.header?.action === 'finish-task'))
     await service.close()
     await rejection

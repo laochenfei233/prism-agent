@@ -1,12 +1,12 @@
 /** DashScope frame building, decoding, and authorization against the documented duplex protocol. */
 import { describe, expect, it } from 'vitest'
 import {
-  authorizedUrl,
   DASHSCOPE_DEFAULT_MODEL,
   DASHSCOPE_DEFAULT_URL,
   finishTaskFrame,
   parseRecognitionEvent,
   RecognitionProtocolError,
+  recognitionEndpoint,
   runTaskFrame,
 } from '../src/protocol.ts'
 
@@ -51,17 +51,17 @@ describe('finishTaskFrame', () => {
   })
 })
 
-describe('authorizedUrl', () => {
-  it('carries the bearer token as a query parameter', () => {
-    const url = new URL(authorizedUrl(DASHSCOPE_DEFAULT_URL, 'sk-abc'))
+describe('recognitionEndpoint', () => {
+  it('upgrades the endpoint without carrying the key in the URL', () => {
+    const url = new URL(recognitionEndpoint(DASHSCOPE_DEFAULT_URL))
     expect(url.protocol).toBe('wss:')
     expect(url.origin).toBe('wss://dashscope.aliyuncs.com')
     expect(url.pathname).toBe('/api-ws/v1/inference')
-    expect(url.searchParams.get('authorization')).toBe('Bearer sk-abc')
+    expect(url.searchParams.get('authorization')).toBeNull()
   })
 
   it('upgrades an HTTP endpoint to a WebSocket scheme', () => {
-    expect(authorizedUrl('http://localhost:9000/asr', 'k')).toBe('ws://localhost:9000/asr?authorization=Bearer+k')
+    expect(recognitionEndpoint('http://localhost:9000/asr')).toBe('ws://localhost:9000/asr')
   })
 })
 

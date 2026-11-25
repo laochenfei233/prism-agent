@@ -53,8 +53,8 @@ export class FakeDashScopeService {
   readonly requests: ReceivedFrame[] = []
   /** Binary PCM frames received across all connections, in arrival order. */
   readonly audio: Buffer[] = []
-  /** Authorization query values received, one per connection. */
-  readonly authorizations: (string | null)[] = []
+  /** Authorization header values received, one per connection. */
+  readonly authorizations: (string | undefined)[] = []
 
   private readonly server: WebSocketServer
   private readonly sockets = new Set<WebSocket>()
@@ -64,8 +64,8 @@ export class FakeDashScopeService {
     this.server = server
     server.on('connection', (socket, request) => {
       this.sockets.add(socket)
-      const url = new URL(request.url ?? '/', 'ws://localhost')
-      this.authorizations.push(url.searchParams.get('authorization'))
+      // The bearer token arrives on the handshake, not in the URL.
+      this.authorizations.push(request.headers.authorization)
       socket.on('message', (data: Buffer, isBinary: boolean) => { this.receive(socket, data, isBinary) })
       socket.on('close', () => { this.sockets.delete(socket) })
     })

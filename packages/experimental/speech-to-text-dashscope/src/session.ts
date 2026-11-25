@@ -6,11 +6,12 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import WebSocket from 'ws'
 import {
-  authorizedUrl,
   DASHSCOPE_SAMPLE_RATE,
   finishTaskFrame,
   parseRecognitionEvent,
+  recognitionEndpoint,
   RecognitionProtocolError,
   runTaskFrame,
   type RecognitionEvent,
@@ -122,7 +123,11 @@ export class RecognitionSession {
   ): Promise<RecognitionSession> {
     const taskId = randomUUID()
     const frames = new FrameQueue()
-    const socket = new WebSocket(authorizedUrl(options.url, apiKey))
+    // The bearer token rides the handshake headers, not the URL, so it is not
+    // exposed to TLS-terminating intermediaries or endpoint access logs.
+    const socket = new WebSocket(recognitionEndpoint(options.url), {
+      headers: { authorization: `Bearer ${apiKey}` },
+    })
     const opened = Promise.withResolvers<undefined>()
     let connectionSettled = false
     const settleConnection = (error?: Error): void => {
