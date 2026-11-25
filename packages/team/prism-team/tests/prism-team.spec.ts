@@ -225,7 +225,7 @@ describe('configuration', () => {
     expect(() => PrismTeam.resolveConfig({ maxReports: 0 })).toThrow('maxReports must be an integer >= 1')
     expect(() => PrismTeam.resolveConfig({ writeTools: [] })).toThrow('writeTools must be a non-empty array')
     expect(() => PrismTeam.resolveConfig({ writeTools: [{ tool: '', pathArgument: 'p' }] })).toThrow('every writeTools entry')
-    expect(() => PrismTeam.resolveConfig({ worktree: 'yes' } as PrismTeam.Config)).toThrow('worktree must be a boolean')
+    expect(() => PrismTeam.resolveConfig(JSON.parse('{"worktree":"yes"}') as PrismTeam.Config)).toThrow('worktree must be a boolean')
   })
 })
 
