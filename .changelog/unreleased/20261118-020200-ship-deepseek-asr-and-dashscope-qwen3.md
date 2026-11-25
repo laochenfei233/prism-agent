@@ -1,8 +1,0 @@
----
-type: added
-breaking: false
-audience: user
-commits: 78576a19a6
-draft: true
----
-Ship DeepSeek ASR and DashScope qwen3-asr as built-in recognizers

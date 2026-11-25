@@ -1,6 +1,2305 @@
 {
   "versions": [
     {
+      "version": "0.2.3",
+      "date": "2026-11-25",
+      "summary": "The first stable release: phone access now needs explicit approval with single-use sign-in links, the feishu/dingtalk/wecom bot channels delegate to the upstream connectors, speech recognition gains nine HTTP providers with long-audio splitting, and memory runs on autopilot with auditable claims.",
+      "entries": [
+        {
+          "type": "added",
+          "text": "Prism memory runs on autopilot: claims stated in your own words save live immediately, inferences park until a second conversation corroborates them, contradictions settle by recency with rollback, and an optional per-turn model read captures what the form matcher misses",
+          "breaking": true,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "2a9d7c5062"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add durable minutes service and tools",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "878c9c8ba2"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Package an installable dsh bundle",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "aa50ad63b2"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the LLM-maintained knowledge vault package, its bundle mirror, and the ownership note",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a39fbda65d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Carry the stored page through the Web conflict envelope",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "476e70df1d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Plugin — remote status, web push, mobile adapter, settings",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "438f954ad0"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add secondary-press menus across the client surfaces",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "67a03a5cad"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Archive configuration, memory, and project folders to WebDAV, SMB, or S3",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a7fb9f077d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the transfer package with a CRC-verified zip reader (T1)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "191049f24c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Export engine over the shared session exporter plus the settings transfer applier (T2, T4)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "156fdd83c9"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Import engine with single-flight job store (T3)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0fa6260070"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Host routes for export, import, job poll, and settings application (T5)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0e24300c2f"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Client transfer section, nav icon, and web-app composition row (T5, T6)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "93eb00b37d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Custom-theme inputs, hex validation, and token synthesis",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "56f120f4df"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Paper, blueprint, phosphor, sumi, and sage palettes with custom boot passthrough",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f9c0f9cd78"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Synthesize the custom theme in the runtime with a setCustom write face",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "68a73e9ddf"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The Appearance section with the custom-theme group and its own nav glyph",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "9438358c84"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "One distinct preview motif per theme, textures riding the gallery entries",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "51ccf6de43"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Save, apply, and delete named custom-theme presets",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fc65868786"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Mirror customPresets in the host Config with regenerated catalogs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "349bd4a5ed"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Regroup the settings entry surfaces",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4481fd6089"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Scaffold the dual-face plugin and the Models-page footer card",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "62d2f0da00"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Pin the four-family catalog and add the durable registry",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c74a0795f5"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Verified downloads and the install lifecycle",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "11f0a1a729"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Runtime provisioning and the BGE embedding engine",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f585f82245"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The RapidOCR engine behind the default OCR capability",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "542e30e654"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The PaddleOCR sidecar on the pip-provisioned venv",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6de91f3ebc"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "HY-MT1.5 translation over the provisioned llama.cpp",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "eb46836284"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Card selection state and pure presentation helpers",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6d24d51ce7"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bilingual README and the as-built BGE engine wiring",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ee54891672"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Command palette, region cycling, tree navigation, approval arrows",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "54cc93bd81"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Composer focus command and behavior specs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6f52ed5416"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add a native Git workbench tab",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d4cb29144d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Give a person their own read and write surface",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "80dc9139bc"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Auto-archive idle conversations on a schedule",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "755fb4e5e8"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Sensitive-read denial, command guard, and a /guardrails report",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fc97c2a69b"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Answer a pending approval from its Session row",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "aaa43b9043"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Refresh the brand copy and drop the hero preview badge",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "031cccfef3"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Retire the dsh-tauri local bundle",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "44cef975c1"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add an observe mode and a decision ledger",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d26fc68c37"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Finish the Git workbench tests and gates",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "575ab11e7c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add a keyless 18-engine web search provider",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f883b71f78"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Answer a pending approval from the panel",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4b40272185"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The guardrails bundle gains an observe mode: every rail still decides, but a `deny` or `ask` is recorded instead of applied, so a deployment can read a rail's reach before arming it. `/guardrails` now leads with the mode and the configuration hash a decision was made under, and lists the calls the observing run would have stopped.",
+          "breaking": false,
+          "audience": "internal",
+          "highlight": false,
+          "commits": [
+            "b5f6e1cc62"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Restore the approval line in the session row",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d7eff18fd6"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Offer the approval placement in General settings",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "930b7ee51d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "A pending approval now shows in the conversation list and in the Progress panel. A new choice — in the panel header and in Settings → General — decides where you answer it, the panel by default; the other place still shows what is being asked with a hint naming the one that answers.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "caa85dc358"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The Pocket page now carries nine chat-bot channels — Telegram, Discord, Slack, 飞书/Lark, DingTalk, QQ connect outbound with no public IP; 微信, 企业微信, and WhatsApp receive through signed callback routes the page walks you through exposing. A bot drives one bound session: its messages run the agent, replies return to the chat, and pending approvals or questions arrive as numbered choices you answer by reply. The page itself gained a scannable QR for the phone link, per-channel cards with live status and a credential probe, and the same settings material as the app's own pages — it previously rendered unstyled on desktop.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "10965cdec2",
+            "a546e8d44e",
+            "64bc6efc42"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add prism-team and the compose mode",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "933c30fa6a"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the session-header team panel",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "59e51024eb"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Make the local network the default remote route",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fc01b19f6c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Open side conversations in the right Sidebar",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "da62bb37d2"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Carry plugin rows in the assistant message context menu",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b244bf5ed5"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Export a project from its context menu",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "51342066b9"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The Pocket page now exposes this workspace three ways. It starts on the local network: it finds the machine's private IPv4 address (192.168 first), and a server bound to it gives the phone a direct `http://192.168.x.y:port` link with no trust entry, since the fence already admits the listener's own bind address. When the server listens on loopback only, the page says so and prints the `prism web --host <address> --port <port>` step instead of a link; the desktop app always starts on loopback. Tailscale and a stable Cloudflare tunnel hostname remain one click away as fallbacks: the page reports both probes, prints the steps they need, and measures an advertised address before calling it ready. The choice is stored in the DSH home's `pocket/remote.json` and survives restarts. The plugin still starts no daemon and changes no trust policy.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "8e45ddcf9e"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "A session now shows its estimated cost in the conversation header; opening it reveals the priced token buckets, the built-in DeepSeek rate table with the peak-hour multiple, and an editor for custom per-model prices. A model with no price reads \"No price yet\" and opens the same editor. Completed turns also show their own cost beside the token total, and both figures follow custom prices you save.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c7a20dca79"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Session rows now carry their own filing marks: favorite, review-later, a 1–5 priority, up to 20 tags, and a note, all set from the row menu's new entries or the Tags & note… dialog. The marks show in the row, View options can filter the list and search to favorites or review-later and order by priority, and search matches tag and note text. The dialog's Copy prompt and Import move an annotation through the clipboard without calling a model. A batch mode entered from the header's checklist button puts a checkbox on every row and runs archive, unarchive, favorite, unfavorite, review-later, priority, or clear-tags over the selection, then reports how many succeeded and failed. Annotations stay in this browser, and a Session still cannot be moved to another Workspace, because its working directory lives in the immutable Session header that decides Workspace membership.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4c63fd5f56"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Classify auxiliary memory extraction with a purpose of its own",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d1200ece0e"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the Web meetings page with speech preparation and in-page answers",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a435d61c7b"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Offer the DashScope online recognizer beside SenseVoice",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "face351265"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Register config-driven third-party HTTP ASR providers",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e13f05ae1c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The web listener's request-header byte bound is configurable as `maxRequestHeaderBytes` in the `dsh-host-webserver` config, defaulting to 64 KiB with a 1 KiB minimum, instead of a fixed constant.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c4ed844a21"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Port the microcompact guard into the new prism-guardrails plugin",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "25ddd739fd"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bridge subagent delegations into the job registry",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "3fc5ebc50f"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Give prism-memory cited-source verification, claim comparison, digest parent lineage, and a mirror audit",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "004a4d4976"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bridge the HachimoDock desktop terminal to prism sessions",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "59ec6850e7"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Give prism-memory an opt-in model-assisted distillation window and a `/memory bootstrap` pass over past sessions\n\nWith `assistedDistill` on, the turn-stopping path keeps a rolling buffer of recent turns and, every `assistedDistillEveryTurns` turns, asks the deployment's own model to propose the durable claims the form-recognizing reader cannot see. Every candidate is written `pending` — the model proposes, a person promotes — and one that names its source message is cited with the same fingerprint `/memory verify` re-reads. `/memory bootstrap apply` closes a fresh install's cold start: it distills past sessions of the calling working directory through the same protocol, once per session, skipping sessions a completed pass already processed, and fails loud when the session-query engine, the llm service, or a routed model is missing.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c3a864baaf"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Give prism-guardrails a stuck-nudge rail that reminds instead of enforcing\n\nWhen one turn piles up `stuckNudgeAfterFailures` consecutive failed calls (3 by default), a one-shot judge call through the agent's own provider route decides whether the failures are one loop. A confident yes attaches a reminder to the failing call's accepted result — change the approach, or say plainly that you are stuck and stop — and the call itself is never refused. Any success clears the run, a new turn starts fresh, `stuckNudgePerTurn` bounds the reminders, and the rail ships on because it refuses nothing: `stuckNudgeAfterFailures: 0` turns it off. `/guardrails` lists the rail and records each reminder as a `steer`.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "1dbe6af27d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The config-driven HTTP speech provider can speak the audio-bearing chat-completions request form (mode: `chat-completions`) beside the OpenAI multipart transcription form, so chat-completions ASR endpoints such as MiMo-V2.5-ASR join voice input and the meetings page by configuration alone; recognition reads the answer's `choices[0].message.content`.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f5baf8f73f"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Split long imports past a recognizer's declared cap at quiet boundaries",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "aa3646b842"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add nine request forms to the HTTP ASR provider",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "17aa816166",
+            "bc17bf2a5d",
+            "8556c9970c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Ship DeepSeek ASR and DashScope qwen3-asr as built-in recognizers",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "78576a19a6"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add a speech recognition settings section",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6dc4367595"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Seat speech and local models as Models-page tabs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0bb75caa30"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Keep the LAN listener reachable through the installer",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "11e9b74722"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Check updates from the domestic mirror first",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "178869a9cf"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Ship the prism-wiki knowledge vault and unify the @prism scope",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4a1133972d"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bind the web GUI on the machine's LAN addresses with `dsh --profile web --bind-lan`",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f14f94947f",
+            "7d4a7ebcc3"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Auto-archive idle conversations and projects",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "9ed8c89ff6",
+            "32aa5717a2",
+            "40487b1507",
+            "71d2bcedcb"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The memory hygiene pass now also runs on a wall clock: every `scheduledMaintainMinutes` (default 360) and once shortly after load, the plugin applies expiry archiving, near-duplicate merging, and capacity eviction with no turn and no operator command, so a quiet workspace stays tidy. `scheduledMaintain: false` keeps tidying on the turn path and operator command alone.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e8509de3e9"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "The memory page can now rewrite a claim and retire one. An edit supersedes the old wording and inherits the record's layer, class, scope, and tags, so the supersede chain keeps the old wording readable and `/memory restore` rolls an edit back; retirement takes the same path as `/memory forget`. Project- and conversation-scoped claims stay under their session's authority: the page lists them, and the new routes refuse them.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e8509de3e9"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Ship the archived-projects settings section, opt-in defaults, and the default-Workspace exemption",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fe7c212175"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Auto-answer approvals under the autonomous-guarded preset",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c2337a66f7"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bind one more local address at runtime (T1)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ed9aed09c7"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Bind the LAN address from the settings page (T2)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "41d64598e8"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Offer the LAN bind action on the settings page (T3)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "21a21324ce"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Turn a dropped folder into an independent project",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "dd14a7ee93"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add a model-free microcompact pass that clears stale tool results before summarization compaction",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0d46c0d4d4"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Conversations from ZCode can now be imported from the Settings import page, alongside the existing coding agents.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "874208ee",
+            "3bf7b177",
+            "d7f4d2d7"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Render contributed source cards ahead of the built-in stores",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e93a8169a0"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Move the import entry to the import page's first source card",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "532472271a"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Delegate feishu/dingtalk/wecom to the upstream connectors",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "a2d1abda0b"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the usage-reminder rail (usageReminderThresholds)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "38749f9739"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Add the wait-time reminder rail (waitReminderAfterMs)",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7abf808b6c"
+          ]
+        },
+        {
+          "type": "added",
+          "text": "Port the team bundle to the subagent-tree Team architecture",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d037faae7c"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The memory plugin's model-assisted distillation now admits each candidate through the same source trust tiers as the form distiller, keyed by the speaker of the message the candidate cites: a claim grounded in the person's own message can land active on the shipped defaults, while one grounded in the assistant's account parks until corroborated. The `assistedDistillConfidence` key is removed, and the per-turn `llmDistill` channel that existed only on an unreleased branch is retired in favor of the assisted window, whose call keeps the `memory-distill` purpose stamp for cost attribution.",
+          "breaking": true,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e8509de3e9"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "Converge settings-entry-regroup with appearance-themes",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ff313d56dd"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "Revert: Drop the approval line from the session row",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d26a0ebaee"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The local-model card on the Models settings page now matches the page around it: one settings card per model family with a lifecycle dot, a real variant selector, a download progress bar, and a confirmation dialog instead of the browser's own.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fc627cbc16",
+            "4fe8e4893d",
+            "4c8dc6ba46"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "Revert: Drop the upstream release watch in favor of manual resync",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "cff26c4dc6"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The desktop installer is rebuilt on Tauri 2.12.6 with a re-synced NSIS template: upgrades keep offering the in-place upgrade first, downgrades are now also blocked in passive and update installs, and a successful upgrade uninstall no longer leaves the old uninstaller behind.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7ac0410a41"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The harness core, packages, catalogs, and documentation are resynced to upstream deepseek-harness `0.2.3-alpha.2` as one content merge, with the Prism desktop shell, branding, CLI identity, and workflow exclusions re-applied on top.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "1bacfc0267"
+          ]
+        },
+        {
+          "type": "changed",
+          "text": "The phone QR now opens an access-request page instead of embedding a login link: compare the code with the one shown under Settings → Pocket, allow the phone there, and it signs in once with a single-use link.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": true,
+          "commits": [
+            "140817441c"
+          ]
+        },
+        {
+          "type": "removed",
+          "text": "The Cron scheduling stack is gone: the `cron_*` model tools, the `ctx.cron` and `ctx.remote.cron` APIs, the Session-header Cron panel, and the Cron overlay no longer exist. Scheduled tasks live in one place now, the Automation tasks page and the `schedule_*` tools, which already accept five-field cron timing in an explicit zone; recreate any Cron task there. Stored Cron records stay on disk and are no longer read.",
+          "breaking": true,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c74c424c37"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Recheck cancellation before commits",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0ca7b233be"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Make the bundle patch upsertable",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c23775004e"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Correct quoted list values, schema delivery, and the review findings",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a55adf914a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Make concurrent writers safe and correct the claim",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ec658507cb"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep one malformed page from breaking every vault-wide operation",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b877fa1029"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Carry the stored page in a revision conflict",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "321b44012d"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Harden the vault walk and keep the conflict code when the stored page is unparsable",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "cd2431499f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "WebServer service name, drawer anchor, subscription hardening",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0e3e383195"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review findings — failure cards, fence-true trust badge, backdrop, zh README",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b54a8baf44"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review round 2 — error-card detail drops the session id; peer-declare the session-controller types",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "2f3a5b8ca1"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Fill the Windows app icon slot",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a10615c14a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep context menus out of layout and the draft usable",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c3b3a8b2ed"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Resolve review findings across wiring, transports, and the page",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "2f880a1c0a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the second review pass",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "66821c5ae3"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Refuse a credentialed endpoint and document why",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "5ab3d63613"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close stale composer menus and close review gaps",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "8e2ba69e14"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Update ThemeSnapshot consumers for the custom theme inputs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6aaad4eb24"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Literal custom Config keys, regenerated catalogs, and review copy fixes",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "745b01c530"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Update ThemeSnapshot consumers for the customPresets field",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e783ecbb41"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review fixes — schema name pattern, safe aria params, IME guard, coverage tests",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6163edc40c"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Apply review findings to the settings entry regroup",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7462f3774c"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Clear the real lint gate on the presets change",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "86a562f950"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Narrow the tolerant reader colors for the strict aggregate check",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "55f7def45c"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Cover the missing-color junk branch in the tolerant reader",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "81d23f693f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review pass — wire projection checkpoints, mid-stream size caps, ADS and ancestor guards, skip-count surfacing, download handoff",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "61fd9cd16c"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Label provisioned variants instead of a byte floor",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "057a862318"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review round — provisioning pre-check, placement scan, override validation",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e7898c7756"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Row controls keep their keys; palette spec",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "df9d9ff809"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Fence tool writes under the harness home",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b0ec9d1010"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Validate foreign events before a native import",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "99a44dd398"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Enforce admission limits on image reads",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ec9a842a8d"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Sign updater artifacts in CI",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "155802a76c"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Authenticate every HTML entry",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e5d0858812"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Refuse cmd metacharacters in the popup fallback",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "8ac6d68e45"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the review findings on the security-audit fixes",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "bc193cb282"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Inline the reader validation and scope its claim",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "814654e53d"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Move the palette Web default off Mod+Alt+P",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "45ec9ebe7f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Exclude the harness home from every shell profile",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "acc1baa003"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Republish copied attachments read-only",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ccd2fd0631"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Leave latest.json to tauri-action",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fa45014585"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Carry the home denial to the standalone runner",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "34750305c4"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the review findings on the operator surface",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b6467f10fc"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Cap the search the way the service caps it, and state the review order",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "67c8302650"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Narrow the shipped credential segments, wait for the commands service, and correct the docs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4c3d69444f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Read the volatile config through its references",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0aa06f5a0a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep the pending approval line inside its own row",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d3206c01c9"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Tighten the observe report and record the README pair",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a9c6fc2da8"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Resolve the provider through ctx.get and fetch pages through the web seam",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ab2c4efb3b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Resolve engine wrappers before reading pages through the fetch seam",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "cc6a6a6d02"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the Git workbench review findings",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0b132d2906"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Drop the unused path-validation parameters",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "9b8564b578"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The desktop window no longer shows a scrollbar beside the interface at any window size.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "11d235cdbb"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "After a Prism Agent desktop upgrade the plugin page no longer marks app-provided plugins as \"Problem\": the copies seeded into the profile now follow the installation's manifest and build, so a bundled plugin such as prism-meeting, aegis, or prism-memory loads again once the installation ships a compatible build. The bundled plugins prism-pocket, prism-local-models, and prism-session-autoarchive now ship with their built `lib/`. When the app provides a plugin's files, the incompatibility hint now says to update and restart the app instead of uninstall and reinstall.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7d75059a67"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep a loadable plugin copy through the swap",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "cf85f0a33b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "A first sandboxed command in a large Windows workspace no longer freezes every conversation: the workspace's ACL preparation runs in a background helper, the interface stays responsive, and a preparation that takes longer than two minutes reports a retryable error instead of hanging.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "efc184f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Ship the windows-acl entry chunks under the published glob",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d66583dd87"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Include the RestartManager macros the NSIS template calls",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ba06d2162f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review round — merge saves, guard relay sends, re-mint stream URLs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "441055d03a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Follow-ups — Telegram is_bot filter, QQ reconnect token refresh",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "9b11180d41"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Refresh the generated catalog entry for the widened writeHead, and assert the TLS prune is Secure",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "5d6bd12029"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Heal the cookie accumulation that wedged desktop web authentication",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f0d2f1b12f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Compare worktree paths against task write scopes",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c4bd1a25a3"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Show the tunnel steps and trust flag before a hostname is stored",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d8b9f2ff1f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Draw the cost-dashboard controls on hairline borders",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6ce808e0c7"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep the cost editor reachable for unpriced models",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "390d2acddb"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Attach the side conversation to its Workspace and frame open failures",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "57ce788948"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Answer the review on annotations and batch actions",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "f7b2603fab"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "End batch mode on a query by gesture, and tighten annotation edges",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7abb3206e2"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep the provisional New Session row out of batch selection",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "df5065d995"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the review findings on the autopilot gates",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4361a858f7"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Pocket bot bindings now record the operator's sender identity, so a group member or a stranger in another chat can no longer rebind with `/new`, drive the session, or approve tool executions from the bound chat. A channel never claims a binding on its first message either: the Pocket page shows a pairing code beside the QR (copyable, rotatable in one click) and `/start <code>` from your chat binds the bot; the code rotates on every successful pairing. `/new` still rebinds — but only for the operator, whose sender identity also recovers the session from any other chat. The callback-signing tokens (WeCom/WeChat token, WhatsApp verify token) are now masked in the list route like the other secrets, callback signature checks compare in constant time, and replayed callback messages are deduplicated before any handling. The QR caption now notes that the scan is a login link and should not be shared or screenshotted.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "1e1a8a8fcb"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Delete stale cookies in both Secure variants",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "04d321abea"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Retire the dsh-agent-progress local bundle",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "412ae843c0"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The session-header cost pill now prices its billing tier at the latest logged settlement instant instead of the render-time wall clock, so the same session log always renders the same estimate. The token-usage projection carries that instant as `lastSettledAt`.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "45eb8befef"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "After a switch from an HTTPS listener back to plain HTTP, the stale Secure session cookie an earlier authority left behind is deleted again: mint responses now expire every stale session-cookie name with both secure variants of the deletion Set-Cookie, because a non-secure Set-Cookie cannot delete a Secure-only cookie (RFC 6265bis). Previously that cookie survived the prune and could push the browser's Cookie header back past the listener's request-header bound, wedging the launch-token exchange.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "04d321abea"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Store the live transcript at the end and add a recognizer selector",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "800ad1ab90"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Repair the merged speech layout for the rc.4 aggregate",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "310df0e340"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Drop stray in-tree declaration emissions from the repair commit",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ac20465f84"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Land the meeting line against the rc.4 aggregate",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "78423010ef"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Restore the promoted speech packages the base bundle depends on",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c4b457bf8f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Reconcile the lockfile with the restored speech packages",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "6f1c6d03e9"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Restore the authenticate_webview command the rc.4 lib.rs registers",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "bdcb6b5607"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Consolidate the speech seam on the experimental packages",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "df1583090a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Inject the WebKit session through a loopback proxy",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b1927d4e7a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Complete lifecycle payload ripple and host aggregate wiring",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "40633eee89"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close review findings — generated catalogs, product classification, ledger hygiene",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "afdc2e943b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Reconcile the fork surfaces with the merged 0.2.2-rc.1 tree",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "a860b312ad"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Review fixes — hub teardown, host-context reads, raw wire checks",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "2ce3993e0f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Restore the 0.2.2 composition seams the fork suites exercise",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fccd9905c4"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Converge the merged menu architecture and close the A12 file-row gap",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "aea51cb7f4"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Drop the retired inline menu seat from the browser contracts",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4dfd5185af"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the review findings on the assisted distillation paths",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "bb13e6e65b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Tokenize the JSON-escaped cwd spelling and pin the refresh pass to the real cwd",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0e1408eb32"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Close the review findings on the stuck-nudge rail",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "3a74af2a3e"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Move the desktop shell's hub off the shared 3081 port\n\nSibling dsh-fork desktop shells share the upstream 3081 default, so whichever\nproduct boots second loses the port and lands on a fallback port every launch.\nThe port is part of the browser session's cookie authority, and each move\ninvalidated every existing session cookie into the\n\"authentication required; reopen the URL printed by dsh web\" page. The shell\nnow defaults to the private port 38081; the scan fallback and the README port\ncontract move with it.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "430dc18e88"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Authenticate the desktop window through a loopback proxy\n\nThe desktop window used to authenticate with the webview's own cookie jar.\nInside the frame that jar is a third-party store, and because cookies ignore\nports, a session minted for an earlier loopback port survived every port change\nand left the window on the \"authentication required\" page with no way to\nrecover short of clearing the store by hand. The window now loads a loopback\nproxy that attaches the signed session to every request and WebSocket\nhandshake and rewrites Host, Origin, and Referer; the webview's cookie jar is\nno longer involved. The proxy keeps its port for the app's lifetime, so a\nrestarted server only replaces the session behind an origin that never changes.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "430dc18e88"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Reopen the hidden window on macOS activation",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "eac9d844da"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Seed the web profile before the desktop's first boot\n\nA fresh Prism home has no `profiles/web/package.json` — the CLI writes it on\nits first `dsh web` boot, and the shell seeded its bundled bundle layers before\nthat boot. The merge failed with ENOENT, `spawn_child` returned before spawning\nanything, and the window stayed on \"starting local service\" with no hub to\nconnect to. Seeding now asks the installed CLI's own `initProfile` for the web\ntemplate (manifest, patch layer, pnpm settings) when the manifest is missing,\nthen merges the bundled layers into it as before.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "681f024be8"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Read the host connection through ctx.get in the hachimodock bridge\n\nThe hachimodock plugin used to read the host `connection` service with\n`Reflect.get(ctx, 'connection')`. The resynced cordis context proxy rejects\nundeclared property access, so every activation failed with \"cannot get\nproperty \\\"connection\\\" without inject\" and the desktop-side bridge entry\nnever came up after the 0.2.2-rc.1 update. The plugin now reads the service\nthrough `ctx.get`, which needs no inject declaration and returns `undefined`\nwhen the service is absent, so the activation stream stays optional exactly\nas the surrounding guard intends.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "58319e8499"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Read host services through ctx.get in prism-pocket and prism-local-models\n\nBoth plugins still read host services with `Reflect.get(ctx, name)`. The\nresynced cordis context proxy rejects undeclared property access, so those\nreads fail with \"cannot get property ... without inject\" the moment they run\nin a fiber context — the same failure that broke the hachimodock bridge\nentry after the 0.2.2-rc.1 update. All reads now go through `ctx.get`, which\nneeds no inject declaration and returns `undefined` when the service is\nabsent; the guards around the required services keep their localized errors.\npocket's tsconfig maps cordis to the built vendor types like prism-hachimodock\nalready does, and local-models widens its pinned cordis declaration with\n`ctx.get` beside the existing `ctx.provide` widening.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c195c5738a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Defer unparseable audio to the provider and declare caps in test rosters",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ea4ed6c9f4"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Correct the TC3 canonical form and close review findings",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "e215f20173"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Map feishu secrets and run the watch step with pipefail",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "ed0a236731"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Keep the service list live so settings can edit it",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "4b8e6f405a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Cite dropped folders through the WebView2 File.path fallback",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7e30b3c19a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Open a claimed link only through its own route",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "b8c45e6dc4"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Withhold the LAN address while the listener is bound elsewhere",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "8f9c7d84dc"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Lock the mirror host on the update wire and refresh stale docs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7f9ddd5d4b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Let the shell's own drawer present while it is open",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0495580a10"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The phone settings pages keep their facts and their buttons",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "47232ef11b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Align the test fixtures with the resynced agent and client APIs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "42cdf80a93"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Pass the package directory to clientBundle",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "81fa81cce7"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The approval buttons in a Session row stay inside the sidebar, and answering from the row no longer also opens that Session.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "5d23128584"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The Meetings page loads its records again\n\nThe shipped base composition mounted the meeting service and its model-facing tools, and the client module roster therefore also served the Meetings page. Its browser routes came only from the separately installed plugin bundle, so every request from the page answered a plain-text 404 and the page showed the browser's JSON parser message, \"The string did not match the expected pattern.\" The base bundle now composes the page's browser routes beside the service row, and an answer that carries no JSON envelope is reported by its HTTP status.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "31673ad8"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Clear every tool when schemastery empties the tools list",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "32cd73f6de"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Resolve runtime native deps for the bundle target arch",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "91585a1d81"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Refresh the generated slot catalog and lockfile",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "d99a063c8a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Cover shell reads in the sensitive-read rail",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "086508c8ac"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Stop a bot adapter whose start failed",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "3d4d987a6e"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Honor supersedes on identical claims and count corroboration per conversation",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "7ee85d3793"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Carry ASR credentials in handshake headers, not URLs",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "be779c88c6"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Parse the serialization before writing a page",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "14e067fa8b"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Read callback XML fields with a linear scan",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "03829cb608"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Read engine and fetched pages with a linear scanner",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "05d542ac3f"
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.2.1-rc.4",
       "date": "2026-10-31",
       "summary": "Prism gains in-app updates with a new About page, imports conversations from ten coding agents, and installs under its own prism-agent identity with a dedicated data root.",
