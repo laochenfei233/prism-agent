@@ -2,7 +2,9 @@
  * Dependency-free HTML reading for search-engine pages: entity decoding, tag
  * stripping, anchor extraction, and readable page text. Engines answer with
  * markup this package does not control, so every helper here is tolerant of
- * truncated or reordered pages and never throws.
+ * truncated or reordered pages and never throws. Every reader walks the page
+ * in one linear pass: the previous lazy-quantifier regexes spent quadratic
+ * time on adversarial pages, which stalled the shared event loop.
  *
  * @module @prism/prism-search/html
  */
@@ -42,9 +44,106 @@ export function decodeEntities(text: string): string {
   })
 }
 
+/** One scanner segment: a run of text, a tag, a comment, or raw element content. */
+interface HtmlSegment {
+  readonly kind: 'text' | 'tag' | 'comment' | 'rawtext'
+  /** The segment's raw markup, as written in the page. */
+  readonly text: string
+  /** Offset of the segment's first character. */
+  readonly start: number
+  /** Offset just past the segment. */
+  readonly end: number
+}
+
+/** Elements whose content is dropped by the readable-text pass. */
+const RAW_TEXT_ELEMENTS: readonly string[] = ['script', 'style', 'noscript', 'svg']
+
+/** Closing tags that readPageText renders as line breaks. */
+const BREAKING_TAG = /<(?:br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/td|\/section|\/article)[^>]*>/i
+
+/** Whether the tag text opens `name` (`<name` followed by a non-name character). */
+function opensTag(tag: string, name: string): boolean {
+  if (!tag.toLowerCase().startsWith(`<${name}`)) return false
+  const next = tag[name.length + 1]
+  return next === undefined || !/[a-z0-9_]/.test(next)
+}
+
+/** Whether the tag text closes `name` (`</name` followed by a non-name character). */
+function closesTag(tag: string, name: string): boolean {
+  if (!tag.toLowerCase().startsWith(`</${name}`)) return false
+  const next = tag[name.length + 2]
+  return next === undefined || !/[a-z0-9_]/.test(next)
+}
+
+/**
+ * Split the page into a linear run of segments, so every reader sees text,
+ * tags, comments, and raw element content without backtracking.
+ * @param html - page markup.
+ * @returns the segments in document order.
+ */
+function scanSegments(html: string): HtmlSegment[] {
+  const segments: HtmlSegment[] = []
+  const lower = html.toLowerCase()
+  let cursor = 0
+  while (cursor < html.length) {
+    const lt = lower.indexOf('<', cursor)
+    if (lt === -1) {
+      segments.push({ kind: 'text', text: html.slice(cursor), start: cursor, end: html.length })
+      break
+    }
+    if (lt > cursor) segments.push({ kind: 'text', text: html.slice(cursor, lt), start: cursor, end: lt })
+    if (lower.startsWith('<!--', lt)) {
+      const close = lower.indexOf('-->', lt + 4)
+      const end = close === -1 ? html.length : close + 3
+      segments.push({ kind: 'comment', text: html.slice(lt, end), start: lt, end })
+      cursor = end
+      continue
+    }
+    const rawName = RAW_TEXT_ELEMENTS.find(name => opensTag(lower.slice(lt, lt + name.length + 2), name))
+    if (rawName !== undefined) {
+      const openerEnd = lower.indexOf('>', lt)
+      if (openerEnd === -1) {
+        // A truncated opener has no closer to find: the rest of the page is
+        // one malformed tag.
+        segments.push({ kind: 'tag', text: html.slice(lt), start: lt, end: html.length })
+        break
+      }
+      const closer = lower.indexOf(`</${rawName}`, openerEnd)
+      if (closer === -1) {
+        // A truncated raw element keeps its content out of every reader.
+        segments.push({ kind: 'tag', text: html.slice(lt, openerEnd + 1), start: lt, end: openerEnd + 1 })
+        segments.push({ kind: 'rawtext', text: html.slice(openerEnd + 1), start: openerEnd + 1, end: html.length })
+        break
+      }
+      const closerEnd = lower.indexOf('>', closer)
+      const stop = closerEnd === -1 ? html.length : closerEnd + 1
+      segments.push({ kind: 'tag', text: html.slice(lt, openerEnd + 1), start: lt, end: openerEnd + 1 })
+      segments.push({ kind: 'rawtext', text: html.slice(openerEnd + 1, closer), start: openerEnd + 1, end: closer })
+      segments.push({ kind: 'tag', text: html.slice(closer, stop), start: closer, end: stop })
+      cursor = stop
+      continue
+    }
+    const gt = lower.indexOf('>', lt)
+    if (gt === -1) {
+      // A stray `<` with no `>` stays literal, as the tag-strip regex did.
+      segments.push({ kind: 'text', text: html.slice(lt, lt + 1), start: lt, end: lt + 1 })
+      cursor = lt + 1
+      continue
+    }
+    segments.push({ kind: 'tag', text: html.slice(lt, gt + 1), start: lt, end: gt + 1 })
+    cursor = gt + 1
+  }
+  return segments
+}
+
 /** Remove markup, decode entities, and collapse whitespace. */
 export function stripTags(html: string): string {
-  return decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim()
+  let out = ''
+  for (const segment of scanSegments(html)) {
+    // Raw element content stays (only tags are removed), as the tag-strip regex did.
+    out += segment.kind === 'tag' || segment.kind === 'comment' ? ' ' : decodeEntities(segment.text)
+  }
+  return out.replace(/\s+/g, ' ').trim()
 }
 
 /** One anchor found in a page, with the offsets of its markup. */
@@ -62,25 +161,37 @@ export interface Anchor {
 }
 
 /**
- * Every anchor in the page, in document order.
+ * Every anchor in the page, in document order. The first `</a>` closes an
+ * anchor, and an anchor with no closer is never reported.
  * @param html - page markup.
  * @returns the anchors with stable offsets.
  */
 export function anchors(html: string): Anchor[] {
   const found: Anchor[] = []
-  const pattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(html)) !== null) {
-    const attrs = match[1] ?? ''
-    const href = attribute(attrs, 'href')
-    if (href === undefined || href.length === 0) continue
-    found.push({
-      href: decodeEntities(href),
-      attrs,
-      text: stripTags(match[2] ?? ''),
-      start: match.index,
-      end: pattern.lastIndex,
-    })
+  let open: { readonly attrs: string; readonly start: number; inner: string } | undefined
+  for (const segment of scanSegments(html)) {
+    if (open === undefined) {
+      if (segment.kind === 'tag' && opensTag(segment.text, 'a')) {
+        open = { attrs: segment.text.slice(2, -1), start: segment.start, inner: '' }
+      }
+      continue
+    }
+    if (segment.kind === 'tag') {
+      if (!closesTag(segment.text, 'a')) continue
+      const href = attribute(open.attrs, 'href')
+      if (href !== undefined && href.length > 0) {
+        found.push({
+          href: decodeEntities(href),
+          attrs: open.attrs,
+          text: stripTags(open.inner),
+          start: open.start,
+          end: segment.end,
+        })
+      }
+      open = undefined
+      continue
+    }
+    open.inner += segment.text
   }
   return found
 }
@@ -101,17 +212,19 @@ function attribute(attrs: string, name: string): string | undefined {
  * @returns the page text, possibly empty.
  */
 export function readPageText(html: string, limit: number): string {
-  const withoutHidden = html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-  const text = decodeEntities(
-    withoutHidden
-      .replace(/<(?:br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/td|\/section|\/article)[^>]*>/gi, '\n')
-      .replace(/<[^>]*>/g, ' '),
-  )
+  let out = ''
+  for (const segment of scanSegments(html)) {
+    if (segment.kind === 'rawtext' || segment.kind === 'comment') {
+      out += ' '
+      continue
+    }
+    if (segment.kind === 'tag') {
+      out += BREAKING_TAG.test(segment.text) ? '\n' : ' '
+      continue
+    }
+    out += segment.text
+  }
+  const text = decodeEntities(out)
     .replace(/\r/g, '')
     .replace(/[ \t\f\v]+/g, ' ')
     .replace(/ *\n */g, '\n')
@@ -121,14 +234,32 @@ export function readPageText(html: string, limit: number): string {
 }
 
 /**
- * The page's `<title>` text, when the page has one.
+ * The page's `<title>` text, when the page has one with a closer.
  * @param html - page markup.
  * @returns the title text or undefined.
  */
 export function pageTitle(html: string): string | undefined {
-  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)
-  if (match === null) return undefined
-  const title = stripTags(match[1] ?? '')
+  let open = false
+  let closed = false
+  let inner = ''
+  for (const segment of scanSegments(html)) {
+    if (segment.kind !== 'tag') {
+      if (open) inner += segment.kind === 'rawtext' ? ' ' : segment.text
+      continue
+    }
+    if (open) {
+      if (closesTag(segment.text, 'title')) {
+        closed = true
+        break
+      }
+      // A nested tag between the title tags is markup, not title text.
+      inner += ' '
+      continue
+    }
+    open = opensTag(segment.text, 'title')
+  }
+  if (!open || !closed) return undefined
+  const title = stripTags(inner)
   return title.length === 0 ? undefined : title
 }
 

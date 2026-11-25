@@ -55,3 +55,23 @@ describe('isCJK', () => {
     expect(isCJK('deep search')).toBe(false)
   })
 })
+
+describe('adversarial pages', () => {
+  it('scans a page of unclosed anchors in linear time', () => {
+    const hostile = '<a href="https://x.test/">'.repeat(50_000)
+    expect(anchors(hostile)).toEqual([])
+  })
+
+  it('scans a page of unclosed raw elements in linear time', () => {
+    const hostile = '<script>'.repeat(50_000)
+    expect(readPageText(hostile, 1000)).toBe('')
+  })
+
+  it('keeps a stray `<` literal when no `>` follows', () => {
+    expect(stripTags('a < b')).toBe('a < b')
+  })
+
+  it('drops the content of a truncated script element', () => {
+    expect(readPageText('<script>var secret = 1', 1000)).toBe('')
+  })
+})
