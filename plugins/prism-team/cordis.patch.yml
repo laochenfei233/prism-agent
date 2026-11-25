@@ -1,0 +1,19 @@
+# The prism-team bundle patch: one row over the profile root.
+#
+# This bundle needs the Agent Teams packages mounted beside it
+# (`dsh-agent-team` and `dsh-tool-agent-team` under `packages/team/`) plus the
+# subagent runtime that owns the tree. Without them the row fails to load,
+# which is the intended loud failure: there is no team to add to.
+#
+# `writeTools` names DeepSeek Harness's own write tools
+# (`packages/fs/tool-fs`). A profile whose tools differ edits these names.
+# `mode: observe` records every refused write and lets it through — read it as
+# a way to close the guard, not as a dry run that still protects.
+- insert:
+    - id: prism-team
+      name: 'prism-team'
+      config:
+        mode: enforce
+        worktree: true
+        maxReports: 200
+        writeTools: [write, edit, str_replace_editor]

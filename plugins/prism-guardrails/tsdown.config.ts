@@ -12,7 +12,7 @@ import { defineConfig } from 'tsdown'
 
 export default defineConfig({
   name: 'prism-guardrails',
-  entry: ['src/index.ts', 'src/ponytail.ts'],
+  entry: ['src/index.ts', 'src/ponytail.ts', 'src/compose.ts'],
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',

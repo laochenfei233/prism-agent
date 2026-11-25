@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for compose-next-mode.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/compose-next-mode.md
+/:
+  en: 58c0378376726386
+  zh: c4537db0dee5d55a
+/compose-next-as-a-mode:
+  en: fb0ea49aff4369e9
+  zh: d2525e323ad7ebb1
+/compose-next-as-a-mode/report:
+  en: e609b2c0f5018573
+  zh: 40fc0b64403c69a8
+/compose-next-as-a-mode/s1-problem:
+  en: c45aaf2afb74ce66
+  zh: 4d3a91139bc75f7e
+/compose-next-as-a-mode/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/compose-next-as-a-mode/s2-design/s2-1-home-prism-guardrails-src-compose-ts:
+  en: e6172e4bb88f7a8e
+  zh: f816404cfcbe0763
+/compose-next-as-a-mode/s2-design/s2-2-levels-and-the-section:
+  en: db91b8610e16e0ce
+  zh: 503292afff1c3c6d
+/compose-next-as-a-mode/s2-design/s2-3-the-automatic-rule-and-its-price:
+  en: 690aa173d42114dc
+  zh: f77e67ad79a274b8
+/compose-next-as-a-mode/s2-design/s2-4-state:
+  en: 33bb8404ed04b1ca
+  zh: 32190188efd97093
+/compose-next-as-a-mode/s2-design/s2-5-configuration:
+  en: 299f1ac4ced877f9
+  zh: 51c0237a5cff44c7
+/compose-next-as-a-mode/s3-scope:
+  en: b519bfb4a59af3a1
+  zh: fad6f69d9c49643c
+/compose-next-as-a-mode/tasks:
+  en: fed39f7a99a51af4
+  zh: 5337bac3f576910e
+/compose-next-as-a-mode/s4-acceptance:
+  en: 0470467a63c680df
+  zh: 04c8dcb9310a8653
