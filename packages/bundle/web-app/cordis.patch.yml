@@ -124,6 +124,24 @@
     - id: prism-autonomy
       name: '@prism/prism-autonomy'
 
+    # Out-of-tree bundle loaded from its built entry by relative path (the form
+    # a checkout that has not installed the package needs). Zero behavior until
+    # a session enables a Team; the browser half serves the session-header
+    # Team chip and its panel.
+    - id: prism-team
+      name: '@prism/prism-team'
+      config:
+        mode: enforce
+        worktree: true
+        maxReports: 200
+        writeTools:
+          - tool: write
+            pathArgument: file_path
+          - tool: edit
+            pathArgument: file_path
+          - tool: str_replace_editor
+            pathArgument: path
+
     # Session-menu application choices over Host resolution on macOS, Windows,
     # and Linux. An empty catalog hides the action. The Host routes and browser
     # controls also serve the file-tree directory opener.

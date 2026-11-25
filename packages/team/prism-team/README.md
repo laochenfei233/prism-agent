@@ -23,10 +23,12 @@ A Team is an enabled subagent tree: the root Agent is the Lead and every continu
 
 Add the bundle to a profile, then enable Agent Teams. For a checkout that has not installed the package, point the row at the built entry instead of the package name:
 
+The shipped Web/Desktop composition mounts the bundle by name (`@prism/prism-team` in `packages/bundle/web-app/cordis.patch.yml`). For another profile, add the same row there or point it at the built entry directly:
+
 ```yaml
 - insert:
     - id: prism-team
-      name: 'file:///absolute/path/to/plugins/prism-team/lib/index.js'
+      name: '@prism/prism-team'
       config:
         mode: enforce
         worktree: true

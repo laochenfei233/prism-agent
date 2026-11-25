@@ -557,6 +557,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-agent-team` | yes | Shared task DAG and change waits for subagent trees |
 | `@deepseek-ai/dsh-tool-agent-team` | yes | Scoped model-facing Agent Teams tools over ctx.agentTeams |
+| `@prism/prism-team` | yes | Prism Team: structured teammate reports, a needs-a-person list, a private worktree per teammate, and an enforced task write scope for Agent Teams |
 
 ## telemetry
 

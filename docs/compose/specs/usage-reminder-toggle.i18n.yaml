@@ -5,36 +5,36 @@
 /:
   en: f163c589feaac590
   zh: f163c589feaac590
-/section:
-  en: 8dc054cdc847d758
+/token-usage-reminder-switch-off-by-default:
+  en: 7d93f54add819aa1
   zh: d71efe895c32b30b
-/section/report:
-  en: a6077315871149de
+/token-usage-reminder-switch-off-by-default/report:
+  en: b052fbe3a06b9df4
   zh: a6077315871149de
-/section/s1-problem:
-  en: 38a8bdd1af24f0b4
+/token-usage-reminder-switch-off-by-default/s1-problem:
+  en: 52e11365e8e9bccd
   zh: 38a8bdd1af24f0b4
-/section/s2-design:
+/token-usage-reminder-switch-off-by-default/s2-design:
   en: ecbb0dbfa14686f0
   zh: ecbb0dbfa14686f0
-/section/s2-design/s2-1-session-event:
-  en: 10117117e2792ccc
+/token-usage-reminder-switch-off-by-default/s2-design/s2-1-observation-point-accumulate-from-session-event:
+  en: eb8a4c243dff71ea
   zh: 10117117e2792ccc
-/section/s2-design/s2-2-agent-steer:
-  en: 4e3c122034469d1b
+/token-usage-reminder-switch-off-by-default/s2-design/s2-2-injection-steer-when-a-threshold-is-crossed:
+  en: c66a7ad7e41ffcda
   zh: 4e3c122034469d1b
-/section/s2-design/s2-3:
-  en: 4a79db28a71b271b
+/token-usage-reminder-switch-off-by-default/s2-design/s2-3-configuration:
+  en: bcbe191bd098a46f
   zh: 4a79db28a71b271b
-/section/s2-design/s2-4:
-  en: fa0d86e966b868f2
+/token-usage-reminder-switch-off-by-default/s2-design/s2-4-ledger:
+  en: 2815eff088ed3b0e
   zh: fa0d86e966b868f2
-/section/s3-scope:
-  en: 37b6cddc33a0edc9
+/token-usage-reminder-switch-off-by-default/s3-scope:
+  en: 9cd8242d8411bbce
   zh: 37b6cddc33a0edc9
-/section/tasks:
-  en: e8d0edc9879bb5f9
+/token-usage-reminder-switch-off-by-default/tasks:
+  en: c033cc86955d2284
   zh: e8d0edc9879bb5f9
-/section/s4-acceptance:
-  en: 8cc3c923c3b94011
+/token-usage-reminder-switch-off-by-default/s4-acceptance:
+  en: 47d033a5ac0be545
   zh: 8cc3c923c3b94011

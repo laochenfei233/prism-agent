@@ -23,10 +23,12 @@ Prism Team 在 Agent Teams 包之外补上四项能力，且不改动它们：
 
 把 bundle 加进 profile，然后启用 Agent Teams。对尚未安装本包的 checkout，把这一行指向构建产物而不是包名：
 
+The shipped Web/Desktop composition mounts the bundle by name (`@prism/prism-team` in `packages/bundle/web-app/cordis.patch.yml`). For another profile, add the same row there or point it at the built entry directly:
+
 ```yaml
 - insert:
     - id: prism-team
-      name: 'file:///absolute/path/to/plugins/prism-team/lib/index.js'
+      name: '@prism/prism-team'
       config:
         mode: enforce
         worktree: true

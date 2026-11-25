@@ -5990,6 +5990,40 @@ export type ImportSourceId =
 ```
 <!-- END GENERATED config-catalog:@prism/prism-session-import -->
 
+<!-- BEGIN GENERATED config-catalog:@prism/prism-team -->
+<a id="prismprism-team"></a>
+
+## `@prism/prism-team`
+
+- `inject`: `agents` · `agentTeams` · `subagents` · `tools` · `systemPrompt` · `commands`
+- `source`: [`packages/team/prism-team/src/index.ts:59`](../packages/team/prism-team/src/index.ts)
+
+```ts config-catalog
+/** Deployment configuration for the team bundle. */
+export interface Config {
+  /** Whether an out-of-scope write is refused (`enforce`) or only recorded (`observe`). Defaults to `enforce`. */
+  readonly mode?: Mode
+  /** Whether each continuable teammate gets its own git worktree. Defaults to `true`. */
+  readonly worktree?: boolean
+  /** Write tools the scope check judges. Defaults to `write` and `edit` (`file_path`) plus `str_replace_editor` (`path`). */
+  readonly writeTools?: readonly WriteTool[]
+  /** Reports kept per team in the in-memory ledger. Defaults to `200`. */
+  readonly maxReports?: number
+}
+
+/** How the write scope applies: `observe` records a refusal and lets the write through. */
+export type Mode = 'enforce' | 'observe'
+
+/** One guarded write tool and the argument naming the path it writes. */
+export interface WriteTool {
+  /** Tool name as the model calls it. */
+  readonly tool: string
+  /** Argument carrying the written path. */
+  readonly pathArgument: string
+}
+```
+<!-- END GENERATED config-catalog:@prism/prism-team -->
+
 ## Loadable plugins with no config
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.

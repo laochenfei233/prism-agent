@@ -34,13 +34,8 @@ commits: e161bdab89 (feat/tool-name-suggestions), e7c738b135 (master)
 ### S2.3 返回形态：不 rethrow，返回增强后的错误结果
 
 ```ts
-declare const enhanced: string
-declare const originalInfo: Record<string, unknown>
-const enhancedResult = {
-  content: [{ type: 'text', text: `Error: ${enhanced}` }],
-  isError: true,
-  error: { message: enhanced, ...originalInfo }, // keep reachableFrom and the rest
-}
+{ content: [{ type: 'text', text: `Error: ${enhanced}` }], isError: true,
+  error: { message: enhanced, ...originalInfo } }   // preserves reachableFrom etc.
 ```
 
 该结果经 `normalizeDispatchResult`（`pipeline.ts:570-588`）与 post-execute 正常流转，最终写入 `tool/result` 事件到达模型（`batch.ts:258`）。判定逻辑（哪些调用被拒/放行）完全不变——本特性只改错误文本。

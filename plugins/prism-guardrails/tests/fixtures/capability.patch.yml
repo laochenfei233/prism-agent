@@ -30,6 +30,14 @@
         model: capability-mock
         cwd: !!js process.cwd()
 
+# The fixture disables headless-startup, so sandbox-policy cannot read its
+# `headlessStartup` service; restate the sandbox statically for this run.
+- id: sandbox-policy
+  config:
+    mode: 'workspace-write'
+    workspaceRoot: !!js process.cwd()
+    additionalWritableRoots: []
+
 - id: shell-env
   config:
     dshHome: './.dsh-home'

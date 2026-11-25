@@ -28,9 +28,9 @@ base bundle 的 permission-presets 预设表新增一个预设：`autonomous-gua
 
 ```ts
 // The plugin's config and its defaults.
-interface AutonomyConfig {
-  preset: 'autonomous-guarded' // the preset that engages autonomy
-  requireHuman: { reasonPrefix: string }[] // the require-human list
+const config = {
+  preset: 'autonomous-guarded', // the preset that engages autonomy
+  requireHuman: [{ reasonPrefix: 'escalate sandbox to' }], // the require-human list
 }
 ```
 
