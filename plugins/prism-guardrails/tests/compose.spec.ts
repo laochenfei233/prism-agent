@@ -12,6 +12,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import * as Compose from '../src/compose.ts'
 
@@ -19,6 +20,7 @@ import * as Compose from '../src/compose.ts'
 async function harness(config: Compose.Config = {}): Promise<{ ctx: Context; agent: Agent }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(Compose, config)

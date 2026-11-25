@@ -1,18 +1,21 @@
 /**
- * Team capabilities the experimental Agent Teams packages leave open: a
- * structured report instead of prose, one needs-a-person list, a private
- * worktree per teammate, and an enforced write scope.
+ * Team capabilities the shared Agent Teams packages leave open: a structured
+ * report instead of prose, one needs-a-person list, a private worktree per
+ * teammate, and an enforced write scope.
  *
- * Every part attaches to a documented extension point and owns its decision
- * there, so this bundle adds behavior without rewriting an upstream package:
+ * A Team is an enabled subagent tree: the root Agent is the Lead and every
+ * continuable descendant is a teammate, so membership is read from the live
+ * tree rather than a separate roster. Every part attaches to a documented
+ * extension point and owns its decision there, so this bundle adds behavior
+ * without rewriting an upstream package:
  *
  * - **Reports** — `team_report` turns a teammate's progress into a structured
- *   status the Lead receives as one message, so coordination stops depending on
- *   free text read out of order.
+ *   status the Lead receives as one inbox message, so coordination stops
+ *   depending on free text read out of order.
  * - **The needs-a-person list** — `/team` orders blocked, failed, ready and
  *   waiting rows before working ones, and a healthy team takes one line.
- * - **A worktree per teammate** — a teammate gets its own `git worktree` and
- *   branch, so two members stop editing one checkout.
+ * - **A worktree per teammate** — a continuable teammate gets its own
+ *   `git worktree` and branch, so two members stop editing one checkout.
  * - **The write scope** — a teammate's write outside the scope of the task it
  *   claimed goes to approval instead of proceeding. The task board calls those
  *   scopes advisory; here the write tools obey them.
@@ -28,14 +31,16 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { TeamTaskView } from '@deepseek-ai/dsh-agent-team'
 // Type-only: activates the `ctx.connection` service these routes register on.
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
-import type { TeamMembership } from '@deepseek-ai/dsh-experimental-agent-team'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+import { SubagentError } from '@deepseek-ai/dsh-subagent'
+import type { SubagentDescendantListEntry } from '@deepseek-ai/dsh-subagent'
+import { defineTool, ToolContextUnavailableError } from '@deepseek-ai/dsh-tools'
+import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import type { TeamPanelValue } from './panel-contract.ts'
 import { TEAM_PANEL_PATH } from './routes.ts'
 
@@ -54,7 +59,7 @@ export interface WriteTool {
 export interface Config {
   /** Whether an out-of-scope write is refused (`enforce`) or only recorded (`observe`). Defaults to `enforce`. */
   readonly mode?: Mode
-  /** Whether each teammate gets its own git worktree. Defaults to `true`. */
+  /** Whether each continuable teammate gets its own git worktree. Defaults to `true`. */
   readonly worktree?: boolean
   /** Write tools the scope check judges. Defaults to `write` and `edit` (`file_path`) plus `str_replace_editor` (`path`). */
   readonly writeTools?: readonly WriteTool[]
@@ -66,7 +71,7 @@ export interface Config {
 export interface ResolvedConfig {
   /** How the write scope applies. */
   readonly mode: Mode
-  /** Whether each teammate gets its own git worktree. */
+  /** Whether each continuable teammate gets its own git worktree. */
   readonly worktree: boolean
   /** Guarded tool name to the argument naming the written path. */
   readonly writeTools: ReadonlyMap<string, string>
@@ -184,7 +189,7 @@ export function createLedger(limit: number): Ledger {
 export const name = 'prism-team'
 
 /** Services this bundle reads. */
-export const inject = ['agents', 'agentTeams', 'tools', 'systemPrompt', 'commands'] as const
+export const inject = ['agents', 'agentTeams', 'subagents', 'tools', 'systemPrompt', 'commands'] as const
 
 /** Order of the team section inside the assembled prompt, before tools. */
 const TEAM_SECTION_ORDER = 40
@@ -192,9 +197,31 @@ const TEAM_SECTION_ORDER = 40
 /** Statuses the needs-a-person list shows before working rows. */
 const NEEDS_A_PERSON: ReadonlySet<LedgerEntry['status']> = new Set(['blocked', 'failed', 'ready', 'waiting'])
 
-/** The first eight characters of a Team brand, used in paths and branches. */
+/** The first eight characters of a team or session brand, used in paths and branches. */
 function teamShort(id: string): string {
   return id.slice(0, 8)
+}
+
+/**
+ * Resolve the Team this agent belongs to: the live root of its subagent tree
+ * when that tree's Team mode is enabled.
+ *
+ * Every subagent-resolution failure means "no team here": an independently
+ * resumed child has no live root, and a composition without the subagent
+ * runtime has no tree at all. Both leave the agent outside this bundle.
+ *
+ * @param ctx - the plugin context carrying the Team and subagent services.
+ * @param agent - the exact live agent to resolve.
+ * @returns the live Lead (root) Agent, or `undefined` outside an enabled team.
+ */
+function teamRoot(ctx: Context, agent: Agent): Agent | undefined {
+  try {
+    if (!ctx.agentTeams.isEnabled(agent)) return undefined
+    return ctx.subagents.rootOf(agent)
+  } catch (error: unknown) {
+    if (error instanceof SubagentError) return undefined
+    throw error
+  }
 }
 
 /** The path a write tool was called with, under the argument that tool names. */
@@ -225,7 +252,7 @@ function withoutWorktree(path: string): string {
 /**
  * Whether one path is covered by any of a task's write scopes.
  *
- * @param root - the session working directory the scopes are relative to.
+ * @param root - the team workspace root the scopes are relative to.
  * @param target - the path the write named, absolute or relative to `root`.
  * @param scopes - the claimed task's advisory write scopes.
  * @returns whether the path is inside one scope, matched per path segment.
@@ -249,12 +276,12 @@ type Workspace =
  * Create the teammate's own worktree and branch under the Lead's checkout.
  *
  * A failure is reported to the member instead of thrown: the teammate is
- * already created by the Team service, so refusing here would leave a member
- * with no explanation of why it has no directory.
+ * already created by the subagent runtime, so refusing here would leave a
+ * member with no explanation of why it has no directory.
  *
  * @param root - the Team Lead's working directory, when it records one.
  * @param short - the team's short brand.
- * @param member - the teammate's immutable name.
+ * @param member - the teammate's immutable catalog name.
  * @returns the prepared path and branch, or a warning to state in the member's prompt.
  */
 function prepareWorktree(root: string | undefined, short: string, member: string): Workspace {
@@ -284,9 +311,9 @@ function prepareWorktree(root: string | undefined, short: string, member: string
 }
 
 /** The prompt section one member reads. */
-function sectionText(membership: TeamMembership, workspace: Workspace | undefined): string {
+function sectionText(role: 'lead' | 'teammate', member: string, workspace: Workspace | undefined): string {
   const lines = [
-    `PRISM TEAM (${membership.role} "${membership.name}")`,
+    `PRISM TEAM (${role} "${member}")`,
     '',
     'Report through `team_report` rather than prose: one status per report, `summary` saying where the work stands. Statuses are `progress`, `waiting`, `ready`, `blocked`, `failed`, and `dropped`. Use `waiting` only when you need a decision from the Lead, and say what the decision is.',
     'Claim a shared task before writing files, and keep writes inside the `writeScopes` the task names. A write outside that scope goes to approval; a write with no claimed task is refused the same way.',
@@ -308,80 +335,144 @@ function memberLine(member: { readonly name: string; readonly status: string }):
   return `  ${member.name.padEnd(12)} ${member.status}`
 }
 
+/** One roster row: the Lead first, then every continuable descendant. */
+interface RosterMember {
+  /** Model-facing member name. */
+  readonly name: string
+  /** Team role. */
+  readonly role: 'lead' | 'teammate'
+  /** Live status; `inactive` means no turn is executing. */
+  readonly status: string
+}
+
 /**
- * Install the tools and section one Team member needs.
+ * Read the roster of one live team: the Lead, then every continuable
+ * descendant in catalog order. One-shot and external children are ordinary
+ * delegation, not Team members; an unreadable branch is skipped rather than
+ * failing the whole read.
  *
- * @param ctx - the plugin context every member-scoped registration derives from.
- * @param agent - the exact live member.
- * @param membership - its resolved team role.
- * @param ledger - the shared team ledger.
- * @param workspace - the member's prepared directory, when the deployment asks for one.
- * @returns the disposer that unwinds every registration.
+ * @param ctx - the plugin context carrying the subagent service.
+ * @param root - the live Lead Agent.
+ * @returns the roster rows, Lead first.
  */
-function installMember(
+async function roster(ctx: Context, root: Agent): Promise<readonly RosterMember[]> {
+  const members: RosterMember[] = [{ name: 'lead', role: 'lead', status: 'running' }]
+  const entries = await listDescendants(ctx, root)
+  for (const entry of entries) {
+    if (entry.kind !== 'child' || entry.mode !== 'continuable') continue
+    members.push({ name: entry.path ?? entry.name ?? entry.label, role: 'teammate', status: entry.activity })
+  }
+  return members
+}
+
+/**
+ * List one team's descendants, tolerating an unreadable catalog: the roster
+ * and reports degrade to what the live tree still answers.
+ *
+ * @param ctx - the plugin context carrying the subagent service.
+ * @param root - the live Lead Agent.
+ * @returns the descendant entries, or an empty list when the catalog cannot be read.
+ */
+async function listDescendants(ctx: Context, root: Agent): Promise<readonly SubagentDescendantListEntry[]> {
+  return await ctx.subagents.listDescendants(root.session.id).catch(() => [] as SubagentDescendantListEntry[])
+}
+
+/** A continuable child row: the only descendant kind that is a Team teammate. */
+type TeammateEntry = Extract<SubagentDescendantListEntry, { readonly kind: 'child'; readonly mode: 'continuable' }>
+
+/**
+ * Narrow one descendant to a continuable child. Diagnostics and one-shot or
+ * external children are ordinary delegation, not Team teammates.
+ *
+ * @param entry - one descendant catalog row.
+ * @returns the continuable-child view, or `undefined` when the row is not a teammate.
+ */
+function continuable(entry: SubagentDescendantListEntry): TeammateEntry | undefined {
+  return entry.kind === 'child' && entry.mode === 'continuable' ? entry : undefined
+}
+
+/**
+ * Install the team prompt section, shown only to members of an enabled team.
+ *
+ * @param ctx - the plugin context the section is registered on.
+ * @param workspaces - prepared teammate checkouts, keyed by session id.
+ * @param names - resolved member names, keyed by session id.
+ */
+function installSection(
   ctx: Context,
-  agent: Agent,
-  membership: TeamMembership,
-  ledger: Ledger,
-  workspace: Workspace | undefined,
-): () => void {
-  const scoped = agent.ctx
-  const team = String(membership.id)
-  const disposers: (() => void)[] = []
-  try {
-    disposers.push(scoped.systemPrompt.section({
-      name: 'prism-team',
-      order: TEAM_SECTION_ORDER,
-      text: () => sectionText(membership, workspace),
-    }))
-    disposers.push(scoped.tools.register(defineTool({
-      name: 'team_report',
-      description: 'Report one structured status for your Team work. The Lead receives it as one message; the status is what `/team` groups.',
-      parameters: {
-        status: { type: 'string', required: true, enum: [...REPORT_STATUSES], description: 'progress while working, waiting when you need a decision, ready when there is a result to review, blocked or failed when you cannot continue, dropped when there is nothing to do.' },
-        summary: { type: 'string', required: true, description: 'Where the work stands in one or two sentences, and what the Lead should do next when the status needs a person.' },
-        task_id: { type: 'string', description: 'Shared task this report is about, when it is about one.' },
-      },
-      output: {
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            delivered: { type: 'boolean', required: true },
-            status: { type: 'string', required: true },
-            reports: { type: 'integer', required: true },
-          },
+  workspaces: ReadonlyMap<string, Workspace>,
+  names: ReadonlyMap<string, string>,
+): void {
+  ctx.systemPrompt.section({
+    name: 'prism-team',
+    order: TEAM_SECTION_ORDER,
+    text: ({ agent }) => {
+      if (agent === undefined) return ''
+      const root = teamRoot(ctx, agent)
+      if (root === undefined) return ''
+      const lead = root === agent
+      const key = String(agent.session.id)
+      const fallback = lead ? 'lead' : teamShort(key)
+      return sectionText(lead ? 'lead' : 'teammate', names.get(key) ?? fallback, workspaces.get(key))
+    },
+  })
+}
+
+/**
+ * Install the `team_report` tool, available to every member of an enabled
+ * team. A teammate's report becomes one message in the Lead's inbox; the
+ * Lead's own report only fills the ledger, because the team service refuses
+ * self-messages and a Lead report has no other receiver.
+ *
+ * @param ctx - the plugin context the tool is registered on.
+ * @param ledger - the shared team ledger.
+ * @param names - resolved member names, keyed by session id.
+ */
+function installReportTool(ctx: Context, ledger: Ledger, names: ReadonlyMap<string, string>): void {
+  ctx.tools.register(defineTool({
+    name: 'team_report',
+    description: 'Report one structured status for your Team work. The Lead receives it as one message; the status is what `/team` groups.',
+    parameters: {
+      status: { type: 'string', required: true, enum: [...REPORT_STATUSES], description: 'progress while working, waiting when you need a decision, ready when there is a result to review, blocked or failed when you cannot continue, dropped when there is nothing to do.' },
+      summary: { type: 'string', required: true, description: 'Where the work stands in one or two sentences, and what the Lead should do next when the status needs a person.' },
+      task_id: { type: 'string', description: 'Shared task this report is about, when it is about one.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          delivered: { type: 'boolean', required: true },
+          status: { type: 'string', required: true },
+          reports: { type: 'integer', required: true },
         },
-        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
       },
-      async execute(args, exec) {
-        const entry: LedgerEntry = {
-          name: membership.name,
-          status: args.status as ReportStatus,
-          summary: args.summary,
-          ...args.task_id === undefined ? {} : { taskId: args.task_id },
-        }
-        const delivered = membership.role === 'teammate'
-        if (delivered) {
-          const text = `Report from ${membership.name} [${entry.status}]: ${entry.summary}`
-            + (entry.taskId === undefined ? '' : ` (task ${entry.taskId})`)
-          await ctx.agentTeams.sendMessage(agent, {
-            target: 'lead',
-            content: [{ type: 'text', text }],
-            signal: exec.signal,
-          })
-        }
-        ledger.record(team, entry)
-        return { delivered, status: entry.status, reports: ledger.list(team).length }
-      },
-    })))
-  } catch (error) {
-    for (const dispose of disposers.reverse()) dispose()
-    throw error
-  }
-  return () => {
-    for (const dispose of disposers.reverse()) dispose()
-  }
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    async execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new ToolContextUnavailableError('team_report requires a calling Agent')
+      const root = teamRoot(ctx, agent)
+      if (root === undefined) throw new Error('team_report: this session is not on an enabled Team')
+      const lead = root === agent
+      const key = String(agent.session.id)
+      const member = lead ? 'lead' : names.get(key) ?? teamShort(key)
+      const entry: LedgerEntry = {
+        name: member,
+        status: args.status as ReportStatus,
+        summary: args.summary,
+        ...args.task_id === undefined ? {} : { taskId: args.task_id },
+      }
+      if (!lead) {
+        const text = `Report from ${member} [${entry.status}]: ${entry.summary}`
+          + (entry.taskId === undefined ? '' : ` (task ${entry.taskId})`)
+        await ctx.subagents.sendMessage(agent, root.session.id, [{ type: 'text', text }], { signal: exec.signal })
+      }
+      const team = String(root.session.id)
+      ledger.record(team, entry)
+      return { delivered: !lead, status: entry.status, reports: ledger.list(team).length }
+    },
+  }), { when: ({ agent }) => agent !== undefined && teamRoot(ctx, agent) !== undefined })
 }
 
 /**
@@ -391,36 +482,48 @@ function installMember(
  * everything else is inferred and goes to approval, where a person prices it.
  * Under `observe` the same decision is recorded and the write proceeds.
  *
- * @param ctx - the plugin context the listener is scoped to.
+ * @param ctx - the plugin context the listener is registered on.
  * @param config - resolved configuration.
  * @param ledger - the shared team ledger.
+ * @param names - resolved member names, keyed by session id.
  */
-function installWriteGate(ctx: Context, config: ResolvedConfig, ledger: Ledger): void {
+function installWriteGate(
+  ctx: Context,
+  config: ResolvedConfig,
+  ledger: Ledger,
+  names: ReadonlyMap<string, string>,
+): void {
   ctx.on('tools/pre-execute', (exec, next): Promise<PreToolDecision> => {
     const agent = exec.agent
     if (agent === undefined) return next()
-    const membership = ctx.agentTeams.tryMembership(agent)
-    if (membership === undefined || membership.role === 'lead') return next()
     if (!config.writeTools.has(exec.name)) return next()
+    const root = teamRoot(ctx, agent)
+    // Only teammates are gated: the Lead owns the shared checkout and every scope.
+    if (root === undefined || root === agent) return next()
     const pathArgument = config.writeTools.get(exec.name)
     if (pathArgument === undefined) return next()
     const path = writtenPath(exec.arguments, pathArgument)
     if (path === undefined) return next()
-    const root = agent.session.header.cwd
-    if (root === undefined) return next()
+    const workspaceRoot = root.session.header.cwd
+    if (workspaceRoot === undefined) return next()
 
     // Only the caller's own claimed task authorizes a write: another member's
     // scope is context, not permission.
     const claimed = ctx.agentTeams.listTasks(agent)
-      .filter(task => task.status === 'in_progress' && task.ownerName === membership.name)
-    const covered = claimed.some(task => withinScopes(root, path, task.writeScopes))
+      .filter(task => task.status === 'in_progress' && String(task.ownerId) === String(agent.session.id))
+    const covered = claimed.some(task => withinScopes(workspaceRoot, path, task.writeScopes))
     if (covered) return next()
 
     const reason = claimed.length === 0
       ? `\`${path}\` is written with no claimed shared task of your own, so no write scope covers it. Claim the task this work belongs to (team_task_list, then team_task_update with action "claim") and retry.`
       : `\`${path}\` is outside the write scopes of your claimed task (${claimed.map(task => `${task.id}: ${task.writeScopes.join(', ') || 'none'}`).join('; ')}). Either stay inside that scope or tell the Lead the task's scope is wrong.`
     if (config.mode === 'observe') {
-      ledger.record(String(membership.id), { name: membership.name, status: 'observed', summary: path })
+      const key = String(agent.session.id)
+      ledger.record(String(root.session.id), {
+        name: names.get(key) ?? teamShort(key),
+        status: 'observed',
+        summary: path,
+      })
       return next()
     }
     return Promise.resolve({ kind: 'ask', reason })
@@ -446,77 +549,96 @@ function plural(count: number, noun: string): string {
 }
 
 /**
+ * Assemble the `/team` body: the head line, needs-a-person rows before working
+ * ones, observed writes, open tasks, and the roster with worktree paths.
+ *
+ * @param team - the team brand.
+ * @param members - the live roster, Lead first.
+ * @param tasks - the team's open task views.
+ * @param entries - the team's ledger entries.
+ * @param worktreePaths - prepared checkout paths, keyed `<teamShort>:<member>`.
+ * @returns the rendered command text.
+ */
+function teamText(
+  team: string,
+  members: readonly RosterMember[],
+  tasks: readonly TeamTaskView[],
+  entries: readonly LedgerEntry[],
+  worktreePaths: ReadonlyMap<string, string>,
+): string {
+  const needs = entries.filter(entry => NEEDS_A_PERSON.has(entry.status)).sort((left, right) => rank(left.status) - rank(right.status))
+  const observed = entries.filter(entry => entry.status === 'observed')
+  const working = entries.filter(entry => !NEEDS_A_PERSON.has(entry.status) && entry.status !== 'observed')
+
+  const head = `Team ${teamShort(team)}: ${plural(members.length, 'member')}, ${String(tasks.length)} open ${tasks.length === 1 ? 'task' : 'tasks'} (${String(needs.length)} need a person).`
+  if (needs.length === 0 && observed.length === 0 && working.length === 0 && tasks.length === 0) {
+    return head
+  }
+
+  const lines = [head]
+  if (needs.length > 0) lines.push('', 'needs a person:', ...needs.map(reportRow))
+  if (working.length > 0) lines.push('', 'working:', ...working.map(reportRow))
+  if (observed.length > 0) lines.push('', 'observed writes:', ...observed.map(reportRow))
+  if (tasks.length > 0) {
+    lines.push('', 'tasks:', ...tasks.map(task => `  ${task.id} ${task.status}${task.ownerName === undefined ? '' : ` (${task.ownerName})`}${task.ready ? '' : ' blocked'} · ${task.subject}`))
+  }
+  lines.push('', ...members.map(member => {
+    const path = worktreePaths.get(`${teamShort(team)}:${member.name}`)
+    return `${memberLine(member)}${path === undefined ? '' : ` · ${path}`}`
+  }))
+  return lines.join('\n')
+}
+
+/**
  * Install the `/team` command, which any member may run.
  *
- * @param ctx - the plugin context the command is scoped to.
+ * @param ctx - the plugin context the command is registered on.
  * @param ledger - the shared team ledger.
- * @param worktrees - prepared teammate checkout paths, keyed `<team>:<name>`.
+ * @param worktreePaths - prepared checkout paths, keyed `<teamShort>:<member>`.
  */
-function installTeamCommand(ctx: Context, ledger: Ledger, worktrees: ReadonlyMap<string, string>): void {
+function installTeamCommand(ctx: Context, ledger: Ledger, worktreePaths: ReadonlyMap<string, string>): void {
   ctx.effect(() => ctx.commands.register({
     definitionId: CommandDefinitionId('prism-team/team'),
     name: 'team',
     description: 'Show the roster, the open tasks, and the reports this team recorded, needs-a-person rows first',
-    handler: (invocation: CommandInvocation): CommandResult => {
+    handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
       const agent = invocation.agent
-      const membership = ctx.agentTeams.tryMembership(agent)
-      if (membership === undefined) return { kind: 'error', text: '/team: this session is not a Team member.' }
-      const team = String(membership.id)
-      const members = ctx.agentTeams.listMembers(agent)
+      const root = teamRoot(ctx, agent)
+      if (root === undefined) return { kind: 'error', text: '/team: this session is not a Team member.' }
+      const team = String(root.session.id)
+      const members = await roster(ctx, root)
       const tasks = ctx.agentTeams.listTasks(agent).filter(task => task.status !== 'completed')
-      const entries = ledger.list(team)
-      const needs = entries.filter(entry => NEEDS_A_PERSON.has(entry.status)).sort((left, right) => rank(left.status) - rank(right.status))
-      const observed = entries.filter(entry => entry.status === 'observed')
-      const working = entries.filter(entry => !NEEDS_A_PERSON.has(entry.status) && entry.status !== 'observed')
-
-      const head = `Team ${teamShort(team)}: ${plural(members.length, 'member')}, ${String(tasks.length)} open ${tasks.length === 1 ? 'task' : 'tasks'} (${String(needs.length)} need a person).`
-      if (needs.length === 0 && observed.length === 0 && working.length === 0 && tasks.length === 0) {
-        return { kind: 'success', text: head }
-      }
-
-      const lines = [head]
-      if (needs.length > 0) lines.push('', 'needs a person:', ...needs.map(reportRow))
-      if (working.length > 0) lines.push('', 'working:', ...working.map(reportRow))
-      if (observed.length > 0) lines.push('', 'observed writes:', ...observed.map(reportRow))
-      if (tasks.length > 0) {
-        lines.push('', 'tasks:', ...tasks.map(task => `  ${task.id} ${task.status}${task.ownerName === undefined ? '' : ` (${task.ownerName})`}${task.ready ? '' : ' blocked'} · ${task.subject}`))
-      }
-      lines.push('', ...members.map(member => {
-        const path = worktrees.get(`${team}:${member.name}`)
-        return `${memberLine(member)}${path === undefined ? '' : ` · ${path}`}`
-      }))
-      return { kind: 'success', text: lines.join('\n') }
+      return { kind: 'success', text: teamText(team, members, tasks, ledger.list(team), worktreePaths) }
     },
   }), 'prism-team.team()')
 }
 
 /**
  * Answer one panel read: the roster, tasks, and reports for the team a session
- * belongs to.
+ * belongs to. A teammate's session resolves to its Team through its live tree
+ * root, so the browser never has to know which member the open page shows.
  *
- * A teammate's session resolves to its Team through `tryMembership`, so the
- * browser never has to know which member the open page shows.
- *
- * @param ctx - the plugin context carrying the Team service.
+ * @param ctx - the plugin context carrying the Team and subagent services.
  * @param ledger - the shared team ledger.
+ * @param worktreePaths - prepared checkout paths, keyed `<teamShort>:<member>`.
  * @param sessionId - the session the open panel belongs to.
  * @returns the panel value; a session with no live team still returns its recorded reports.
  */
-function panelValue(ctx: Context, ledger: Ledger, sessionId: string): TeamPanelValue {
+async function panelValue(
+  ctx: Context,
+  ledger: Ledger,
+  sessionId: string,
+): Promise<TeamPanelValue> {
   const agent = ctx.agents.list().find(candidate => String(candidate.session.id) === sessionId)
-  const membership = agent === undefined ? undefined : ctx.agentTeams.tryMembership(agent)
-  if (agent === undefined || membership === undefined) {
+  const root = agent === undefined ? undefined : teamRoot(ctx, agent)
+  if (agent === undefined || root === undefined) {
     return { team: sessionId, live: false, members: [], tasks: [], reports: ledger.list(sessionId) }
   }
-  const team = String(membership.id)
+  const team = String(root.session.id)
   return {
     team,
     live: true,
-    members: ctx.agentTeams.listMembers(agent).map(member => ({
-      name: member.name,
-      role: member.role,
-      status: member.status,
-    })),
+    members: await roster(ctx, root),
     tasks: ctx.agentTeams.listTasks(agent)
       .filter(task => task.status !== 'completed')
       .map(task => ({
@@ -537,7 +659,7 @@ function panelValue(ctx: Context, ledger: Ledger, sessionId: string): TeamPanelV
  * of the bundle, and `ctx.get` reads the service without making it a dependency
  * of every deployment.
  *
- * @param ctx - the plugin context carrying the Team service.
+ * @param ctx - the plugin context carrying the connection service.
  * @param ledger - the shared team ledger.
  */
 function installPanelRoute(ctx: Context, ledger: Ledger): void {
@@ -555,7 +677,7 @@ function installPanelRoute(ctx: Context, ledger: Ledger): void {
       if (typeof sessionId !== 'string' || sessionId === '') {
         return Response.json({ error: 'sessionId is required' }, { status: 400 })
       }
-      return Response.json(panelValue(ctx, ledger, sessionId))
+      return Response.json(await panelValue(ctx, ledger, sessionId))
     },
   } satisfies ConnectionFetchRoute), 'prism-team.panel()')
 }
@@ -563,8 +685,9 @@ function installPanelRoute(ctx: Context, ledger: Ledger): void {
 /**
  * Install the team bundle.
  *
- * Members are resolved from the live Team service, so a session that is not on
- * a team receives no tool, no section, and no write check.
+ * Membership is the enabled subagent tree: the root Agent is the Lead and every
+ * continuable descendant is a teammate. A session outside such a tree receives
+ * no tool, no section, and no write check.
  *
  * @param ctx - plugin context; every registration is scoped to it and disposed with it.
  * @param config - deployment configuration, validated here so a misconfiguration fails at load.
@@ -572,42 +695,59 @@ function installPanelRoute(ctx: Context, ledger: Ledger): void {
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = resolveConfig(config)
   const ledger = createLedger(resolved.maxReports)
-  const workspaces = new Map<Agent, Workspace>()
+  const workspaces = new Map<string, Workspace>()
   const worktreePaths = new Map<string, string>()
-  const installed = new Map<Agent, () => void>()
+  const names = new Map<string, string>()
+  const adopted = new Set<string>()
 
-  const workspaceFor = (agent: Agent, membership: TeamMembership, worktree: boolean): Workspace | undefined => {
-    if (!worktree || membership.role !== 'teammate') return undefined
-    const existing = workspaces.get(agent)
-    if (existing !== undefined) return existing
-    const prepared = prepareWorktree(membership.root.session.header.cwd, teamShort(String(membership.id)), membership.name)
-    workspaces.set(agent, prepared)
-    if ('path' in prepared) worktreePaths.set(`${String(membership.id)}:${membership.name}`, prepared.path)
-    return prepared
+  /**
+   * Adopt one subagent into its team: cache its catalog name, and prepare its
+   * own worktree when the deployment asks for one. One-shot children stay in
+   * the shared checkout; their turns are too short to own a directory.
+   */
+  const adopt = async (agent: Agent): Promise<void> => {
+    if (agent.session.header.origin !== 'subagent') return
+    const key = String(agent.session.id)
+    if (adopted.has(key)) return
+    adopted.add(key)
+    try {
+      const root = teamRoot(ctx, agent)
+      if (root === undefined || root === agent) return
+      const short = teamShort(String(root.session.id))
+      const entry = (await listDescendants(ctx, root))
+        .map(continuable)
+        .find(member => member !== undefined && String(member.id) === key)
+      const member = entry === undefined ? short : entry.path ?? entry.name ?? entry.label ?? short
+      names.set(key, member)
+      if (!resolved.worktree || entry === undefined) return
+      const prepared = prepareWorktree(root.session.header.cwd, short, entry.name ?? member)
+      workspaces.set(key, prepared)
+      if ('path' in prepared) worktreePaths.set(`${short}:${entry.name ?? member}`, prepared.path)
+    } catch (error) {
+      // Adoption never breaks the member: a missing name or checkout only
+      // degrades the section text, so record and move on.
+      ctx.logger.warn(`prism-team: adopting ${key} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
-  const maybeInstall = (agent: Agent): void => {
-    if (installed.has(agent)) return
-    const membership = ctx.agentTeams.tryMembership(agent)
-    if (membership === undefined) return
-    installed.set(agent, installMember(ctx, agent, membership, ledger, workspaceFor(agent, membership, resolved.worktree)))
-  }
-
-  for (const agent of ctx.agents.list()) maybeInstall(agent)
-  ctx.on('agent/created', ({ agent }) => { maybeInstall(agent) })
+  for (const agent of ctx.agents.list()) void adopt(agent)
+  ctx.on('agent/created', ({ agent }) => { void adopt(agent) })
   ctx.on('agent/disposed', ({ agent }) => {
-    installed.get(agent)?.()
-    installed.delete(agent)
-    workspaces.delete(agent)
+    const key = String(agent.session.id)
+    adopted.delete(key)
+    names.delete(key)
+    workspaces.delete(key)
   })
   ctx.effect(() => () => {
-    for (const dispose of installed.values()) dispose()
-    installed.clear()
+    adopted.clear()
+    names.clear()
     workspaces.clear()
     worktreePaths.clear()
   }, 'prism-team.scoped()')
 
-  installWriteGate(ctx, resolved, ledger)
+  installSection(ctx, workspaces, names)
+  installReportTool(ctx, ledger, names)
+  installWriteGate(ctx, resolved, ledger, names)
   installTeamCommand(ctx, ledger, worktreePaths)
   installPanelRoute(ctx, ledger)
 }

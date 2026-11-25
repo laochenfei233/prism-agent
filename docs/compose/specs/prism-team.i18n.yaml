@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for prism-team.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/prism-team.md
+/:
+  en: 677de8e93280beee
+  zh: 677de8e93280beee
+/prism-team:
+  en: b2603688743d584b
+  zh: 4e8d4b2856f6c812
+/prism-team/report:
+  en: 9cfebf60f41d9af6
+  zh: 30b3c544828047b0
+/prism-team/s1-problem:
+  en: 9af6ee4facdb9d9a
+  zh: 8b4756c7c31a800c
+/prism-team/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/prism-team/s2-design/s2-1-home-and-loading:
+  en: 724c995de9f7139f
+  zh: 22ef182ec5f4b5fb
+/prism-team/s2-design/s2-2-structured-reporting:
+  en: 01262fa51edd5653
+  zh: 1994ab667b39409f
+/prism-team/s2-design/s2-3-the-needs-a-person-list:
+  en: 6a522324975b8895
+  zh: 0deff1398332d299
+/prism-team/s2-design/s2-4-a-worktree-per-member:
+  en: 0f3d5c9b175f3889
+  zh: 856397e282e88977
+/prism-team/s2-design/s2-5-the-write-authorization-gate:
+  en: 9c02828112af1e15
+  zh: c9f36b134ed875f3
+/prism-team/s2-design/s2-6-mode-routing-is-not-this-plugin-s-job:
+  en: a8ee0cbf34a22e65
+  zh: 4a87f9c40fd8a379
+/prism-team/s2-design/s2-7-configuration:
+  en: 11cb9644f7a8ff66
+  zh: 039e17fe3d6d4ecb
+/prism-team/s2-design/s2-8-failure-behavior:
+  en: 67cbb2932a3b7bd3
+  zh: 9787991dddcd6ba3
+/prism-team/s2-design/s2-9-browser-panel-the-session-header-entry:
+  en: 587e2f5ccb3187d8
+  zh: 9a15a317a9cd839e
+/prism-team/s3-scope:
+  en: 6588a59382548e40
+  zh: 004b24a49cb3691c
+/prism-team/tasks:
+  en: 78c7f086fd6569df
+  zh: 68a6e7bc47508bf0
+/prism-team/s4-acceptance:
+  en: a98a28770bbdc2ab
+  zh: 9ae366ec5b5625ea

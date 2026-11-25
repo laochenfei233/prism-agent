@@ -19,13 +19,16 @@
     "paths": {
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent": ["../../packages/core/agent/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-agent-team": ["../../packages/team/agent-team/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-connection": ["../../packages/client/connection/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-commands": ["../../packages/interaction/commands/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-commands/brand": ["../../packages/interaction/commands/lib/types/brand.d.ts"],
-      "@deepseek-ai/dsh-experimental-agent-team": ["../../packages/experimental/agent-team/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-session": ["../../packages/session/session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-subagent": ["../../packages/subagent/subagent/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-system-prompt": ["../../packages/core/system-prompt/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/client"]
 }

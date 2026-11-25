@@ -62,6 +62,24 @@
 
 提示词与工作流维护在这里，而不是从方法包的 `SKILL.md` 搬入：改措辞就是改 `src/ponytail.ts`，profile 里的其他东西都不用动。
 
+## Compose 模式
+
+`compose-next` 工作流进入本 bundle 的理由与 Ponytail 相同：它原本只是一个 skill，长任务没有工作流可循，一个 profile 里跑模式有两种方式。bundle patch 在 profile 中挂载第三行（`prism-guardrails-compose`，name 为 `prism-guardrails/compose`）：一个 system-prompt 段落陈述各阶段，`/compose-next` 切换档位。
+
+| 档位 | 效果 |
+|---|---|
+| `lite` | 五阶段：orient、spec、implement、verify、review |
+| `full` | 完整九阶段，包括 Grill 决策门、独立工作区，以及任何不可逆步骤之前的收尾交接 |
+| `off` | 不贡献段落；命令仍然挂载（默认） |
+
+| 命令 | 效果 |
+|---|---|
+| `/compose-next [lite\|full\|off\|auto]` | 显示或切换档位；`auto` 取消显式选择，不带参数时打印当前档位与手势清单 |
+
+会话累计开启 `autoLongTaskSteps` 步（默认 20；`0` 关闭该规则）后自动到达 `lite`。显式 `/compose-next` 选择优先于该规则，`/compose-next auto` 让规则重新生效。
+
+这条规则与 skill 自己的入口门槛相悖——后者要求只在显式请求时进入，绝不从任务的体量推断。本行默认启用自动规则，因为长任务正是为它准备的：没有它，一个 30 步的回合没有任何工作流。代价真实存在——长回合会开始产出没人要的 spec 文档——想要回 skill 门槛的部署把 `autoLongTaskSteps` 设为 `0`。段落只陈述阶段，不搬 skill 全文；人工调用的运行仍以 skill 为准。
+
 ## 配置
 
 每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。四个例外：卡住提醒与等待时长提醒随插件出厂开启——它们什么都不拒绝（卡住提醒的裁判只在失败重复时才被调用），`stuckNudgeAfterFailures: 0` 与 `waitReminderAfterMs: 0` 分别关闭它们；用量提醒的**空数组**就是它的关闭开关而不是加载失败，因为该 rail 出厂即关，`[]` 就是它的默认值；报错文案改进（`skillInvocationGuidance`、`toolNameSuggestions`）随插件开启，因为它们只是改善一条消息。

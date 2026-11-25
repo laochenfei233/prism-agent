@@ -1,90 +1,92 @@
 ---
 feature: compose-next-mode
 status: delivered
-updated: 2026-11-04
+updated: 2026-11-25
 branch: feat/prism-team
 commits: 50ff54bd96..c4bd1a25a3
 ---
 
 # Compose Next As A Mode
 
+English | [中文](compose-next-mode.zh.md)
+
 ## Report
 
-**What was built** — `plugins/prism-guardrails/src/compose.ts`：与 `ponytail.ts` 同构的模式条目。等级 `off | lite | full`（`lite` 五阶段、`full` 九阶段），一段按会话解析的 system-prompt 段落，一条 `/compose-next off|lite|full|auto` 命令，以及按累计步数自动进入 `lite` 的规则（`autoLongTaskSteps` 默认 20，`0` 关闭）。bundle patch 里加了 `prism-guardrails-compose` 一行，`package.json` 加了 `./compose` 导出，`tsdown` 加了入口。默认 `level: off`，长任务靠自动规则进入。
+**What was built** — `plugins/prism-guardrails/src/compose.ts`: a mode entry structured like `ponytail.ts`. Levels `off | lite | full` (`lite` five phases, `full` nine), one system-prompt section resolved per session, one `/compose-next off|lite|full|auto` command, and an automatic rule that enters `lite` by cumulative steps (`autoLongTaskSteps` defaults to 20, `0` disables). The bundle patch gained a `prism-guardrails-compose` row, `package.json` a `./compose` export, and `tsdown` an entry. The default is `level: off`; long tasks enter through the automatic rule.
 
-**Verification** — `tsc -p tsconfig.verify.json --noEmit` exit 0；`vitest` 的 `compose.spec.ts` 9/9 通过，同目录既有的 `ponytail.spec.ts` 18/18 与 `prism-guardrails.spec.ts` 144/144 全绿（合计 171，回归门）；`tsdown` 产出 `lib/compose.js` 9.51 kB；`oxlint`（staged）0 warning 0 error。
+**Verification** — `tsc -p tsconfig.verify.json --noEmit` exit 0; `vitest`'s `compose.spec.ts` 9/9 pass, with the existing `ponytail.spec.ts` 18/18 and `prism-guardrails.spec.ts` 144/144 all green (171 total, the regression gate); `tsdown` produces `lib/compose.js` 9.51 kB; `oxlint` (staged) 0 warnings 0 errors.
 
 **Journey log** —
 
-- 规格初稿把 compose 写成「只给团队成员的闩锁，指向 skill 本体」；用户要求把 skill 本身变成插件能力，于是改为承载阶段正文（与 ponytail 承载其规则同一做法），由 `prism-guardrails` 提供给每个 profile。
-- 自动进入与 skill 自身「只在明确要求时进入」的规则冲突；按用户要求默认开启，冲突与关闭方式写进 README，而不是悄悄改规则。
+- The spec draft made compose "a latch for team members pointing at the skill itself"; the user asked to turn the skill itself into a plugin capability, so it became the carrier of the phase text (the same way ponytail carries its rules), provided by `prism-guardrails` to every profile.
+- The automatic entry conflicts with the skill's own "enter only on an explicit request" rule; per the user's request it defaults on, and the conflict and its opt-out are written in the README rather than silently changing the rule.
 
 ## [S1] Problem
 
-`compose-next` 是一份 skill：九阶段（Orient → Grill → Spec → Workspace → Implement → Verify → Review → Finalize → Finish），而且它自己第一句就规定「只在用户明确要求时进入，不要因为任务大就推断」。
+`compose-next` is a skill: nine phases (Orient → Grill → Spec → Workspace → Implement → Verify → Review → Finalize → Finish), and its own first sentence says "enter only on an explicit user request; never infer it from how large a task looks".
 
-结果是两个具体毛病：
+The result is two concrete problems:
 
-- 一个跑了 30 步的长任务没有任何工作流约束，也没有任何东西会把它拉回来；`ponytail` 已经按会话自动切换等级，`compose-next` 没有对应物。
-- 模式能力的两个家不一致：ponytail 是插件（`prism-guardrails/src/ponytail.ts`，bundle 挂进每个 profile），compose-next 只有 skill。同一个用户要用两次不同的机制。
+- A long task 30 steps in has no workflow constraint and nothing pulling it back; `ponytail` already switches levels automatically per session, and `compose-next` has no counterpart.
+- The two mode capabilities have inconsistent homes: ponytail is a plugin (`prism-guardrails/src/ponytail.ts`, bundle-mounted into every profile), compose-next only a skill. The same user needs two different mechanisms.
 
-要的是把 compose-next 变成和 ponytail 一样的插件能力：一个 system-prompt 段落 + 一条斜杠命令 + 一条自动规则，长任务自动进入。
+The goal is to make compose-next a plugin capability like ponytail: one system-prompt section + one slash command + one automatic rule, entered automatically on long tasks.
 
 ## [S2] Design
 
-### S2.1 落点：`prism-guardrails/src/compose.ts`
+### S2.1 Home: `prism-guardrails/src/compose.ts`
 
-与 `ponytail.ts` 同构：`level`（`off | lite | full`）、`autoLongTaskSteps`、一段按会话解析的 section、一条 `/compose-next` 命令。bundle patch 里再加一行 `prism-guardrails-compose`。
+Structured like `ponytail.ts`: `level` (`off | lite | full`), `autoLongTaskSteps`, one section resolved per session, one `/compose-next` command. The bundle patch gains one more row, `prism-guardrails-compose`.
 
-不新建第二个模式插件：`ponytail` 已经证明 skill→插件的家在 `prism-guardrails`，同一件事不该有两个家。
+No second mode plugin: `ponytail` already proved the skill-to-plugin home is `prism-guardrails`; the same thing should not have two homes.
 
-### S2.2 等级与段落
+### S2.2 Levels and the section
 
-`off` 不输出段落。`lite` 是五阶段（Orient → Spec → Implement → Verify → Review），`full` 是九阶段（多了 Grill、Workspace、Finalize、Finish，以及每一步的门）。段落正文是阶段的**契约**，不是 skill 的全文：措辞保持 `prism-guardrails` 的风格，用祈使句写清每一步要做什么、哪一步不许跳。
+`off` outputs no section. `lite` is the five phases (Orient → Spec → Implement → Verify → Review); `full` is the nine (adding Grill, Workspace, Finalize, Finish, and each step's gate). The section body is the phases' **contract**, not the skill's full text: the wording keeps `prism-guardrails`' style, using imperatives that state what each step does and which steps may not be skipped.
 
-段落共用 `ponytail` 的收尾约束：只在「真正开放的产品决定、无法绕开的阻塞、需要同意的破坏性操作」三种情况停下来，其余不停；两遍失败就换策略；不许把跳过的阶段说成「已经做完了」。
+The section shares ponytail's stopping constraints: stop only for "a genuinely open product decision, a blocker that cannot be worked around, a destructive action requiring consent", and never otherwise; two failures of the same approach mean changing strategy; never describe a skipped phase as "already done".
 
-### S2.3 自动规则与它要付的代价
+### S2.3 The automatic rule and its price
 
-`autoLongTaskSteps` 默认 `20`（与 ponytail 的一致），`0` 关闭。会话累计步数达到阈值即在 section 里切到 `lite`。
+`autoLongTaskSteps` defaults to `20` (matching ponytail), `0` disables. When a session's cumulative steps reach the threshold, the section switches to `lite`.
 
-**这条规则与 skill 自身的进入规则冲突**：skill 说不要按任务大小推断，而自动规则正是按任务大小推断。用户显式要求长任务自动进入，所以默认开启，但代价必须在 README 里写清楚：打开后，一个长任务会自己开始产出规格文档，即使没人要求。要退回 skill 的规则就把 `autoLongTaskSteps` 设为 `0`。
+**This rule conflicts with the skill's own entry rule**: the skill says never to infer from a task's size, and the automatic rule infers exactly that. The user explicitly asked for automatic entry on long tasks, so it defaults on — but the price must be stated in the README: once on, a long task starts producing a spec document nobody asked for. To return to the skill's rule, set `autoLongTaskSteps` to `0`.
 
-`/compose-next off|auto|lite|full` 覆盖自动规则；`auto` 放弃显式选择，回到自动规则。
+`/compose-next off|auto|lite|full` overrides the automatic rule; `auto` drops the explicit choice and returns to the rule.
 
-### S2.4 状态
+### S2.4 State
 
-按会话存 `WeakMap<Agent, ComposeLevel>`（显式选择）与 `WeakMap<Agent, number>`（步数）。一个跑长任务的会话不影响旁边的会话，与 ponytail 的状态模型一致。
+Per session, a `WeakMap<Agent, ComposeLevel>` (the explicit choice) and a `WeakMap<Agent, number>` (the step count). A session running a long task does not affect neighboring sessions, matching ponytail's state model.
 
-### S2.5 配置
+### S2.5 Configuration
 
 ```yaml
 - id: prism-guardrails-compose
   name: 'prism-guardrails/compose'
   config:
-    level: off            # 默认不进入；长任务靠自动规则
-    autoLongTaskSteps: 20 # 0 = 关闭自动规则
+    level: off            # default off; long tasks enter via the automatic rule
+    autoLongTaskSteps: 20 # 0 = disable the automatic rule
 ```
 
-两个键在装载时校验，非法值立刻抛错并指向键名。
+Both keys are validated at load; an illegal value throws immediately and names the key.
 
 ## [S3] Scope
 
-- In scope：`src/compose.ts`、`cordis.patch.yml` 一行、`package.json` 的 `./compose` 导出、`tsdown.config.ts` 的入口、`tests/compose.spec.ts`、`prism-guardrails` README 的 compose 段。
-- Out of scope：改动 `prism-guardrails` 的十二条 rail；把 compose 状态写进会话日志；Web UI；替团队插件做模式路由（那是 `prism-team` 之外的另一件事）。
+- In scope: `src/compose.ts`, one `cordis.patch.yml` row, the `./compose` export in `package.json`, the `tsdown.config.ts` entry, `tests/compose.spec.ts`, and the compose section of the `prism-guardrails` README.
+- Out of scope: changing `prism-guardrails`' twelve rails; writing compose state into the session log; a Web UI; mode routing for the team plugin (a separate concern beyond `prism-team`).
 
 ## Tasks
 
-- [x] T1: `src/compose.ts`（等级、自动规则、段落、命令）(depends: none)
-- [x] T2: 装载（`cordis.patch.yml` 行、`package.json` 导出、`tsdown` 入口）(depends: T1)
+- [x] T1: `src/compose.ts` (levels, the automatic rule, the section, the command) (depends: none)
+- [x] T2: Loading (the `cordis.patch.yml` row, the `package.json` export, the `tsdown` entry) (depends: T1)
 - [x] T3: `tests/compose.spec.ts` (depends: T1)
-- [x] T4: README 的 compose 段与冲突说明 (depends: T2)
+- [x] T4: The README's compose section and the conflict statement (depends: T2)
 
 ## [S4] Acceptance
 
-- [x] A1 默认配置下（`level: off` 且未到阈值）段落为空。
-- [x] A2 `level: lite` 的段落含五个阶段且不含 Grill；`level: full` 含九个阶段与 Finish。
-- [x] A3 `autoLongTaskSteps: 3` 时第 2 步不切、第 3 步切到 `lite`；设为 `0` 时永不切换。
-- [x] A4 `/compose-next full` 立刻改写段落，`off` 清空，`auto` 回到自动规则。
-- [x] A5 非法 `level` 与非法步数在装载时抛错，错误文本指向键名。
-- [x] A6 `prism-guardrails` 既有的 ponytail 与 rail 用例全绿（回归门）。
+- [x] A1 With the default configuration (`level: off`, threshold not reached) the section is empty.
+- [x] A2 The `level: lite` section contains the five phases and not Grill; `level: full` contains the nine phases and Finish.
+- [x] A3 With `autoLongTaskSteps: 3`, step 2 does not switch and step 3 switches to `lite`; set to `0`, it never switches.
+- [x] A4 `/compose-next full` rewrites the section immediately, `off` empties it, `auto` returns to the automatic rule.
+- [x] A5 An illegal `level` and an illegal step count throw at load with the key named in the message.
+- [x] A6 `prism-guardrails`' existing ponytail and rail cases stay green (the regression gate).

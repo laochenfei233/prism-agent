@@ -1,6 +1,8 @@
 # prism-team
 
-Prism Team adds four capabilities the experimental Agent Teams packages leave open, without changing them:
+English | [中文](README.zh.md)
+
+Prism Team adds four capabilities the Agent Teams packages leave open, without changing them:
 
 | Capability | What changes |
 |---|---|
@@ -13,9 +15,9 @@ It is an out-of-tree bundle: it registers on documented extension points and nev
 
 ## Requirements
 
-The bundle needs the experimental Agent Teams packages mounted beside it — `dsh-experimental-agent-team` with `dsh-experimental-tool-agent-team`, or the `dsh-experimental-agent-team-profile` bundle that carries both. Without them the row fails to load, which is the intended loud failure: there is no team to add to.
+The bundle needs the Agent Teams packages mounted beside it — `dsh-agent-team` (the shared task board, `ctx.agentTeams`) with `dsh-tool-agent-team` (the task tools) — plus the subagent runtime that owns the tree. Without them the row fails to load, which is the intended loud failure: there is no team to add to.
 
-A session that is not on a team receives no tool, no section, and no write check.
+A Team is an enabled subagent tree: the root Agent is the Lead and every continuable descendant is a teammate. A session outside such a tree receives no tool, no section, and no write check.
 
 ## Install
 
@@ -37,7 +39,7 @@ Every key is optional and validated at load; an unusable value fails plugin load
 | Field | Default | Meaning |
 |---|---|---|
 | `mode` | `enforce` | `enforce` asks before an out-of-scope write; `observe` records it and lets it through |
-| `worktree` | `true` | Create one `git worktree` and branch per teammate |
+| `worktree` | `true` | Create one `git worktree` and branch per continuable teammate |
 | `writeTools` | `write`, `edit`, `str_replace_editor` | Tool names whose `file_path` argument the scope check judges |
 | `maxReports` | `200` | Reports kept per team in the in-memory ledger |
 
@@ -74,13 +76,13 @@ A path inside a teammate's own worktree (`.worktrees/<checkout>/…`) compares a
 
 ## The worktree
 
-On a teammate's creation the bundle prepares `<Lead cwd>/.worktrees/team-<team>-<name>` on branch `team/<team>/<name>` and writes `*` into `.worktrees/.gitignore` when the checkout does not ignore that directory yet. Failure to prepare is reported in the member's section and never blocks the member — the Team service has already created it.
+On a teammate's creation the bundle prepares `<Lead cwd>/.worktrees/team-<team>-<name>` on branch `team/<team>/<name>` and writes `*` into `.worktrees/.gitignore` when the checkout does not ignore that directory yet. Failure to prepare is reported in the member's section and never blocks the member — the subagent runtime has already created it. One-shot children are ordinary delegation, not teammates, and get no worktree.
 
 Nothing removes a worktree automatically: an unreviewed checkout may be the member's only result. `/team` and the member section carry the path; removal is `git worktree remove <path>` by hand.
 
 ## Known limitations
 
-- **The worktree is advice, not confinement.** A session's working directory is fixed at creation, and the Team packages offer no per-member directory. A teammate must address files with absolute paths inside its worktree; the shared checkout stays writable. What the worktree changes is real but narrow: each member finally has its own checkout it can commit and `git diff` in.
+- **The worktree is advice, not confinement.** A session's working directory is fixed at creation, and the bundle cannot switch a member's cwd to its worktree. A teammate must address files with absolute paths inside its worktree; the shared checkout stays writable. What the worktree changes is real but narrow: each member finally has its own checkout it can commit and `git diff` in.
 - **The ledger is in memory.** It answers "what does the team look like right now" and disappears on restart. An out-of-tree plugin cannot write Session events, so the durable copy of a report is the message in the Lead's inbox.
 - **`observe` is a way to close the guard.** A deployment that thinks it is protected while it runs `observe` is worse off than one that never mounted the check. `/team` prints the observed rows, and the first line of the member section states the mode.
 - **`/team` reads what the team service exposes.** It lists roster, tasks, and this bundle's ledger; it does not summarize a teammate's own conversation.
@@ -93,4 +95,4 @@ Nothing removes a worktree automatically: an unreviewed checkout may be the memb
 npm test    # vitest run --config vitest.config.ts
 ```
 
-The suite drives the real tools, system-prompt, session, and command registries against a stubbed Team service, so it exercises this bundle's own decisions rather than the team domain.
+The suite drives the real tools, system-prompt, session, and command registries against stubbed Team and subagent services, so it exercises this bundle's own decisions rather than the team domain.
