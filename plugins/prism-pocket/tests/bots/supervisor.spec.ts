@@ -68,6 +68,28 @@ describe('BotSupervisor', () => {
     expect(supervisor.handle('telegram')).toBeUndefined()
   })
 
+  it('stops an adapter whose start rejected, so no orphan reconnect loop survives', async () => {
+    const hooks: BotAdapterHooks[] = []
+    const failing = scriptedHandle({ start: vi.fn(async () => { throw new Error('ready timeout') }) })
+    const { supervisor } = recordingSupervisor({ telegram: factoryOf([failing], hooks) })
+    await supervisor.start('telegram', TELEGRAM_CONFIG)
+    expect(supervisor.state('telegram')).toEqual({ status: 'error', detail: 'ready timeout' })
+    expect(failing.stop).toHaveBeenCalled()
+    expect(supervisor.handle('telegram')).toBeUndefined()
+  })
+
+  it('starts a fresh adapter after a failed start stopped its orphan', async () => {
+    const hooks: BotAdapterHooks[] = []
+    const failing = scriptedHandle({ start: vi.fn(async () => { throw new Error('ready timeout') }) })
+    const second = scriptedHandle()
+    const { supervisor } = recordingSupervisor({ telegram: factoryOf([failing, second], hooks) })
+    await supervisor.start('telegram', TELEGRAM_CONFIG)
+    await supervisor.start('telegram', readBotConfig('telegram', { botToken: 'b' }))
+    expect(failing.stop).toHaveBeenCalled()
+    expect(supervisor.state('telegram').status).toBe('online')
+    expect(supervisor.handle('telegram')).toBe(second)
+  })
+
   it('survives a live adapter reporting an error after start', async () => {
     const hooks: BotAdapterHooks[] = []
     const { supervisor } = recordingSupervisor({ telegram: factoryOf([scriptedHandle()], hooks) })

@@ -64,8 +64,19 @@ export class BotSupervisor {
         await handle.start()
       } catch (cause: unknown) {
         const detail = cause instanceof Error ? cause.message : String(cause)
-        this.record(channel, 'error', detail)
         this.handles.delete(channel)
+        // A failed start can leave the adapter running — a WebSocket adapter's
+        // reconnect loop survives its own start rejection — so stop it here;
+        // otherwise the orphan keeps driving the session after the page shows
+        // the channel as failed or stopped.
+        try {
+          await handle.stop()
+        } catch (stopError: unknown) {
+          // The start failure is what the page shows; a broken stop of the
+          // already-failed adapter gives the operator nothing new to act on.
+          void stopError
+        }
+        this.record(channel, 'error', detail)
         // A failed start is a state, not a throw: the page shows the detail.
         return
       }

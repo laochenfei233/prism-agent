@@ -216,6 +216,10 @@ function installBots(ctx: Context, runtime: PocketRuntime): void {
 
   const deliverInbound = async (channel: BotChannelId, message: BotInbound): Promise<void> => {
     try {
+      // A channel with no running handle or with its switch off must not drive
+      // the session: the persisted binding alone is not authority, because an
+      // adapter whose start failed can outlive its handle and redeliver later.
+      if (supervisor.handle(channel) === undefined || !store.enabled(channel)) return
       // An empty messageId skips dedup: the platform gave nothing to key on.
       if (message.messageId.length > 0 && !dedup.first(`${channel}:${message.messageId}`)) return
       const entry = store.entry(channel)
