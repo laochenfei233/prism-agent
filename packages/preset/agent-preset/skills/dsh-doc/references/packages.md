@@ -467,7 +467,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-session-log-export` | yes | Web Session-log ZIP export and Session Markdown copy |
 | `@deepseek-ai/dsh-session-query-sqlite` | yes | Concrete ctx.sessionQuery backend with SQLite FTS5 search |
 | `@deepseek-ai/dsh-tool-session-list` | no | Read-only paginated Workspace and Session metadata tools |
-| `@prism/prism-session-import` | yes | Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI) |
+| `@prism/prism-session-import` | yes | Import conversations from other coding agents (Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, ZCode) |
 
 ## settings
 
@@ -557,6 +557,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 |---|---|---|
 | `@deepseek-ai/dsh-agent-team` | yes | Shared task DAG and change waits for subagent trees |
 | `@deepseek-ai/dsh-tool-agent-team` | yes | Scoped model-facing Agent Teams tools over ctx.agentTeams |
+| `@prism/prism-team` | yes | Prism Team: structured teammate reports, a needs-a-person list, a private worktree per teammate, and an enforced task write scope for Agent Teams |
 
 ## telemetry
 

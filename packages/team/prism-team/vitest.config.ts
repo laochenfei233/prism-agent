@@ -12,16 +12,16 @@
  */
 import { defineConfig } from 'vitest/config'
 import tsconfigPaths from 'vite-tsconfig-paths'
-import { standardDecoratorPlugin } from '../../vitest.shared.ts'
+import { standardDecoratorPlugin } from '../../../vitest.shared.ts'
 
 export default defineConfig({
-  plugins: [tsconfigPaths({ projects: ['../../tsconfig.base.json'] }), standardDecoratorPlugin()],
+  plugins: [tsconfigPaths({ projects: ['../../../tsconfig.base.json'] }), standardDecoratorPlugin()],
   test: {
     name: 'prism-team',
     include: ['tests/**/*.spec.ts'],
     // These suites drive real Cordis services in one process; forks keep Node's
     // CJS lexer away from worker threads, matching the repository runner.
     pool: 'forks',
-    setupFiles: ['../../scripts/test-proxy-environment.ts'],
+    setupFiles: ['../../../scripts/test-proxy-environment.ts'],
   },
 })

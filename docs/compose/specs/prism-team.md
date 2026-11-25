@@ -12,7 +12,7 @@ English | [中文](prism-team.zh.md)
 
 ## Report
 
-**What was built** — `plugins/prism-team`, a Host-only out-of-tree plugin that adds four capabilities to Agent Teams without touching `packages/**`: the `team_report` tool turns a teammate's progress into one structured message in the Lead's inbox and records it in the plugin's ledger; `/team` orders `blocked/failed/ready/waiting` before `progress` and takes one line when the team is healthy; each continuable teammate gets its own `git worktree` and branch `team/<team>/<name>` at creation, with the path written into its prompt section; a write gate on `tools/pre-execute` judges writes against the `writeScopes` of the task the member claimed — out-of-scope writes default to `ask`, or are only recorded under `observe`. Membership is read from the enabled subagent tree (`isEnabled` + `rootOf`), so a session outside a team gets zero behavior.
+**What was built** — `packages/team/prism-team`, a Host-only out-of-tree plugin that adds four capabilities to Agent Teams without touching `packages/**`: the `team_report` tool turns a teammate's progress into one structured message in the Lead's inbox and records it in the plugin's ledger; `/team` orders `blocked/failed/ready/waiting` before `progress` and takes one line when the team is healthy; each continuable teammate gets its own `git worktree` and branch `team/<team>/<name>` at creation, with the path written into its prompt section; a write gate on `tools/pre-execute` judges writes against the `writeScopes` of the task the member claimed — out-of-scope writes default to `ask`, or are only recorded under `observe`. Membership is read from the enabled subagent tree (`isEnabled` + `rootOf`), so a session outside a team gets zero behavior.
 
 **Verification** — plugin `tsc -p tsconfig.json --noEmit` and `tsc -p tsconfig.client.json --noEmit` exit 0; `vitest run --config vitest.config.ts` 19/19 pass, including worktree cases that assert two teammates get distinct paths and branches in a temporary git repository, the Lead gets none, and `git worktree list` admits both; `tsdown` builds `lib/index.js` 27 kB and `lib/client.js` 14 kB; repository `pnpm run typecheck` passes 5/5 programs. The 14 pre-existing `ponytail.spec.ts` failures are unchanged from master (the same file and plugin code fail there).
 
@@ -45,7 +45,7 @@ The goal is to put these four capabilities into **one out-of-tree plugin** witho
 
 ### S2.1 Home and loading
 
-`plugins/prism-team`: a single-entry Host plugin (`name = 'prism-team'`, with a `cordis.patch.yml` row and `dsh.bundle.patch`), structurally like `prism-guardrails`. It reads membership as **a subagent tree with Team mode enabled**: `ctx.agentTeams.isEnabled(agent)` plus `ctx.subagents.rootOf(agent)` — the root Agent is the Lead and every continuable descendant is a teammate. Tools and the section register once globally, made conditionally visible by `when` and per-agent section text, instead of per-member installs; member names and worktrees are prepared on `agent/created`. The task board and the other team tools come from upstream `packages/team/agent-team` and `tool-agent-team`; this plugin does not change them.
+`packages/team/prism-team`: a single-entry Host plugin (`name = 'prism-team'`, with a `cordis.patch.yml` row and `dsh.bundle.patch`), structurally like `prism-guardrails`. It reads membership as **a subagent tree with Team mode enabled**: `ctx.agentTeams.isEnabled(agent)` plus `ctx.subagents.rootOf(agent)` — the root Agent is the Lead and every continuable descendant is a teammate. Tools and the section register once globally, made conditionally visible by `when` and per-agent section text, instead of per-member installs; member names and worktrees are prepared on `agent/created`. The task board and the other team tools come from upstream `packages/team/agent-team` and `tool-agent-team`; this plugin does not change them.
 
 Sessions outside a team (ordinary sessions, independently resumed subagents, trees without Team enabled) get no behavior: `isEnabled` false or `rootOf` throwing `SubagentError` (no live root) skips them.
 
@@ -167,7 +167,7 @@ Cost and limitation: the client half ships as `lib/client.js` (CJS + the `window
 
 ## [S3] Scope
 
-- In scope: the `plugins/prism-team` package (entry, tools, two commands, the rail, worktree preparation, the ledger, config validation), unit tests (including the real Cordis composition), the README and its limitations, and `cordis.patch.yml`.
+- In scope: the `packages/team/prism-team` package (entry, tools, two commands, the rail, worktree preparation, the ledger, config validation), unit tests (including the real Cordis composition), the README and its limitations, and `cordis.patch.yml`.
 - Out of scope: the web panel UI; GitHub / Feishu source ingestion; Mandate and policy-version revalidation; automatic merging; `cwd` switching; changes to `packages/**`; mounting the plugin into a running profile (offered as a separate final step).
 
 ## Tasks

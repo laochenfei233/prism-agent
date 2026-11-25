@@ -11,7 +11,7 @@
 # a way to close the guard, not as a dry run that still protects.
 - insert:
     - id: prism-team
-      name: 'prism-team'
+      name: '@prism/prism-team'
       config:
         mode: enforce
         worktree: true

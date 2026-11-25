@@ -12,7 +12,7 @@ commits: 50ff54bd96..c4bd1a25a3
 
 ## Report
 
-**What was built** — `plugins/prism-team`，一个 Host-only 出树插件，把四条能力装进实验性 Agent Teams 而不改动 `packages/**`：`team_report` 工具把 teammate 的进展变成一条结构化消息送进 Lead 收件箱并记入插件台账；`/team` 把 `blocked/failed/ready/waiting` 排在 `progress` 之前、健康时只输出一行；每个 teammate 在创建时拿到自己的 `git worktree` 与分支 `team/<team>/<name>`，路径写进它的段落；`tools/pre-execute` 上的写入门闸按该成员已认领任务的 `writeScopes` 判定，范围外默认 `ask`、`observe` 下只记录。装载走 `agent/created` + `ctx.agentTeams.tryMembership`，非团队成员零行为。
+**What was built** — `packages/team/prism-team`，一个 Host-only 出树插件，把四条能力装进实验性 Agent Teams 而不改动 `packages/**`：`team_report` 工具把 teammate 的进展变成一条结构化消息送进 Lead 收件箱并记入插件台账；`/team` 把 `blocked/failed/ready/waiting` 排在 `progress` 之前、健康时只输出一行；每个 teammate 在创建时拿到自己的 `git worktree` 与分支 `team/<team>/<name>`，路径写进它的段落；`tools/pre-execute` 上的写入门闸按该成员已认领任务的 `writeScopes` 判定，范围外默认 `ask`、`observe` 下只记录。装载走 `agent/created` + `ctx.agentTeams.tryMembership`，非团队成员零行为。
 
 **Verification** — `tsc -p tsconfig.verify.json --noEmit`（借主 checkout 的已构建声明）exit 0；`vitest run --config vitest.config.ts` 17/17 通过，其中 worktree 用例在临时 git 仓库里断言两个 teammate 拿到不同路径与分支、Lead 没有 worktree、`git worktree list` 承认两者；`tsdown` 构建产出 `lib/index.js` 16.78 kB；`oxlint`（staged）0 warning 0 error；`git diff --cached --check` 干净。`capability.e2e.spec.ts` 未跑：它自己的脚本是 `npm run build && …`，本次没有产出仓库级构建。
 
@@ -45,7 +45,7 @@ commits: 50ff54bd96..c4bd1a25a3
 
 ### S2.1 落点与装载
 
-`plugins/prism-team`：单入口 Host 插件（`name = 'prism-team'`，带 `cordis.patch.yml` 行与 `dsh.bundle.patch`），与 `prism-guardrails` 同构。它把成员资格读成**启用了 Team 模式的子代理树**：`ctx.agentTeams.isEnabled(agent)` 加 `ctx.subagents.rootOf(agent)`——根 Agent 是 Lead，每个可续谈（continuable）后代是 teammate。工具与 section 全局注册一次，用 `when` 与按 agent 计算的 section 文本做条件可见，不再逐成员安装；成员名与 worktree 的准备挂在 `agent/created` 上。任务板与其余团队工具由上游 `packages/team/agent-team` 与 `tool-agent-team` 提供，本插件不改它们。
+`packages/team/prism-team`：单入口 Host 插件（`name = 'prism-team'`，带 `cordis.patch.yml` 行与 `dsh.bundle.patch`），与 `prism-guardrails` 同构。它把成员资格读成**启用了 Team 模式的子代理树**：`ctx.agentTeams.isEnabled(agent)` 加 `ctx.subagents.rootOf(agent)`——根 Agent 是 Lead，每个可续谈（continuable）后代是 teammate。工具与 section 全局注册一次，用 `when` 与按 agent 计算的 section 文本做条件可见，不再逐成员安装；成员名与 worktree 的准备挂在 `agent/created` 上。任务板与其余团队工具由上游 `packages/team/agent-team` 与 `tool-agent-team` 提供，本插件不改它们。
 
 树外会话（普通会话、独立恢复的子代理、未启用 Team 的树）一行行为都没有：`isEnabled` 为假或 `rootOf` 抛 `SubagentError`（无活根）即跳过。
 
@@ -167,7 +167,7 @@ git worktree add <root>/.worktrees/team-<teamShort>-<name> -b team/<teamShort>/<
 
 ## [S3] Scope
 
-- In scope：`plugins/prism-team` 包（入口、工具、两个命令、rail、worktree 准备、台账、配置校验）、单元测试（含真实 Cordis 组合）、README 与限制、`cordis.patch.yml`。
+- In scope：`packages/team/prism-team` 包（入口、工具、两个命令、rail、worktree 准备、台账、配置校验）、单元测试（含真实 Cordis 组合）、README 与限制、`cordis.patch.yml`。
 - Out of scope：Web 面板 UI；GitHub / 飞书来源接入；Mandate 与策略版本重校验；自动合并；`cwd` 切换；改动 `packages/**`；把插件装进正在跑的 profile（收尾时作为单独一步提供）。
 
 ## Tasks

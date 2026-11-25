@@ -189,7 +189,7 @@ export function createLedger(limit: number): Ledger {
 export const name = 'prism-team'
 
 /** Services this bundle reads. */
-export const inject = ['agents', 'agentTeams', 'subagents', 'tools', 'systemPrompt', 'commands'] as const
+export const inject = ['agents', 'agentTeams', 'subagents', 'tools', 'systemPrompt', 'commands']
 
 /** Order of the team section inside the assembled prompt, before tools. */
 const TEAM_SECTION_ORDER = 40
