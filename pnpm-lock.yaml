@@ -11559,6 +11559,9 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: workspace:*
         version: link:../../workspace/workspace
+      '@prism/prism-session-import':
+        specifier: workspace:*
+        version: link:../../session-query/session-import
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -12504,6 +12507,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
@@ -12529,9 +12535,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      ws:
-        specifier: ^8.21.0
-        version: 8.21.3
 
   packages/experimental/speech-to-text-openai:
     dependencies:
