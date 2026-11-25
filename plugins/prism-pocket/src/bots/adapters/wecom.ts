@@ -10,7 +10,7 @@
 import type { BotAdapterFactory, WecomConfig } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { fetchBotJson, postBotJson } from '../shared/http.ts'
-import { callbackSignature, decryptWechatMessage } from '../shared/sign.ts'
+import { callbackSignature, decryptWechatMessage, timingSafeStringEquals } from '../shared/sign.ts'
 import { readXmlField } from '../shared/xml.ts'
 
 /** Per-message character limit of the app text message. */
@@ -30,7 +30,7 @@ export const WECOM_API_BASE = 'https://qyapi.weixin.qq.com'
  * @returns whether the signature matches.
  */
 export function verifyWecomCallback(token: string, msgSignature: string, timestamp: string, nonce: string, encrypt: string): boolean {
-  return callbackSignature(token, timestamp, nonce, encrypt) === msgSignature
+  return timingSafeStringEquals(callbackSignature(token, timestamp, nonce, encrypt), msgSignature)
 }
 
 /**
@@ -47,6 +47,8 @@ export function resolveWecomVerifyEcho(config: WecomConfig, echoStr: string): st
 export interface WecomCallbackMessage {
   readonly from: string
   readonly content: string
+  /** The platform message id, when the message carries one. */
+  readonly msgId?: string
 }
 
 /**
@@ -63,7 +65,8 @@ export function readWecomCallback(config: WecomConfig, encrypt: string): WecomCa
   const content = readXmlField(plaintext, 'Content')
   if (from === undefined || msgType === undefined || content === undefined) return undefined
   if (msgType !== 'text' || content.trim().length === 0) return undefined
-  return { from, content: content.trim() }
+  const msgId = readXmlField(plaintext, 'MsgId')
+  return { from, content: content.trim(), ...(msgId !== undefined ? { msgId } : {}) }
 }
 
 /** The adapter: access-token cache plus the app-message send. */

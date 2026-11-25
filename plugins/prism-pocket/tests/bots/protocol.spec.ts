@@ -9,8 +9,9 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { chunkText } from '../../src/bots/shared/chunk.ts'
+import { DEDUP_CAPACITY, DEDUP_TTL_MS, InboundDedup } from '../../src/bots/shared/dedup.ts'
 import { decodeLarkFrame, encodeLarkFrame } from '../../src/bots/shared/protobuf.ts'
-import { callbackSignature, decryptWechatMessage, encryptWechatMessage, timestampFresh } from '../../src/bots/shared/sign.ts'
+import { callbackSignature, decryptWechatMessage, encryptWechatMessage, timestampFresh, timingSafeStringEquals } from '../../src/bots/shared/sign.ts'
 import { buildEncryptedReply, readXmlField } from '../../src/bots/shared/xml.ts'
 import { nextTelegramOffset, readTelegramUpdate, telegramApiBase } from '../../src/bots/adapters/telegram.ts'
 import { buildDiscordIdentify, parseDiscordFrame, readDiscordMessage } from '../../src/bots/adapters/discord.ts'
@@ -61,9 +62,9 @@ describe('telegram', () => {
   it('narrows text updates and skips bots and non-text', () => {
     const update = readTelegramUpdate({
       update_id: 7,
-      message: { chat: { id: 42 }, from: { first_name: 'Chen' }, text: ' hello ' },
+      message: { chat: { id: 42 }, message_id: 900, from: { id: 99, first_name: 'Chen' }, text: ' hello ' },
     })
-    expect(update).toEqual({ updateId: 7, chatId: '42', senderName: 'Chen', text: 'hello' })
+    expect(update).toEqual({ updateId: 7, chatId: '42', senderId: '99', messageId: '900', senderName: 'Chen', text: 'hello' })
     expect(readTelegramUpdate({ update_id: 8, message: { chat: { id: 1 }, from: { is_bot: true }, text: 'x' } })).toBeUndefined()
     expect(readTelegramUpdate({ update_id: 9, message: { chat: { id: 1 } } })).toBeUndefined()
   })
@@ -85,18 +86,20 @@ describe('discord', () => {
       .toEqual({ op: 10, s: 3, data: { heartbeat_interval: 45000 } })
     expect(parseDiscordFrame('not json')).toBeUndefined()
     expect(JSON.parse(buildDiscordIdentify('tok'))).toMatchObject({ op: 2, d: { token: 'tok', intents: (1 << 9) | (1 << 12) | (1 << 15) } })
-    const message = readDiscordMessage({ content: ' hi ', channel_id: 'c1', author: { username: 'u' } })
-    expect(message).toEqual({ chatId: 'c1', senderName: 'u', text: 'hi' })
+    const message = readDiscordMessage({ content: ' hi ', channel_id: 'c1', id: 'm1', author: { id: 'u1', username: 'u' } })
+    expect(message).toEqual({ chatId: 'c1', senderId: 'u1', messageId: 'm1', senderName: 'u', text: 'hi' })
     expect(readDiscordMessage({ content: 'x', channel_id: 'c1', author: { bot: true } })).toBeUndefined()
   })
 })
 
 describe('slack', () => {
   it('parses envelopes, acks them, and filters bot and edit events', () => {
-    const envelope = parseSlackEnvelope('{"type":"events_api","envelope_id":"e1","payload":{"event":{"type":"message","channel":"C1","text":"hi"}}}')
+    const envelope = parseSlackEnvelope('{"type":"events_api","envelope_id":"e1","payload":{"event":{"type":"message","channel":"C1","user":"U1","ts":"1710000000.000100","text":"hi"}}}')
     expect(envelope?.envelopeId).toBe('e1')
     expect(buildSlackAck('e1')).toBe('{"envelope_id":"e1"}')
-    expect(readSlackMessage(envelope?.payload)).toEqual({ chatId: 'C1', senderName: undefined, text: 'hi' })
+    expect(readSlackMessage(envelope?.payload)).toEqual({
+      chatId: 'C1', senderId: 'U1', messageId: '1710000000.000100', senderName: 'U1', text: 'hi',
+    })
     expect(readSlackMessage({ event: { type: 'message', channel: 'C1', text: 'x', bot_id: 'B1' } })).toBeUndefined()
     expect(readSlackMessage({ event: { type: 'message', channel: 'C1', text: 'x', subtype: 'message_changed' } })).toBeUndefined()
   })
@@ -135,9 +138,12 @@ describe('lark frames', () => {
   it('narrows im.message.receive_v1 text and strips the group mention', () => {
     const event = {
       header: { event_type: 'im.message.receive_v1' },
-      event: { message: { chat_id: 'oc1', chat_type: 'group', message_type: 'text', content: JSON.stringify({ text: '@Bot hi' }) } },
+      event: {
+        sender: { sender_id: { open_id: 'ou1' } },
+        message: { chat_id: 'oc1', chat_type: 'group', message_id: 'om1', message_type: 'text', content: JSON.stringify({ text: '@Bot hi' }) },
+      },
     }
-    expect(readLarkEventEnvelope(event)).toMatchObject({ chatId: 'oc1', text: 'hi' })
+    expect(readLarkEventEnvelope(event)).toMatchObject({ chatId: 'oc1', senderId: 'ou1', messageId: 'om1', text: 'hi' })
     expect(readLarkEventEnvelope({ header: { event_type: 'other' } })).toBeUndefined()
     expect(readLarkEventEnvelope({
       header: { event_type: 'im.message.receive_v1' },
@@ -151,11 +157,11 @@ describe('dingtalk', () => {
     const frame = defined(parseDingtalkFrame(JSON.stringify({
       type: 'CALLBACK',
       headers: { messageId: 'mid', contentType: 'application/json', topic: '/v1.0/im/bot/messages/get' },
-      data: JSON.stringify({ conversationId: 'cid', text: { content: ' hello ' }, senderNick: 'C', sessionWebhook: 'https://w' }),
+      data: JSON.stringify({ conversationId: 'cid', text: { content: ' hello ' }, senderNick: 'C', senderStaffId: 'staff-1', msgId: 'msg-1', sessionWebhook: 'https://w' }),
     })))
     expect(buildDingtalkAck(frame)).toContain('"messageId":"mid"')
     expect(readDingtalkMessage(JSON.parse(frame?.data ?? '{}'))).toEqual({
-      chatId: 'cid', senderName: 'C', text: 'hello', webhook: 'https://w',
+      chatId: 'cid', senderId: 'staff-1', messageId: 'msg-1', senderName: 'C', text: 'hello', webhook: 'https://w',
     })
     expect(buildDingtalkOpenRequest('c', 's')).toMatchObject({
       clientId: 'c',
@@ -171,9 +177,9 @@ describe('qq', () => {
 
   it('narrows C2C and group messages and builds passive send bodies', () => {
     const c2c = readQqMessage('C2C_MESSAGE_CREATE', { id: 'm1', content: ' hi ', author: { user_openid: 'U1' } })
-    expect(c2c).toEqual({ chatId: 'U1', text: 'hi', msgId: 'm1', group: false })
+    expect(c2c).toEqual({ chatId: 'U1', senderId: 'U1', text: 'hi', msgId: 'm1', group: false })
     const group = readQqMessage('GROUP_AT_MESSAGE_CREATE', { id: 'm2', content: 'yo', author: { member_openid: 'M1' } })
-    expect(group).toMatchObject({ chatId: 'M1', group: true })
+    expect(group).toMatchObject({ chatId: 'M1', senderId: 'M1', group: true })
     expect(readQqMessage('OTHER', { content: 'x', author: { user_openid: 'U' } })).toBeUndefined()
     expect(buildQqSendBody('hi', 'm1', 2)).toEqual({ msg_type: 0, content: 'hi', msg_id: 'm1', msg_seq: 2 })
     expect(qqSendUrl('M1', true)).toContain('/v2/groups/M1/messages')
@@ -209,13 +215,13 @@ describe('wechat family crypto', () => {
     )
     const encrypt = defined(readXmlField(body, 'Encrypt'))
     const message = readWechatCallback(wechat, body)
-    expect(message).toMatchObject({ from: 'openid-1', msgType: 'text', content: 'hello' })
+    expect(message).toMatchObject({ from: 'openid-1', msgType: 'text', content: 'hello', msgId: '9001' })
     expect(encrypt).toBeDefined()
     expect(readWechatCallback({ ...wechat, appId: 'other' }, body)).toBeUndefined()
 
     const wecomXml = wechatBody('userid-1', 'corp', 'ping')
     const wecomEncrypt = defined(encryptWechatMessage(AES_KEY, wecomXml, 'corp'))
-    expect(readWecomCallback(wecom, wecomEncrypt)).toEqual({ from: 'userid-1', content: 'ping' })
+    expect(readWecomCallback(wecom, wecomEncrypt)).toEqual({ from: 'userid-1', content: 'ping', msgId: '9001' })
     expect(readWecomCallback(wecom, defined(encryptWechatMessage(AES_KEY, wecomXml, 'elsewhere')))).toBeUndefined()
   })
 
@@ -246,16 +252,46 @@ describe('whatsapp', () => {
   it('narrows text messages and skips statuses', () => {
     const body = {
       entry: [{ changes: [{ value: {
-        messages: [{ from: '15551234567', text: { body: ' hello ' } }],
+        messages: [{ from: '15551234567', id: 'wamid.1', text: { body: ' hello ' } }],
         statuses: [{ status: 'delivered' }],
       } }] }],
     }
-    expect(readWhatsappMessages(body)).toEqual([{ from: '15551234567', text: 'hello' }])
+    expect(readWhatsappMessages(body)).toEqual([{ from: '15551234567', id: 'wamid.1', text: 'hello' }])
     expect(readWhatsappMessages({ entry: [] })).toEqual([])
+  })
+})
+
+describe('timingSafeStringEquals', () => {
+  it('accepts equal strings and rejects different or differently sized ones', () => {
+    expect(timingSafeStringEquals('abc', 'abc')).toBe(true)
+    expect(timingSafeStringEquals('abc', 'abd')).toBe(false)
+    expect(timingSafeStringEquals('abc', 'abcd')).toBe(false)
+    expect(timingSafeStringEquals('', '')).toBe(true)
+    expect(timingSafeStringEquals('a', '')).toBe(false)
+  })
+})
+
+describe('InboundDedup', () => {
+  it('drops a replayed key inside the window and admits it again after the TTL', () => {
+    const dedup = new InboundDedup()
+    const t0 = 1_000_000
+    expect(dedup.first('wechat:m1', t0)).toBe(true)
+    expect(dedup.first('wechat:m1', t0 + 1)).toBe(false)
+    expect(dedup.first('wechat:m1', t0 + DEDUP_TTL_MS - 1)).toBe(false)
+    expect(dedup.first('wechat:m1', t0 + DEDUP_TTL_MS)).toBe(true)
+    expect(dedup.first('wechat:m2', t0)).toBe(true)
+  })
+
+  it('stays bounded at the capacity, evicting the oldest', () => {
+    const dedup = new InboundDedup()
+    for (let index = 0; index < DEDUP_CAPACITY; index += 1) expect(dedup.first(`c:m${index}`, 1000)).toBe(true)
+    expect(dedup.first('c:new', 1000)).toBe(true)
+    expect(dedup.first('c:m1', 1000)).toBe(false)
+    expect(dedup.first('c:m0', 1000)).toBe(true)
   })
 })
 
 /** A minimal WeChat-family text callback XML. */
 function wechatBody(from: string, to: string, content: string): string {
-  return `<xml><ToUserName><![CDATA[${to}]]></ToUserName><FromUserName><![CDATA[${from}]]></FromUserName><CreateTime>111</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[${content}]]></Content></xml>`
+  return `<xml><ToUserName><![CDATA[${to}]]></ToUserName><FromUserName><![CDATA[${from}]]></FromUserName><CreateTime>111</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[${content}]]></Content><MsgId>9001</MsgId></xml>`
 }

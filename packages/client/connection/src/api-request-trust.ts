@@ -1,5 +1,5 @@
 /**
- * Browser-trust fence for every /api request. Defends the two confused-deputy
+ * Browser-trust fence for WebServer routes and direct Connection admission. Defends the two confused-deputy
  * paths a browser opens against a local HTTP API — DNS rebinding (Host names
  * the attacker's domain while the socket reaches this server) and cross-site
  * requests fired from a malicious page. The Host fence binds every request,
@@ -95,33 +95,34 @@ export function isRemoteAuthority(entry: string): boolean {
 }
 
 /**
- * Whether a parsed authority names the deployment's own bind address. A browser
- * dialing that literal sends it as Host, and accepting it grants nothing
- * further: the literal is no rebinding target, the Origin and cross-site checks
- * still apply, and it stays outside `trustedHosts`. Matching ignores the port,
- * like a port-less entry, and any `%zone` id (an interface selector, not
- * address text).
+ * Whether a parsed authority names one of the deployment's own bind addresses.
+ * A browser dialing that literal sends it as Host, and accepting it grants
+ * nothing further: the literal is no rebinding target, the Origin and
+ * cross-site checks still apply, and it stays outside `trustedHosts`. Matching
+ * ignores the port, like a port-less entry, and any `%zone` id (an interface
+ * selector, not address text).
  */
-function isBindAddressAuthority(hostUrl: URL, bindHost: string | undefined): boolean {
-  if (bindHost === undefined) return false
-  const zoneAt = bindHost.indexOf('%')
-  const address = zoneAt === -1 ? bindHost : bindHost.slice(0, zoneAt)
-  const bindUrl = parseAuthority(address.includes(':') ? `[${address}]` : address)
-  return bindUrl !== undefined && bindUrl.hostname === hostUrl.hostname
+function isBindAddressAuthority(hostUrl: URL, bindHosts: readonly string[] | undefined): boolean {
+  return bindHosts?.some((bindHost) => {
+    const zoneAt = bindHost.indexOf('%')
+    const address = zoneAt === -1 ? bindHost : bindHost.slice(0, zoneAt)
+    const bindUrl = parseAuthority(address.includes(':') ? `[${address}]` : address)
+    return bindUrl !== undefined && bindUrl.hostname === hostUrl.hostname
+  }) === true
 }
 
 /**
- * Decide whether one /api request may reach the RPC bridge.
+ * Decide whether one request satisfies the deployment's source policy.
  * @param request - Node HTTP or Fetch request facts (headers).
  * @param trustedHosts - non-loopback authorities this deployment serves: exact `host:port`, or port-less `host` matching any port.
- * @param bindHost - the listener's own bind IP literal, accepted on any port independently of `trustedHosts`.
+ * @param bindHosts - the listener's own bind IP literals, each accepted on any port independently of `trustedHosts`.
  * @param protocol - listener protocol for default Host ports; HTTP when no Web carrier is mounted.
- * @returns true when the Host is ours (loopback, the bind address, or trusted) and any attached browser markers are same-origin.
+ * @returns true when the Host is ours (loopback, a bind address, or trusted) and any attached browser markers are same-origin.
  */
 export function isTrustedApiRequest(
   request: ConnectionTrustRequest,
   trustedHosts: readonly string[],
-  bindHost?: string,
+  bindHosts?: readonly string[],
   protocol: 'http:' | 'https:' = 'http:',
 ): boolean {
   // Host fence (DNS-rebinding defense), applied to every request: the browser
@@ -137,7 +138,7 @@ export function isTrustedApiRequest(
   if (hostUrl === undefined) return false
   if (!isLoopbackHostname(hostUrl.hostname)
     && !isTrustedAuthority(hostUrl, trustedHosts, protocol)
-    && !isBindAddressAuthority(hostUrl, bindHost)) return false
+    && !isBindAddressAuthority(hostUrl, bindHosts)) return false
   // Cross-site fence: modern browsers label the initiator relationship on
   // every fetch; an explicit cross-site marker is refused regardless of Origin.
   if (header(request.headers, 'sec-fetch-site') === 'cross-site') return false

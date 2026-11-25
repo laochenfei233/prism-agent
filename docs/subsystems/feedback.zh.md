@@ -296,7 +296,7 @@ fork 种子可以包含父 Session 的反馈事件，但 payload 保留父级 `s
 
 [`@deepseek-ai/dsh-client-ui-message-feedback`](../../packages/client/ui-message-feedback) 是浏览器侧消费方。`@deepseek-ai/dsh-api-remotes` 挂载生成的 `messageFeedback` 与 `sessionFeedback` 贡献，因此该插件调用 `ctx.remote.messageFeedback` 与 `ctx.remote.sessionFeedback`，不接触传输层。
 
-控件是 `conversation.chat.assistant-actions` list slot 的 `feedback` 条目（order 10），该 slot 由 `ui-conversation` 声明，并渲染在已定稿助手消息的 IconActions 行内。`AssistantMessageNode` 携带来自 `assistant/message` 事件的可选 `messageId`。被中断冻结的部分输出没有该字段，渲染点在字段缺失时跳过该 slot。该操作栏每个 Turn 渲染一次，位于收尾的助手消息上：Host 接受每条 append-origin 步骤消息作为目标，但多步骤 Turn 中较早的步骤渲染的是工具行而非可评分正文，因此 UI 暴露的范围比 Host 约定允许的更窄。
+控件是 `conversation.chat.assistant-actions` list slot 的 `feedback` 条目（order 10），该 slot 由 `ui-conversation` 声明，并渲染在已定稿助手消息的 IconActions 行内。`AssistantMessageNode` 携带来自 `assistant/message` 事件的可选 `messageId`。被中断冻结的部分输出没有该字段，渲染点在字段缺失时跳过该 slot。该操作栏每个 Turn 渲染一次，位于收尾的助手消息上：Host 接受每条 append-origin 步骤消息作为目标，但多步骤 Turn 中较早的步骤渲染的是工具行而非 IconActions 行，因此操作栏暴露的范围比 Host 约定允许的更窄。已定稿的助手正文还会在右键菜单里提供这两项评分，即 `conversation.chat.message.menu.item` 的 `feedback` 条目，其两行打开同一个弹窗。
 
 每个 Session 一个 `MessageFeedbackController`，支撑该 Session 内所有消息的控件：一次 `list` 读取即填充整段对话，且延迟到首次 hover 或 focus 才发起，而非挂载时触发。每次变更把该 controller 最后观察到的版本作为 `ifVersion` 发送；`version-conflict` 响应携带权威条目，controller 据此对账而不重新拉取。变更按 Session 串行，排队操作与已提交版本比较。注入的 `retract` 操作会在该队列内重新检查已提交评分，并在并发变更后变为无操作，因此陈旧 UI 无法绕过弹窗记录裸评分。`connection/reset` 只刷新已读取过的 Session。
 
@@ -313,6 +313,24 @@ fork 种子可以包含父 Session 的反馈事件，但 payload 保留父级 `s
 - Web 控制器不消费反馈日志事件，因此另一个标签页的评分要等到重连或下一次冲突响应才可见，不会立即出现。
 - 弹窗不预先校验 `maxNoteBytes`；针对消息的超长描述在提交时以 `note-too-large` 失败，而不是在输入过程中。Session 级备注没有大小上限，`/feedback` 命令从来也没有。
 - `sessionFeedback.record` 只服务 live Session，否则回答 `session-not-found`；弹窗打开期间 Session 退役时，弹窗会报告该失败。
+
+## 导出日志中的反馈
+
+本节面向从导出日志中筛选已评价 Session 的使用方。记录字段以及哪些反馈释放日志前缀由 [OTel 后端](../../packages/session/session-telemetry-otel/README.zh.md#use-this-package)负责；去重由[会话遥测子系统](session-telemetry.zh.md)负责，导出的 `data` 与权威日志的差异由[脱敏 waterfall](session-telemetry.zh.md#session-telemetryrecord--waterfall)负责。反馈特有的 `data` 字段如下：
+
+| 事件 | 评价对象 | `data` | 含义 |
+|---|---|---|---|
+| `feedback/record` | 整个 Session | `text?`、`category?` | 一条不可变备注。`/feedback <text>` 只记录 `text`；Web 弹窗记录所选 `category` 和填写的 `text`，两者均可选；两个字段都缺失的记录也有效。 |
+| `feedback/message-put` | 一条 assistant 消息 | `sessionId`，以及含 `messageId`、`rating`、`note?`、`category?`、`version`、`createdAt`、`updatedAt` 的 `item` | 创建或编辑后的完整当前值 |
+| `feedback/message-delete` | 一条 assistant 消息 | `sessionId`、`messageId` | 撤回当前值 |
+
+按以下规则推导反馈：
+
+1. 统计 Session 自身的反馈时，排除 `seq` 小于 `session.seed_length`（仅 seeded Session 携带）的反馈事件，以及 `data.sessionId` 与记录 `sessionId` 不同的 `feedback/message-*` 事件。其他事件，包括继承前缀，都保留给后续规则使用。
+2. 在同一 Session 内，`feedback/message-put` 按 `data.item.messageId` 分组，`feedback/message-delete` 按 `data.messageId` 分组；`seq` 最大的事件为当前值，该事件为 `feedback/message-delete` 时表示当前没有反馈。较早的 put 保留为编辑历史。
+3. 被评价的回复是 `data.message.id` 等于 `data.item.messageId` 的 append-origin `assistant/message`；在 seeded Session 中它可能位于继承前缀。该事件的 `data.turn` 标识所属轮次，截至该事件的全部事件可以还原当时的对话状态。
+
+服务和事件都不记录操作者。Host 插件和运行时扩展可以调用 `sessionFeedback.record` 和 `messageFeedback.put`，或直接追加这些事件；Client 插件可以调用同样的 Remote。因此导出的反馈字段可能包含插件写入的状态。Session 自身每追加一个反馈事件，也会授权释放截至该事件的前缀。文本内容不能确定写入者；针对特定插件的识别规则由使用方的工具负责。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

@@ -14,10 +14,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: the ctx.workspaces merge.
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+// Type-only: the ui-workspace project-row menu SlotMap row.
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 // Type-only: the ctx.remote merge that carries remote.directoryPicker.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@prism/prism-data/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { ProjectExportMenuItem } from './ProjectExportMenuItem.tsx'
 import { TransferSection, type TransferFace } from './TransferSection.tsx'
 import { zh, en, type TransferLocaleKey } from './locales.ts'
 
@@ -62,4 +65,12 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: () => face,
   }, TransferSection))
+  // The project row's right-click menu gains the export action; the settings
+  // page remains the place for multi-project and settings archives.
+  ctx.slots.inject('sidebar.workspaces.project.menu.item', () => ctx.slots.register({
+    name: 'sidebar.workspaces.project.menu.item',
+    id: 'export-project',
+    order: 900,
+    locale: NS,
+  }, ProjectExportMenuItem))
 }

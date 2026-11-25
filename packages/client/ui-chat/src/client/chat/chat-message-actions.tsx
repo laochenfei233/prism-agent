@@ -9,7 +9,9 @@ import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
 import type { MouseEvent as ReactMouseEvent, ReactNode, RefObject } from 'react'
 import { ContextMenu, useContextMenu, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MessageMenuOpenState } from '../contract/slots.ts'
 
 /** Quote-preserving text the Chat view hands down to message bodies. */
 export interface ChatMessageActions {
@@ -44,6 +46,14 @@ export interface MessageContextMenu {
   menu: ReactNode
 }
 
+/** A settled message whose menu may carry plugin-contributed rows. */
+export interface MessageMenuExtras {
+  /** Durable id of the settled assistant message the menu describes. */
+  readonly messageId: MessageId
+  /** Render the menu's plugin rows in this body's slot scope. */
+  readonly renderSlot: PropsRenderSlots<'conversation.chat.message.menu.item'>['renderSlot']
+}
+
 /** Selected text inside `root`, falling back to the element's own text. */
 function actedText(root: HTMLElement): string {
   const selection = window.getSelection()
@@ -58,12 +68,21 @@ function actedText(root: HTMLElement): string {
 /**
  * Build one message body's context menu over the selection it contains.
  * @param t - the Chat locale seat.
+ * @param extras - renders the settled message's plugin rows when the menu may
+ *   carry them; omission renders the shipped rows only.
  * @returns the element ref, its context-menu handler, and the menu element.
  */
-export function useMessageContextMenu(t: PropsLocale<'chat'>['t']): MessageContextMenu {
+export function useMessageContextMenu(
+  t: PropsLocale<'chat'>['t'],
+  extras?: MessageMenuExtras,
+): MessageContextMenu {
   const state = useContextMenu()
   const actions = useContext(ChatMessageActionsContext)
   const ref = useRef<HTMLDivElement>(null)
+  const openState = useMemo((): MessageMenuOpenState => [
+    state.point !== null,
+    (open: boolean) => { if (!open) state.close() },
+  ], [state.point, state.close])
   const items = useMemo((): readonly MenuEntry[] => [
     { id: 'copy', label: t('context.copy') },
     { id: 'add-to-task', label: t('context.addToTask'), disabled: actions === undefined },
@@ -83,9 +102,22 @@ export function useMessageContextMenu(t: PropsLocale<'chat'>['t']): MessageConte
     else if (id === 'add-to-task') actions?.appendQuote(text)
     else if (id === 'ask-side') actions?.askInSideConversation(text)
   }, [actions])
+  // The slot renders nothing while the menu is closed: building its entries
+  // before a press would mount plugin rows for a menu nobody opened.
+  const extraRows = extras === undefined || state.point === null
+    ? null
+    : extras.renderSlot(
+      'conversation.chat.message.menu.item',
+      { messageId: extras.messageId },
+      { hookContext: openState },
+    )
   return {
     ref,
     onContextMenu,
-    menu: <ContextMenu state={state} items={items} onSelect={onSelect} />,
+    menu: (
+      <ContextMenu state={state} items={items} onSelect={onSelect}>
+        {extraRows}
+      </ContextMenu>
+    ),
   }
 }

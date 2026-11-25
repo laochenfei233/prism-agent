@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for hachimodock-support.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/hachimodock-support.md
+/:
+  en: d9ae7b4d9f1f4141
+  zh: d9ae7b4d9f1f4141
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching:
+  en: f2412d46741da9f6
+  zh: 5d8ad0a2c1e0ea1c
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/report:
+  en: b51a737712bd2244
+  zh: 2d0930482ddb4872
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s1-problem:
+  en: 408371bbccabf0aa
+  zh: 09a7045e0b35d831
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-1-new-plugin-prism-prism-hachimodock:
+  en: 3f6a2d7ba93c46fb
+  zh: 7102248c746e3fb7
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-2-config:
+  en: 1ed21a1529cdd33e
+  zh: f5be2ea7d5729675
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-3-host-wiring:
+  en: dba5bd41e8b643f4
+  zh: bece3528389a4262
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-4-voice:
+  en: fd32c57d9cf11a66
+  zh: d174219a7071e9b4
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-5-conversation-switching-new-capability:
+  en: e21a4b67f8d8ccff
+  zh: 325a78275c4b1d79
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s2-design/s2-6-packaging-and-docs:
+  en: 16c6c37902130d89
+  zh: 8094f8e27f59bc4f
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s3-scope:
+  en: 282bfeb656ac8600
+  zh: 267d8c0976818a6c
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/tasks:
+  en: 6323124eb614dd33
+  zh: aa8dff992c6952fe
+/hachimodock-bridge-support-device-status-approval-relay-voice-and-conversation-switching/s4-acceptance:
+  en: 69da278485d0800c
+  zh: 5da0d5c72ea4b7a8

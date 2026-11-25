@@ -55,7 +55,9 @@ export function apply(ctx: Context, config: ConfigShape = {}): void {
     return () => service.dispose()
   }, 'local-models: service claim')
 
-  const connection = Reflect.get(ctx, 'connection') as ConnectionRoute
+  // `ctx.get` reads without the inject requirement; the context proxy rejects
+  // undeclared `Reflect.get` access since the cordis resync.
+  const connection = ctx.get('connection') as ConnectionRoute
   ctx.effect(() => connection.fetch.register({
     path: LOCAL_MODELS_CATALOG_PATH,
     methods: ['GET'],
@@ -161,7 +163,7 @@ function errorStatus(code: LocalModelsErrorCode): number {
 
 /** Read the harness home from the boot-provided path helper. */
 function homeOf(ctx: Context): string {
-  const provider: unknown = Reflect.get(ctx, 'dshHomePath')
+  const provider: unknown = ctx.get('dshHomePath')
   if (typeof provider !== 'function') {
     throw new Error('local-models: the dshHomePath service is required to locate the models root')
   }

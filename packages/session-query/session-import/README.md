@@ -1,5 +1,5 @@
 ---
-description: "Settings import of conversation history from Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI."
+description: "Settings import of conversation history from Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, and ZCode."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import` adds an Import page under Settings that reads conversation history from ten other coding agents and writes each conversation as a normal durable session in this harness. Imported sessions appear in the sidebar under the project for their recorded working folder, and the next prompt continues the conversation. DeepSeek Harness sessions are copied natively with their original session id and full event log, so tool calls and results survive; the other nine stores are normalized to text. Sources are opened read-only.
+`dsh-session-import` adds an Import page under Settings that reads conversation history from eleven other coding agents and writes each conversation as a normal durable session in this harness. Imported sessions appear in the sidebar under the project for their recorded working folder, and the next prompt continues the conversation. DeepSeek Harness sessions are copied natively with their original session id and full event log, so tool calls and results survive; the other ten stores are normalized to text. Sources are opened read-only.
 
 ## Table of Contents
 
@@ -52,6 +52,9 @@ The package looks for each store at its documented root under the OS home. A sou
 | Hermes | `~/.hermes` |
 | Pi | `~/.pi/agent/sessions` |
 | Gemini CLI | `~/.gemini/tmp` |
+| ZCode | `~/.zcode` |
+
+Optional bundles can contribute additional source cards through the `settings.sessionImport.source` list slot; contributed cards render ahead of the built-in stores, and a deployment without contributions keeps the page exactly as listed above.
 
 ### Configuration
 
@@ -137,7 +140,7 @@ None for the import itself; the session is new. Later turns share the normal ses
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Converted sources are text only** — Claude Code, Codex, Grok, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI lose tool calls, tool results, reasoning, images, and subagent transcripts. DeepSeek Harness is the exception: its log is copied natively, and a version or event envelope this build cannot read fails that session instead of falling back to text.
+- **Converted sources are text only** — Claude Code, Codex, Grok, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, and ZCode lose tool calls, tool results, reasoning, images, and subagent transcripts. DeepSeek Harness is the exception: its log is copied natively, and a version or event envelope this build cannot read fails that session instead of falling back to text.
 - **Native copies are copied verbatim** — the import validates the log with the stored reader's event grammar before writing it, so an invalid event fails the import. Cross-event turn and step relationships are enforced only when the surface folds, so a relationship-invalid log can still import and then fail to open; repair it in the source or omit that session. Imported events keep the source's provider and model attribution without an imported-content marker.
 - **No incremental sync** — a repeated import of the same source session is a duplicate; newer messages in the foreign store are not appended to the existing DSH session.
 - **Best-effort undocumented stores** — OpenClaw and Hermes payload schemas vary across builds; events that carry no recognizable role and text are skipped, and a session with no usable text reports as skipped.

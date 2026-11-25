@@ -18,6 +18,9 @@
     "declarationMap": false,
     "sourceMap": false,
     "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["es2024", "dom", "dom.iterable"],
     "paths": {
       "vitest": ["../../node_modules/vitest"],
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
@@ -30,5 +33,5 @@
       "@deepseek-ai/dsh-workspace": ["../../packages/workspace/workspace/lib/types/index.d.ts"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }

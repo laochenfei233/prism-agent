@@ -16,6 +16,14 @@ import { POCKET_ICON_PATH, POCKET_MANIFEST_PATH, POCKET_SW_PATH } from './routes
 /** Structural shape of the webserver service this plugin registers into. */
 export interface WebServerLike {
   register(route: { kind: 'exact' | 'prefix'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void> }): () => void
+  /** The configured bind address. */
+  readonly host: string
+  /** The listening port, or undefined before the listener bound. */
+  readonly port: number | undefined
+  /** Every bound address: the configured host first, then the runtime binds. */
+  readonly hosts: readonly string[]
+  /** Bind one more concrete local address on the configured port. */
+  bindAdditionalHost(host: string): Promise<void>
 }
 
 /** The web app manifest. */

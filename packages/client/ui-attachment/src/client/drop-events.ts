@@ -1,4 +1,5 @@
 /** Document drag-and-drop listeners owned by one mounted attachment view. */
+import { FILE_DRAG_TOKEN_TYPE } from '@deepseek-ai/dsh-util-file-drag'
 import type { ComposerAttachmentsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 /**
@@ -20,11 +21,24 @@ function droppedDirectories(dataTransfer: DataTransfer, files: readonly File[]):
 }
 
 /**
+ * Handle a drop's directory members before the attachment intake. The handler
+ * owns the drop when it returns without calling `addAsReferences`; calling
+ * `addAsReferences()` runs the legacy attachment intake for the same batch.
+ */
+export type DirectoryDropHandler = (
+  files: readonly File[],
+  directories: ReadonlySet<File>,
+  addAsReferences: () => void,
+) => void
+
+/**
  * Install one attachment view's file-drop listeners.
  * @param canAcceptDrop - whether this view accepts the dropped files.
  * @param onAddFiles - attachment intake callback.
  * @param dragDepth - the view's retained nested-drag counter.
  * @param setDragActive - publish whether a file drag is active.
+ * @param readFileDrag - resolve an original image retained by this application during a browser drag.
+ * @param onDirectories - intercept a drop that carries directories, before the attachment intake.
  * @returns cleanup for exactly these listeners.
  */
 export function installDocumentDropEvents(
@@ -32,10 +46,14 @@ export function installDocumentDropEvents(
   onAddFiles: ComposerAttachmentsProps['onAddFiles'],
   dragDepth: { current: number },
   setDragActive: (active: boolean) => void,
+  readFileDrag: (transfer: DataTransfer) => File | undefined,
+  onDirectories?: DirectoryDropHandler,
 ): () => void {
   const fileTransfer = (event: globalThis.DragEvent): DataTransfer | null => {
     const dataTransfer = event.dataTransfer
-    if (dataTransfer === null || !dataTransfer.types.includes('Files')) return null
+    if (dataTransfer === null || (!dataTransfer.types.includes('Files') && !dataTransfer.types.includes(FILE_DRAG_TOKEN_TYPE))) return null
+    if (dataTransfer.types.includes(FILE_DRAG_TOKEN_TYPE)
+      && (!(event.target instanceof Element) || event.target.closest('[data-composer-card]') === null)) return null
     return dataTransfer
   }
   const reset = (): void => {
@@ -43,10 +61,11 @@ export function installDocumentDropEvents(
     setDragActive(false)
   }
   const onDragEnter = (event: globalThis.DragEvent): void => {
-    if (fileTransfer(event) === null) return
+    const dataTransfer = fileTransfer(event)
+    if (dataTransfer === null) return
     event.preventDefault()
     dragDepth.current += 1
-    setDragActive(true)
+    if (!dataTransfer.types.includes(FILE_DRAG_TOKEN_TYPE)) setDragActive(true)
   }
   const onDragOver = (event: globalThis.DragEvent): void => {
     const dataTransfer = fileTransfer(event)
@@ -67,10 +86,16 @@ export function installDocumentDropEvents(
     if (dataTransfer === null) return
     event.preventDefault()
     reset()
-    if (canAcceptDrop) {
-      const files = [...dataTransfer.files]
-      onAddFiles(files, droppedDirectories(dataTransfer, files))
+    if (!canAcceptDrop) return
+    const image = dataTransfer.types.includes(FILE_DRAG_TOKEN_TYPE) ? readFileDrag(dataTransfer) : undefined
+    const files = image === undefined ? [...dataTransfer.files] : [image]
+    if (files.length === 0) return
+    const directories = droppedDirectories(dataTransfer, files)
+    if (directories.size > 0 && onDirectories !== undefined) {
+      onDirectories(files, directories, () => { onAddFiles(files, directories) })
+      return
     }
+    onAddFiles(files, directories)
   }
   document.addEventListener('dragenter', onDragEnter)
   document.addEventListener('dragover', onDragOver)

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for meetings.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/meetings.md
+/meetings:
+  en: 9128abe975946b0f
+  zh: b44757dd5cc84a52
+/meetings/meeting-and-answer-vocabulary:
+  en: 9056b8acdda4982e
+  zh: 0923bbf154c50d72
+/meetings/request-vocabulary:
+  en: 37967abc90f2ba8c
+  zh: 5900a0ea7e0ca757
+/meetings/recognition-vocabulary:
+  en: d870888629a0e1dd
+  zh: 3182ea93579865c2
+/meetings/durable-storage:
+  en: 608e9716769200fe
+  zh: e80f209b0764b428
+/meetings/service-semantics:
+  en: c4e2233a5572fc15
+  zh: e3ccf9a8f96a3d43
+/meetings/speech-recognition:
+  en: ccc40aa0d708bf56
+  zh: 48c5872304218317
+/meetings/browser-interface:
+  en: 98d0546d1dd66419
+  zh: 69bf2f132e178c65

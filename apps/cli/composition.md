@@ -54,8 +54,10 @@ flowchart LR
   cfg --> plugin_dsh_base_settings
   plugin_dsh_base_authorization["authorization<br/>@deepseek-ai/dsh-authorization"]
   cfg --> plugin_dsh_base_authorization
-  plugin_dsh_base_deepseek_account["deepseek-account<br/>@deepseek-ai/dsh-deepseek-account-platform"]
+  plugin_dsh_base_deepseek_account["deepseek-account<br/>@deepseek-ai/dsh-deepseek-account"]
   cfg --> plugin_dsh_base_deepseek_account
+  plugin_dsh_base_deepseek_auth["deepseek-auth<br/>@deepseek-ai/dsh-deepseek-auth"]
+  cfg --> plugin_dsh_base_deepseek_auth
   plugin_dsh_base_credentials["credentials<br/>@deepseek-ai/dsh-credentials-local"]
   cfg --> plugin_dsh_base_credentials
   plugin_dsh_base_llm_pi_ai["llm-pi-ai<br/>@deepseek-ai/dsh-llm-pi-ai"]
@@ -68,8 +70,6 @@ flowchart LR
   cfg --> plugin_dsh_base_session_query_sqlite
   plugin_dsh_base_working_directory["working-directory<br/>@deepseek-ai/dsh-working-directory"]
   cfg --> plugin_dsh_base_working_directory
-  plugin_dsh_base_tool_working_directory["tool-working-directory<br/>@deepseek-ai/dsh-tool-working-directory"]
-  cfg --> plugin_dsh_base_tool_working_directory
   plugin_dsh_base_session_projection["session-projection<br/>@deepseek-ai/dsh-session-projection"]
   cfg --> plugin_dsh_base_session_projection
   plugin_dsh_base_storage["storage<br/>@deepseek-ai/dsh-storage"]
@@ -78,6 +78,14 @@ flowchart LR
   cfg --> plugin_dsh_base_storage_json
   plugin_dsh_base_storage_domain["storage-domain<br/>@deepseek-ai/dsh-storage-domain"]
   cfg --> plugin_dsh_base_storage_domain
+  plugin_dsh_base_speech_to_text["speech-to-text<br/>@deepseek-ai/dsh-experimental-speech-to-text"]
+  cfg --> plugin_dsh_base_speech_to_text
+  plugin_dsh_base_speech_to_text_dashscope["speech-to-text-dashscope<br/>@deepseek-ai/dsh-experimental-speech-to-text-dashscope"]
+  cfg --> plugin_dsh_base_speech_to_text_dashscope
+  plugin_dsh_base_prism_meeting["prism-meeting<br/>@prism/prism-meeting"]
+  cfg --> plugin_dsh_base_prism_meeting
+  plugin_dsh_base_prism_meeting_web["prism-meeting-web<br/>@prism/prism-meeting/web"]
+  cfg --> plugin_dsh_base_prism_meeting_web
   plugin_dsh_base_session_projection_cache["session-projection-cache<br/>@deepseek-ai/dsh-session-projection-cache"]
   cfg --> plugin_dsh_base_session_projection_cache
   plugin_dsh_base_otel["otel<br/>@deepseek-ai/dsh-otel"]
@@ -86,6 +94,8 @@ flowchart LR
   cfg --> plugin_dsh_base_session_telemetry_otel
   plugin_dsh_base_subprocess["subprocess<br/>@deepseek-ai/dsh-subprocess-local"]
   cfg --> plugin_dsh_base_subprocess
+  plugin_dsh_base_cli_account["cli-account<br/>@deepseek-ai/dsh-cli-account"]
+  cfg --> plugin_dsh_base_cli_account
   plugin_dsh_base_sandbox["sandbox<br/>@deepseek-ai/dsh-sandbox-local"]
   cfg --> plugin_dsh_base_sandbox
   plugin_dsh_base_sandbox_policy["sandbox-policy<br/>@deepseek-ai/dsh-sandbox-policy"]
@@ -96,7 +106,7 @@ flowchart LR
   cfg --> plugin_dsh_base_pwsh_sandbox
   plugin_dsh_base_approval["approval<br/>@deepseek-ai/dsh-user-approval"]
   cfg --> plugin_dsh_base_approval
-  plugin_dsh_base_permission["permission<br/>@deepseek-ai/dsh-permission-presets"]
+  plugin_dsh_base_permission["permission<br/>autonomous-guarded"]
   cfg --> plugin_dsh_base_permission
   plugin_dsh_base_shell_env["shell-env<br/>@deepseek-ai/dsh-shell-env"]
   cfg --> plugin_dsh_base_shell_env
@@ -120,6 +130,8 @@ flowchart LR
   cfg --> plugin_dsh_base_skill_filesystem
   plugin_dsh_base_tool_skill["tool-skill<br/>@deepseek-ai/dsh-tool-skill"]
   cfg --> plugin_dsh_base_tool_skill
+  plugin_dsh_base_upstream_skills["upstream-skills<br/>@deepseek-ai/dsh-upstream-skills"]
+  cfg --> plugin_dsh_base_upstream_skills
   plugin_dsh_base_commands["commands<br/>@deepseek-ai/dsh-commands"]
   cfg --> plugin_dsh_base_commands
   plugin_dsh_base_command_feedback["command-feedback<br/>@deepseek-ai/dsh-command-feedback"]
@@ -134,20 +146,24 @@ flowchart LR
   cfg --> plugin_dsh_base_plan_mode
   plugin_dsh_base_token_meter["token-meter<br/>@deepseek-ai/dsh-token-meter"]
   cfg --> plugin_dsh_base_token_meter
+  plugin_dsh_base_prism_microcompact["prism-microcompact<br/>@prism/prism-microcompact"]
+  cfg --> plugin_dsh_base_prism_microcompact
   plugin_dsh_base_compaction_basic["compaction-basic<br/>@deepseek-ai/dsh-compaction-basic"]
   cfg --> plugin_dsh_base_compaction_basic
   plugin_dsh_base_command_compact["command-compact<br/>@deepseek-ai/dsh-command-compact"]
   cfg --> plugin_dsh_base_command_compact
   plugin_dsh_base_subagent["subagent<br/>@deepseek-ai/dsh-subagent"]
   cfg --> plugin_dsh_base_subagent
+  plugin_dsh_base_agent_team["agent-team<br/>@deepseek-ai/dsh-agent-team"]
+  cfg --> plugin_dsh_base_agent_team
+  plugin_dsh_base_tool_agent_team["tool-agent-team<br/>@deepseek-ai/dsh-tool-agent-team"]
+  cfg --> plugin_dsh_base_tool_agent_team
   plugin_dsh_base_subagent_spawn_in_process["subagent-spawn-in-process<br/>@deepseek-ai/dsh-subagent-spawn-in-process"]
   cfg --> plugin_dsh_base_subagent_spawn_in_process
   plugin_dsh_base_subagent_fork_in_process["subagent-fork-in-process<br/>@deepseek-ai/dsh-subagent-fork-in-process"]
   cfg --> plugin_dsh_base_subagent_fork_in_process
   plugin_dsh_base_tool_subagent_control["tool-subagent-control<br/>@deepseek-ai/dsh-tool-subagent-control"]
   cfg --> plugin_dsh_base_tool_subagent_control
-  plugin_dsh_base_tool_subagent_list_agents["tool-subagent-list-agents<br/>@deepseek-ai/dsh-tool-subagent-control/list-agents"]
-  cfg --> plugin_dsh_base_tool_subagent_list_agents
   plugin_dsh_base_tool_subagent["tool-subagent<br/>@deepseek-ai/dsh-tool-subagent"]
   cfg --> plugin_dsh_base_tool_subagent
   plugin_dsh_base_tool_subagent_fork["tool-subagent-fork<br/>@deepseek-ai/dsh-tool-subagent"]
@@ -172,6 +188,8 @@ flowchart LR
   cfg --> plugin_dsh_base_image_offload
   plugin_dsh_base_tool_todo["tool-todo<br/>@deepseek-ai/dsh-tool-todo"]
   cfg --> plugin_dsh_base_tool_todo
+  plugin_dsh_base_tool_prism_meeting["tool-prism-meeting<br/>@prism/prism-meeting/tools"]
+  cfg --> plugin_dsh_base_tool_prism_meeting
   plugin_dsh_base_tool_goal["tool-goal<br/>@deepseek-ai/dsh-tool-goal"]
   cfg --> plugin_dsh_base_tool_goal
   plugin_dsh_base_repeat_tool_reminder["repeat-tool-reminder<br/>@deepseek-ai/dsh-repeat-tool-reminder"]
@@ -190,6 +208,10 @@ flowchart LR
   cfg --> plugin_dsh_base_mcp_resources
   plugin_dsh_base_tools["tools<br/>@deepseek-ai/dsh-tools"]
   cfg --> plugin_dsh_base_tools
+  plugin_dsh_base_tool_executor_native["tool-executor-native<br/>@deepseek-ai/dsh-tool-executor-native"]
+  cfg --> plugin_dsh_base_tool_executor_native
+  plugin_dsh_base_tool_executor_ptc["tool-executor-ptc<br/>@deepseek-ai/dsh-tool-executor-ptc"]
+  cfg --> plugin_dsh_base_tool_executor_ptc
   plugin_dsh_base_system_prompt["system-prompt<br/>@deepseek-ai/dsh-system-prompt"]
   cfg --> plugin_dsh_base_system_prompt
   plugin_dsh_base_agent_loop["agent-loop<br/>@deepseek-ai/dsh-agent-loop"]
@@ -227,28 +249,33 @@ flowchart LR
 | `config-editor` | `@deepseek-ai/dsh-config-editor` |
 | `settings` | `@deepseek-ai/dsh-settings` |
 | `authorization` | `@deepseek-ai/dsh-authorization` |
-| `deepseek-account` | `@deepseek-ai/dsh-deepseek-account-platform` |
+| `deepseek-account` | `@deepseek-ai/dsh-deepseek-account` |
+| `deepseek-auth` | `@deepseek-ai/dsh-deepseek-auth` |
 | `credentials` | `@deepseek-ai/dsh-credentials-local` |
 | `llm-pi-ai` | `@deepseek-ai/dsh-llm-pi-ai` |
 | `session-persistence-jsonl` | `@deepseek-ai/dsh-session-persistence-jsonl` |
 | `attachment-local` | `@deepseek-ai/dsh-attachment-local` |
 | `session-query-sqlite` | `@deepseek-ai/dsh-session-query-sqlite` |
 | `working-directory` | `@deepseek-ai/dsh-working-directory` |
-| `tool-working-directory` | `@deepseek-ai/dsh-tool-working-directory` |
 | `session-projection` | `@deepseek-ai/dsh-session-projection` |
 | `storage` | `@deepseek-ai/dsh-storage` |
 | `storage-json` | `@deepseek-ai/dsh-storage-json` |
 | `storage-domain` | `@deepseek-ai/dsh-storage-domain` |
+| `speech-to-text` | `@deepseek-ai/dsh-experimental-speech-to-text` |
+| `speech-to-text-dashscope` | `@deepseek-ai/dsh-experimental-speech-to-text-dashscope` |
+| `prism-meeting` | `@prism/prism-meeting` |
+| `prism-meeting-web` | `@prism/prism-meeting/web` |
 | `session-projection-cache` | `@deepseek-ai/dsh-session-projection-cache` |
 | `otel` | `@deepseek-ai/dsh-otel` |
 | `session-telemetry-otel` | `@deepseek-ai/dsh-session-telemetry-otel` |
 | `subprocess` | `@deepseek-ai/dsh-subprocess-local` |
+| `cli-account` | `@deepseek-ai/dsh-cli-account` |
 | `sandbox` | `@deepseek-ai/dsh-sandbox-local` |
 | `sandbox-policy` | `@deepseek-ai/dsh-sandbox-policy` |
 | `bash-sandbox` | `@deepseek-ai/dsh-bash-sandbox` |
 | `pwsh-sandbox` | `@deepseek-ai/dsh-pwsh-sandbox` |
 | `approval` | `@deepseek-ai/dsh-user-approval` |
-| `permission` | `@deepseek-ai/dsh-permission-presets` |
+| `permission` | `autonomous-guarded` |
 | `shell-env` | `@deepseek-ai/dsh-shell-env` |
 | `tool-bash` | `@deepseek-ai/dsh-tool-bash` |
 | `tool-pwsh` | `@deepseek-ai/dsh-tool-pwsh` |
@@ -260,6 +287,7 @@ flowchart LR
 | `skill` | `@deepseek-ai/dsh-skill` |
 | `skill-filesystem` | `@deepseek-ai/dsh-skill-filesystem` |
 | `tool-skill` | `@deepseek-ai/dsh-tool-skill` |
+| `upstream-skills` | `@deepseek-ai/dsh-upstream-skills` |
 | `commands` | `@deepseek-ai/dsh-commands` |
 | `command-feedback` | `@deepseek-ai/dsh-command-feedback` |
 | `goal` | `@deepseek-ai/dsh-goal` |
@@ -267,13 +295,15 @@ flowchart LR
 | `command-goal` | `@deepseek-ai/dsh-command-goal` |
 | `plan-mode` | `@deepseek-ai/dsh-plan-mode` |
 | `token-meter` | `@deepseek-ai/dsh-token-meter` |
+| `prism-microcompact` | `@prism/prism-microcompact` |
 | `compaction-basic` | `@deepseek-ai/dsh-compaction-basic` |
 | `command-compact` | `@deepseek-ai/dsh-command-compact` |
 | `subagent` | `@deepseek-ai/dsh-subagent` |
+| `agent-team` | `@deepseek-ai/dsh-agent-team` |
+| `tool-agent-team` | `@deepseek-ai/dsh-tool-agent-team` |
 | `subagent-spawn-in-process` | `@deepseek-ai/dsh-subagent-spawn-in-process` |
 | `subagent-fork-in-process` | `@deepseek-ai/dsh-subagent-fork-in-process` |
 | `tool-subagent-control` | `@deepseek-ai/dsh-tool-subagent-control` |
-| `tool-subagent-list-agents` | `@deepseek-ai/dsh-tool-subagent-control/list-agents` |
 | `tool-subagent` | `@deepseek-ai/dsh-tool-subagent` |
 | `tool-subagent-fork` | `@deepseek-ai/dsh-tool-subagent` |
 | `ptc-runtime` | `@deepseek-ai/dsh-ptc-runtime-node` |
@@ -286,6 +316,7 @@ flowchart LR
 | `tool-result-pruner` | `@deepseek-ai/dsh-compaction-tool-result-pruner` |
 | `image-offload` | `@deepseek-ai/dsh-compaction-image-offload` |
 | `tool-todo` | `@deepseek-ai/dsh-tool-todo` |
+| `tool-prism-meeting` | `@prism/prism-meeting/tools` |
 | `tool-goal` | `@deepseek-ai/dsh-tool-goal` |
 | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |
 | `web` | `@deepseek-ai/dsh-web` |
@@ -295,6 +326,8 @@ flowchart LR
 | `tool-web` | `@deepseek-ai/dsh-tool-web` |
 | `mcp-resources` | `@deepseek-ai/dsh-mcp-resources` |
 | `tools` | `@deepseek-ai/dsh-tools` |
+| `tool-executor-native` | `@deepseek-ai/dsh-tool-executor-native` |
+| `tool-executor-ptc` | `@deepseek-ai/dsh-tool-executor-ptc` |
 | `system-prompt` | `@deepseek-ai/dsh-system-prompt` |
 | `agent-loop` | `@deepseek-ai/dsh-agent-loop` |
 | `fs-sandbox` | `@deepseek-ai/dsh-fs-sandbox` |

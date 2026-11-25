@@ -5,6 +5,7 @@
 - id: deepseek-account
   config:
     platformOrigin: "{{origin}}"
+    harnessOrigin: "{{origin}}"
     allowLoopbackHttp: true
 # The scenario signs in from the DeepSeek card on the Models page; the keyless
 # replay masks the ambient key, so the automatic first-run credential dialog is

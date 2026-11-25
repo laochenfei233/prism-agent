@@ -15,15 +15,16 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [goal.md](goal.md) | persisted goal identity, lifecycle snapshots, activation, change records, and round attribution |
 | [schedule.md](schedule.md) | Host-owned reminder records, durable transitions, active and ended views, and ordinary-conversation delivery |
 | [todo.md](todo.md) | the todo package's whole-list item type, durable event ownership, and projection |
-| [cron.md](cron.md) | calendar scheduled tasks: the five-field rule, occurrence resolution over an explicit zone, the durable job domain behind a leader lease, run outcomes, delivery, and the model and Remote management surfaces |
 | [deliverables.md](deliverables.md) | what a turn hands to the user: `PresentedFile` deliveries from `present` and the Host-served `WorkspaceChangesSummary` of changed files from git snapshots |
 | [commands.md](commands.md) | the human-command registry service: definitions, adapter discovery, direct invocation, results, and parsing views |
 | [session.md](session.md) | the full `SessionEventMap` variant catalog, `TurnEndReason`, `deriveMessages()`, execution enclosure, and standalone events |
 | [working-directory.md](working-directory.md) | Session execution directories, durable changes, recovery, and user context |
 | [worktrees.md](worktrees.md) | Experimental Git branch and checkout creation under existing permissions |
+| [forge.md](forge.md) | Experimental code host change requests: provider contract, shared status polling, and Session bindings |
 | [persistence.md](persistence.md) | the durability seam: `SessionPersistence`, the JSONL provider, `session/flush`, crash recovery, `SessionHeader` |
 | [settings.md](settings.md) | the user-settings seam: `SettingsNamespace` registration, layered resolution (defaults → composition `base` → user document), owner scopes, hot commits |
 | [credentials.md](credentials.md) | the credential seam: `CredentialRef` references (never values) in configuration, per-operation resolution, UI-safe `CredentialInfo`, provider source layers |
+| [account.md](account.md) | the DeepSeek account: browser sign-in state, the stored grant, Host-only request credentials for the account model route and the web providers, and the Platform session projection |
 | [session-query.md](session-query.md) | logical records, bounded exact-event reads, relationship traces, semantic filters/documents, and full-text result pages |
 | [feedback.md](feedback.md) | lifecycle-bound per-message feedback records, optimistic versions, sidecar persistence, and the Host Remote contract |
 | [session-title.md](session-title.md) | durable title snapshots, cited source-message seqs, and the asynchronous provider contract |
@@ -33,7 +34,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [mcp.md](mcp.md) | external MCP connections, scoped tools and resources, server instructions, protocol results, and configuration ownership |
 | [user-questions.md](user-questions.md) | the UI-backed human question/answer seam: `AskUserQuestionRequest`, answer/options vocabulary, provider API, error taxonomy |
 | [approval.md](approval.md) | the one-shot user-approval seam: `ApprovalRequest`, `ApprovalOutcome`, per-session policy, audit events, and answerer contracts |
-| [office-to-pdf.md](office-to-pdf.md) | authorized Office-to-PDF conversion, native/WASM engines, and bounded shared reuse |
+| [office-kit.md](office-kit.md) | authorized Office rendering, conversion, and recalculation, native/WASM engines, and bounded shared reuse |
 | [attachment.md](attachment.md) | durable image identity and metadata, validation inputs, verified reads, and the `AttachmentStore` seam |
 | [shell.md](shell.md) | the shell executor seam: `ShellExecRequest`/`Spec`, `ShellRunResult`, background `ShellProcess` handles |
 | [subprocess.md](subprocess.md) | the subprocess seam: fully-explicit `SubprocessSpawnSpec`, offset-based output readers, unclassified `SubprocessOutcome`, and the managed `DSH_*` environment vocabulary |
@@ -49,9 +50,11 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [skills.md](skills.md) | the skill service: discovery priority, `SkillSummary`/`SkillDefinition`, session-prefix catalog, model-facing `skill` loading |
 | [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
 | [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
+| [meetings.md](meetings.md) | durable meeting records, configured analysis, and model-facing meeting operations |
 | [voice-input.md](voice-input.md) | experimental named recognizers, transient audio and revision-guarded draft insertion |
 | [translation.md](translation.md) | experimental anonymous text translation and explicit provider requests |
-| [agent-team.md](agent-team.md) | Agent Teams: implicit Lead identity, named continuable teammates, direct peer inbox delivery, and shared task DAG |
+| [agent-team.md](agent-team.md) | Agent Teams: shared task DAG and task ownership for a subagent tree |
+| [liveshare.md](liveshare.md) | the opt-in LiveShare bundle: nested share modes, a fork's ceiling and durability, enforcement installation, and the constraint a shared Session's externally driven turns run under |
 | [claude-code-mods.md](claude-code-mods.md) | Claude Code mods through the experimental bridge: every event, `$` member, chain rule, drawing feature, and example mod that differs from Claude Code |
 | [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
 | [spill.md](spill.md) | the spill storage seam: `SaveTextSpill`, `SpillOwner`/`SpillSource`, `SpillRef`, the branded `SpillLocator` |
@@ -73,5 +76,6 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [session-telemetry.md](session-telemetry.md) | the outbound session-reporting capability seam: `SessionTelemetryRecord`/`SessionTelemetrySeverity`, the `SessionTelemetrySink` contract, and the `session-telemetry/record` redact waterfall |
 | [otel.md](otel.md) | Shared ordinary-event and Session-log OTLP channels |
 | [product-telemetry.md](product-telemetry.md) | Explicit product analytics submission and OTLP/HTTP transport |
+| [wiki.md](wiki.md) | the per-Workspace markdown knowledge vault: the three-layer directory, atomic page writes with a generated catalog and log, the rebuildable SQLite full-text cache, and the `ctx.wikiVault` service |
 
 > Type declarations and their JSDoc on these pages are source-equivalent and drift-checked by `pnpm run verify-type-equiv` (see [development.md](../development.md#documenting-types-verbatim-ts-type-equiv)). Ordinary blocks preserve complete declarations; `public-api` blocks preserve body-stripped public class declarations. Cordis services and events use each page's generated **Cordis API** section.

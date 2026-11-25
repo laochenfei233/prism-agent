@@ -12,7 +12,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Parse one poll response into a snapshot, refusing foreign shapes. */
+/** Parse one poll response into a snapshot, refusing foreign shapes.
+ * @param value - the JSON body the transfer route answered with.
+ * @returns the parsed snapshot, or `undefined` for a foreign or idle shape.
+ */
 export function snapshotOf(value: unknown): TransferJobSnapshot | undefined {
   if (!isRecord(value) || typeof value['jobId'] !== 'string') return undefined
   if (value['state'] === 'idle') return undefined
@@ -88,7 +91,10 @@ function errorOf(value: Record<string, unknown>): { readonly error?: NonNullable
   }
 }
 
-/** Locale key for one job phase. */
+/** Locale key for one job phase.
+ * @param phase - the snapshot phase to name.
+ * @returns the locale key the phase renders with.
+ */
 export function phaseKeyOf(phase: TransferJobSnapshot['phase']): 'phaseValidating' | 'phaseExtracting' | 'phaseRestoring' | 'phaseApplyingSettings' | 'phaseRegistering' {
   if (phase === 'extracting') return 'phaseExtracting'
   if (phase === 'restoring') return 'phaseRestoring'
@@ -97,7 +103,10 @@ export function phaseKeyOf(phase: TransferJobSnapshot['phase']): 'phaseValidatin
   return 'phaseValidating'
 }
 
-/** Read `{code, message}` from a failure body. */
+/** Read `{code, message}` from a failure body.
+ * @param body - the JSON body a failed transfer request answered with.
+ * @returns the code and message, or `undefined` for a foreign shape.
+ */
 export function failureOf(body: unknown): { readonly code: string; readonly message: string } | undefined {
   if (!isRecord(body)) return undefined
   if (typeof body['code'] !== 'string') return undefined
@@ -137,7 +146,10 @@ export function exportSkippedNotices(
   return notices.length === 0 ? null : notices.join(' ')
 }
 
-/** Human byte size for the chosen-file line. */
+/** Human byte size for the chosen-file line.
+ * @param bytes - the byte count to render.
+ * @returns the size in bytes or the largest fitting binary unit.
+ */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`
   const units = ['KiB', 'MiB', 'GiB']

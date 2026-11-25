@@ -12,7 +12,7 @@ commits: c21408d0fb..cf85f0a33b
 
 ## Report
 
-**What was built** — 桌面壳现在让播种进 `$DSH_HOME/profiles/node_modules` 的插件副本跟随正在运行的安装包：安装包的清单变了、副本缺少自己清单声明的入口、或记录的安装包版本变了，都会替换副本；没有入口的构建既不新建也不替换副本，链接目标一概不碰；交换先暂存新构建，失败时恢复原副本。这正是 `@prism-ai/prism-meeting` 显示「异常」的原因：profile 副本的 `package.json` 仍写着 0.1.7-rc.1 的 peer，尽管它的 `lib/` 与安装包中的逐字节相同，加载器仍跳过该 bundle。打包现在先经检出目录的 tsdown 构建每个 `plugins/*` bundle 再复制，构建没有产出声明入口时以包名报错，并先清空再跳过本检出无法构建的包（`plugins/prism-meeting`，其源码不在本仓库）。插件页对由应用提供文件的插件给出真正可行的补救：更新应用后重启，而不是卸载重装。
+**What was built** — 桌面壳现在让播种进 `$DSH_HOME/profiles/node_modules` 的插件副本跟随正在运行的安装包：安装包的清单变了、副本缺少自己清单声明的入口、或记录的安装包版本变了，都会替换副本；没有入口的构建既不新建也不替换副本，链接目标一概不碰；交换先暂存新构建，失败时恢复原副本。这正是 `@prism/prism-meeting` 显示「异常」的原因：profile 副本的 `package.json` 仍写着 0.1.7-rc.1 的 peer，尽管它的 `lib/` 与安装包中的逐字节相同，加载器仍跳过该 bundle。打包现在先经检出目录的 tsdown 构建每个 `plugins/*` bundle 再复制，构建没有产出声明入口时以包名报错，并先清空再跳过本检出无法构建的包（`plugins/prism-meeting`，其源码不在本仓库）。插件页对由应用提供文件的插件给出真正可行的补救：更新应用后重启，而不是卸载重装。
 
 **Verification** — `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib seed_tests`（`CARGO_TARGET_DIR` 指向主检出的 target）→ 9 通过。`node --check apps/desktop/scripts/bundle-runtime.mjs` → 无问题。一个临时脚本调用导出的打包辅助函数：构建并复制 `prism-pocket`（32706 B）、`prism-local-models`（60033 B）、`prism-session-autoarchive`（7534 B）到 `apps/desktop/runtime/plugins/*/lib/index.js`；预先植入的 `runtime/plugins/prism-meeting` 被清掉并按包名跳过；构建不产出声明入口的样板以包名失败。`node node_modules/vitest/vitest.mjs run packages/client/ui-plugin-manager/tests` → 6 个文件、263 个测试。`pnpm run typecheck` → 5/5 门；`pnpm run build:check` → 2/2。`npx tsx scripts/run-oxlint.ts apps/desktop/scripts packages/client/ui-plugin-manager` → 0 错误。`verify-md-links` 通过，`verify-translation-pairing` 与 `verify-md-wrap` 对本改动涉及的文件无报告。其余为既有红灯、本改动未触碰：`verify-md-wrap`（`docs/compose/specs/appearance-themes.md`、`custom-theme-presets.md`）、`verify-translation-pairing`（`packages/client`、`ui-primitives`、`ui-theme`、`ui-settings-general` 的 README 记录）、`verify-repository-references`（既有 `.changelog` 片段与 `python/sdk/uv.lock`）、`verify-concrete-terms`（`plugins/prism-search/src/fusion.ts`）、`verify-package-readme-summaries`（`ui-chat`、`ui-conversation`、`sandbox-windows-acl`）、`verify-package-readme-model-experience`（`ui-sidebar-git`）、`scripts/doc-standard.spec.ts`（`packages/backup/prism-backup/README.zh.md`），以及全仓 `lint`（别处 383 条）。
 
@@ -25,9 +25,9 @@ commits: c21408d0fb..cf85f0a33b
 
 ## [S1] Problem
 
-应用升级之后，插件管理页把 `@prism-ai/prism-meeting` 标为「异常」；同时 `@prism/prism-pocket`、`@prism/prism-local-models`、`prism-session-autoarchive` 三个随包插件根本没有构建出的 `lib/`。
+应用升级之后，插件管理页把 `@prism/prism-meeting` 标为「异常」；同时 `@prism/prism-pocket`、`@prism/prism-local-models`、`prism-session-autoarchive` 三个随包插件根本没有构建出的 `lib/`。
 
-问题不在构建字节里。对已安装的 web profile 运行 `dsh --dump-config`，输出 `skipping profile bundle "@prism-ai/prism-meeting": Error: Plugin @prism-ai/prism-meeting@0.1.0 is incompatible with dsh 0.2.1-rc.4: requirements {"@deepseek-ai/dsh-llm":"0.1.7-rc.1","@deepseek-ai/dsh-speech-to-text":"0.1.7-rc.1","@deepseek-ai/dsh-storage-domain":"0.1.7-rc.1","@deepseek-ai/dsh-tools":"0.1.7-rc.1"}`；而 profile 里那份副本的 `lib/index.js` 与 `lib/client.js` 与安装包中的逐字节相同（SHA-256 相等）。兼容性读的是副本 `package.json` 的 peer 范围，那份清单仍写着 0.1.7-rc.1，加载器于是跳过该 bundle，`listBundles` 报出 `incompatible-version` —— 正是页面上渲染的那个标签。
+问题不在构建字节里。对已安装的 web profile 运行 `dsh --dump-config`，输出 `skipping profile bundle "@prism/prism-meeting": Error: Plugin @prism/prism-meeting@0.1.0 is incompatible with dsh 0.2.1-rc.4: requirements {"@deepseek-ai/dsh-llm":"0.1.7-rc.1","@deepseek-ai/dsh-speech-to-text":"0.1.7-rc.1","@deepseek-ai/dsh-storage-domain":"0.1.7-rc.1","@deepseek-ai/dsh-tools":"0.1.7-rc.1"}`；而 profile 里那份副本的 `lib/index.js` 与 `lib/client.js` 与安装包中的逐字节相同（SHA-256 相等）。兼容性读的是副本 `package.json` 的 peer 范围，那份清单仍写着 0.1.7-rc.1，加载器于是跳过该 bundle，`listBundles` 报出 `incompatible-version` —— 正是页面上渲染的那个标签。
 
 造成这一状态的有两个缺陷：
 

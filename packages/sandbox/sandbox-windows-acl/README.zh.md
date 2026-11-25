@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-在 Windows 上，本包将子进程的写入与删除限制在工作区和私有临时目录内：`workspace-write` 授予这两处，`read-only` 均不授予。挂载 `dsh-sandbox-local` 后，受限的 bash 与 PowerShell 命令即获得此行为；调用方也可以直接使用公开 `AclSandbox` API；任何 Win32 操作失败都会阻止不受限制的 spawn。每次授权同时写入能力 SID 允许 ACE、对父目录删除权限的环境性拒绝，以及被降级令牌必须匹配的 Low 完整性标签，因此一个授权根目录无法触及另一个。可写工作区内若包含 harness home，同一能力 SID 会在该目录上获得常驻 Deny ACE，Windows 会在继承的允许之前求值它。该保证仍为部分强制：硬链接是文件对象别名，而被其他 AppContainer 工具 ACL 过的文件不可读。
+在 Windows 上，本包将子进程的写入与删除限制在工作区和私有临时目录内：`workspace-write` 授予这两处，`read-only` 均不授予。挂载 `dsh-sandbox-local` 后，受限 shell 命令即获得此行为；也可直接使用公开 `AclSandbox` API——任何 Win32 操作失败都会阻止不受限制的 spawn。每次授权同时写入能力 SID 允许 ACE、父目录删除拒绝，以及 Low 完整性标签，因此一个授权根目录无法触及另一个；授权根目录内的 harness home 会获得常驻 Deny ACE。该保证仍为部分强制：硬链接是文件对象别名，而被其他 AppContainer 工具 ACL 过的文件不可读。
 
 ## 目录
 

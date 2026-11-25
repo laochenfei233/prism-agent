@@ -78,6 +78,8 @@ import { isSurfaceEligibleType } from '../../core/session/src/surface.ts'
 
 - 标准键，每个键在全仓只有一个含义，统计口径是 `packages/*/*/package.json` 与 `apps/*/package.json`：`.`（包主入口）、`./package.json`（工具链访问，不是语义导出）、`./src/*`（测试与工具的源码透传，文档状态仍待定）、`./client`（浏览器入口，与 `dsh.client` 声明配对）、`./types`（类型入口）、`./typert`（typert 类型运行时）、`./remote`（`@Remote` 调用面）、`./locale/*.json`（本地化资源）、`./cordis.patch.yml`（`dsh.bundle` 声明的 bundle 补丁层）。这里不列各键的包数，因为下一个包就会让它过期；下面的复算命令会打印当前数字。
 - 集合之外的键（`./brand` 5 个包、`./worker` 4 个、`./startup`、`./runner`、`./protocol` 各 2 个，另有大量一次性键）没有文档含义，属待核项，不是可照抄的先例。
+- `dsh-tools` 另行提供 `./pipeline`，用于复用调用阶段与批量调度。主入口与 pipeline bundle 共享运行时 chunk，以保持错误类的身份一致；工作区检查验证导出目标与发布文件。
+- `dsh-tool-executor-ptc` 提供 `./run-code`，用于共享程序工具工厂、显式指定运行时及调用上限，并传入私有可调用工具定义。工作区检查验证其导出目标与发布文件。
 - 判定条件：改动是否新增了标准集合以外的 export 键？
 - 例外：无默认例外；新增键须先改正家文档与检查，并取得对应领域专家确认。
 - 复算分布：
@@ -116,7 +118,7 @@ python3 -c "import json,glob,collections; c=collections.Counter(); [c.update(jso
 
 依赖声明与版本一致性由依赖扫描机械保证；本页既不复述 `devDependencies` 与 `peerDependencies` 的字段规则，也不另立包准入清单。扫描失败时，在本地复现并修正它指名的清单，因为规则的正家是扫描与其策略文件。为了让改动落地而修改扫描或放宽策略不属于常规改动，须经对应领域专家确认。
 
-- 入口：[verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts)，以 `pnpm run verify-package-dependencies` 运行，被 `scripts/run-gates.ts` 作为 `package-dependencies` 门禁调用，`.github/workflows/release.yml` 也直接运行它。
+- 入口：[verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts)，以 `pnpm run verify-package-dependencies` 运行，被 `scripts/run-gates.ts` 作为 `package-dependencies` 门禁调用。
 - 策略正家：[package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) 导出 `PACKAGE_DEPENDENCY_POLICY`；声明面、版本形态与豁免都在该文件定义，包级背景见 [packages/README.zh.md](../../packages/README.zh.md)。
 - 边界：本页不列包清单、字段规则或阈值，只指向正家文件。
 - 查接线：`grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`。
@@ -150,7 +152,7 @@ Restating a required-devDependency package list or the field rules on this page 
 内部依赖写法按包族决定：`@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 用 `workspace:*`，其余内部包用 `workspace:~`，`workspace:^` 已退出。同一个依赖名在所有 workspace 内写法一致，不一致是扫描硬失败，不是评审可以放行的警告。写法统一才能保持一条解析路径，避免同一个依赖出现重复实例以及随之而来的解析差异。
 
 - 判定在 [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts) 的 `workspaceRange()`：`@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 包族取 `workspace:*`，其余内部包取 `workspace:~`；扫描遍历受管清单，比对同一依赖名的每一处声明。
-- 边界：同命名空间但不是 workspace 成员的包按普通第三方版本范围声明，不受包族规则约束——`@deepseek-ai/libreoffice-kit` 在 `apps/desktop-host/package.json`（dependencies）、`packages/bundle/web-app/package.json`（devDependencies）、`packages/document/office-to-pdf/package.json`（dependencies）、`packages/skill/skill-office/package.json`（dependencies）中声明为 `^0.1.5`。
+- 边界：同命名空间但不是 workspace 成员的包按普通第三方版本范围声明，不受包族规则约束——`@deepseek-ai/libreoffice-kit` 在 `packages/bundle/web-app/package.json`（devDependencies）和 `packages/document/office-kit/package.json`（dependencies）中声明为 `0.2.3`。
 - 分布不在此复述；下面的复算命令会打印 `workspace:*`、`workspace:~`、`workspace:^` 的当前数量，以及族规则之外的精确版本声明。
 - 例外：门禁机械判定；确需例外意味着修改扫描与策略文件，并须经对应领域专家确认、在改动上说明理由。
 - 复算：
@@ -166,7 +168,7 @@ python3 -c "import json,glob,collections; c=collections.Counter(); [c.update([r]
   "dependencies": {
     "@deepseek-ai/dsh-base": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/libreoffice-kit": "^0.1.5"
+    "@deepseek-ai/libreoffice-kit": "0.2.3"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-typert-registry": "workspace:*"

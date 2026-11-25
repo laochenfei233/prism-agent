@@ -35,6 +35,15 @@
  *   material is refused, because the content would land in the session log.
  * - **Command guard** — a shell call whose text matches a guarded pattern goes
  *   to approval, so a force-push or a recursive delete is priced before it runs.
+ * - **Usage reminder** — a session whose cumulative token usage first crosses a
+ *   configured threshold is reminded at its turn boundary to prefer concise
+ *   outputs; it refuses nothing.
+ * - **Wait-time reminder** — a tool call whose actual elapsed wait crosses a
+ *   configured threshold carries a reminder on its result to background or
+ *   split the work; it refuses nothing.
+ * - **Unknown tool names** — a call to a name no visible tool registers comes
+ *   back with the nearest registered names instead of a bare `unknown tool`
+ *   the model can only retry blindly.
  *
  * `/guardrails` reports which of these a running deployment has armed, the mode
  * it decides in, and what an `observe` run has seen: under `observe` every rail
@@ -51,15 +60,16 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ContextFormed } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ContextFormed, GenerateOptions, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { PlanModeController } from '@deepseek-ai/dsh-plan-mode'
 import type { SkillRegistry } from '@deepseek-ai/dsh-skill'
-import type { PostToolDecision, PreToolDecision } from '@deepseek-ai/dsh-tools'
+import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionFailure, ToolExecutionResult, ToolFailure } from '@deepseek-ai/dsh-tools'
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/types'
 import { configVersion, resolveConfig } from './config.ts'
 import { createLedger } from './decision.ts'
 import { PONYTAIL_MARKER } from './marker.ts'
+import { suggestToolNames, toolNameHint } from './tool-hints.ts'
 import type { Config, Mode, ResolvedConfig, ResolvedWriteTool } from './config.ts'
 import type { Decision, DecisionLedger, DecisionOutcome } from './decision.ts'
 
@@ -101,6 +111,9 @@ const MAX_REPORTED_DECISIONS = 10
 
 /** How much of one decision's subject the status report shows. */
 const MAX_REPORTED_SUBJECT = 60
+
+/** How much of one failure's text the judge's prompt carries per entry. */
+const STUCK_FAILURE_TEXT_MAX = 160
 
 /** One agent's consecutive-repeat chain: the last tracked call's identity and its run length. */
 interface RepeatChain {
@@ -156,6 +169,10 @@ export function apply(ctx: Context, config: Config = {}): void {
   installUnfinishedTodoGate(ctx, resolved, ledger)
   installSensitiveReadDenial(ctx, resolved, ledger)
   installCommandGuard(ctx, resolved, ledger)
+  installStuckNudge(ctx, resolved, ledger)
+  installUsageReminder(ctx, resolved, ledger)
+  installWaitTimeReminder(ctx, resolved, ledger)
+  installToolNameSuggestions(ctx, resolved)
   installStatusCommand(ctx, resolved, ledger, version)
 }
 
@@ -622,6 +639,247 @@ function unfinishedTodos(agent: Agent): readonly TodoItem[] {
   return []
 }
 
+/** One failed call in a stuck chain: the tool and what it said went wrong. */
+interface StuckFailure {
+  readonly tool: string
+  readonly message: string
+}
+
+/** One agent's stuck chain and its per-turn quota spend. */
+interface StuckRecord {
+  readonly failures: StuckFailure[]
+  nudged: number
+}
+
+/** The judge's verdict on one failure chain. */
+interface StuckVerdict {
+  readonly spinning: boolean
+  readonly confidence: number
+}
+
+/**
+ * The bound judge's outcome: a verdict, or why there is none. The caller logs
+ * the reason, so an operator can tell a missing route from an unusable reply.
+ */
+type StuckJudgement = StuckVerdict | 'no-route' | 'unusable'
+
+/** The bound judge, or `undefined` while no llm service is mounted. */
+type StuckJudge = (agent: Agent, failures: readonly StuckFailure[], signal: AbortSignal) => Promise<StuckJudgement>
+
+/**
+ * Nudge an agent that keeps repeating the same failing call.
+ *
+ * The failure chain is per turn — the loop opening a turn the record has not
+ * seen resets it, whatever enqueued the turn — and any successful call clears
+ * it, so the judge only ever sees a run of consecutive failures inside one
+ * turn. When the
+ * run reaches the threshold, one one-shot model call decides whether the run
+ * really is a loop, and only a confident yes sends a reminder. The reminder
+ * rides the accepted result's additional contexts: the call itself is never
+ * refused, this rail has no deny to make, and the text says plainly that
+ * stopping is the person's call.
+ *
+ * The judge is an external dependency. No llm service, no routed model, an
+ * unusable reply, or a failed call all mean this window sends nothing, and
+ * only a log line records why; the chain keeps accumulating, and the next
+ * qualifying window tries the judge again.
+ */
+function installStuckNudge(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const threshold = resolved.stuckNudgeAfterFailures
+  const quota = resolved.stuckNudgePerTurn
+  if (threshold === undefined || quota === undefined) return
+  const records = new WeakMap<Agent, StuckRecord>()
+  let judge: StuckJudge | undefined
+
+  ctx.inject(['llm'], childCtx => {
+    const llm = childCtx.llm
+    judge = (agent, failures, signal) => judgeStuck(llm, agent, failures, resolved.stuckNudgeMaxTokens, signal)
+    childCtx.effect(() => () => {
+      judge = undefined
+    }, 'prism-guardrails.stuckJudgeRelease')
+  })
+
+  const turnSeen = new WeakMap<Agent, number>()
+
+  ctx.on('agent/pre-step', ({ agent, turn }, next): Promise<PreStepDecision> => {
+    // The loop opens every turn, whatever enqueued it — a claimed user message
+    // or a scheduled follow-up — so the run and its quota reset per turn rather
+    // than per message source.
+    if (turnSeen.get(agent) !== turn) {
+      turnSeen.set(agent, turn)
+      records.delete(agent)
+    }
+    return next()
+  })
+
+  ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
+    const decided = await next()
+    const agent = exec.agent
+    if (agent === undefined) return decided
+    // Child calls of a composite tool run the same pipeline with the same
+    // agent, and this rail counts them like any other call — the same blind
+    // spot the repeat rail has: one child failure each, one child success
+    // clearing the run, while the model only sees the parent's outcome.
+    const record = records.get(agent) ?? { failures: [], nudged: 0 }
+    records.set(agent, record)
+    if (result.isError) {
+      record.failures.push({ tool: exec.name, message: failureText(result) })
+    } else {
+      record.failures.length = 0
+    }
+    if (record.failures.length < threshold || record.nudged >= quota) return decided
+    const bound = judge
+    if (bound === undefined) {
+      ctx.logger.warn('prism-guardrails: stuck chain reached the threshold but no llm service is mounted; no nudge sent')
+      return decided
+    }
+    const judgement = await bound(agent, record.failures, exec.signal).catch((error: unknown) => {
+      ctx.logger.warn('prism-guardrails: the stuck judge call failed; no nudge sent')
+      ctx.logger.warn(error)
+      return undefined
+    })
+    if (judgement === 'no-route') {
+      ctx.logger.warn('prism-guardrails: the stuck judge has no routed model to call; no nudge sent')
+      return decided
+    }
+    if (judgement === 'unusable') {
+      ctx.logger.warn('prism-guardrails: the stuck judge reply was not a readable verdict; no nudge sent')
+      return decided
+    }
+    const verdict = judgement
+    if (verdict === undefined || !verdict.spinning || verdict.confidence < resolved.stuckNudgeConfidence) {
+      return decided
+    }
+    if (decided.kind !== 'accept') return decided
+    record.nudged += 1
+    note(ledger, agent, 'stuck nudge', `${exec.name} failed ${String(record.failures.length)} time(s)`, 'steer')
+    return {
+      ...decided,
+      additionalContexts: [
+        createUserMessage({
+          content: [{
+            type: 'text',
+            text: `You have now seen ${String(record.failures.length)} consecutive failures of \`${exec.name}\` with the same `
+              + 'outcome. Retrying the same call is unlikely to change it. Read the error and change the approach: '
+              + 'try a different method, fix the underlying cause first, or ask the person. If you are genuinely '
+              + 'stuck, say so plainly and stop — the person can interrupt at any time.',
+          }],
+          source: { kind: 'prism-guardrails', form: 'instructions' },
+        }),
+      ],
+    }
+  })
+}
+
+/** The error text one failed call contributes to the chain, bounded for the judge's prompt. */
+function failureText(result: ToolExecutionFailure): string {
+  const raw = result.error.message
+  const collapsed = raw.replace(/\s+/g, ' ').trim()
+  return collapsed.length <= STUCK_FAILURE_TEXT_MAX ? collapsed : `${collapsed.slice(0, STUCK_FAILURE_TEXT_MAX - 1)}…`
+}
+
+/**
+ * The identity-free instruction for every judge call.
+ */
+const STUCK_JUDGE_SYSTEM = [
+  'You decide whether an agent is stuck in a loop.',
+  'The input is a run of consecutive tool failures inside one turn, oldest first.',
+  'Answer with JSON only: {"spinning": <true|false>, "confidence": <0..1>}.',
+  '"spinning" is true only when the same failure keeps repeating and retrying alone will not fix it.',
+  'An empty answer or prose means no verdict.',
+].join(' ')
+
+/**
+ * The provider route one agent's calls take, or `undefined` when none is recorded.
+ * @param agent - the agent whose route is read.
+ * @returns the route, or `undefined`.
+ */
+function routeOf(agent: Agent): { readonly provider: string, readonly model: string } | undefined {
+  const routed = agent.session.requestHeader()?.config
+  if (routed?.provider !== undefined && routed.provider !== ''
+    && routed.model !== undefined && routed.model !== '') {
+    return { provider: routed.provider, model: routed.model }
+  }
+  if (agent.options.provider !== undefined && agent.options.provider !== ''
+    && agent.options.model !== undefined && agent.options.model !== '') {
+    return { provider: agent.options.provider, model: agent.options.model }
+  }
+  return undefined
+}
+
+/**
+ * Ask one model whether a run of consecutive failures is a loop.
+ *
+ * The request is a one-shot call whose content is the chain summary, routed
+ * through the agent's own provider route and bound to the failing call's
+ * cancellation signal; the caller owns its inputs until the stream settles.
+ * @param llm - the llm runtime to dispatch through.
+ * @param agent - the agent whose routed model judges the chain.
+ * @param failures - the consecutive failures, oldest first.
+ * @param maxTokens - the token cap the deployment allows one judge call.
+ * @param signal - the failing call's cancellation signal, honored by the judge.
+ * @returns the verdict, or why there is none.
+ */
+async function judgeStuck(
+  llm: LlmRuntime,
+  agent: Agent,
+  failures: readonly StuckFailure[],
+  maxTokens: number,
+  signal: AbortSignal,
+): Promise<StuckJudgement> {
+  const route = routeOf(agent)
+  if (route === undefined) return 'no-route'
+  const summary = failures
+    .map((failure, index) => `${index + 1}. [${failure.tool}] ${failure.message}`)
+    .join('\n')
+  const assembler = new BlockAssembler()
+  const options: GenerateOptions = {
+    provider: route.provider,
+    model: route.model,
+    system: STUCK_JUDGE_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [{ type: 'text', text: `Consecutive tool failures:\n${summary}\n\nIs the agent spinning? Answer as the JSON object.` }],
+    }],
+    maxTokens,
+    signal,
+  }
+  for await (const chunk of llm.stream(options)) assembler.push(chunk)
+  const finish = assembler.finish
+  if (finish.kind !== 'stop' && finish.kind !== 'tool-calls') return 'unusable'
+  return parseStuckVerdict(assembler.blocks()
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('')) ?? 'unusable'
+}
+
+/**
+ * Read one judge reply into a verdict.
+ *
+ * The first balanced brace region is the answer; anything the model wrapped
+ * around it is ignored, and an unreadable region is no verdict.
+ * @param raw - the judge's full text output.
+ * @returns the verdict, or `undefined`.
+ */
+function parseStuckVerdict(raw: string): StuckVerdict | undefined {
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start < 0 || end <= start) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1))
+  } catch {
+    return undefined
+  }
+  if (typeof parsed !== 'object' || parsed === null) return undefined
+  const record = parsed as Record<string, unknown>
+  if (typeof record.spinning !== 'boolean') return undefined
+  if (!Number.isFinite(record.confidence) || (record.confidence as number) < 0 || (record.confidence as number) > 1) {
+    return undefined
+  }
+  return { spinning: record.spinning, confidence: record.confidence as number }
+}
+
 /**
  * Track each agent's current turn, the files it wrote, and whether it verified.
  *
@@ -876,6 +1134,204 @@ function installCommandGuard(ctx: Context, resolved: ResolvedConfig, ledger: Dec
   })
 }
 
+/** One session's cumulative token usage and the thresholds already reminded. */
+interface UsageRecord {
+  total: number
+  readonly reminded: Set<number>
+}
+
+/**
+ * Remind a session whose cumulative token usage first crosses a threshold.
+ *
+ * The total accumulates in memory from the `usage` each committed
+ * `assistant/message` reports — `totalTokens` when the adapter gave one, the
+ * input and output sum otherwise — keyed by session, and is dropped when the
+ * agent is disposed. It is a reminder's figure, not billing: it does not fold
+ * retries the way the durable `tokenUsage` projection does, and a plugin
+ * restart resets it.
+ *
+ * The stop boundary has no veto, so the reminder steers at
+ * `agent/turn-stopping`, the verification gate's mechanism: the loop observes
+ * the pending input and runs another step. Each threshold reminds at most once
+ * per session, and a boundary that crosses several thresholds sends one
+ * reminder for the highest and marks the lower ones reminded — a session at
+ * 250k needs no 100k nudge behind it.
+ */
+function installUsageReminder(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const thresholds = resolved.usageReminderThresholds
+  if (thresholds === undefined) return
+  const records = new Map<string, UsageRecord>()
+
+  ctx.on('session/event', (session, event) => {
+    if (event.type !== 'assistant/message') return
+    const usage = event.data.usage
+    if (usage === undefined) return
+    const record = records.get(session.id) ?? { total: 0, reminded: new Set<number>() }
+    records.set(session.id, record)
+    record.total += usage.totalTokens ?? usage.inputTokens + usage.outputTokens
+  })
+
+  ctx.on('agent/turn-stopping', ({ agent }) => {
+    const record = records.get(agent.session.id)
+    if (record === undefined) return
+    const crossed = thresholds.filter(threshold => threshold <= record.total && !record.reminded.has(threshold))
+    if (crossed.length === 0) return
+    for (const threshold of crossed) record.reminded.add(threshold)
+    const reached = Math.max(...crossed)
+    note(ledger, agent, 'usage reminder', `~${formatTokens(reached)} tokens`, 'steer')
+    agent.steer(createUserMessage({
+      content: [{
+        type: 'text',
+        text: `Session token usage has reached ~${formatTokens(reached)} tokens. Continue with the task, but `
+          + 'prefer concise outputs and avoid re-reading large files unnecessarily.',
+      }],
+      source: { kind: 'prism-guardrails', form: 'instructions' },
+    }))
+  })
+
+  ctx.on('agent/disposed', ({ agent }) => {
+    records.delete(agent.session.id)
+  })
+}
+
+/**
+ * Remind a model when a tool call's actual wait time exceeds a threshold.
+ *
+ * The hook wraps `tools/execute` to measure the real elapsed time of each call.
+ * When the elapsed time reaches `waitReminderAfterMs`, the tool result receives
+ * an `additionalContexts` entry reminding the model of the wait cost and suggesting
+ * background execution or task splitting. This is a soft nudge — it never refuses
+ * the call, and the original result content is unchanged.
+ *
+ * Per-turn quota (`waitReminderPerTurn`, default 2) prevents reminder spam.
+ * The quota resets at each `agent/pre-step` turn boundary.
+ *
+ * In `observe` mode the rail records the decision and delegates; the reminder is
+ * still injected (a steer is not a refusal).
+ */
+function installWaitTimeReminder(ctx: Context, resolved: ResolvedConfig, ledger: DecisionLedger): void {
+  const threshold = resolved.waitReminderAfterMs
+  const quota = resolved.waitReminderPerTurn
+  if (threshold === undefined || quota === undefined) return
+
+  // `agent/pre-step` fires per step, not per turn, so the quota resets only
+  // when the loop opens a turn the record has not seen — the stuck nudge's
+  // turnSeen pattern.
+  const turnSeen = new WeakMap<Agent, number>()
+  const usedThisTurn = new WeakMap<Agent, number>()
+
+  ctx.on('agent/pre-step', ({ agent, turn }, next): Promise<PreStepDecision> => {
+    if (turnSeen.get(agent) !== turn) {
+      turnSeen.set(agent, turn)
+      usedThisTurn.set(agent, 0)
+    }
+    return next()
+  })
+
+  ctx.on('tools/execute', async (exec, next): Promise<ToolExecutionResult> => {
+    const agent = exec.agent
+    if (agent === undefined) return next()
+
+    const used = usedThisTurn.get(agent) ?? 0
+    if (used >= quota) return next()
+
+    const t0 = Date.now()
+    const result = await next()
+    const elapsed = Date.now() - t0
+
+    if (elapsed < threshold) return result
+
+    usedThisTurn.set(agent, used + 1)
+    note(ledger, agent, 'wait reminder', `~${formatMs(elapsed)}`, 'steer')
+
+    const reminder = createUserMessage({
+      content: [{
+        type: 'text',
+        text: `The call to \`${exec.name}\` waited ${formatMs(elapsed)}. For long waits, prefer background execution `
+          + '(`run_in_background: true`), split the task, or check whether you are waiting for input that will not arrive. '
+          + 'This is a reminder only — the result is unchanged.',
+      }],
+      source: { kind: 'prism-guardrails', form: 'instructions' },
+    })
+
+    return {
+      ...result,
+      additionalContexts: [...(result.additionalContexts ?? []), reminder],
+    }
+  })
+}
+
+/** One millisecond count as the reminder states it: 65000 reads "65s", 60000 reads "60s", an hour reads "60m". */
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${String(ms)}ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 3600) return `${String(seconds)}s`
+  return `${String(Math.round(seconds / 60))}m`
+}
+
+/** One token count as the reminder states it: 120000 reads "120k", 900 reads "900". */
+function formatTokens(tokens: number): string {
+  return tokens >= 1000 ? `${String(Math.round(tokens / 1000))}k` : String(tokens)
+}
+
+/**
+ * Answer an unknown-tool failure with the visible names it probably meant.
+ *
+ * The pipeline resolves the miss inside the `tools/execute` waterfall, so the
+ * wrapper rewrites only the failure's text: the refusal outcome, the error
+ * envelope, and the structured identity (`UNKNOWN_TOOL`, plus any routing
+ * detail) stay the pipeline's own. A name with no near match keeps the
+ * original message verbatim, and every other failure is returned unchanged.
+ */
+function installToolNameSuggestions(ctx: Context, resolved: ResolvedConfig): void {
+  if (!resolved.toolNameSuggestions) return
+  ctx.on('tools/execute', async (exec, next): Promise<ToolExecutionResult> => {
+    try {
+      const result = await next()
+      if (!result.isError || !isUnknownToolFailure(result.error)) return result
+      return toolFailureWithSuggestions(ctx, exec, result.error)
+    } catch (error) {
+      // A downstream `tools/execute` listener may surface the same miss as a
+      // thrown error; the shipped pipeline resolves it as a failure result.
+      if (!isUnknownToolError(error)) throw error
+      return toolFailureWithSuggestions(ctx, exec, {
+        message: error.message,
+        info: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' },
+      })
+    }
+  })
+}
+
+/** Whether a failure carries the pipeline's unknown-tool identity. */
+function isUnknownToolFailure(failure: ToolFailure): boolean {
+  return failure.info?.name === 'ToolNotFoundError' || failure.info?.code === 'UNKNOWN_TOOL'
+}
+
+/** Whether a thrown value is the pipeline's unknown-tool miss. */
+function isUnknownToolError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'ToolNotFoundError'
+}
+
+/**
+ * Rebuild one unknown-tool failure with its nearest-name hint appended.
+ *
+ * @param ctx - plugin context, read for the calling agent's visible tools.
+ * @param exec - the failed call, whose name is the miss.
+ * @param failure - the pipeline's own failure detail.
+ * @returns the failure result with the hint in its text and the original
+ *   structured `info` preserved.
+ */
+function toolFailureWithSuggestions(ctx: Context, exec: ToolExecution, failure: ToolFailure): ToolExecutionResult {
+  const candidates = ctx.tools.schemas(exec.agent ?? undefined).map(schema => schema.name)
+  const hint = toolNameHint(suggestToolNames(exec.name, candidates))
+  const message = hint === '' ? failure.message : `${failure.message} — ${hint}`
+  return {
+    content: [{ type: 'text', text: `Error: ${message}` }],
+    isError: true,
+    error: { message, ...failure.info !== undefined ? { info: failure.info } : {} },
+  }
+}
+
 /**
  * Register `/guardrails`, which reports which rails the deployment has armed.
  *
@@ -939,6 +1395,15 @@ function describeRails(resolved: ResolvedConfig, decisions: readonly Decision[],
     ['command guard', resolved.commandGuard === undefined
       ? undefined
       : `${String(resolved.commandGuard.tools.size)} tool(s), ${String(resolved.commandGuard.rules.length)} pattern(s)`],
+    ['stuck nudge', resolved.stuckNudgeAfterFailures === undefined || resolved.stuckNudgePerTurn === undefined
+      ? undefined
+      : `after ${String(resolved.stuckNudgeAfterFailures)} consecutive failures`],
+    ['usage reminder', resolved.usageReminderThresholds === undefined
+      ? undefined
+      : resolved.usageReminderThresholds.map(threshold => `~${formatTokens(threshold)}`).join(', ')],
+    ['wait reminder', resolved.waitReminderAfterMs === undefined || resolved.waitReminderPerTurn === undefined
+      ? undefined
+      : `after ${formatMs(resolved.waitReminderAfterMs)}, max ${String(resolved.waitReminderPerTurn)}/turn`],
   ]
   const armed = rails.filter(([, detail]) => detail !== undefined).length
   // An observing deployment is not protected, so its first line says so before

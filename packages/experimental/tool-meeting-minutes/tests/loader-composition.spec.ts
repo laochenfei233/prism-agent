@@ -10,8 +10,11 @@ import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { unsupportedInbox, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as SpeechToTextDefinition from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { SpeechProviderId } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import * as FileSystemLocal from '@deepseek-ai/dsh-fs-local'
@@ -78,7 +81,7 @@ async function agent(ctx: Context): Promise<Agent> {
   const id = SessionId('meeting-minutes-agent')
   const session = Session.create(id)
   const value: Agent = {
-    id, options: {}, session, inbox: unsupportedInbox(),
+    id, options: {}, session, model: unsupportedModel(), inbox: unsupportedInbox(),
     status: 'idle', ctx: scope.ctx,
     followup: () => {}, steer: () => {}, inject: () => {}, send: () => {}, cancel() {},
     runMaintenance: task => task(new AbortController().signal),
@@ -114,9 +117,11 @@ async function boot(configLines: readonly string[] = []): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-meeting-minutes-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
+    "- name: '@deepseek-ai/dsh-session-projection'",
     "- name: '@deepseek-ai/dsh-agent'",
     "- name: '@deepseek-ai/dsh-system-prompt'",
     "- name: '@deepseek-ai/dsh-tools'",
+    "- name: '@deepseek-ai/dsh-tool-executor-native'",
     "- name: '@deepseek-ai/dsh-fs-local'",
     "- name: '@deepseek-ai/dsh-experimental-speech-to-text'",
     '  config:',
@@ -134,9 +139,11 @@ async function boot(configLines: readonly string[] = []): Promise<Context> {
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-fs-local', FileSystemLocal],
     ['@deepseek-ai/dsh-experimental-speech-to-text', SpeechToTextDefinition],
     ['stub-speech-provider', StubSpeechProvider],
@@ -157,7 +164,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot()
     const audioPath = await recording('weekly.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('minutes'),
       name: 'meeting_minutes',
@@ -184,7 +191,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot()
     const audioPath = await recording('standup.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('default-template'),
       name: 'meeting_minutes',
@@ -199,7 +206,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
     const ctx = await boot(['    maxPreviewCharacters: 12'])
     const audioPath = await recording('long.wav')
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('bounded'),
       name: 'meeting_minutes',
@@ -215,7 +222,7 @@ describe('meeting_minutes real Loader composition through cordis.yml', () => {
   it('rejects a recording that does not exist', async () => {
     const ctx = await boot()
     const owner = await agent(ctx)
-    const result = await ctx.tools.execute({
+    const result = await executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('missing'),
       name: 'meeting_minutes',

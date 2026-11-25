@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
@@ -7,9 +7,10 @@ import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
-import { RetryId } from '@deepseek-ai/dsh-llm-retry'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { RetryId } from '@deepseek-ai/dsh-llm-retry/types'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import { CompactionId } from '@deepseek-ai/dsh-compaction'
+import type { CompactionId } from '@deepseek-ai/dsh-compaction/types'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -23,6 +24,9 @@ const ZERO: TokenUsageProjection = {
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
 }
+
+/** Pinned wall clock the fake-timer block appends settlement events at. */
+const SETTLED_AT = Date.parse('2026-11-02T05:00:00Z')
 
 async function harness(): Promise<{
   ctx: Context
@@ -90,7 +94,7 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeq, e
   const endIdx = nodes.findIndex(node => node.seq === end)
   const shadowed = nodes.slice(startIdx, endIdx + 1)
   session.append('compaction/summary', {
-    compactionId: CompactionId('token-usage-summary'),
+    compactionId: brandString<CompactionId>('token-usage-summary'),
     summary: [{ type: 'text', text: 'summary' }],
     shadowedRange: { start, end },
     shadowedSeqs: shadowed.map(node => node.seq),
@@ -101,11 +105,19 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeq, e
 }
 
 describe('tokenUsage session projection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(SETTLED_AT)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('serves zero buckets without usage samples', async () => {
     const { ctx, session } = await harness()
     expect(projected(ctx, session)).toEqual(ZERO)
     session.append('llm/retry-started', {
-      retryId: RetryId('token-meter-no-usage-retry'),
+      retryId: brandString<RetryId>('token-meter-no-usage-retry'),
       turn: 1,
       step: 1,
       retry: 1,
@@ -135,6 +147,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 4,
       cacheReadTokens: 7,
       cacheWriteTokens: 2,
+      lastSettledAt: SETTLED_AT,
     })
     expect(changes).toHaveLength(1)
   })
@@ -159,12 +172,13 @@ describe('tokenUsage session projection', () => {
       outputTokens: 5,
       cacheReadTokens: 8,
       cacheWriteTokens: 1,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
   it('accumulates retried attempts while replacing samples within each attempt', async () => {
     const { ctx, session } = await harness()
-    const retryId = RetryId('token-meter-retry')
+    const retryId = brandString<RetryId>('token-meter-retry')
     session.append('turn/start', { turn: 1 })
     startStep(session, 1, 1)
     usageChunk(session, {
@@ -215,6 +229,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 7,
       cacheReadTokens: 11,
       cacheWriteTokens: 1,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -252,6 +267,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 15,
       cacheReadTokens: 2,
       cacheWriteTokens: 4,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -265,6 +281,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 1,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -291,6 +308,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 3,
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 
@@ -311,6 +329,7 @@ describe('tokenUsage session projection', () => {
       outputTokens: 2,
       cacheReadTokens: 5,
       cacheWriteTokens: 0,
+      lastSettledAt: SETTLED_AT,
     })
   })
 })
@@ -361,14 +380,14 @@ function appendAssistant(
 describe('contextPressure session projection', () => {
   it('serves no pressure or capacity for an empty log', async () => {
     const { ctx, session } = await harness()
-    expect(pressure(ctx, session)).toEqual({})
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({})
   })
 
   it('does not synthesize zero pressure before a provider usage sample', async () => {
     const { ctx, session } = await harness()
     startStep(session, 1, 1)
     recordContext(session, 'small', 64_000)
-    expect(pressure(ctx, session)).toEqual({ contextWindow: 64_000 })
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({ contextWindow: 64_000 })
   })
 
   it('sums prompt-side buckets and excludes response output', async () => {
@@ -382,7 +401,8 @@ describe('contextPressure session projection', () => {
     }, 1, 1)
     // Output is deliberately absent: occupancy describes the prompt that was
     // sent, so it holds still while the response streams.
-    expect(pressure(ctx, session).pressureTokens).toBe(125)
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({ pressureTokens: 125 })
+    expect(pressure(ctx, session)).toEqual({ pressureTokens: 125, projectedTokens: 125 })
   })
 
   it('replaces pressure with the newest request rather than accumulating', async () => {
@@ -446,7 +466,7 @@ describe('contextPressure session projection', () => {
     const checkpoint = JSON.parse(JSON.stringify(
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
-    expect(checkpoint.contextPressure?.ver).toBe(5)
+    expect(checkpoint.contextPressure?.ver).toBe(6)
 
     await meterFiber.dispose()
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('contextPressure')

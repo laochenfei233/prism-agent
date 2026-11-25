@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   applicationServerKeyBytes,
-  edgeSwipeAction,
   shouldActivate,
 } from '../../src/client/pure.ts'
 
@@ -26,23 +25,6 @@ describe('shouldActivate', () => {
   it('lets the explicit override win in both directions', () => {
     expect(shouldActivate(1920, false, 'on')).toBe(true)
     expect(shouldActivate(390, true, 'off')).toBe(false)
-  })
-})
-
-describe('edgeSwipeAction', () => {
-  it('recognizes a fast inward flick from the left edge', () => {
-    expect(edgeSwipeAction(4, 400, 90, 410, 220)).toBe('open')
-    expect(edgeSwipeAction(28, 400, 90, 400, 220)).toBe('open')
-  })
-
-  it('rejects touches that start away from the edge', () => {
-    expect(edgeSwipeAction(29, 400, 90, 400, 220)).toBeNull()
-  })
-
-  it('rejects short, diagonal, and slow drags', () => {
-    expect(edgeSwipeAction(4, 400, 50, 400, 220)).toBeNull()
-    expect(edgeSwipeAction(4, 400, 90, 500, 220)).toBeNull()
-    expect(edgeSwipeAction(4, 400, 90, 400, 900)).toBeNull()
   })
 })
 

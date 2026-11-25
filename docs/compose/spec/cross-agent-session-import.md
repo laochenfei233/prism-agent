@@ -1,18 +1,29 @@
 ---
 feature: cross-agent-session-import
-status: in-progress
-updated: 2026-10-29
+status: delivered
+updated: 2026-11-24
 branch: feat/session-import
-commits: c64d35c4..HEAD
+commits: c64d35c4..aefa21596b
 ---
 
 # Cross-Agent Session Import
 
 English | [中文](cross-agent-session-import.zh.md)
 
+## Report
+
+**What was built** — The Settings import page reads conversation history from eleven foreign coding-agent stores and writes each conversation as a durable session in this harness, grouped into projects by working folder with explicit merge confirmation for existing projects. DeepSeek Harness homes copy natively (original session id, full event log, copied attachments); the other ten stores normalize to user/assistant text. The latest increment adds ZCode (`~/.zcode/cli/db/db.sqlite`, the shared `session`/`message`/`part` schema) with subagent and synthetic-text filtering, verified against a live store.
+
+**Verification** — `sources.spec.ts` 11/11 including the ZCode fixture; full package suite 32 pass / 2 fail, both failures confirmed pre-existing on master; `tsc` host and client faces clean; a real-store probe confirmed roles, synthetic flags, part-type drops, timestamps, and the `parent_id`/`time_archived` filters; `test:docs` 14 passed / 7 failed with the identical failure set on clean master; `verify-plugin-packages`, `verify-config-catalog`, `verify-translation-pairing` (re-recorded edited pairs), oxlint, whitespace, and the vendor manifest guard all pass.
+
+**Journey log** —
+- ZCode's store turned out to use the same `session`/`message`/`part` SQLite schema as MiMo Code and OpenCode, so the reader reuses `scanChatDatabase` instead of adding a parser.
+- The synthetic-text filter needs JSON booleans: SQLite's `json_extract` renders `true` as `1`, which briefly misled the fixture into writing `synthetic: 1`; the reader path parses JSON in JavaScript and requires `synthetic: true`.
+- Devin and Antigravity were scoped out by user decision pending verifiable sample data; community documentation points at Devin `~/.local/share/devin/cli/sessions.db` (`sessions` + `message_nodes`) and Antigravity `~/.gemini/antigravity*/brain/<id>/.system_generated/logs/transcript_full.jsonl` joined with `conversation_summaries.db`, but no reachable machine had either store to verify a reader against.
+
 ## [S1] Problem
 
-Users arrive with conversation history in other CLI agents: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, and Gemini CLI. Prism Agent shows an empty sidebar for that history, and the only import work in this repository targets another DSH home ([SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), not foreign formats.
+Users arrive with conversation history in other CLI agents: Claude Code, Codex, Grok, DeepSeek Harness, MiMo Code, OpenCode, OpenClaw, Hermes, Pi, Gemini CLI, and ZCode. Prism Agent shows an empty sidebar for that history, and the only import work in this repository targets another DSH home ([SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), not foreign formats.
 
 Reading the history is not enough: the user must be able to open an imported conversation and continue it, with the prior text in the model request. The imported conversations must also land in projects: one project per working folder, and when that folder is already a project here, merging the imported sessions into it is a decision the user confirms, never a silent side effect.
 
@@ -40,12 +51,13 @@ Each source has one reader that turns its native store into the normalized trans
 | Hermes | `~/.hermes` | `state.db` (`sessions`, `messages`) or exported `session_*.json` |
 | Pi | `~/.pi/agent/sessions` | `--<cwd>--/<timestamp>_<uuid>.jsonl` |
 | Gemini CLI | `~/.gemini/tmp` | `<project>/chats/session-*.jsonl` or legacy `.json` |
+| ZCode | `~/.zcode` | `cli/db/db.sqlite` (`session`, `message`, `part`) |
 
 The current home (`ctx.dshHomePath()`) is excluded from the DeepSeek Harness source and reported as unavailable instead of listed twice.
 
 ### [S2.3] Normalized transcript
 
-For the nine converted sources, one reader returns:
+For the ten converted sources, one reader returns:
 
 ```ts
 interface ImportedSession {
@@ -117,25 +129,25 @@ Readers open files with read access and SQLite databases with `readOnly: true`. 
 
 ## [S3] Scope
 
-- In scope: the ten readers, the normalized transcript, plan/apply, the route, the settings section, project grouping with merge confirmation, unit tests, one real-composition test, README and package registration.
+- In scope: the eleven readers, the normalized transcript, plan/apply, the route, the settings section, project grouping with merge confirmation, unit tests, one real-composition test, README and package registration.
 - Out of scope: importing attachments or tool-call transcripts, bidirectional sync, live watching for new foreign sessions, importing another DSH home's workspace grouping and memory (owned by [SESSION-IMPORT-PLAN.md](../../../SESSION-IMPORT-PLAN.md)), and reverse export.
 
 ## Tasks
 
-- [ ] T1: create the package skeleton, manifest, tsconfig faces, tsdown config, and bundle registration (depends: none)
-- [ ] T2: implement the normalized model, source catalog, and file readers (depends: T1)
-- [ ] T3: implement the SQLite readers for MiMo Code, OpenCode, OpenClaw, and Hermes (depends: T2)
-- [ ] T4: implement discovery, plan, apply, session synthesis, and workspace merge confirmation (depends: T2, T3)
-- [ ] T5: implement the route and the settings section with confirmation and result views (depends: T4)
-- [ ] T6: add unit tests per reader plus plan/apply tests and one real-composition test (depends: T4, T5)
-- [ ] T7: write README pairs, update the group README and root layout, then run the repository gates (depends: T6)
+- [x] T1: create the package skeleton, manifest, tsconfig faces, tsdown config, and bundle registration (depends: none)
+- [x] T2: implement the normalized model, source catalog, and file readers (depends: T1)
+- [x] T3: implement the SQLite readers for MiMo Code, OpenCode, OpenClaw, and Hermes (depends: T2)
+- [x] T4: implement discovery, plan, apply, session synthesis, and workspace merge confirmation (depends: T2, T3)
+- [x] T5: implement the route and the settings section with confirmation and result views (depends: T4)
+- [x] T6: add unit tests per reader plus plan/apply tests and one real-composition test (depends: T4, T5)
+- [x] T7: write README pairs, update the group README and root layout, then run the repository gates (depends: T6)
 
 ## [S4] Acceptance
 
-- [ ] A1: each of the ten sources is discovered at its documented root, and its reader returns user and assistant text in order with cwd, timestamps, and a stable key.
-- [ ] A2: applying a plan creates decodable session logs whose `deriveMessages()` equals the imported dialogue; a second apply reports every session as `duplicate` and changes no bytes.
-- [ ] A2b: a native DeepSeek Harness import keeps the original session id and complete event sequence, including `tool/call` and `tool/result`, and `Session.create` over the stored log derives the tool result into model history; attachments are present in the current home.
-- [ ] A3: imported sessions appear under the project for their folder; a folder whose project already exists is merged only when `confirmMerge` is true, and rejected with `merge-confirmation-required` otherwise.
-- [ ] A4: source roots are unchanged after plan and apply (file hashes and SQLite mtimes).
-- [ ] A5: the settings page lists sources, previews projects, blocks import until the merge confirmation is acknowledged, and reports per-session results.
-- [ ] A6: focused tests, `pnpm run typecheck`, `pnpm run build`, the package README checks, and `verify-client-ui-i18n` pass.
+- [x] A1: each of the eleven sources is discovered at its documented root, and its reader returns user and assistant text in order with cwd, timestamps, and a stable key.
+- [x] A2: applying a plan creates decodable session logs whose `deriveMessages()` equals the imported dialogue; a second apply reports every session as `duplicate` and changes no bytes.
+- [x] A2b: a native DeepSeek Harness import keeps the original session id and complete event sequence, including `tool/call` and `tool/result`, and `Session.create` over the stored log derives the tool result into model history; attachments are present in the current home.
+- [x] A3: imported sessions appear under the project for their folder; a folder whose project already exists is merged only when `confirmMerge` is true, and rejected with `merge-confirmation-required` otherwise.
+- [x] A4: source roots are unchanged after plan and apply (file hashes and SQLite mtimes).
+- [x] A5: the settings page lists sources, previews projects, blocks import until the merge confirmation is acknowledged, and reports per-session results.
+- [x] A6: focused tests, `pnpm run typecheck`, `pnpm run build`, the package README checks, and `verify-client-ui-i18n` pass.

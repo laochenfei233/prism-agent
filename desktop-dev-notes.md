@@ -81,7 +81,7 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 
 ### 应用内更新器（update.rs + prism-about）
 更新链 = `tauri-plugin-updater`（下载/验签/拉起安装器）+ `src/update.rs`（状态机：三条 `prism_*` 命令、`prism://update-state` 事件、`update-state.json` 持久化、启动 30s 静默检查）+ 宿主桥（bundle 期注入 `globalThis.dshDesktop`，`protocolVersion: 1`）+ `plugins/prism-about`（设置·关于节）。
-- **更新源钉死**：`tauri.conf.json` endpoint = `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`（永远解析到最新已发布 release 的资产）；无自定义源入口。draft release 对该 URL 不可见。
+- **更新源钉死**：`tauri.conf.json` endpoints = 国内镜像 `https://cdn.xyern.com/prism-agent/updates/latest.json` 在前（关于页显示官方地址 `prism.xyern.com`，显示/实际有意分离，见 update.rs 的 `MIRROR_*` 常量）+ GitHub Releases `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json` 兜底（按序尝试，首个成功生效）；无自定义源入口。draft release 对 GitHub URL 不可见。
 - **签名**：公钥入库，私钥在 `~/.prism-updater/prism-updater.key`（无口令）；CI secret `TAURI_SIGNING_PRIVATE_KEY`，本机 `pnpm tauri build` 也要设（`tauri dev` 不用）。`createUpdaterArtifacts: true` 首个 release 之前，应用内检查报「无法连接更新源」属预期。
 - **安装序列**（`RunEvent::Exit` 在 `std::process::exit` 时不触发）：先 `download()`（进度按整百分比节流，dsh 仍运行）→ `DshHandle::stop()` → `install(bytes)`；Windows 上插件拉起安装器后直接退出进程，安装器走既有 `--quit` 钩子链并以 `restart_after_install`（默认 true）重启应用。
 - **桥白名单**：壳页只放行三条 `prism_*` 命令；iframe 是 web 内容，绝不做成通用 invoke 中继。`install` 的 RPC 不设超时——成功路径进程即退，回包永不到达，进度靠事件。
@@ -115,7 +115,7 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 | 安装插件弹 cmd 窗口 | windowsHide 默认 false + GUI 壳无控制台 | AllocConsole+SW_HIDE + pnpm windowsHide |
 | 正式安装版首启向导不出现 | ensure_default_plugins 预写 patch 误判已初始化 | 判定改用 desktop.json |
 | `Bad CPU type in executable (os error 86)`（Intel Mac 装插件） | mac x64 包里是 arm64 node（`--arch x64` 未被解析） | 参数解析支持 `--flag value` 空格形式 |
-| `dsh exited during startup`（Intel Mac） | 疑似闭包 native 模块仍为 arm64（x64 node 加载 arm64 .node 崩溃） | CI "Verify closure architecture" 步骤定位；若命中需让 pnpm 显式跑在 x64 node 下 |
+| `dsh exited during startup`（Intel Mac） | 已实锤（2026-11-24）：装机的 runtime 闭包按 arm64 目标打包——`node-addon-require-builtin-darwin-x64` 整包缺失，loader 首个 require 即 MODULE_NOT_FOUND，hub 秒退（err.log 可见）；闭包里 node-pty 仅剩 darwin-arm64/linux-arm64 prebuild 可证 | bundle-runtime 跨架构时改为用内置目标架构 node 显式驱动 pnpm（pnpm 按自身进程 arch 选 optional 原生依赖，PATH 注入无效）+ 打包末尾 fail-loud 校验 `node-addon-require-builtin-<平台>-<arch>` 存在 + manifest.json 记录 `arch` |
 | `dsh crashed repeatedly` + hub.log 每 4 秒重复 "Plugin Hub 已启动"（macOS） | `ensure_default_plugins` 无条件插入 win-terminal-inspector 的 patch 行，而 mac/linux 包不带该插件 → loader 解析不到 → 每次启动即崩 → 看门狗循环重启 | 行插入按运行时是否含该插件门控 + 移除残留行自愈（`a43d73d3b`） |
 | `directory picker failed: spawn osascript ENOENT`（macOS，同类含 npx/git 全 ENOENT） | dsh 子进程 PATH 用 `;` 拼接——Windows 正确但 mac/linux 分隔符应为 `:`，坏 PATH 使所有按 PATH 查找的子进程 spawn 失败 | 改用 `std::env::join_paths` 按平台取分隔符（`1dbb66584`） |
 | 重装后纯白屏 + 不 spawn hub + 全程无日志（macOS 全新 profile） | `ensure_default_plugins` 只在 Windows 分支（win-terminal 复制）创建 `profiles/web`；macOS 无任何代码创建它 → patch 写入 ENOENT → hub 永不 spawn；导航栏移除后窗口只剩空白 iframe，且 dsh://failed 早于前端订阅发出 → 无横幅 | 函数开头 `create_dir_all(profile)`（`128fc96a5`） |
@@ -129,7 +129,7 @@ pnpm 的 os/cpu/libc 过滤基于**运行它的 node 的架构**。mac x64 构�
 ## 五、当前状态与待办
 
 - **CI**：架构校验 run（33033441566）构建中——验证 5 行矩阵 + 闭包架构自检；完成后确认 mac x64 与 win arm64 行的 node/原生模块均为目标架构。
-- **Intel Mac "dsh exited during startup"**：待 CI 校验结果定性——若闭包 native 为 arm64，需把 bundle-runtime 的 pnpm 改为显式用内置 x64 node 调用（不再依赖 PATH 解析）。
+- **Intel Mac "dsh exited during startup"**：已定性并修复（2026-11-24）——根因是 pnpm 在 arm64 进程下解析 optional 原生依赖，跨架构打包时 `bundle-runtime.mjs` 现已用内置目标架构 node 显式驱动 pnpm shim，并在打包末尾 fail-loud 校验 require-builtin 平台包；本机已用 `--arch x64` 重打 runtime 换入 /Applications（旧 arm64 runtime 备份为 `runtime.arm64-bak`）。
 - **Gitea**：代码已有私有只读镜像（自动从 GitHub 同步）；构建产物如需走 Gitea 分发需另找上传通道（镜像仓库只读）。
 - **本地**：`apps/desktop` 有未跟踪 `.tmp-tauri-cli/`（npx 缓存的 Tauri CLI，不入库）；`~/.dsh` 保留 `sessions/`。
 

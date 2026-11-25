@@ -39,7 +39,7 @@ apps/desktop/
       tray.rs           # 托盘常驻（关窗不退出，托盘菜单：显示/退出）
       host_rpc.rs       # POST /api/host.openPath 等宿主 RPC（session-context-menu 依赖）
       setup.rs          # 首次启动向导编排（profile 预设 + 插件安装）
-      updater.rs        # 应用内更新器状态机（tauri-plugin-updater；更新源固定 GitHub Releases latest.json）
+      updater.rs        # 应用内更新器状态机（tauri-plugin-updater；国内镜像在前、GitHub Releases 兜底）
     tauri.conf.json
     capabilities/
     icons/

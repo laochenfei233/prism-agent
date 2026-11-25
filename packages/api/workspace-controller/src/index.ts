@@ -12,6 +12,8 @@ import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
+  WorkspaceArchiveWorkspaceRequest,
+  WorkspaceArchivedWorkspacesValue,
   WorkspaceBaseline,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
@@ -26,6 +28,7 @@ import type {
   WorkspacePinValue,
   WorkspaceRenameRequest,
   WorkspaceUnarchiveSessionRequest,
+  WorkspaceUnarchiveWorkspaceRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
 } from './types.ts'
@@ -172,6 +175,27 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
+   * Hide one known Workspace from grouping surfaces; its record, order, and
+   * accounting are untouched.
+   * @param request - Workspace identity to archive.
+   * @returns the complete resulting archive set.
+   */
+  @Remote('archiveWorkspace')
+  archiveWorkspace(request: WorkspaceArchiveWorkspaceRequest): Promise<WorkspaceArchivedWorkspacesValue> {
+    return this.commands.archiveWorkspace(request)
+  }
+
+  /**
+   * Restore one archived Workspace to grouping surfaces.
+   * @param request - Workspace identity to unarchive.
+   * @returns the complete resulting archive set.
+   */
+  @Remote('unarchiveWorkspace')
+  unarchiveWorkspace(request: WorkspaceUnarchiveWorkspaceRequest): Promise<WorkspaceArchivedWorkspacesValue> {
+    return this.commands.unarchiveWorkspace(request)
+  }
+
+  /**
    * Surface one known unarchived Session ahead of unpinned Sessions.
    * @param request - Session identity to pin.
    * @returns the complete resulting pin set, most recently pinned first.
@@ -219,6 +243,7 @@ export class WorkspaceController extends TypertRemoteService {
         items: items.map(item => ({ ...item, sessionIds: sessions(item.sessionIds) })),
         archivedSessionIds: sessions(value.archivedSessionIds),
         pinnedSessionIds: sessions(value.pinnedSessionIds),
+        archivedWorkspaceIds: value.archivedWorkspaceIds.filter(visible),
       }
     }
     for await (const frame of this.feed.follow(signal)) {
@@ -251,6 +276,9 @@ export class WorkspaceController extends TypertRemoteService {
           break
         case 'pinned':
           yield { type: 'pinned', pinnedSessionIds: sessions(frame.pinnedSessionIds) }
+          break
+        case 'archived-workspaces':
+          yield { type: 'archived-workspaces', archivedWorkspaceIds: frame.archivedWorkspaceIds.filter(visible) }
           break
         /* v8 ignore next -- closed follow-frame union. */
         default:

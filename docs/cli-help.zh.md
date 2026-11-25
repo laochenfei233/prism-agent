@@ -110,21 +110,29 @@ Usage: dsh --profile headless [options] [task...]
 Answer one task and exit; the answer goes to stdout and diagnostics to stderr.
 
 Arguments:
-  task               the task text; multiple words are joined by spaces, and `-`
-                     reads stdin
+  task                        the task text; multiple words are joined by
+                              spaces, and `-` reads stdin
 
 Options:
-  --json             write newline-delimited run events to stdout instead of the
-                     final message
-  --session-id <id>  adopt the persisted Session with this id; an unknown id is
-                     an error
-  -h, --help         show this help
+  --json                      write newline-delimited run events to stdout
+                              instead of the final message
+  --session-id <id>           adopt the persisted Session with this id; an
+                              unknown id is an error
+  --permission-mode <preset>  select a configured permission preset for this
+                              task, including on resume
+  --approval-policy <policy>  set approval behavior after selecting the
+                              permission preset (choices: "ask", "never")
+  --add-dir <path>            allow an additional physical absolute directory
+                              under workspace-write (repeatable)
+  -h, --help                  show this help
 
 Examples:
   dsh --profile headless "run the tests"          answer one task and exit
   echo "run the tests" | dsh --profile headless   read the task from stdin
   dsh --profile headless --json "run the tests"   emit machine-readable run events
   dsh --profile headless --session-id session-… "continue"   resume an existing Session
+  dsh --profile headless --permission-mode workspace-write --add-dir /repo/.git "commit the fix"
+                                                        grant shared Git metadata for this task
 
 ```
 
@@ -178,6 +186,9 @@ Options:
   --host <host>                  bind address: one concrete IPv4 or IPv6 literal
                                  of a local interface; wildcard addresses are
                                  rejected
+  --bind-lan                     also bind the machine's own private IPv4
+                                 addresses (192.168/10/172.16-31), resolved at
+                                 startup; requires an explicit --port
   --no-open                      do not open the Web UI in the default browser
   --port <port>                  listen port; pass 0 to let the OS pick a free
                                  one
@@ -197,6 +208,7 @@ Examples:
   dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
   dsh --profile web --host 10.0.0.7          bind one local interface address
+  dsh --profile web --bind-lan --port 8080   also serve the machine's private IPv4 addresses on port 8080
   dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
                                              advertise a prefix-stripping HTTPS proxy entry and admit its authority
   dsh --profile web --tls-cert ./server-chain.pem --tls-key ./server-key.pem

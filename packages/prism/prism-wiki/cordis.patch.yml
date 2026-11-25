@@ -1,0 +1,31 @@
+# Prism wiki bundle patch. Four rows: the vault service (layout, full-text
+# search cache, and the per-session schema frame), the model-facing tool
+# registrant, the operator command registrant, and the Web Knowledge page.
+#
+# The vault directory and the bounds on one search, one source read, and one
+# page write are stated here rather than defaulted in code so a deployment can
+# tighten them from a later patch layer. The values below are the shipped
+# defaults; protocolSection stays unset so the shipped protocol text applies.
+
+- insert:
+    - id: prism-wiki
+      name: '@prism/prism-wiki'
+      config:
+        vaultRoot: !!js dshHomePath('knowledge')
+        maxSearchResults: 6
+        maxSourceChars: 40000
+        maxPageChars: 200000
+
+    - id: tool-prism-wiki
+      name: '@prism/prism-wiki/tools'
+
+    # Vault entry points a model does not drive on its own: they run from a
+    # human command instead, so they cost no tool schema.
+    - id: command-prism-wiki
+      name: '@prism/prism-wiki/commands'
+
+    # Browser channel and Knowledge page: needs the Web Connection and its web
+    # server, so a profile that composes either without the other leaves this
+    # row pending instead of failing it.
+    - id: web-prism-wiki
+      name: '@prism/prism-wiki/web'

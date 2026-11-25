@@ -6,7 +6,7 @@
 
 import { describe, expect, onTestFinished, vi } from 'vitest'
 import { RemoteStreamCarrierError, type ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { frames, openStream, type RemoteMock, type StreamScript } from '@deepseek-ai/dsh-remote-mock'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
@@ -20,6 +20,7 @@ import {
 } from '../src/client/index.ts'
 import type { WorkspaceFollowFrame, WorkspaceId } from '../src/types.ts'
 import { FOLLOW, baseline, err, followGenerations, workspace, workspaceWorld } from './remote/workspace.client.ts'
+import { brandString } from '@deepseek-ai/dsh-brand'
 
 const SELF = '@deepseek-ai/dsh-api-workspace-controller'
 /** The plugin as the web bundle composes it: itself plus the Gateway client, the Connection, and the Typert registry. */
@@ -32,7 +33,7 @@ const it = createClientTest({ roster: API_ROSTER })
 const COLD_BOOT_TIMEOUT_MS = 60_000
 
 const wid = (id: string): WorkspaceId => id as WorkspaceId
-const sid = (id: string): SessionId => SessionId(id)
+const sid = (id: string): SessionId => brandString<SessionId>(id)
 
 /** Boot the plugin with `follow` answering its state stream. */
 async function pluginClient(mock: RemoteMock, start: () => Promise<TestClient>, follow: StreamScript): Promise<TestClient> {
@@ -59,6 +60,7 @@ function accepts(overrides: Partial<WorkspaceFollowSink> = {}): WorkspaceFollowS
     removeView: ignore,
     replaceOrder: ignore,
     replaceArchived: ignore,
+  replaceArchivedWorkspaces: ignore,
     replacePinned: ignore,
     ...overrides,
   }
@@ -346,7 +348,7 @@ describe('WorkspaceController', () => {
   it('returns no Workspace when startup is ineligible without changing the list', async ({ mock, start }) => {
     const { remote, client } = await gatewayClient(mock, start)
     const model = new ClientWorkspaceModel(remote.workspace)
-    model.replaceBaseline({ items: [], archivedSessionIds: [], pinnedSessionIds: [] })
+    model.replaceBaseline({ items: [], archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [] })
     const controller = new WorkspaceController(client.ctx, model)
     const before = model.getSnapshot()
     mock.remote.workspace.initializeDefault.mockResolvedValueOnce({ ok: true, value: undefined })
@@ -357,7 +359,7 @@ describe('WorkspaceController', () => {
   it('publishes the model source and exposes successful Workspace commands', async ({ mock, start }) => {
     const { remote, client } = await gatewayClient(mock, start)
     const model = new ClientWorkspaceModel(remote.workspace)
-    model.replaceBaseline({ items: [workspace('one')], archivedSessionIds: [], pinnedSessionIds: [] })
+    model.replaceBaseline({ items: [workspace('one')], archivedSessionIds: [], pinnedSessionIds: [], archivedWorkspaceIds: [] })
     const controller = new WorkspaceController(client.ctx, model)
 
     expect(controller.list).toBe(model)
@@ -371,6 +373,8 @@ describe('WorkspaceController', () => {
     })
     await expect(controller.archiveSession(sid('session'))).resolves.toBeUndefined()
     await expect(controller.unarchiveSession(sid('session'))).resolves.toBeUndefined()
+    await expect(controller.archiveWorkspace(wid('one'))).resolves.toBeUndefined()
+    await expect(controller.unarchiveWorkspace(wid('one'))).resolves.toBeUndefined()
     await expect(controller.pinSession(sid('session'))).resolves.toBeUndefined()
     await expect(controller.unpinSession(sid('session'))).resolves.toBeUndefined()
     await expect(controller.delete(wid('one'))).resolves.toBeUndefined()
@@ -382,6 +386,8 @@ describe('WorkspaceController', () => {
     await expect(controller.archiveSession(sid('session'), { stopActivity: true })).resolves.toBeUndefined()
     expect(mock.log.requests('workspace/archiveSession')).toEqual([{ sessionId: 'session' }, { sessionId: 'session', stopActivity: true }])
     expect(mock.log.requests('workspace/unarchiveSession')).toEqual([{ sessionId: 'session' }])
+    expect(mock.log.requests('workspace/archiveWorkspace')).toEqual([{ workspaceId: 'one' }])
+    expect(mock.log.requests('workspace/unarchiveWorkspace')).toEqual([{ workspaceId: 'one' }])
     expect(mock.log.requests('workspace/pinSession')).toEqual([{ sessionId: 'session' }])
     expect(mock.log.requests('workspace/unpinSession')).toEqual([{ sessionId: 'session' }])
     expect(mock.log.requests('workspace/delete')).toEqual([{ workspaceId: 'one' }])

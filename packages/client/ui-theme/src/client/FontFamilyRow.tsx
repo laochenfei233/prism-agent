@@ -5,6 +5,7 @@
  * an empty field restores the built-in stack. The field shows the persisted
  * list and resets whenever that list changes.
  */
+import clsx from 'clsx'
 import { Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { normalizeFontFamily, type FontRole } from '../theme-settings.ts'
@@ -38,7 +39,7 @@ export function FontFamilyRow({ t, role, setFontFamily, useStore }: FontFamilyRo
     setFontFamily(input.value)
   }
   return (
-    <div className={rowCss.row}>
+    <div className={clsx(rowCss.row, rowCss.stacked)}>
       <div className={rowCss.rowText}>
         <div className={rowCss.title}>{title}</div>
         <div className={rowCss.desc}>{t(`fontFamily.${role}.description`)}</div>

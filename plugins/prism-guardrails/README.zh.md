@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力。
+一个独立于仓库之外的 DeepSeek Harness bundle：把十二项**建议性**能力变成**强制性**能力，并加入四条自己的、什么都不拒绝的 rail：卡住提醒、用量提醒、等待时长提醒与未知工具名建议。
 
 它的形态是"已发布插件"（`dsh.bundle.patch` + 一个可被 Loader 加载的 Host 半边），而不是对 Harness 检出目录的改动：每条 rail 都注册在文档化的扩展点上，没有改写任何上游包。
 
-十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
+十二条之中有四条是对 DeepSeek Harness 自带建议的加固，六条把三个方法包——**Ponytail**（偷懒阶梯：先复用再新写、先用标准库再引依赖、宁可标注捷径也不要默默留下它）、**Aegis**（先定路线再动手、先验证再声称完成）与 **Compose Next**（先写完自己排的计划再汇报）——的规则，从"要求模型遵守的文字"变成"工具流水线做出的判定"。最后两条覆盖破坏性命令与凭据读取：这两类既不由工具流水线拒绝，也不由沙箱覆盖——`SandboxMode` 只约束文件效果，网络与进程策略不在它的词表里（`packages/sandbox/sandbox-policy/README.md`）。第十三条 rail 是卡住提醒：它什么都不拒绝，只裁判断一串失败是否值得点名。第十四条 rail 是用量提醒：它统计会话的累计 token 用量，在越过配置阈值时提醒模型保持简洁。第十五条 rail 是等待时长提醒：它度量一次前台工具调用实际阻塞了多久，在等待过久时提醒模型改用后台执行或拆分任务。第十六条把模型大概想用的可见工具名追加到未知工具的报错里。rail 只读模型做了什么；Ponytail 模式本身属于本 bundle（见下文「Ponytail 模式」），Aegis 与 Compose Next 的 skill 仍留在其方法包安装的位置。
 
 ## 为什么需要它
 
@@ -24,6 +24,10 @@
 | 轮次完成（Compose Next） | 工作流要求模型做完自己的任务并给出交付证据；但只要模型不再调用工具，循环照样结束该轮 | 模型自己写的 todo 清单里还有未完成项时，在它能停下之前被 steer 继续 |
 | 破坏性命令 | 没有任何东西解析 shell 命令文本，`bash` 与 `pwsh` 正因此被排除在计划模式 rail 之外；沙箱管的是文件效果，管不了强推 | 命中配置模式的命令送交审批 |
 | 凭据读取 | 在其他所有 rail 眼里 `read` 与 `grep` 都是只读工具，而一次读取会永久留在会话日志里 | 读取配置的凭据路径被拒绝 |
+| 在失败上原地打转 | 没有任何东西盯着同一轮里反复同一种失败调用的轮次；模型自己的判断是唯一的刹车 | 裁判模型确认这串失败是个循环之后，下一个结果携带一句换思路的提醒 —— 调用本身永不被告决 |
+| Token 用量 | 持久化的 `tokenUsage` 投影与客户端的用量展示报告会话花了多少，但没有任何东西告诉模型会话已经变得多贵 | 累计用量首次越过配置阈值后，在轮次边界发送一句提醒 —— 它什么都不拒绝 |
+| 等待时长 | 没有任何东西度量一次前台工具调用阻塞了本轮多久；基座超时只有到硬上限才把调用转后台 | 实际等待越过配置阈值的调用，其结果上附加一句提醒，建议后台执行或拆分任务 —— 它什么都不拒绝 |
+| 未知工具名 | 流水线只以光杆 `unknown tool "x"` 拒绝，模型只能盲目重试 | 报错列出它大概想用的可见工具名（按接近程度排序），并保留原拒绝的结构化身份 |
 
 本 bundle 与它所加固的包和方法包相互独立。它通过 plan-mode 控制器的公开 `get()` 读取计划状态、通过公开注册表读取 skill 目录、通过文档化的扩展点进入工具流水线、轮次边界与会话日志，因此能与一个未改动的检出目录组合，并在某个服务缺失时退化为空操作。
 
@@ -60,7 +64,7 @@
 
 ## 配置
 
-每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。
+每条 rail 在对应键给出取值之前都是**关闭**的，而**存在但不可用**的键会让插件**加载即失败**。因此省略键是关闭该 rail 的唯一方式，拼错的键无法冒充有意的省略。四个例外：卡住提醒与等待时长提醒随插件出厂开启——它们什么都不拒绝（卡住提醒的裁判只在失败重复时才被调用），`stuckNudgeAfterFailures: 0` 与 `waitReminderAfterMs: 0` 分别关闭它们；用量提醒的**空数组**就是它的关闭开关而不是加载失败，因为该 rail 出厂即关，`[]` 就是它的默认值；报错文案改进（`skillInvocationGuidance`、`toolNameSuggestions`）随插件开启，因为它们只是改善一条消息。
 
 | 键 | 类型 | 含义 | 默认 |
 |---|---|---|---|
@@ -70,6 +74,7 @@
 | `maxStepsPerTurn` | 整数 `>= 1` | 一轮最多可开启的步骤数 | rail 关闭 |
 | `unfinishedTodoContinuations` | 整数 `>= 0` | 一轮因为模型自己的 todo 清单仍有未完成项而被送回继续的次数；`0` 表示关闭 | rail 关闭 |
 | `skillInvocationGuidance` | 布尔 | 模型调用"仅用户可调用"的 skill 被拒时，是否指出可行出路 | `true` |
+| `toolNameSuggestions` | 布尔 | 未知工具的报错是否列出它大概想用的可见工具名 | `true` |
 | `writeTools` | 非空的 `{ tool, pathArgument, contentArgument? }` 数组 | 该部署的写文件工具；所有需要读取写入内容的 rail 都以它为前置 | 由这些 rail 要求 |
 | `maxWrittenFilesPerTurn` | 整数 `>= 0` | 一轮可写入的不同文件数；超出后下一条新路径送交审批，`0` 表示关闭 | rail 关闭 |
 | `requirePonytailUpgradePaths` | 布尔 | 写入的 `shortcut:` 注释（较早的 `ponytail:`）是否必须给出上限与升级路径 | `false` |
@@ -80,12 +85,21 @@
 | `sensitivePaths` | 非空、互不相同、非空白的路径段数组 | 被视为凭据材料的路径段 | rail 关闭 |
 | `commandGuard.tools` | 非空的 `{ tool, commandArgument }` 数组 | 调用中携带命令行文本的工具 | 由该 rail 要求 |
 | `commandGuard.deny` | 非空的 `{ pattern, reason }` 数组 | 命令文本要匹配的正则，以及审批人需要知道的理由 | 由该 rail 要求 |
+| `stuckNudgeAfterFailures` | 整数 `0` 或 `>= 2` | 连续失败调用达到多少次后，请裁判判断 agent 是否在原地打转；`0` 关闭 | `3` |
+| `stuckNudgeConfidence` | `(0, 1]` 区间内的数 | 裁判置信度达到多少才发送提醒 | `0.7` |
+| `stuckNudgeMaxTokens` | 整数 `>= 1` | 一次裁判调用可花费的 token 上限 | `512` |
+| `stuckNudgePerTurn` | 整数 `>= 0` | 一轮最多可收到的提醒数；`0` 关闭 | `1` |
+| `usageReminderThresholds` | 严格升序的正整数数组 | 会话累计 token 用量每越过一个阈值就向模型发送一次提醒；空数组或省略键即关闭 | `[]`（关闭） |
+| `waitReminderAfterMs` | 整数 `>= 0` | 实际等待超过多少毫秒后在工具调用结果上附加提醒；`0` 关闭 | `60000` |
+| `waitReminderPerTurn` | 整数 `>= 0` | 一轮最多注入的提醒条数；`0` 关闭 | `2` |
 
 `writeTools` 条目填写的是该工具**自己**的参数键，因此参数名不同的部署是被"配置"而不是被"特判"。对 DeepSeek Harness 自带的工具集而言即 `{ tool: write, pathArgument: file_path, contentArgument: content }` 与 `{ tool: edit, pathArgument: file_path, contentArgument: new_string }`；不携带文本的工具省略 `contentArgument`。
 
 `readTools` 同理：`{ tool: read, pathArgument: file_path }`、`{ tool: read_image, pathArgument: file_path }` 与 `{ tool: grep, pathArgument: path }` 覆盖 DeepSeek Harness 中按路径读取的三个工具。
 
 `mode` 是唯一同时作用于全部 rail 的键，也是唯一能在武装之前看见某条 rail 的办法：`observe` 下每条 rail 的判定与 `enforce` 完全一致，只是记下这次判定并放行。`/guardrails` 会列出它本来会挡住什么。`deny` 与 `ask` 都算观察结果；`steer` 不算——把一轮送回补证据是要求把活干完，不是拒绝，观察模式不该把它一起关掉。
+
+卡住提醒是唯一什么都不拒绝的 rail，因此它也没有可供观察的 `deny`：它在两种模式下行为完全一致，并把提醒记为一条 `steer`。在同一轮内它统计 agent 连续失败的调用——任何一次成功都清空这串失败，而循环开启一个新轮次就会重置这串失败及其配额，无论该轮次由什么消息开启——当连续失败达到 `stuckNudgeAfterFailures`，一次走 agent 自己 provider 路由的一次性调用会裁判这些失败是否同一个循环。只有置信度足够的肯定（`stuckNudgeConfidence`）才会把一句提醒附在失败调用的已接受结果上；提醒点名这串失败，说明单靠重试不会改变它，并明说停不停由人决定。`stuckNudgePerTurn` 限定提醒次数，忽略第一次的模型每次只多付一次失败。裁判是外部依赖：没有 llm 服务、没有已路由的模型，或一份无法读取的裁判结果，都意味着这个窗口什么也不发，留一行日志说明原因，下一个达标的窗口再试。
 
 加载期拒绝项（每条文案都由测试套件断言）：
 
@@ -101,6 +115,7 @@
 | `maxStepsPerTurn` 非整数或 `< 1` | `maxStepsPerTurn must be an integer >= 1` |
 | `unfinishedTodoContinuations` 非整数或 `< 0` | `unfinishedTodoContinuations must be an integer >= 0` |
 | `skillInvocationGuidance` 非布尔 | `skillInvocationGuidance must be a boolean` |
+| `toolNameSuggestions` 非布尔 | `toolNameSuggestions must be a boolean` |
 | `writeTools` 不是数组或为空 | `writeTools must be an array of { tool, pathArgument, contentArgument? } entries` |
 | 条目没有给出工具名或路径参数 | `writeTools entries must name a tool` / `writeTools entry "write" must name its pathArgument` |
 | `contentArgument` 为空白 | `writeTools entry "write" must name a non-empty contentArgument or omit it` |
@@ -124,6 +139,16 @@
 | 命令工具条目没有给出参数名 | `commandGuard.tools entry "bash" must name its commandArgument` |
 | 模式条目没有给出理由 | `commandGuard.deny entry "…" must name a reason` |
 | 模式无法编译 | `commandGuard.deny pattern "(" is not a regular expression: …` |
+| `stuckNudgeAfterFailures` 不是整数，或 `< 0` | `stuckNudgeAfterFailures must be an integer >= 0` |
+| `stuckNudgeAfterFailures: 1` | `stuckNudgeAfterFailures must be 0 (off) or >= 2 — one failure is not stuck` |
+| `stuckNudgeConfidence` 不在 `(0, 1]` 区间 | `stuckNudgeConfidence must be a number in (0, 1]` |
+| `stuckNudgeMaxTokens` 不是整数，或 `< 1` | `stuckNudgeMaxTokens must be an integer >= 1` |
+| `stuckNudgePerTurn` 不是整数，或 `< 0` | `stuckNudgePerTurn must be an integer >= 0` |
+| `usageReminderThresholds` 不是数组 | `usageReminderThresholds must be an array of token thresholds` |
+| 阈值为零、负数或小数 | `usageReminderThresholds entries must be positive integers, received …` |
+| 阈值列表非升序或有重复 | `usageReminderThresholds must be strictly ascending, received …` |
+| `waitReminderAfterMs` 不是整数，或 `< 0` | `waitReminderAfterMs must be an integer >= 0` |
+| `waitReminderPerTurn` 不是整数，或 `< 0` | `waitReminderPerTurn must be an integer >= 0` |
 | 其他任意键 | `unknown config key(s) …` |
 
 `writeTools` 与 `readTools` 两行是本 bundle 的跨字段规则：读写文件的 rail 自身不掌握任何工具知识，因此只开启 rail 而不声明工具的部署没有可执行的对象。这种情况在加载期就失败，而不是加载一条永不触发的 rail。
@@ -274,16 +299,57 @@ Error: `read` targets "/home/u/.ssh/id_rsa", which this deployment treats as cre
 
 每个 `pattern` 在加载期编译，并忽略大小写地匹配原始命令文本，因此 `bash -c "git push --force"` 同样会被抓到。判定是 `ask` 而不是 `deny`：删掉构建目录或强推个人分支有时正是想要的动作，只有人能把它和事故区分开。没有审批通道时，fail-closed 审批阶梯会拒绝该调用，这正是无人值守时的预期结果。
 
+### 用量提醒
+
+会话的累计 token 用量首次越过配置阈值后，会在它的停止边界被打断并收到一句提醒：
+
+```
+Session token usage has reached ~120k tokens. Continue with the task, but prefer concise outputs and avoid re-reading large files unnecessarily.
+```
+
+总量从每条已提交 assistant 消息携带的 `usage` 累加而来——适配器给出 `totalTokens` 时用它，否则用输入与输出之和——按会话记账并保存在内存里：插件重启即清零，也不会像持久化的 `tokenUsage` 投影那样折叠重试。它是提醒所需要的数字，不是计费记录。
+
+机制沿用完成验证闸门：在 `agent/turn-stopping` 处 steer，会让循环观察到待处理输入并再跑一步。每个阈值在每个会话最多提醒一次；同一边界越过多个阈值时，只为最高的那个发送一条提醒，并把较低的阈值一并标记——已经到 250k 的会话不需要身后再来一条 100k 的提示。这条 rail 什么都不拒绝，在 `observe` 模式下行为完全一致。
+
+### 等待时长提醒
+
+实际等待时长越过 `waitReminderAfterMs`（默认 60 秒；`0` 关闭该 rail）的工具调用，会在其结果上附加一条 `additionalContexts` 提醒：
+
+```
+The call to `bash` waited 65s. For long waits, prefer background execution (`run_in_background: true`), split the task, or check whether you are waiting for input that will not arrive. This is a reminder only — the result is unchanged.
+```
+
+本 rail 通过包装 `tools/execute` 来度量每次调用的真实耗时。它不修改 `exec.signal`（避免与调用方自己的超时信号发生 fuse 语义纠缠），并通过 `additionalContexts` 注入提醒——调用本身永不被拒绝，原始结果内容保持不变。
+
+每轮配额 `waitReminderPerTurn`（默认 `2`）防止提醒刷屏。配额在每个 `agent/pre-step` 轮次边界重置，因此跨越多轮的长任务每轮都能获得新的配额。
+
+这条 rail 什么都不拒绝，在 `observe` 模式下行为完全一致（账本记录为一条 `steer`）。
+
+### 未知工具名
+
+调用没有任何可见工具注册的名字时，报错会给出它大概想用的相近名字：
+
+```
+Error: unknown tool "bashh" — did you mean "bash"?
+```
+
+多个候选时读作 `unknown tool "bashh" — similar tools: "bash", "bashx", "bashy"`，按接近程度排序，至多三个。提示搭在流水线自己的拒绝上：结果仍是携带完整结构化身份的 `UNKNOWN_TOOL` 错误；没有任何相近候选时保持原文案，其余失败原样返回。包装位于 `tools/execute`，因此流水线分发中任何位置解析出的未知工具——包括把未知名重新抛成错误的监听器——都被覆盖。
+
+距离按大小写折叠后的 Levenshtein 计算，大小写不敏感的子串重叠记一字符优惠；预算为被错名字长度的 `max(2, ⌊len/3⌋)`。`toolNameSuggestions: false` 恢复光杆文案。
+
 ## `/guardrails`
 
 本 bundle 注册一条命令，报告该部署实际启用（armed）了哪些 rail、当前所处的模式，以及 `observe` 下看见过的判定：
 
 ```
-Guardrails: OBSERVE MODE — 12 of 12 rails armed, nothing is refused (config 3f2a9c1b).
+Guardrails: OBSERVE MODE — 15 of 15 rails armed, nothing is refused (config 3f2a9c1b).
 plan-mode denial: write, edit, str_replace_editor
 repeat approval: after 5 identical calls
 ...
 command guard: 2 tool(s), 3 pattern(s)
+stuck nudge: after 3 consecutive failures
+usage reminder: ~100k, ~250k
+wait reminder: after 60s, max 2/turn
 decisions this session: 2 (2 observed)
   observed  command guard  git push --force origin main
   observed  sensitive reads  .env.local
@@ -362,7 +428,7 @@ node --import tsx/esm apps/cli/src/bin.ts --profile headless \
 npm run typecheck   # tsc against the checkout's built declarations: exit 0
 npm run build       # lib/index.js with two external harness imports
 npm run smoke       # artifact: imports, exports, fail-loud config
-npm test            # 144 composed unit tests
+npm test            # 152 composed unit tests
 npm run test:e2e    # 4 end-to-end capability runs against the shipped headless profile
 ```
 
@@ -376,8 +442,9 @@ Vitest 需要 vite 在 Windows 上的 real-path 探测去启动子进程，而�
 
 ## 已知限制与待办
 
-- **`observe` 关掉的是拒绝，不是 rail。** `deny`、`ask` 与 turn budget 的拒绝会变成记录；两处 `steer` 仍然会把一轮送回去补证据或补未完成的 todo。处于 observe 的部署对"这些拒绝本该挡住的调用"没有保护，把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
+- **`observe` 关掉的是拒绝，不是 rail。** `deny`、`ask` 与 turn budget 的拒绝会变成记录；各 `steer` rail 仍会把一轮送回去补证据、补未完成的 todo 或提醒用量。处于 observe 的部署对"这些拒绝本该挡住的调用"没有保护，把它当成受保护，比一开始就不装更糟。因此 `/guardrails` 第一行就打印模式，且 `mode` 不进任何随附 profile：想要它的部署得自己写。
 - **决策记录只在内存里。** 按会话、上限 200 条、进程退出即消失，因此它只回答本次会话里 rail 做了什么。它是调参用的，不是审计日志。
+- **用量总量只在内存里，且只到提醒级精度。** 它在本 bundle 的内存里按会话累加，进程重启或 agent 被释放即清零，也不会像持久化的 `tokenUsage` 投影那样折叠重试或流错误；阈值提醒反映的是本进程看见的量，不是账单。
 - **配置版本只覆盖 rail 配置。** 它标识的是 patch 行里的这些设置，不覆盖 profile 中其他插件，因此它指向一次拒绝背后的配置，而不是整个部署。
 - **本 bundle 在仓库测试运行器之外。** 它位于 `plugins/`，检出目录的 `vitest.config.ts` 不收集该目录，因此它自带配置，也不参与 `pnpm run test` 或逐文件覆盖率门禁。它的证据是上述套件，而不是 CI。
 - **写入路径按调用写下的原样比较。** `a.ts` 与 `./a.ts` 是两条路径，会花掉写盘预算里的两个文件。要规范化它们，需要用调用的工作目录去解析文件系统，那会给这条 rail 一个它本不需要的 provider 依赖。完成验证闸门的文案报告的也是同样的字符串。

@@ -1,13 +1,14 @@
 /** Reconnect-safe Workspace baseline and increment producer. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { Deque } from '@deepseek-ai/dsh-deque'
 import type { DomainChanged } from '@deepseek-ai/dsh-storage-domain'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
 import {
   workspaceDomainState,
   workspaceRecord,
-  WorkspaceId,
 } from '@deepseek-ai/dsh-workspace'
 import type {
   WorkspaceBaseline,
@@ -37,7 +38,7 @@ export function workspaceView(workspace: Workspace): WorkspaceView {
 function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceView {
   const record: WorkspaceRecord = workspaceRecord.parse(value)
   return {
-    workspaceId: WorkspaceId(workspaceId),
+    workspaceId: brandString<WorkspaceId>(workspaceId),
     path: record.path,
     title: record.title,
     sessionIds: [...record.sessionIds],
@@ -53,6 +54,7 @@ export class WorkspaceFeed {
   private order: readonly string[]
   private archived: readonly string[]
   private pinned: readonly string[]
+  private archivedWorkspaces: readonly string[]
 
   /** @param ctx - Host context containing the authoritative Workspace registry. */
   constructor(private readonly ctx: Context) {
@@ -61,6 +63,7 @@ export class WorkspaceFeed {
     this.order = baseline.map(workspace => String(workspace.id))
     this.archived = ctx.workspaceRegistry.archivedSessionIds.map(String)
     this.pinned = ctx.workspaceRegistry.pinnedSessionIds.map(String)
+    this.archivedWorkspaces = ctx.workspaceRegistry.archivedWorkspaceIds.map(String)
     ctx.on('domain/changed', (change: DomainChanged) => { this.changed(change) })
     ctx.effect(() => () => {
       for (const follower of this.followers) follower.close()
@@ -70,13 +73,14 @@ export class WorkspaceFeed {
 
   /**
    * Read the complete current projection synchronously.
-   * @returns all active Workspaces plus archived and pinned Session identities.
+   * @returns all Workspaces plus archived/pinned Session and archived Workspace identities.
    */
   baseline(): WorkspaceBaseline {
     return {
       items: this.ctx.workspaceRegistry.list().map(workspaceView),
       archivedSessionIds: [...this.ctx.workspaceRegistry.archivedSessionIds],
       pinnedSessionIds: [...this.ctx.workspaceRegistry.pinnedSessionIds],
+      archivedWorkspaceIds: [...this.ctx.workspaceRegistry.archivedWorkspaceIds],
     }
   }
 
@@ -126,12 +130,17 @@ export class WorkspaceFeed {
         this.pinned = nextPinned
         this.publish({ type: 'pinned', pinnedSessionIds: [...state.pinnedSessionIds] })
       }
+      const nextArchivedWorkspaces = state.archivedWorkspaceIds.map(String)
+      if (!sameStrings(this.archivedWorkspaces, nextArchivedWorkspaces)) {
+        this.archivedWorkspaces = nextArchivedWorkspaces
+        this.publish({ type: 'archived-workspaces', archivedWorkspaceIds: [...state.archivedWorkspaceIds] })
+      }
       return
     }
     if (change.table !== 'workspaces') return
     if (change.operation === 'deleted') {
       if (!this.knownIds.delete(change.key)) return
-      this.publish({ type: 'remove', workspaceId: WorkspaceId(change.key) })
+      this.publish({ type: 'remove', workspaceId: brandString<WorkspaceId>(change.key) })
       return
     }
     if (!this.knownIds.has(change.key)) return

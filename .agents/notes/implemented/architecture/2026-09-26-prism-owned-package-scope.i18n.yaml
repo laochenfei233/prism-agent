@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-09-26-prism-owned-package-scope.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-26-prism-owned-package-scope.md
+/agent-note-prism-owned-package-scope:
+  en: f2d08420910cdddd
+  zh: fbdb5e343dd2b88d
+/agent-note-prism-owned-package-scope/problem:
+  en: 07cdc33486c00f6a
+  zh: d0cabf5cbbb5bf30
+/agent-note-prism-owned-package-scope/decision:
+  en: b7b8db5b336459eb
+  zh: 8a8cbec3b0d6aebc
+/agent-note-prism-owned-package-scope/alternatives-considered:
+  en: 65894923fde7fba5
+  zh: ab227a3a53963cd6
+/agent-note-prism-owned-package-scope/consequences:
+  en: d1649ed3155e2049
+  zh: c576860d5ee0fbe9

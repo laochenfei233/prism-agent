@@ -3,10 +3,10 @@
 // default-browser links, and the update relay).
 // The top navigation bar is intentionally gone; the dsh UI owns its chrome.
 // The hub port is delivered by the Rust side through dsh_status (it picks a
-// free port when the default 3081 is occupied); the constant below is only
+// free port when the default 38081 is occupied); the constant below is only
 // the plain-browser fallback.
 
-const DEFAULT_ORIGIN = 'http://127.0.0.1:3081';
+const DEFAULT_ORIGIN = 'http://127.0.0.1:38081';
 
 // Boot polls this often. The shell spawns the server before the window exists,
 // so readiness can be published before this document subscribes to events;
@@ -39,6 +39,8 @@ const listen = (event, cb) => window.__TAURI__.event.listen(event, cb);
 
 let currentPort;
 let currentUrl;
+// Launch URL whose token the shell last exchanged for a proxy session.
+let exchangedLaunchUrl;
 let statusRequest;
 let readyFallback;
 // Set while the frame's bridge asks the splash to outlive the frame's load.
@@ -99,27 +101,51 @@ function loadPlainUi() {
   frame.src = DEFAULT_ORIGIN;
 }
 
-function loadAuthenticatedUi(port, url) {
+async function loadAuthenticatedUi(port, url) {
   if (typeof port !== 'number' || typeof url !== 'string') return false;
-  let parsed;
+  let launch;
   try {
-    parsed = new URL(url);
+    launch = new URL(url);
   } catch {
     return false;
   }
-  if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1'
-      || parsed.port !== String(port) || !parsed.searchParams.has('token')) {
+  if (launch.protocol !== 'http:' || launch.hostname !== '127.0.0.1'
+      || launch.port !== String(port) || !launch.searchParams.has('token')) {
     return false;
+  }
+  // The shell exchanges the token and points its loopback proxy at the minted
+  // session; the frame then loads the proxy origin and never authenticates
+  // through its own cookie jar. The proxy keeps its port for the app's
+  // lifetime, so a restarted server only replaces the session behind an origin
+  // that never changes; a new launch token still re-runs the exchange.
+  let target = currentUrl;
+  if (exchangedLaunchUrl !== url || target === undefined) {
+    let session;
+    try {
+      session = await invoke('authenticate_webview', { url });
+    } catch {
+      return false;
+    }
+    target = session?.url;
+    if (typeof target !== 'string') return false;
+    let origin;
+    try {
+      origin = new URL(target);
+    } catch {
+      return false;
+    }
+    if (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1') return false;
+    exchangedLaunchUrl = url;
   }
   // Assigning src reloads the frame, so an unchanged URL must not be reassigned
   // when the polling loop re-reads the same status.
-  if (frameCommitted && currentUrl === url) return true;
+  if (frameCommitted && currentUrl === target) return true;
   currentPort = port;
-  currentUrl = url;
+  currentUrl = target;
   holdRequested = false;
   frameCommitted = true;
   setSplashStatus('正在加载界面…');
-  frame.src = url;
+  frame.src = target;
   hideError();
   return true;
 }
@@ -127,6 +153,7 @@ function loadAuthenticatedUi(port, url) {
 function clearUi() {
   currentPort = undefined;
   currentUrl = undefined;
+  exchangedLaunchUrl = undefined;
   clearTimeout(readyFallback);
   readyFallback = undefined;
   holdRequested = false;
@@ -144,7 +171,7 @@ async function convergeOnAuthenticatedUi() {
         showError(status.error);
         return false;
       }
-      return status.running && loadAuthenticatedUi(status.port, status.url);
+      return status.running && await loadAuthenticatedUi(status.port, status.url);
     } catch {
       return false;
     } finally {

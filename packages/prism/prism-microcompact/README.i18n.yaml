@@ -1,0 +1,67 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/prism/prism-microcompact/README.md
+/:
+  en: 0b5b13a3b38c9ddb
+  zh: 9bcd76376a52c9ba
+/prism-prism-microcompact:
+  en: 45d80cb763579507
+  zh: 261136da710e864a
+/prism-prism-microcompact/summary:
+  en: 80db0b7525a4742c
+  zh: 0d4e2a85fd550841
+/prism-prism-microcompact/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/prism-prism-microcompact/use-this-package:
+  en: 2fe854dc72b4316b
+  zh: 4c76397df3cc975d
+/prism-prism-microcompact/use-this-package/smallest-working-composition:
+  en: 4448a802ce1d5c1d
+  zh: 0bd8fa050d64b7b3
+/prism-prism-microcompact/use-this-package/what-gets-cleared:
+  en: d07d892da38ebdef
+  zh: d7d2290f44fbffa6
+/prism-prism-microcompact/use-this-package/setting-the-thresholds:
+  en: b6089b986eaeeed7
+  zh: a19c6826f806233e
+/prism-prism-microcompact/use-this-package/when-clearing-runs:
+  en: 7419aeeb8094d268
+  zh: 07280f3b3f563176
+/prism-prism-microcompact/understand-the-implementation:
+  en: 18a4c0f34ecbd1fb
+  zh: ccfd0f0bf7d9fc6e
+/prism-prism-microcompact/understand-the-implementation/design-philosophy:
+  en: d269de3750d83142
+  zh: f6b923952d8b398d
+/prism-prism-microcompact/understand-the-implementation/clearing-mechanics:
+  en: f906987959c89b6e
+  zh: 60bdd950c1f041a7
+/prism-prism-microcompact/understand-the-implementation/source-map:
+  en: 990d43fbaa8f5be3
+  zh: 2ff49b546cc73dce
+/prism-prism-microcompact/further-exploration:
+  en: 7d3b347192b47306
+  zh: 8c0afb9ef74c3598
+/prism-prism-microcompact/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/prism-prism-microcompact/model-experience/cleared-tool-result:
+  en: 4d308dd70a79d404
+  zh: 90a901af323d2857
+/prism-prism-microcompact/model-experience/cleared-tool-result/what-the-model-sees:
+  en: ff623b5ffaac4fdd
+  zh: 3bcb0082f7f82b07
+/prism-prism-microcompact/model-experience/cleared-tool-result/token-effect:
+  en: 3606573dc7a74d59
+  zh: ecfa2106d0f7b590
+/prism-prism-microcompact/model-experience/cleared-tool-result/kv-cache-effect:
+  en: e5de8a32a1328940
+  zh: 68fdca05cafd9dd1
+/prism-prism-microcompact/known-limitations-and-deferred-work:
+  en: dcfa4984feb18a5d
+  zh: a3ef3d4cd44c09ef
+/prism-prism-microcompact/known-limitations-and-deferred-work/dev-note:
+  en: 13f1e7e4f1d64676
+  zh: 71bcbc73cba2450e

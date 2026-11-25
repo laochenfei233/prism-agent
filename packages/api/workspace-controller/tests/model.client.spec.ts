@@ -5,6 +5,8 @@ import {
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
+  WorkspaceArchiveWorkspaceRequest,
+  WorkspaceArchivedWorkspacesValue,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
@@ -17,6 +19,7 @@ import type {
   WorkspacePinValue,
   WorkspaceRenameRequest,
   WorkspaceUnarchiveSessionRequest,
+  WorkspaceUnarchiveWorkspaceRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
   WorkspaceId,
@@ -94,6 +97,14 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
     request: WorkspaceUnarchiveSessionRequest,
   ) => Promise<RemoteResult<WorkspaceArchiveValue>> = request =>
     Promise.resolve(remoteOk({ archivedSessionIds: [request.sessionId] }))
+  onArchiveWorkspace: (
+    request: WorkspaceArchiveWorkspaceRequest,
+  ) => Promise<RemoteResult<WorkspaceArchivedWorkspacesValue>> = request =>
+    Promise.resolve(remoteOk({ archivedWorkspaceIds: [request.workspaceId] }))
+  onUnarchiveWorkspace: (
+    _request: WorkspaceUnarchiveWorkspaceRequest,
+  ) => Promise<RemoteResult<WorkspaceArchivedWorkspacesValue>> = () =>
+    Promise.resolve(remoteOk({ archivedWorkspaceIds: [] }))
   onPinSession: (
     request: WorkspacePinSessionRequest,
   ) => Promise<RemoteResult<WorkspacePinValue>> = request =>
@@ -138,6 +149,16 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
     return this.onUnarchiveSession(request)
   }
 
+  archiveWorkspace(request: WorkspaceArchiveWorkspaceRequest): Promise<RemoteResult<WorkspaceArchivedWorkspacesValue>> {
+    this.record('archiveWorkspace', request)
+    return this.onArchiveWorkspace(request)
+  }
+
+  unarchiveWorkspace(request: WorkspaceUnarchiveWorkspaceRequest): Promise<RemoteResult<WorkspaceArchivedWorkspacesValue>> {
+    this.record('unarchiveWorkspace', request)
+    return this.onUnarchiveWorkspace(request)
+  }
+
   pinSession(request: WorkspacePinSessionRequest): Promise<RemoteResult<WorkspacePinValue>> {
     this.record('pinSession', request)
     return this.onPinSession(request)
@@ -166,8 +187,9 @@ function baseline(
   items: readonly WorkspaceView[] = [],
   archivedSessionIds: readonly SessionId[] = [],
   pinnedSessionIds: readonly SessionId[] = [],
+  archivedWorkspaceIds: readonly WorkspaceId[] = [],
 ): void {
-  model.replaceBaseline({ items, archivedSessionIds, pinnedSessionIds })
+  model.replaceBaseline({ items, archivedSessionIds, pinnedSessionIds, archivedWorkspaceIds })
 }
 
 describe('ClientWorkspaceModel', () => {
@@ -372,6 +394,32 @@ describe('ClientWorkspaceModel', () => {
     await expect(model.unarchiveSession(sid('fresh'))).resolves.toMatchObject({ ok: true })
     expect(model.getSnapshot().archivedSessionIds).toEqual([])
     expect(remote.calls).toContainEqual({ method: 'unarchiveSession', request: { sessionId: 'fresh' } })
+  })
+
+  it('installs Workspace archive echoes and complete stream sets', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model)
+    remote.onArchiveWorkspace = request =>
+      Promise.resolve(remoteOk({ archivedWorkspaceIds: [request.workspaceId] }))
+    await expect(model.archiveWorkspace(wid('hidden'))).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedWorkspaceIds).toEqual([wid('hidden')])
+
+    // A failed reply installs nothing; the previous set survives.
+    remote.onArchiveWorkspace = () => Promise.resolve(workspaceError(
+      new RemoteError('workspace/not-found', 'missing', { workspaceId: wid('missing') }),
+    ))
+    await expect(model.archiveWorkspace(wid('missing'))).resolves.toMatchObject({ ok: false })
+    expect(model.getSnapshot().archivedWorkspaceIds).toEqual([wid('hidden')])
+
+    remote.onUnarchiveWorkspace = () => Promise.resolve(remoteOk({ archivedWorkspaceIds: [] }))
+    await expect(model.unarchiveWorkspace(wid('hidden'))).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedWorkspaceIds).toEqual([])
+    expect(remote.calls).toContainEqual({ method: 'unarchiveWorkspace', request: { workspaceId: 'hidden' } })
+
+    // A follow frame installs the complete Host-confirmed set.
+    model.replaceArchivedWorkspaces([wid('late')])
+    expect(model.getSnapshot().archivedWorkspaceIds).toEqual([wid('late')])
   })
 
   it('keeps the latest unarchive reply when overlapping requests settle out of order', async () => {

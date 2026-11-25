@@ -1,10 +1,10 @@
 /**
- * The injected faces of this package's two entries. The
- * 'conversation.chat.assistant-actions' and 'conversation.input.overlay'
- * slots are declared and typed by ui-chat and ui-conversation; this package
- * only contributes entries, so no SlotMap merge lives here. Live state
- * arrives through the `hooks` compartment (the framework standard kit binds
- * `feedback` into `useFeedback` and `dialog` into `useDialog`).
+ * The injected faces of this package's entries. The
+ * 'conversation.chat.assistant-actions', 'conversation.chat.message.menu.item',
+ * and 'conversation.input.overlay' slots are declared and typed by ui-chat and
+ * ui-conversation; this package only contributes entries, so no SlotMap merge
+ * lives here. Live state arrives through the `hooks` compartment (the framework
+ * standard kit binds `feedback` into `useFeedback` and `dialog` into `useDialog`).
  * @module @deepseek-ai/dsh-client-ui-message-feedback/client/slots
  */
 
@@ -12,6 +12,7 @@ import type {
   HostObservable, InjectFace, PropsLocale, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MessageId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { MessageFeedbackItem, MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 // Type-only: pulls this package's LocaleNamespaceMap merge (the 'feedback' seat).
@@ -52,6 +53,22 @@ export interface MessageFeedbackInjected {
 export type MessageFeedbackActionProps =
   PropsRuntime<'conversation.chat.assistant-actions'>
   & InjectFace<MessageFeedbackInjected>
+  & PropsLocale<'feedback'>
+
+/** Injected business face of one message-menu feedback entry. */
+export interface MessageFeedbackMenuInjected {
+  /**
+   * Open the Session's feedback dialog for one message and judgment.
+   * @param messageId - target assistant message.
+   * @param rating - judgment to record on submission.
+   */
+  openDialog: (messageId: MessageId, rating: MessageFeedbackRating) => void
+}
+
+/** Full props of one message-menu feedback entry. */
+export type MessageFeedbackMenuProps =
+  PropsRuntime<'conversation.chat.message.menu.item'>
+  & InjectFace<MessageFeedbackMenuInjected>
   & PropsLocale<'feedback'>
 
 /** Injected business face of the Session's feedback dialog entry. */

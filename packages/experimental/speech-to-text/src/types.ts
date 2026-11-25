@@ -23,6 +23,12 @@ export interface SpeechProviderInfo {
   readonly model?: string
   /** Models this recognizer can run, in deployment order; absent when the deployment fixes one. */
   readonly models?: readonly string[]
+  /**
+   * Longest complete recording one recognition request admits, in seconds. The registry
+   * splits longer recordings into chunks before the provider sees them; absent leaves
+   * the provider free to enforce whatever request bounds it holds privately.
+   */
+  readonly maxAudioSeconds?: number
   readonly setupEstimate?: SpeechSetupEstimate
   /** Origins offered for an explicit preparation download; omitted or empty when no choice applies. */
   readonly downloadSources?: readonly string[]

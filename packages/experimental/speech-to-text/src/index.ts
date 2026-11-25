@@ -5,6 +5,7 @@ import z from '@deepseek-ai/schemastery'
 // entry and `loader/volatile-update` merges.
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
+import { transcribeCapped } from './chunk.ts'
 import type { SpeechPreparationOptions, SpeechProvider, SpeechProviderId, SpeechProviderInfo, SpeechSnapshot, SpeechSelectionPatch, SpeechRequest, SpeechSpec, SpeechStream, SpeechStreamRequest, SpeechStreamSpec, Transcript } from './types.ts'
 
 export type * from './types.ts'
@@ -206,6 +207,8 @@ export default class SpeechToText extends Service {
 
   /**
    * Execute exactly the resolved provider; no fallback sends audio elsewhere.
+   * Recordings beyond the provider's declared request cap are split at quiet
+   * boundaries and merged, so the cap never rejects an admitted recording.
    * @param spec - resolved input; a withdrawn or replaced registration is rejected.
    * @param signal - caller cancellation.
    * @returns final transcript after provider settlement.
@@ -217,8 +220,7 @@ export default class SpeechToText extends Service {
     const combined = AbortSignal.any([signal, registration.lifetime.signal])
     const pending = Promise.resolve().then(() => {
       combined.throwIfAborted()
-      return spec.provider.transcribe({ audio: spec.audio, language: spec.language,
-        ...spec.model === undefined ? {} : { model: spec.model } }, combined)
+      return transcribeCapped(spec, combined)
     })
     registration.pending.add(pending)
     try {

@@ -6,7 +6,9 @@ import { WorkspaceActiveSessionError } from '@deepseek-ai/dsh-workspace'
 import { resolveConfig } from '../src/config.ts'
 import { Config } from '../src/index.ts'
 import type { SweepDependencies } from '../src/index.ts'
-import { selectIdleSessions, sweep } from '../src/index.ts'
+import { selectIdleSessions, selectWorkspaceChanges, sweep } from '../src/index.ts'
+import type { WorkspaceFacts } from '../src/index.ts'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 
 /**
  * Behavior suite for the idle-conversation sweep.
@@ -49,10 +51,18 @@ function stored(
 function dependencies(
   snapshots: readonly SessionPersistenceSnapshot[],
   overrides: Partial<SweepDependencies> = {},
-): SweepDependencies & { readonly archived: string[]; readonly skipped: string[]; readonly warned: string[] } {
+): SweepDependencies & {
+  readonly archived: string[]
+  readonly skipped: string[]
+  readonly warned: string[]
+  readonly workspacesHidden: string[]
+  readonly workspacesRestored: string[]
+} {
   const archived: string[] = []
   const skipped: string[] = []
   const warned: string[] = []
+  const workspacesHidden: string[] = []
+  const workspacesRestored: string[] = []
   return {
     listSessions: () => Promise.resolve(snapshots),
     archivedSessionIds: () => [],
@@ -61,15 +71,35 @@ function dependencies(
       archived.push(sessionId)
       return Promise.resolve()
     },
+    listWorkspaces: () => [],
+    defaultWorkspaceId: () => undefined,
+    archivedWorkspaceIds: () => [],
+    archiveWorkspace: (workspaceId) => {
+      workspacesHidden.push(workspaceId)
+      return Promise.resolve()
+    },
+    unarchiveWorkspace: (workspaceId) => {
+      workspacesRestored.push(workspaceId)
+      return Promise.resolve()
+    },
     now: () => NOW,
     skip: message => { skipped.push(message) },
     warn: (message, error) => { warned.push(`${message}: ${String(error)}`) },
     archived,
     skipped,
     warned,
+    workspacesHidden,
+    workspacesRestored,
     ...overrides,
   }
 }
+
+/** One Workspace the Workspace pass decides against. */
+function facts(id: string, sessionIds: readonly string[], createdAt = '2026-01-01T00:00:00.000Z'): WorkspaceFacts {
+  return { id: WorkspaceId(id), createdAt, sessionIds: sessionIds.map(SessionId) }
+}
+
+const wid = (id: string): WorkspaceId => WorkspaceId(id)
 
 describe('idle selection', () => {
   it('selects a conversation idle past the window and leaves a recent one alone', () => {
@@ -124,13 +154,13 @@ describe('sweep', () => {
       stored('second', { createdAt: NOW - 45 * DAY }),
       stored('fresh', { createdAt: NOW - 2 * DAY }),
     ])
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(2)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(2)
     expect(deps.archived).toEqual(['first', 'second'])
   })
 
   it('uses the configured window instead of the shipped default', async () => {
     const deps = dependencies([stored('ten-days', { createdAt: NOW - 10 * DAY })])
-    await expect(sweep(deps, resolveConfig({ idleDays: 7 }))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true, idleDays: 7 }))).resolves.toBe(1)
     expect(deps.archived).toEqual(['ten-days'])
   })
 
@@ -146,7 +176,7 @@ describe('sweep', () => {
         },
       },
     )
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(1)
     expect(deps.skipped).toEqual(["session 'busy' is still running"])
   })
 
@@ -162,7 +192,7 @@ describe('sweep', () => {
           : Promise.resolve(),
       },
     )
-    await expect(sweep(deps, resolveConfig({}))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig({ enabled: true }))).resolves.toBe(1)
     expect(warn).toHaveBeenCalledWith("session 'broken' could not be archived", failure)
   })
 
@@ -179,16 +209,153 @@ describe('config resolution', () => {
     // The Loader delivers the schema's output, whose volatile fields are
     // `{ get() }` references. Reading them as plain values would turn every
     // number below into NaN and the switch into a permanently true value.
-    expect(resolveConfig(Config({}))).toEqual({ enabled: true, idleDays: 30, sweepIntervalMinutes: 1_440 })
-    expect(resolveConfig(Config({ idleDays: 7, sweepIntervalMinutes: 60 })))
-      .toEqual({ enabled: true, idleDays: 7, sweepIntervalMinutes: 60 })
-    expect(resolveConfig(Config({ enabled: false })).enabled).toBe(false)
+    expect(resolveConfig(Config({}))).toEqual({
+      enabled: false, idleDays: 30, projectIdleDays: 14, includeDefaultWorkspace: false,
+      sweepIntervalMinutes: 1_440,
+    })
+    expect(resolveConfig(Config({
+      enabled: true, idleDays: 7, projectIdleDays: 21, includeDefaultWorkspace: true,
+      sweepIntervalMinutes: 60,
+    }))).toEqual({
+      enabled: true, idleDays: 7, projectIdleDays: 21, includeDefaultWorkspace: true,
+      sweepIntervalMinutes: 60,
+    })
   })
 
   it('archives against the window the schema carries', async () => {
     const deps = dependencies([stored('ten-days', { createdAt: NOW - 10 * DAY })])
-    await expect(sweep(deps, resolveConfig(Config({ idleDays: 7 })))).resolves.toBe(1)
+    await expect(sweep(deps, resolveConfig(Config({ enabled: true, idleDays: 7 })))).resolves.toBe(1)
     expect(deps.archived).toEqual(['ten-days'])
+  })
+})
+
+describe('workspace selection', () => {
+  it('hides an idle project that holds no visible conversation', () => {
+    const changes = selectWorkspaceChanges(
+      [
+        // Every conversation archived; the newest write is 20 days past.
+        facts('stale', ['archived-old'], '2026-10-01T00:00:00.000Z'),
+        // Registered 7 days ago and never used.
+        facts('fresh-empty', [], '2026-10-25T00:00:00.000Z'),
+      ],
+      new Map([[SessionId('archived-old'), { activity: NOW - 20 * DAY, topLevel: true }]]),
+      new Set([SessionId('archived-old')]),
+      new Set(),
+      14,
+      undefined,
+      false,
+      NOW,
+    )
+    expect(changes).toEqual({ hide: [wid('stale')], restore: [] })
+  })
+
+  it('never hides a project a visible top-level conversation keeps alive', () => {
+    const changes = selectWorkspaceChanges(
+      [facts('alive', ['idle-visible'])],
+      new Map([[SessionId('idle-visible'), { activity: NOW - 60 * DAY, topLevel: true }]]),
+      new Set(),
+      new Set(),
+      14,
+      undefined,
+      false,
+      NOW,
+    )
+    expect(changes).toEqual({ hide: [], restore: [] })
+  })
+
+  it('hides a project only a subagent child accounts for', () => {
+    const changes = selectWorkspaceChanges(
+      [facts('child-only', ['child'])],
+      new Map([[SessionId('child'), { activity: NOW - 20 * DAY, topLevel: false }]]),
+      new Set(),
+      new Set(),
+      14,
+      undefined,
+      false,
+      NOW,
+    )
+    expect(changes).toEqual({ hide: [wid('child-only')], restore: [] })
+  })
+
+  it('anchors activity on the newest write even when only a subagent wrote it', () => {
+    const changes = selectWorkspaceChanges(
+      [facts('anchored', ['archived-old', 'child'])],
+      new Map([
+        [SessionId('archived-old'), { activity: NOW - 20 * DAY, topLevel: true }],
+        [SessionId('child'), { activity: NOW - 2 * DAY, topLevel: false }],
+      ]),
+      new Set([SessionId('archived-old')]),
+      new Set(),
+      14,
+      undefined,
+      false,
+      NOW,
+    )
+    expect(changes).toEqual({ hide: [], restore: [] })
+  })
+
+  it('never hides the default Workspace unless the deployment includes it', () => {
+    // The default Workspace's only conversation is archived: with the
+    // exemption the Workspace stays visible no matter how idle it is.
+    const workspaces = [facts('default-ws', ['old-session'], '2026-09-01T00:00:00.000Z')]
+    const sessionFacts = new Map([[SessionId('old-session'), { activity: NOW - 60 * DAY, topLevel: true }]])
+    const archived = new Set([SessionId('old-session')])
+    const exempt = selectWorkspaceChanges(
+      workspaces, sessionFacts, archived, new Set(), 14, wid('default-ws'), false, NOW,
+    )
+    expect(exempt).toEqual({ hide: [], restore: [] })
+    const included = selectWorkspaceChanges(
+      workspaces, sessionFacts, archived, new Set(), 14, wid('default-ws'), true, NOW,
+    )
+    expect(included).toEqual({ hide: [wid('default-ws')], restore: [] })
+  })
+
+  it('restores a hidden project that regained a visible conversation', () => {
+    const changes = selectWorkspaceChanges(
+      [facts('back', ['visible'])],
+      new Map([[SessionId('visible'), { activity: NOW, topLevel: true }]]),
+      new Set(),
+      new Set([wid('back')]),
+      14,
+      undefined,
+      false,
+      NOW,
+    )
+    expect(changes).toEqual({ hide: [], restore: [wid('back')] })
+  })
+})
+
+describe('sweep workspace pass', () => {
+  it('runs after the conversation pass and continues past a failing write', async () => {
+    const archivedSessions: SessionId[] = []
+    const hidden: WorkspaceId[] = []
+    const restored: WorkspaceId[] = []
+    const deps = dependencies(
+      [stored('to-archive', { createdAt: NOW - 20 * DAY }), stored('fresh', { createdAt: NOW - 1 * DAY })],
+      {
+        archivedSessionIds: () => archivedSessions,
+        archive: (sessionId) => {
+          archivedSessions.push(sessionId)
+          return Promise.resolve()
+        },
+        listWorkspaces: () => [
+          facts('idle', ['to-archive']),
+          facts('broken', []),
+          facts('back', ['to-archive', 'fresh']),
+        ],
+        archivedWorkspaceIds: () => [wid('back')],
+        archiveWorkspace: (workspaceId) => workspaceId === wid('broken')
+          ? Promise.reject(new Error('storage down'))
+          : (hidden.push(workspaceId), Promise.resolve()),
+        unarchiveWorkspace: (workspaceId) => (restored.push(workspaceId), Promise.resolve()),
+      },
+    )
+    await expect(sweep(deps, resolveConfig(Config({ enabled: true, idleDays: 7, projectIdleDays: 14 }))))
+      .resolves.toBe(1)
+    expect(deps.archived).toEqual([])
+    expect(hidden).toEqual([wid('idle')])
+    expect(restored).toEqual([wid('back')])
+    expect(deps.warned).toEqual([expect.stringContaining("workspace 'broken' could not be archived")])
   })
 })
 

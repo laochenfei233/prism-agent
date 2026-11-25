@@ -1,6 +1,7 @@
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
 /**
- * ui-workspace contracts. Two registrations share this package:
+ * ui-workspace contracts. Two registrations and one Component Factory share
+ * this package:
  *
  * - WorkspaceBrowser fills the sidebar shell's `sidebar.workspaces` hole —
  *   the whole browsing region (section header, search, grouped/flat session
@@ -8,8 +9,10 @@
  *   consumes the shell's two-fact owner share (wide / expandSidebar).
  * - WorkspacePicker fills the conversation empty-state hole (menu + error
  *   dialog shared with the browser).
+ * - The `workspace.picker` Factory renders the same picker for other
+ *   plugins' surfaces (see `SlotFactoryMap` below).
  *
- * Both registrations declare a **directory-flow hole** (`single` kind): the
+ * Each of the three declares a **directory-flow hole** (`single` kind): the
  * slot a composed picker package's client half fills with its
  * picking interaction — a renderless native-chooser driver or an in-app
  * browsing dialog. ui-workspace owns the trigger (the "Add workspace…"
@@ -19,33 +22,32 @@
  * including creating a new directory to hand back. That occupant-owned
  * creation is why adding a workspace has a single route: an unoccupied hole
  * leaves the surface with no add affordance at all.
- * Two holes exist because the two menu surfaces are independent slot entries
- * and a hole has exactly one declaring entry — they carry the same owner
- * contract and the same occupant.
+ * Three holes exist because the menu surfaces are independent declarations
+ * and a hole has exactly one declaring entry or Factory — they carry the
+ * same owner contract and the same occupant.
  *
- * WorkspaceBrowser also declares the two **Session row action lists**: every
- * row of a Session's "..." menu is an entry of
- * `sidebar.workspaces.session.menu.item`, and every hover button at the row's
- * end is an entry of `sidebar.workspaces.session.row.action`. The shipped
- * actions — pin, rename, fork, archive, copy ID — are ordinary entries
- * registered from `apply`, each carrying its own behavior in its own inject
- * face and reading its own Host state through hooks that face injects, so a
- * client plugin's action lands beside them by `order` and needs nothing from
- * the browser beyond the row identity.
+ * WorkspaceBrowser declares the Session hover-button list. Its built-in
+ * pin and archive entries share callbacks with the structured ctx.contextMenus
+ * contributions. The Session menu adapter owns the legacy
+ * `sidebar.workspaces.session.menu.item` Slot for external React entries;
+ * they receive the captured row identity and render together before Archive.
  *
- * The browser entry additionally declares three `list` seats per Session row
- * (`sidebar.session.row.leading` / `sidebar.session.row.hover`, and the second
- * line `sidebar.workspaces.session.pending`). All take the row's Session
- * identity and nothing else: a session-scoped seat would force a Session
- * binding, which would activate and retain every listed Session.
+ * The browser entry additionally declares `list` seats per Session row
+ * (`sidebar.session.row.leading`, `sidebar.session.row.trailing`, and
+ * `sidebar.session.row.hover`) for ambient row decorations, plus the second
+ * line seat `sidebar.workspaces.session.pending`. They receive only the row's
+ * Session identity; a Session binding would activate and retain every listed
+ * Session.
  */
+import type { ContextMenuTarget } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import type {
-  HostObservable, InjectFace, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, SlotHookFactory,
+  FactoryComponentPropsOf, HostObservable, InjectFace, PropsHooks, PropsLocale, PropsRenderFactories, PropsRenderSlots,
+  PropsRuntime, PropsStore, SlotHookFactory,
 } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pull the owner SlotMap merges into programs that resolve the
 // runtime shares below.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SessionSearchResultItem } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { RemoteHostFacts } from '@deepseek-ai/dsh-api-remotes/client'
@@ -54,8 +56,24 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
 import type { StartSessionOptions } from '../navigation.ts'
+import type { SessionAnnotation, SessionPriority } from '../annotations.ts'
 import type {} from './toast.ts'
 import type { createWorkspaceViewStore } from '../stores.ts'
+
+declare module '@deepseek-ai/dsh-client-ui-context-menu/client' {
+  interface ContextMenuTargetMap {
+    /** Registered Workspace header; path and title belong to the clicked row. */
+    workspace: { readonly workspaceId: WorkspaceId; readonly path: string; readonly displayTitle: string }
+  }
+}
+
+/** One request for the existing Workspace rename or delete dialog. */
+export type WorkspaceActionRequest = {
+  readonly action: 'rename' | 'delete'
+  readonly workspaceId: WorkspaceId
+  readonly displayTitle: string
+  readonly storedTitle: string
+}
 
 /**
  * Owner share of the directory-flow holes: the complete conversation between
@@ -83,6 +101,26 @@ export interface SessionRowOwnerProps {
   displayTitle: string
 }
 
+/** Owner share of one project (Workspace) row menu occurrence. */
+export interface ProjectRowOwnerProps {
+  /** Registered Workspace the row names. */
+  workspaceId: WorkspaceId
+  /** Row display title. */
+  displayTitle: string
+}
+
+/** The project row menu's open state, the same pair shape as the Session row menu. */
+export type ProjectMenuOpenState = MenuOpenState
+
+/** Hook every project-menu entry receives to dismiss the menu it sits in. */
+export type UseProjectMenuOpenState = () => ProjectMenuOpenState
+
+/**
+ * Drag data type a Session row sets to its Session id. The drag allows `copy`, and `move` while the row can be reordered;
+ * a drop target outside the list that accepts the Session sets `dropEffect` to `copy`, which discards the pending reorder.
+ */
+export type SessionDragType = 'application/x-dsh-session'
+
 /** The row menu's open state as its owner holds it: the `useState` pair. */
 export type MenuOpenState = readonly [open: boolean, setOpen: (open: boolean) => void]
 
@@ -105,12 +143,27 @@ export const menuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.session.m
   (_standard, state) => () => state
 
 /**
+ * Bind the project row's render occurrence into its menu entries' hook.
+ * @param _standard - framework standard props (unused).
+ * @param state - the menu's open-state pair from the render occurrence.
+ * @returns the hook the entry calls.
+ */
+export const projectMenuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState> =
+  (_standard, state) => () => state
+
+/**
  * Owner share of the two Session-row schedule seats. Both receive only the
  * row's Session identity: the occupant reads that Session's own scheduled
  * tasks, and reading them activates nothing.
  */
 export interface SessionRowScheduleOwnerProps {
   /** Session this row shows; the occupant addresses its own data by this id. */
+  readonly sessionId: SessionId
+}
+
+/** Owner share of the trailing icon list; rendering does not bind the Session. */
+export interface SessionRowTrailingOwnerProps {
+  /** Session this row shows. */
   readonly sessionId: SessionId
 }
 
@@ -121,6 +174,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /**
+     * Directory-flow hole under every `workspace.picker` Factory occurrence
+     * (declared by the Factory definition). A directory-picker package
+     * registers the same occupant here as in the other two directory-flow
+     * holes; while this hole is empty, Factory occurrences offer no
+     * "Add workspace…" entry.
+     */
+    'workspace.picker.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+    /**
      * Leading decoration of one Session row, in the 16px cell before the title
      * that the row's own state dot otherwise occupies. A higher-priority state
      * (a pending interaction, a new message, live activity) replaces the seat
@@ -129,25 +190,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * An archived row keeps that cell blank — neither its status dot nor this
      * seat renders there, and its live status appears on the hover card only.
      */
-    'sidebar.session.row.leading': { kind: 'list'; scope: 'root'; owner: SessionRowScheduleOwnerProps }
+    'sidebar.session.row.leading': { kind: 'list'; scope: 'root'; inline: true; owner: SessionRowScheduleOwnerProps }
+    /**
+     * Non-interactive icons after the row's time label, before its pin marker,
+     * in ascending `order`. On hover-capable devices, hidden while the row is
+     * hovered, has keyboard focus on itself or its actions, or has an open menu.
+     * Hoverless devices keep the icons beside the menu trigger. Blank Sessions
+     * omit the slot. Occupants address their own data by Session id; they must not
+     * bind or retain the Session.
+     */
+    'sidebar.session.row.trailing': { kind: 'list'; scope: 'root'; inline: true; owner: SessionRowTrailingOwnerProps }
     /**
      * Section of the Session row's hover card between its relative time and
      * its trailing status line. Mounted only while that card is open.
      */
     'sidebar.session.row.hover': { kind: 'list'; scope: 'root'; owner: SessionRowScheduleOwnerProps }
     /**
-     * The rows of one Session's "..." menu, in ascending `order`. ui-workspace
-     * registers the shipped rows here — `pin` (100), `rename` (200), `fork`
-     * (300), `archive` (400), `reveal` (420), `copy-path` (430), `session-id`
-     * (450), and `settings` (800) — so a plugin row is placed
-     * by its own `order` among them. Use a package-namespaced `id`; reusing a shipped id at
-     * another `priority` shadows that row. Each entry renders one
-     * `role="menuitem"` `<button>` (the shipped rows use ui-primitives'
-     * `MenuItemButton`, which adds the host styling and `separatorBefore`),
-     * decides its own visibility from its own state, and dismisses the menu
-     * through the injected `useMenuOpenState` hook after acting; the list's
-     * keyboard walk and focus return read the DOM, so any such button joins
-     * them. Labels come from the contributing package's locale namespace.
+     * Legacy external Session menu rows, in ascending `order`, rendered
+     * together before the built-in Archive action. Built-in actions use
+     * ctx.contextMenus; Slot priority cannot replace them. Each entry renders a
+     * `role="menuitem"` button, owns its visibility and localized label,
+     * and dismisses through `useMenuOpenState`. The shared menu supplies
+     * keyboard navigation and focus return.
      * @example
      * return {
      *   inject: ['slots'],
@@ -181,12 +245,35 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       } }
     }
     /**
+     * Rows appended to one project (Workspace) row's secondary-press menu,
+     * after the shipped new-session, reorder, reveal, rename, and delete rows,
+     * in ascending `order`. A fresh `id` adds a row; reusing a shipped or
+     * plugin id at another `priority` shadows that row. Each entry receives
+     * the Workspace id and display title, renders one `role="menuitem"` button
+     * (ui-primitives' `MenuItemButton` adds the host styling and
+     * `separatorBefore`), and dismisses the menu through the injected
+     * `useMenuOpenState` hook after acting; the list's keyboard walk and focus
+     * return read the DOM, so any such button joins them. Labels come from the
+     * contributing package's locale namespace. The ungrouped bucket renders no
+     * project menu, so no entry renders for it.
+     */
+    'sidebar.workspaces.project.menu.item': {
+      kind: 'list'
+      scope: 'root'
+      owner: ProjectRowOwnerProps
+      hookContext: ProjectMenuOpenState
+      inject: { hooks: {
+        menuOpenState: SlotHookFactory<'sidebar.workspaces.project.menu.item', UseProjectMenuOpenState>
+      } }
+    }
+    /**
      * The hover buttons at the end of one Session row, in ascending `order`,
      * after the "..." menu trigger. ui-workspace registers `archive` (100) and
      * `pin` (200) here. An entry renders one icon button (or nothing, when its
      * action does not apply to the row) and owns the action it performs. Clicks
      * inside the strip stay in the strip, so the button needs no propagation
-     * handling to keep the row from opening.
+     * handling to keep the row from opening. Hoverless devices hide this slot;
+     * contribute the action to the menu list as well for touch access.
      */
     'sidebar.workspaces.session.row.action': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
     /**
@@ -200,15 +287,33 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'sidebar.workspaces.session.pending': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
   }
+
+  interface SlotFactoryMap {
+    /**
+     * The blank-session hero's Workspace picker for another plugin's surface:
+     * a menu of the existing Workspaces plus "Add workspace…", which runs the
+     * `workspace.picker.directoryFlow` occupant, creates a Workspace from the
+     * picked path, and reports it through `onPick`. The caller owns the anchor
+     * control, its open state, and what a pick means.
+     */
+    'workspace.picker': {
+      scope: 'root'
+      props: WorkspacePickerInput
+      inject: WorkspacePickerInjected
+      locale: 'workspace'
+      children: { 'workspace.picker.directoryFlow': { kind: 'single'; scope: 'root' } }
+    }
+  }
 }
 
-/** The two directory-flow holes; a flow package's client half registers its one component into both. */
+/** The three directory-flow holes; a flow package's client half registers its one component into each. */
 export type DirectoryFlowSlotName =
   | 'conversation.hero.workspace.directoryFlow'
   | 'sidebar.workspaces.directoryFlow'
+  | 'workspace.picker.directoryFlow'
 
 /**
- * Directory-picking share both trigger surfaces consume. Occupancy rides the
+ * Directory-picking share every trigger surface consumes. Occupancy rides the
  * inject face's reserved `hooks` compartment: the renderer binds the source
  * into the `useDirectoryFlow` selector hook, so an empty hole hides the
  * "Add workspace…" entry reactively and the surface withdraws an open
@@ -230,7 +335,20 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
  * browsing region drives.
  */
 export type WorkspaceBrowserInjected = {
+  /** Open the registered Workspace actions without changing expansion or selection. */
+  openWorkspaceMenu: (workspaceId: WorkspaceId, path: string, displayTitle: string, point: { x: number; y: number }, mode?: 'toggle') => void
+  /**
+   * Open the browser-owned Workspace rename or delete dialog for one real
+   * Workspace. The project row menu's rename and delete rows raise the same
+   * dialogs the Workspace context-menu actions do; the request no-ops when the
+   * Workspace is absent or the action's remote access is denied.
+   */
+  requestWorkspaceAction: (workspaceId: WorkspaceId, displayTitle: string, action: 'rename' | 'delete') => void
+  /** Dismiss the settled Workspace dialog. */
+  settleWorkspaceAction: () => void
   hooks: DirectoryPickingInjected['hooks'] & {
+    workspaceActionRequest: HostObservable<WorkspaceActionRequest | null>
+    contextMenuTarget: HostObservable<ContextMenuTarget | null>
     /**
      * Fixed Host facts, reached through a hook rather than injected as values:
      * the renderer memoizes an entry's inject result for the registration's
@@ -284,6 +402,12 @@ export type WorkspaceBrowserInjected = {
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /** Show one Workspace directory in the Host file manager. */
   revealWorkspace: (path: string) => void
+  /**
+   * Run one batch action over the given Sessions, one at a time, and raise the
+   * result notice. A rejected Session counts as failed and leaves the others
+   * untouched.
+   */
+  applyBatch: (sessionIds: readonly SessionId[], action: BatchAction) => Promise<BatchResult>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
 }
@@ -291,7 +415,7 @@ export type WorkspaceBrowserInjected = {
 /** The browser's declared viewing store handle, shared with the row actions that write view state. */
 export type WorkspaceViewStoreHandle = ReturnType<typeof createWorkspaceViewStore>
 
-/** Props of one shipped row-menu entry: owner share + locale seat + the entry's own injected share. */
+/** Props of one legacy row-menu entry: owner share + locale seat + the entry's own injected share. */
 export type SessionMenuItemProps<Injected extends object = object> =
   PropsRuntime<'sidebar.workspaces.session.menu.item'>
   & PropsLocale<'workspace'>
@@ -305,8 +429,9 @@ export type SessionRowActionProps<Injected extends object = object> =
 
 /** One transient Workspace notice rendered by the overlay toast entry. */
 export type RowToast =
-  | { kind: 'archived'; sessionId: SessionId }
-  | { kind: 'stoppedAndArchived'; sessionId: SessionId }
+  | { kind: 'archived'; sessionId: SessionId; message?: string; tone?: 'success' | 'warning' }
+  | { kind: 'stoppedAndArchived'; sessionId: SessionId; message?: string; tone?: 'success' | 'warning' }
+  | { kind: 'readingFailed' }
   | { kind: 'sessionIdCopied' }
   | { kind: 'sessionIdCopyFailed' }
   | { kind: 'pathCopied' }
@@ -319,6 +444,8 @@ export type RowToast =
   | { kind: 'defaultWorkspaceFailed' }
   | { kind: 'forkRequiresOpen'; sessionId: SessionId }
   | { kind: 'shortcutForkFailed'; reason: 'unavailable' | 'failed' }
+  /** A batch run finished; both counts are stated so a partial failure is visible. */
+  | { kind: 'batchDone'; ok: number; failed: number }
   /**
    * An explicit New Session request that failed. `message` is untranslated:
    * a Host refusal as `code: message` — the stable code stays in the copy so
@@ -435,6 +562,74 @@ export interface SessionSettingsInjected {
   openSettings: () => void
 }
 
+/** A Session annotation edit requested from a row; the dialog entry opens on it. */
+export interface SessionAnnotationTarget {
+  /** Session the annotation belongs to. */
+  sessionId: SessionId
+  /** Row display title, named in the dialog. */
+  displayTitle: string
+}
+
+/**
+ * Annotation share (menu row toggles and the editor row). The callbacks carry
+ * the whole behavior; the hook is every stored annotation keyed by Session, so
+ * one row reads its own record with a lookup.
+ */
+export interface SessionAnnotationInjected {
+  hooks: {
+    /** Stored annotations by Session id. */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Replace one Session's annotation; an empty record clears it. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Ask for the editor dialog on this Session. */
+  requestAnnotation: (sessionId: SessionId, displayTitle: string) => void
+}
+
+/** Editor dialog share: the pending request, its settlement, and the clipboard round-trip. */
+export interface SessionAnnotationDialogInjected {
+  hooks: {
+    /** The edit asked for, until the dialog consumes or cancels it. */
+    annotationRequest: HostObservable<SessionAnnotationTarget | null>
+    /** Stored annotations by Session id (the draft's seed). */
+    annotations: HostObservable<Readonly<Record<SessionId, SessionAnnotation>>>
+  }
+  /** Consume or cancel the pending request. */
+  settleSessionAnnotation: () => void
+  /** Replace one Session's annotation. */
+  setAnnotation: (sessionId: SessionId, annotation: SessionAnnotation) => void
+  /** Write the prepared prompt to the clipboard; resolves false when the browser refused. */
+  copyAnnotationPrompt: (text: string) => Promise<boolean>
+  /** Read the clipboard for an import; rejects when the browser refuses. */
+  readAnnotationClipboard: () => Promise<string>
+}
+
+/** One batch action the browser can request across the selected Sessions. */
+export type BatchAction =
+  | { readonly kind: 'archive' }
+  | { readonly kind: 'unarchive' }
+  | { readonly kind: 'favorite' }
+  | { readonly kind: 'unfavorite' }
+  | { readonly kind: 'reviewLater' }
+  | { readonly kind: 'unreview' }
+  | { readonly kind: 'priority'; readonly priority: SessionPriority }
+  | { readonly kind: 'clearTags' }
+
+/** How a batch run ended, per Session. */
+export interface BatchResult {
+  /** Sessions the action applied to. */
+  ok: number
+  /** Sessions the action rejected or skipped. */
+  failed: number
+}
+
+/** Props of the annotation editor entry in `shell.overlay`. */
+export type SessionAnnotationDialogProps =
+  PropsRuntime<'shell.overlay'>
+  & PropsLocale<'workspace'>
+  & Omit<SessionAnnotationDialogInjected, 'hooks'>
+  & PropsHooks<SessionAnnotationDialogInjected['hooks']>
+
 /** A Session rename the rename action asked for; the dialog entry opens on it. */
 export interface SessionRenameTarget {
   /** Session to rename. */
@@ -499,11 +694,13 @@ export type RowToastProps =
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
 export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
+  & PropsRenderFactories
   & PropsRenderSlots<
     | 'sidebar.workspaces.directoryFlow'
-    | 'sidebar.workspaces.session.menu.item'
+    | 'sidebar.workspaces.project.menu.item'
     | 'sidebar.workspaces.session.row.action'
     | 'sidebar.workspaces.session.pending'
+    | 'sidebar.session.row.trailing'
     | 'sidebar.session.row.leading'
     | 'sidebar.session.row.hover'
   >
@@ -533,3 +730,19 @@ export type WorkspacePickerProps =
   & Omit<WorkspacePickerInjected, 'hooks'>
   & PropsHooks<WorkspacePickerInjected['hooks']>
   & PropsLocale<'workspace'>
+
+/**
+ * Caller input of one `workspace.picker` occurrence: the hero picker's owner
+ * props, so both surfaces take the same values. `open` is caller-held menu
+ * visibility; the menu portals to the document body and positions against
+ * `anchorRef`, and stays hidden without an anchor element. `selectedId`
+ * marks one row. `onPick` receives an existing Workspace the user chose or
+ * the Workspace created from a picked directory; the caller closes the menu
+ * there. `onClose` fires on outside press, Escape, and before the directory
+ * flow opens. Once the list is ready with no Workspaces, an open request
+ * raises the directory flow directly and calls `onClose`.
+ */
+export type WorkspacePickerInput = EmptyWorkspaceOwnerProps
+
+/** Complete props of the `workspace.picker` Factory definition. */
+export type WorkspacePickerFactoryProps = FactoryComponentPropsOf<'workspace.picker'>

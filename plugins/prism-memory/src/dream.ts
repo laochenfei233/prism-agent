@@ -12,9 +12,11 @@
  * 2. **Topic digests.** Claims that keep returning under one tag become a single
  *    index record, so later recall has one entry point instead of N.
  * 3. **Contradictions.** Two live claims that cover the same subject without
- *    saying the same thing are surfaced for a person to settle. The pass never
- *    resolves them: choosing between two claims is a judgement, and a wrong
- *    automatic choice is worse than an unresolved question.
+ *    saying the same thing are either settled by recency — the newer claim
+ *    supersedes the older, a judgement the deployment has made once in
+ *    configuration rather than per case — or surfaced for a person, per
+ *    `dreamAutoResolveConflicts`. Either way the supersede chain is intact and
+ *    the choice is `/memory restore` away.
  *
  * Every function here is pure and deterministic for a fixed corpus and clock, so
  * a replayed store produces the same journal bytes.
@@ -73,6 +75,8 @@ export interface DreamPlan {
   readonly topics: readonly TopicDigest[]
   /** Unresolved contradictions, for a person to settle. */
   readonly conflicts: readonly Conflict[]
+  /** Contradictions settled by recency; filled by the caller that applies them, empty from the planner. */
+  readonly resolved: readonly Conflict[]
 }
 
 /** Inputs of {@link planDream}. */
@@ -208,7 +212,7 @@ export function planDream(options: DreamOptions): DreamPlan {
       }
     })
 
-  return { scanned: candidates.length, corroborated, topics, conflicts: uniqueConflicts }
+  return { scanned: candidates.length, corroborated, topics, conflicts: uniqueConflicts, resolved: [] }
 }
 
 /**
@@ -224,6 +228,9 @@ export function renderDreamJournal(plan: DreamPlan): string {
   const lines = [`Dream pass over ${plan.scanned} record(s).`]
   if (plan.corroborated.length > 0) {
     lines.push(`Corroborated by more than one conversation: ${plan.corroborated.map(entry => `${entry.id} (x${entry.corroborations})`).join(', ')}`)
+  }
+  if (plan.resolved.length > 0) {
+    lines.push(`Resolved by recency (newer supersedes older): ${plan.resolved.map(conflict => `${conflict.left} vs ${conflict.right} (${conflict.similarity.toFixed(2)})`).join(', ')}`)
   }
   if (plan.topics.length > 0) {
     lines.push(`Topics indexed: ${plan.topics.map(topic => `${topic.tag} (${topic.memberIds.length})`).join(', ')}`)

@@ -12,8 +12,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import {
   appendAssistant,
@@ -27,6 +27,9 @@ import {
 
 const owned = new Set<Context>()
 const trees: string[] = []
+
+const DAY = 86_400_000
+
 afterEach(async () => {
   await Promise.all([...owned].map(ctx => ctx.fiber.dispose()))
   owned.clear()
@@ -74,24 +77,14 @@ describe('distilling a turn', () => {
     expect(stored.map(record => record.layer)).toEqual(['lesson'])
   })
 
-  it('parks a distilled claim for review unless the deployment says otherwise', async () => {
+  it('writes the person\'s constraint live on the shipped defaults', async () => {
     const ctx = await boot()
-    const agent = await createAgent(ctx, 'distil-pending')
+    const agent = await createAgent(ctx, 'distil-user-active')
     appendUser(agent, 'You must never run the release script from a dirty tree.')
     await driveTurnStopping(ctx, agent)
 
-    expect(ctx.prismMemory.all()[0]?.status).toBe('pending')
-    // Pending never injects, so the turn a person typed costs nothing extra.
-    const { messages } = await drivePreStep(ctx, agent, 'how do I cut a release')
-    expect(messages).toHaveLength(1)
-  })
-
-  it('stores it live when the deployment trusts the class of claim', async () => {
-    const ctx = await boot({ autoDistillStatus: 'active', autoDistillConfidence: 0.8 })
-    const agent = await createAgent(ctx, 'distil-active')
-    appendUser(agent, 'You must never run the release script from a dirty tree.')
-    await driveTurnStopping(ctx, agent)
-
+    // The person's own words are the trusted tier: active above the review
+    // floor, so it arrives as standing memory without anyone approving it.
     expect(ctx.prismMemory.all()[0]?.status).toBe('active')
     const { messages } = await drivePreStep(ctx, agent, 'cutting a release now')
     expect(messages).toHaveLength(2)
@@ -100,6 +93,50 @@ describe('distilling a turn', () => {
     const block = textOf(messages[1] as UserMessage)
     expect(block).toContain('Standing memory:')
     expect(block).toContain('never run the release script')
+  })
+
+  it('parks what the assistant established until it is corroborated', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'distil-assistant-pending')
+    appendUser(agent, 'why did the rebuild not pick up my change')
+    appendAssistant(agent, 'The root cause was a stale build cache that survived the rebuild.')
+    await driveTurnStopping(ctx, agent)
+
+    expect(ctx.prismMemory.all()[0]?.status).toBe('pending')
+    // Pending never injects, so the turn a person typed costs nothing extra.
+    const { messages } = await drivePreStep(ctx, agent, 'how do I cut a release')
+    expect(messages).toHaveLength(1)
+  })
+
+  it('parks everything when the deployment asks for review first', async () => {
+    const ctx = await boot({ autoDistillStatus: 'pending' })
+    const agent = await createAgent(ctx, 'distil-pending')
+    appendUser(agent, 'You must never run the release script from a dirty tree.')
+    await driveTurnStopping(ctx, agent)
+
+    expect(ctx.prismMemory.all()[0]?.status).toBe('pending')
+    const { messages } = await drivePreStep(ctx, agent, 'how do I cut a release')
+    expect(messages).toHaveLength(1)
+  })
+
+  it('promotes a held claim the person restates in their own turn', async () => {
+    const ctx = await boot()
+    const agent = await createAgent(ctx, 'distil-promote')
+    const claim = 'The root cause was a stale build cache that survived the rebuild.'
+
+    appendUser(agent, 'why did the rebuild not pick up my change')
+    appendAssistant(agent, claim)
+    await driveTurnStopping(ctx, agent)
+    const held = ctx.prismMemory.all()[0]
+    expect(held?.status).toBe('pending')
+
+    appendUser(agent, `${claim} Remember that.`)
+    await driveTurnStopping(ctx, agent)
+    const after = ctx.prismMemory.all()
+    expect(after).toHaveLength(1)
+    expect(after[0]?.status).toBe('active')
+    expect(after[0]?.reviewedAt).not.toBeNull()
+    expect(after[0]?.reviewNote).toBe('auto-approved: restated at active confidence')
   })
 
   it('does not store the same claim twice across turns, nor inflate its reuse count', async () => {
@@ -154,25 +191,182 @@ describe('the consolidation window', () => {
     expect(ctx.prismMemory.journal(agent)).toEqual([])
   })
 
-  it('confirms a claim two conversations wrote and never resolves a contradiction', async () => {
+  it('confirms a claim two conversations wrote', async () => {
     const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
     const first = await createAgent(ctx, 'dream-a')
     const second = await createAgent(ctx, 'dream-b')
     const claim = 'the default storage backend is sqlite'
     const stored = await ctx.prismMemory.remember({ text: claim, tags: ['backend'] }, first)
     await ctx.prismMemory.remember({ text: claim, tags: ['backend'] }, second)
-    await ctx.prismMemory.remember({
-      text: 'the default storage backend is postgres',
-      tags: ['backend'],
-    }, second)
 
     const report = await ctx.prismMemory.dream({ apply: true })
     expect(report.corroborated.map(entry => entry.id)).toEqual([stored.record.id])
     expect(ctx.prismMemory.all().find(record => record.id === stored.record.id)?.corroboratedAt).not.toBeNull()
+  })
+
+  it('promotes a held claim a second conversation corroborated', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const first = await createAgent(ctx, 'dream-hold-a')
+    const second = await createAgent(ctx, 'dream-hold-b')
+    const claim = 'the ingest pipeline runs hourly'
+    const held = await ctx.prismMemory.remember({ text: claim, tags: ['pipeline'], confidence: 0.2 }, first)
+    expect(held.record.status).toBe('pending')
+    // The identical write from the other conversation corroborates the held
+    // record instead of duplicating it.
+    await ctx.prismMemory.remember({ text: claim, tags: ['pipeline'], confidence: 0.2 }, second)
+    expect(ctx.prismMemory.all()).toHaveLength(1)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    expect(report.promoted).toEqual([held.record.id])
+    const promoted = ctx.prismMemory.all().find(record => record.id === held.record.id)
+    expect(promoted?.status).toBe('active')
+    expect(promoted?.corroboratedAt).not.toBeNull()
+    expect(promoted?.reviewedAt).not.toBeNull()
+    expect(promoted?.reviewNote).toBe('auto-approved: corroborated by another conversation')
+  })
+
+  it('settles a contradiction by recency: the newer claim supersedes the older', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const agent = await createAgent(ctx, 'dream-resolve')
+    const older = await ctx.prismMemory.remember({
+      text: 'the default storage backend is sqlite',
+      tags: ['backend'],
+    }, agent)
+    await new Promise(resolve => setTimeout(resolve, 3))
+    const newer = await ctx.prismMemory.remember({
+      text: 'the default storage backend is postgres',
+      tags: ['backend'],
+    }, agent)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    expect(report.resolved).toHaveLength(1)
+    expect(report.resolved[0]?.left).toBe(older.record.id)
+    expect(report.resolved[0]?.right).toBe(newer.record.id)
+    expect(report.conflicts).toEqual([])
+    const replaced = ctx.prismMemory.all().find(record => record.id === older.record.id)
+    expect(replaced?.status).toBe('superseded')
+    expect(replaced?.supersededBy).toBe(newer.record.id)
+    const standing = ctx.prismMemory.all().find(record => record.id === newer.record.id)
+    expect(standing?.status).toBe('active')
+    expect(standing?.supersedes).toBe(older.record.id)
+    // The journal records the verdict, so the recency choice is auditable.
+    const journal = ctx.prismMemory.journal(agent, 10)
+    expect(journal.some(entry => entry.text.includes('Resolved by recency (newer supersedes older)'))).toBe(true)
+    // A wrong recency choice is one command away from undone.
+    await ctx.prismMemory.restore(older.record.id, 'recency was wrong here', agent)
+    expect(ctx.prismMemory.all().find(record => record.id === older.record.id)?.status).toBe('active')
+  })
+
+  it('leaves a contradiction to a person when the deployment says so', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false, dreamAutoResolveConflicts: false })
+    const first = await createAgent(ctx, 'dream-keep-a')
+    const second = await createAgent(ctx, 'dream-keep-b')
+    await ctx.prismMemory.remember({ text: 'the default storage backend is sqlite', tags: ['backend'] }, first)
+    await ctx.prismMemory.remember({ text: 'the default storage backend is postgres', tags: ['backend'] }, second)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
     // The contradiction is reported and both claims survive: choosing between
-    // them is a judgement, and the pass does not make it.
+    // them stays a human judgement on this deployment.
     expect(report.conflicts).toHaveLength(1)
+    expect(report.resolved).toEqual([])
     expect(ctx.prismMemory.all().filter(record => record.status === 'active')).toHaveLength(2)
+  })
+
+  it('writes a topic digest live on the shipped defaults', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const agent = await createAgent(ctx, 'digest-live')
+    await ctx.prismMemory.remember({ text: 'the deploy pipeline gates on smoke', tags: ['deploy'] }, agent)
+    await ctx.prismMemory.remember({ text: 'the deploy pipeline tags every image', tags: ['deploy'] }, agent)
+    await ctx.prismMemory.remember({ text: 'the deploy pipeline rolls out canary first', tags: ['deploy'] }, agent)
+
+    await ctx.prismMemory.dream({ apply: true })
+    const digest = ctx.prismMemory.all().find(record => record.tags.includes('dream-topic'))
+    expect(digest?.status).toBe('active')
+  })
+
+  it('runs the hygiene pass with the committed consolidation', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const agent = await createAgent(ctx, 'auto-maintain')
+    const expiring = await ctx.prismMemory.remember({
+      text: 'the staging window closes on friday',
+      ttlDays: 1,
+    }, agent)
+
+    const report = await ctx.prismMemory.dream({ apply: true, now: Date.now() + 2 * DAY })
+    expect(report.maintenance?.expired).toEqual([expiring.record.id])
+    expect(ctx.prismMemory.all().find(record => record.id === expiring.record.id)?.status).toBe('archived')
+  })
+
+  it('holds every automatic gate while requireApproval is set', async () => {
+    const ctx = await boot({ requireApproval: true, dreamEveryWrites: 1, dailyReflection: false })
+    const first = await createAgent(ctx, 'gate-a')
+    const second = await createAgent(ctx, 'gate-b')
+    const held = await ctx.prismMemory.remember({ text: 'the ingest pipeline runs hourly', confidence: 0.2 }, first)
+    await ctx.prismMemory.remember({ text: 'the ingest pipeline runs hourly', confidence: 0.2 }, second)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    expect(report.promoted).toEqual([])
+    expect(ctx.prismMemory.all().find(record => record.id === held.record.id)?.status).toBe('pending')
+  })
+
+  it('keeps a digest pending while requireApproval holds', async () => {
+    // Seed live claims first: review holds every write, so a corpus grown
+    // entirely under `requireApproval` never clusters — the gate below is what
+    // stops an existing cluster's digest from reaching recall anyway.
+    const root = await scratch()
+    const path = join(root, 'digest-hold.db')
+    const first = await mountMemory({ config: { dreamEveryWrites: 1, dailyReflection: false }, storagePath: path, tools: true })
+    owned.add(first)
+    const seeder = await createAgent(first, 'digest-seed')
+    for (const text of ['the deploy pipeline gates on smoke', 'the deploy pipeline tags every image', 'the deploy pipeline rolls out canary first']) {
+      await first.prismMemory.remember({ text, tags: ['deploy'] }, seeder)
+    }
+    await first.fiber.dispose()
+    owned.delete(first)
+
+    const second = await mountMemory({ config: { requireApproval: true, dreamEveryWrites: 1, dailyReflection: false }, storagePath: path, tools: true })
+    owned.add(second)
+    await second.prismMemory.dream({ apply: true })
+    const digest = second.prismMemory.all().find(record => record.tags.includes('dream-topic'))
+    expect(digest?.status).toBe('pending')
+  })
+
+  it('skips a pair whose newer claim already carries a supersedes back-link', async () => {
+    const ctx = await boot({ dreamEveryWrites: 1, dailyReflection: false })
+    const agent = await createAgent(ctx, 'fan-in')
+    const olderA = await ctx.prismMemory.remember({
+      text: 'the release window opens on monday',
+      tags: ['window'],
+    }, agent)
+    await new Promise(resolve => setTimeout(resolve, 3))
+    const olderB = await ctx.prismMemory.remember({
+      text: 'the release window opens on tuesdays',
+      tags: ['window'],
+    }, agent)
+    await new Promise(resolve => setTimeout(resolve, 3))
+    const newer = await ctx.prismMemory.remember({
+      text: 'the release window opens on wednesday',
+      tags: ['window'],
+    }, agent)
+
+    const report = await ctx.prismMemory.dream({ apply: true })
+    // Whichever pair sorts first settles and chains; the remaining pairs stay
+    // open for a person rather than overwriting the winner's back-link or
+    // superseding an already-settled record twice.
+    expect(report.resolved).toHaveLength(1)
+    expect(report.conflicts).toHaveLength(2)
+    const [settled] = report.resolved
+    const winner = ctx.prismMemory.all().find(record => record.id === settled?.right)
+    expect(winner?.status).toBe('active')
+    expect(winner?.supersedes).toBe(settled?.left)
+    const loser = ctx.prismMemory.all().find(record => record.id === settled?.left)
+    expect(loser?.status).toBe('superseded')
+    expect(loser?.supersededBy).toBe(settled?.right)
+    const untouchedId = [olderA.record.id, olderB.record.id, newer.record.id]
+      .find(id => id !== settled?.left && id !== settled?.right)
+    const untouched = ctx.prismMemory.all().find(record => record.id === untouchedId)
+    expect(untouched?.status).toBe('active')
+    expect(untouched?.supersedes).toBeNull()
   })
 
   it('does a dry run without writing when asked', async () => {
@@ -295,7 +489,8 @@ describe('importing another tool\'s memory', () => {
     expect(stored?.origin).toBe('import')
     expect(stored?.layer).toBe('rule')
     expect(stored?.scope).toBe('project')
-    expect(stored?.status).toBe('pending')
+    // The import source is a file the operator chose to read, so it lands live.
+    expect(stored?.status).toBe('active')
     expect(stored?.evidence.note).toContain('AGENTS.md')
   })
 
@@ -317,5 +512,72 @@ describe('importing another tool\'s memory', () => {
     const agent = await createAgent(ctx, 'import-none')
     const error = await ctx.prismMemory.importMemories({ agent }).catch((thrown: unknown) => thrown)
     expect(error).toMatchObject({ code: 'PRISM_MEMORY_NO_IMPORT_SOURCE' })
+  })
+})
+
+describe('the backlog on upgrade', () => {
+  it('promotes the backlog the tier policy trusts and holds the rest', async () => {
+    const root = await scratch()
+    const path = join(root, 'backlog.db')
+    const first = await mountMemory({ config: { requireApproval: true }, storagePath: path, tools: true })
+    owned.add(first)
+    const seeder = await createAgent(first, 'seed')
+    await first.prismMemory.remember({ text: 'prefers concise release notes', layer: 'user', origin: 'session', confidence: 0.2 }, seeder)
+    await first.prismMemory.remember({ text: 'imported rule about credentials', origin: 'import', confidence: 0.2 }, seeder)
+    await first.prismMemory.remember({ text: 'a note a model wrote about ingest', origin: 'model', confidence: 0.2 }, seeder)
+    expect(first.prismMemory.all().every(record => record.status === 'pending')).toBe(true)
+    await first.fiber.dispose()
+    owned.delete(first)
+
+    const second = await mountMemory({ config: {}, storagePath: path, tools: true })
+    owned.add(second)
+    const stored = second.prismMemory.all()
+    const stated = stored.find(record => record.text.includes('concise'))
+    expect(stated?.status).toBe('active')
+    expect(stated?.reviewNote).toBe('auto-approved on upgrade: stated by the person')
+    expect(stored.find(record => record.text.includes('imported'))?.status).toBe('active')
+    expect(stored.find(record => record.text.includes('model wrote'))?.status).toBe('pending')
+  })
+})
+
+
+describe('the scheduled hygiene pass', () => {
+  it('archives an expired record on the wall clock, with no turn in the room', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await boot({ scheduledMaintainMinutes: 5 })
+      await ctx.prismMemory.remember(
+        { text: 'a claim whose time-to-live has passed', ttlDays: 1, origin: 'operator' },
+        undefined,
+      )
+
+      // Past the boot guard and far enough for the write's own time-to-live to
+      // lapse under the faked clock, so a scheduled interval lands after it.
+      await vi.advanceTimersByTimeAsync(2 * DAY + 61_000)
+
+      const record = ctx.prismMemory.all().find(entry => entry.text.includes('time-to-live'))
+      expect(record?.status).toBe('archived')
+      expect(record?.evidence.note).toContain('maintenance')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves the corpus alone when the schedule is off', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await boot({ scheduledMaintain: false, scheduledMaintainMinutes: 5 })
+      await ctx.prismMemory.remember(
+        { text: 'a claim whose time-to-live has passed', ttlDays: 1, origin: 'operator' },
+        undefined,
+      )
+
+      await vi.advanceTimersByTimeAsync(2 * DAY + 61_000)
+
+      const record = ctx.prismMemory.all().find(entry => entry.text.includes('time-to-live'))
+      expect(record?.status).toBe('active')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

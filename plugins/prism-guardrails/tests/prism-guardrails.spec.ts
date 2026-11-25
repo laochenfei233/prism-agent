@@ -9,13 +9,15 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
-import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import { defineTool } from '@deepseek-ai/dsh-tools'
+import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../packages/core/agent-loop/tests/mock-adapter.ts'
 import { resolveConfig, configVersion } from '../src/config.ts'
 import type { Config } from '../src/config.ts'
 import { createLedger } from '../src/decision.ts'
 import * as Guardrails from '../src/index.ts'
+import { suggestToolNames, toolNameHint } from '../src/tool-hints.ts'
 
 /**
  * Behavior suite for the capability-hardening bundle.
@@ -78,15 +80,34 @@ function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
 
 /** A tool fixture whose every execution appends its name to `runs`. */
 function fixture(name: string, runs: string[]) {
-  return defineContentToolFixture({
+  return defineTool({
     name,
     description: `${name} fixture`,
     parameters: {},
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text' as const, text: value }],
+    },
     execute() {
       runs.push(name)
-      return Promise.resolve([{ type: 'text' as const, text: `${name} ran` }])
+      return Promise.resolve(`${name} ran`)
     },
   })
+}
+
+/** One direct tool call through the executor's batch API, bypassing the loop. */
+async function callTool(
+  ctx: Context,
+  input: { signal: AbortSignal; callId: ToolCallId; name: string; arguments: unknown; agent?: Agent },
+): Promise<ToolExecutionResult> {
+  const batch = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: input.callId, name: input.name, arguments: JSON.stringify(input.arguments) }],
+    signal: input.signal,
+    ...input.agent === undefined ? {} : { agent: input.agent },
+  })
+  const outcome = batch.results[0]
+  if (outcome === undefined) throw new Error('the executor omitted the call result')
+  return outcome.result
 }
 
 /** Every model-visible tool result this context produced, in call order. */
@@ -111,7 +132,7 @@ async function userTurn(ctx: Context, agent: Agent, text: string): Promise<void>
 }
 
 describe('configuration validation', () => {
-  it('resolves an empty configuration with every rail off and guidance on', () => {
+  it('resolves an empty configuration with the opt-in rails off and guidance on', () => {
     expect(resolveConfig({})).toEqual({
       mode: 'enforce',
       planDeniedTools: undefined,
@@ -119,6 +140,7 @@ describe('configuration validation', () => {
       maxStepsPerTurn: undefined,
       unfinishedTodoContinuations: undefined,
       skillInvocationGuidance: true,
+      toolNameSuggestions: true,
       writeTools: undefined,
       maxWrittenFilesPerTurn: undefined,
       requirePonytailUpgradePaths: false,
@@ -128,6 +150,13 @@ describe('configuration validation', () => {
       readTools: undefined,
       sensitivePaths: undefined,
       commandGuard: undefined,
+      stuckNudgeAfterFailures: 3,
+      stuckNudgeConfidence: 0.7,
+      stuckNudgeMaxTokens: 512,
+      stuckNudgePerTurn: 1,
+      usageReminderThresholds: undefined,
+      waitReminderAfterMs: 60000,
+      waitReminderPerTurn: 2,
     })
   })
 
@@ -138,6 +167,7 @@ describe('configuration validation', () => {
       maxStepsPerTurn: 20,
       unfinishedTodoContinuations: 2,
       skillInvocationGuidance: false,
+      toolNameSuggestions: false,
       writeTools: [{ tool: 'write', pathArgument: 'path', contentArgument: 'content' }],
       maxWrittenFilesPerTurn: 4,
       requirePonytailUpgradePaths: true,
@@ -150,12 +180,14 @@ describe('configuration validation', () => {
         tools: [{ tool: 'bash', commandArgument: 'command' }],
         deny: [{ pattern: 'git\\s+push\\s+--force', reason: 'rewrites remote history' }],
       },
+      usageReminderThresholds: [100000, 250000],
     })
     expect([...(resolved.planDeniedTools ?? [])]).toEqual(['write', 'edit'])
     expect(resolved.repeatAskAfter).toBe(5)
     expect(resolved.maxStepsPerTurn).toBe(20)
     expect(resolved.unfinishedTodoContinuations).toBe(2)
     expect(resolved.skillInvocationGuidance).toBe(false)
+    expect(resolved.toolNameSuggestions).toBe(false)
     expect(resolved.writeTools?.get('write')).toEqual({ pathArgument: 'path', contentArgument: 'content' })
     expect(resolved.maxWrittenFilesPerTurn).toBe(4)
     expect(resolved.requirePonytailUpgradePaths).toBe(true)
@@ -166,10 +198,23 @@ describe('configuration validation', () => {
     expect(resolved.sensitivePaths).toEqual(['.env', '.ssh'])
     expect(resolved.commandGuard?.tools.get('bash')).toBe('command')
     expect(resolved.commandGuard?.rules[0]?.pattern.test('GIT PUSH --FORCE origin main')).toBe(true)
+    expect(resolved.usageReminderThresholds).toEqual([100000, 250000])
   })
 
   it('treats repeatAskAfter 0 as the off switch rather than a threshold', () => {
     expect(resolveConfig({ repeatAskAfter: 0 }).repeatAskAfter).toBeUndefined()
+  })
+
+  it('rejects an invalid stuck-nudge configuration at load', () => {
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: 1 })).toThrow(/one failure is not stuck/)
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: -2 })).toThrow(/stuckNudgeAfterFailures/)
+    expect(() => resolveConfig({ stuckNudgeConfidence: 1.5 })).toThrow(/stuckNudgeConfidence/)
+    expect(() => resolveConfig({ stuckNudgeConfidence: 0 })).toThrow(/stuckNudgeConfidence/)
+    expect(() => resolveConfig({ stuckNudgeAfterFailures: 2.5 })).toThrow(/stuckNudgeAfterFailures/)
+    expect(() => resolveConfig({ stuckNudgeMaxTokens: 0 })).toThrow(/stuckNudgeMaxTokens/)
+    expect(() => resolveConfig({ stuckNudgePerTurn: -1 })).toThrow(/stuckNudgePerTurn/)
+    expect(resolveConfig({ stuckNudgeAfterFailures: 0 }).stuckNudgeAfterFailures).toBeUndefined()
+    expect(resolveConfig({ stuckNudgePerTurn: 0 }).stuckNudgePerTurn).toBeUndefined()
   })
 
   it('defaults the mode to enforce and accepts observe', () => {
@@ -195,6 +240,10 @@ describe('configuration validation', () => {
     expect(resolveConfig({ unfinishedTodoContinuations: 0 }).unfinishedTodoContinuations).toBeUndefined()
   })
 
+  it('treats an empty usageReminderThresholds as the off switch rather than an error', () => {
+    expect(resolveConfig({ usageReminderThresholds: [] }).usageReminderThresholds).toBeUndefined()
+  })
+
   it.each([
     ['a non-array denied list', { planDeniedTools: 'write' }, 'must be an array'],
     ['an empty denied list', { planDeniedTools: [] }, 'must not be empty'],
@@ -209,6 +258,7 @@ describe('configuration validation', () => {
     ['a negative todo-continuation count', { unfinishedTodoContinuations: -1 }, 'integer >= 0'],
     ['a fractional todo-continuation count', { unfinishedTodoContinuations: 1.5 }, 'integer >= 0'],
     ['a non-boolean guidance switch', { skillInvocationGuidance: 'yes' }, 'must be a boolean'],
+    ['a non-boolean suggestion switch', { toolNameSuggestions: 'yes' }, 'must be a boolean'],
     ['an unknown key', { maxSteps: 3 }, 'unknown config key'],
     ['an unknown mode', { mode: 'dry-run' }, 'mode must be "enforce" or "observe"'],
     ['a non-array write list', { writeTools: 'write' }, 'must be an array'],
@@ -243,6 +293,12 @@ describe('configuration validation', () => {
     ['an empty command-pattern list', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [] } }, 'must be a non-empty array'],
     ['a command pattern naming no reason', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: 'x' }] } }, 'must name a reason'],
     ['an unparsable command pattern', { commandGuard: { tools: [{ tool: 'bash', commandArgument: 'command' }], deny: [{ pattern: '(', reason: 'y' }] } }, 'is not a regular expression'],
+    ['a non-array threshold list', { usageReminderThresholds: '100000' }, 'must be an array'],
+    ['a zero threshold', { usageReminderThresholds: [0] }, 'positive integers'],
+    ['a negative threshold', { usageReminderThresholds: [-1] }, 'positive integers'],
+    ['a fractional threshold', { usageReminderThresholds: [1.5] }, 'positive integers'],
+    ['a non-ascending threshold list', { usageReminderThresholds: [50000, 20000] }, 'strictly ascending'],
+    ['a duplicated threshold', { usageReminderThresholds: [100, 100] }, 'strictly ascending'],
   ])('rejects %s', (_label, config, message) => {
     expect(() => resolveConfig(config as Config)).toThrow(message)
   })
@@ -283,7 +339,7 @@ describe('plan-mode tool denial', () => {
     const agent = await ctx.agentLoop.create(SessionId('plan-active'), { provider: 'mock', model: 'mock' })
 
     expect(ctx.planMode.set(agent, true)).toBe('committed')
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'write', arguments: { path: 'a' }, agent,
     })
     expect(denied.isError).toBe(true)
@@ -292,7 +348,7 @@ describe('plan-mode tool denial', () => {
     expect(runs).toEqual([])
 
     expect(ctx.planMode.set(agent, false)).toBe('committed')
-    const allowed = await ctx.tools.execute({
+    const allowed = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c2'), name: 'write', arguments: { path: 'a' }, agent,
     })
     expect(allowed.isError).toBe(false)
@@ -306,7 +362,7 @@ describe('plan-mode tool denial', () => {
     const agent = await ctx.agentLoop.create(SessionId('plan-other'), { provider: 'mock', model: 'mock' })
     ctx.planMode.set(agent, true)
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read', arguments: {}, agent,
     })
     expect(result.isError).toBe(false)
@@ -343,7 +399,7 @@ describe('plan-mode tool denial', () => {
     ctx.tools.register(fixture('write', runs))
     const agent = await ctx.agentLoop.create(SessionId('plan-absent'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'write', arguments: {}, agent,
     })
     expect(result.isError).toBe(false)
@@ -357,7 +413,7 @@ describe('plan-mode tool denial', () => {
     const agent = await ctx.agentLoop.create(SessionId('plan-off'), { provider: 'mock', model: 'mock' })
     ctx.planMode.set(agent, true)
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'write', arguments: {}, agent,
     })
     expect(result.isError).toBe(false)
@@ -588,7 +644,7 @@ describe('skill-invocation guidance', () => {
 
   async function callSkill(ctx: Context, session: string, argumentsValue: unknown): Promise<ToolExecutionResult> {
     const agent = await ctx.agentLoop.create(SessionId(session), { provider: 'mock', model: 'mock' })
-    return ctx.tools.execute({
+    return callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId(`call-${session}`), name: 'skill', arguments: argumentsValue, agent,
     })
   }
@@ -696,7 +752,7 @@ describe('skill-invocation guidance', () => {
     ctx.skills.register(USER_ONLY)
 
     const agent = await ctx.agentLoop.create(SessionId('skill-other-tool'), { provider: 'mock', model: 'mock' })
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'probe', arguments: { name: 'user-only' }, agent,
     })
     expect(result.isError).toBe(false)
@@ -734,7 +790,7 @@ let nextCallId = 0
 /** Call a tool directly with one argument record, bypassing the loop. */
 function toolCall(ctx: Context, agent: Agent, name: string, args: object): Promise<ToolExecutionResult> {
   nextCallId += 1
-  return ctx.tools.execute({
+  return executeModelToolFixture(ctx, {
     signal: testToolSignal, callId: ToolCallId(`call-${String(nextCallId)}`), name, arguments: args, agent,
   })
 }
@@ -1146,7 +1202,7 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-aws'), { provider: 'mock', model: 'mock' })
 
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
       arguments: { file_path: '/home/u/.aws/credentials' }, agent,
     })
@@ -1162,7 +1218,7 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read'), { provider: 'mock', model: 'mock' })
 
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
       arguments: { file_path: '/home/u/.ssh/id_rsa' }, agent,
     })
@@ -1180,7 +1236,7 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-dotenv'), { provider: 'mock', model: 'mock' })
 
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
       arguments: { file_path: 'C:\\work\\.env.local' }, agent,
     })
@@ -1197,7 +1253,7 @@ describe('sensitive-read denial', () => {
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-source'), { provider: 'mock', model: 'mock' })
 
     for (const filePath of ['src/environment.ts', 'src/index.ts']) {
-      const allowed = await ctx.tools.execute({
+      const allowed = await callTool(ctx, {
         signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
         arguments: { file_path: filePath }, agent,
       })
@@ -1214,7 +1270,7 @@ describe('sensitive-read denial', () => {
 
     // A `credentials` segment in the shipped list would refuse both of these.
     for (const filePath of ['packages/credentials/credentials/src/index.ts', 'docs/subsystems/credentials.md']) {
-      const allowed = await ctx.tools.execute({
+      const allowed = await callTool(ctx, {
         signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
         arguments: { file_path: filePath }, agent,
       })
@@ -1229,7 +1285,7 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-upper'), { provider: 'mock', model: 'mock' })
 
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
       arguments: { file_path: 'C:\\Users\\U\\.SSH\\ID_RSA' }, agent,
     })
@@ -1245,7 +1301,7 @@ describe('sensitive-read denial', () => {
     ctx.tools.register(fixture('grep', runs))
     const agent = await ctx.agentLoop.create(SessionId('sensitive-read-other-tool'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'grep',
       arguments: { path: '/home/u/.ssh/id_rsa' }, agent,
     })
@@ -1273,7 +1329,7 @@ describe('command guard', () => {
     ctx.tools.register(fixture('bash', runs))
     const agent = await ctx.agentLoop.create(SessionId('command-guarded'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
       arguments: { command: 'git push --force origin main' }, agent,
     })
@@ -1290,7 +1346,7 @@ describe('command guard', () => {
     ctx.tools.register(fixture('bash', runs))
     const agent = await ctx.agentLoop.create(SessionId('command-wrapped'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
       arguments: { command: 'bash -c "git push --force origin main"' }, agent,
     })
@@ -1305,7 +1361,7 @@ describe('command guard', () => {
     ctx.tools.register(fixture('bash', runs))
     const agent = await ctx.agentLoop.create(SessionId('command-allowed'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'bash',
       arguments: { command: 'git status --short' }, agent,
     })
@@ -1320,13 +1376,102 @@ describe('command guard', () => {
     ctx.tools.register(fixture('pwsh', runs))
     const agent = await ctx.agentLoop.create(SessionId('command-other-tool'), { provider: 'mock', model: 'mock' })
 
-    const result = await ctx.tools.execute({
+    const result = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'pwsh',
       arguments: { command: 'git push --force origin main' }, agent,
     })
 
     expect(result.isError).toBe(false)
     expect(runs).toEqual(['pwsh'])
+  })
+})
+
+describe('usage reminder', () => {
+  /** Boot a harness on one threshold list, with the model scripted. */
+  async function usageHarness(
+    session: string,
+    thresholds: readonly number[],
+    responses: ReturnType<typeof textResponse>[],
+  ): Promise<{ ctx: Context; agent: Agent; adapter: MockAdapter }> {
+    const ctx = await harness({ usageReminderThresholds: thresholds })
+    const agent = await newAgent(ctx, session)
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, adapter }
+  }
+
+  /** The text the model was sent in one request, across every content block. */
+  function requestText(request: GenerateOptions): string {
+    return request.messages
+      .map(message => message.content.map(block => block.type === 'text' ? block.text : '').join(''))
+      .join('\n')
+  }
+
+  it('stays out of the loop entirely when the rail is off', async () => {
+    const { ctx, agent, adapter } = await usageHarness('usage-off', [], [textResponse('done')])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('sends one steer at the first boundary past each threshold, once', async () => {
+    // The mock reports inputTokens 10 + outputTokens = text length per call, so
+    // the cumulative totals across the four scripted calls are 25, 37, 57, 71.
+    const { ctx, agent, adapter } = await usageHarness('usage-first', [20, 40], [
+      textResponse('x'.repeat(15)),
+      textResponse('ok'),
+      textResponse('y'.repeat(10)),
+      textResponse('done'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(2)
+    const firstSteer = adapter.requests[1]
+    if (firstSteer === undefined) throw new Error('the second request carries the first reminder')
+    expect(requestText(firstSteer)).toContain('Session token usage has reached ~20 tokens')
+    expect(requestText(firstSteer)).not.toContain('~40 tokens')
+
+    await userTurn(ctx, agent, 'more')
+
+    // A repeated 20-token reminder would need a third request in this turn.
+    expect(adapter.requests).toHaveLength(4)
+    const secondSteer = adapter.requests[3]
+    if (secondSteer === undefined) throw new Error('the fourth request carries the second reminder')
+    expect(requestText(secondSteer)).toContain('Session token usage has reached ~40 tokens')
+  })
+
+  it('names the highest threshold when one boundary crosses several', async () => {
+    const { ctx, agent, adapter } = await usageHarness('usage-jump', [10, 20], [
+      textResponse('x'.repeat(15)),
+      textResponse('ok'),
+    ])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(2)
+    const steered = adapter.requests[1]
+    if (steered === undefined) throw new Error('the second request carries the reminder')
+    expect(requestText(steered)).toContain('Session token usage has reached ~20 tokens')
+    expect(requestText(steered)).not.toContain('~10 tokens')
+  })
+
+  it('leaves a session whose steps report no usage alone', async () => {
+    const noUsage: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'no usage reported' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'no usage reported' } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ]
+    const ctx = await harness({ usageReminderThresholds: [1] })
+    const agent = await newAgent(ctx, 'usage-no-usage')
+    const adapter = new MockAdapter([noUsage])
+    ctx.llm.registerAdapter(['mock'], adapter)
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(1)
   })
 })
 
@@ -1643,8 +1788,8 @@ describe('/guardrails status', () => {
     const execution = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
     const text = execution?.result.text ?? ''
 
-    expect(text).toContain('Guardrails: 3 of 12 rails armed (mode: enforce, config ')
-    expect(text.split('\n').slice(1, 13)).toEqual([
+    expect(text).toContain('Guardrails: 5 of 15 rails armed (mode: enforce, config ')
+    expect(text.split('\n').slice(1, 16)).toEqual([
       'plan-mode denial: off',
       'repeat approval: off',
       'turn budget: 20 steps',
@@ -1657,6 +1802,9 @@ describe('/guardrails status', () => {
       'verification gate: off',
       'sensitive reads: .env',
       'command guard: off',
+      'stuck nudge: after 3 consecutive failures',
+      'usage reminder: off',
+      'wait reminder: after 60s, max 2/turn',
     ])
     // Nothing was observed and nothing was refused, so the ledger has no rows
     // beyond the count an observing deployment would need.
@@ -1671,7 +1819,7 @@ describe('/guardrails status', () => {
     const second = await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal)
 
     expect(first?.result.text.split('\n')[0])
-      .toMatch(/^Guardrails: \d+ of 12 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
+      .toMatch(/^Guardrails: \d+ of 15 rails armed \(mode: enforce, config [0-9a-f]{8}\)\.$/)
     expect(second?.result.text).toEqual(first?.result.text)
   })
 
@@ -1711,7 +1859,7 @@ describe('/guardrails status', () => {
     const runs: string[] = []
     ctx.tools.register(fixture('read', runs))
     const agent = await ctx.agentLoop.create(SessionId('status-no-commands'), { provider: 'mock', model: 'mock' })
-    const denied = await ctx.tools.execute({
+    const denied = await callTool(ctx, {
       signal: testToolSignal, callId: ToolCallId('c1'), name: 'read',
       arguments: { file_path: '.env' }, agent,
     })
@@ -1733,5 +1881,483 @@ describe('/guardrails status', () => {
 
     expect((await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text)
       .not.toContain('decisions this session')
+  })
+})
+
+/** A tool fixture whose every execution fails with one fixed message. */
+function failingFixture(name: string, message: string) {
+  return defineTool({
+    name,
+    description: `${name} fixture`,
+    parameters: {},
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text' as const, text: value }],
+    },
+    execute() {
+      return Promise.reject(new Error(message))
+    },
+  })
+}
+
+/** The full model-visible text of every request the adapter received, in order. */
+function requestTexts(adapter: MockAdapter): string[] {
+  return adapter.requests.map(options => options.messages
+    .map(message => JSON.stringify(message.content))
+    .join(' '))
+}
+
+describe('stuck nudge', () => {
+  it('nudges once when the judge confirms a confident loop, and refuses nothing', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 3 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const results = recordToolResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('stuck-confident'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Every result reached the model unchanged — the nudge rides alongside, it never refuses.
+    expect(results).toHaveLength(3)
+    expect(results.every(text => text.includes('the cache is stale'))).toBe(true)
+    const judged = requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))
+    expect(judged).toHaveLength(1)
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('sends nothing when the judge says not spinning, is unsure, or is unreadable', async () => {
+    for (const reply of ['{"spinning":false,"confidence":0.95}', '{"spinning":true,"confidence":0.4}', 'no verdict in this prose']) {
+      const ctx = await harness({ stuckNudgeAfterFailures: 2 })
+      ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+      const agent = await ctx.agentLoop.create(SessionId('stuck-doubt'), { provider: 'mock', model: 'mock' })
+
+      const adapter = new MockAdapter([
+        toolCallResponse('c0', 'broken', { q: 'x' }),
+        toolCallResponse('c1', 'broken', { q: 'x' }),
+        textResponse(reply),
+        textResponse('done'),
+      ])
+      ctx.llm.registerAdapter(['mock'], adapter)
+      await userTurn(ctx, agent, 'go')
+
+      expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(1)
+      expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(false)
+    }
+  })
+
+  it('clears the chain on a success and resets it on a new turn', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 3 })
+    const runs: string[] = []
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    ctx.tools.register(fixture('probe', runs))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-clears'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'probe', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Two failures around one success never reach the threshold, so the judge
+    // is never asked: five requests, no judge among them.
+    expect(runs).toEqual(['probe'])
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(0)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('spends its per-turn quota after one nudge', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 2, stuckNudgePerTurn: 1 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-quota'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // The third failure qualifies again, but the quota is spent, so the judge
+    // is not asked a second time. The nudge, once delivered, is durable session
+    // text: every later request carries it.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(1)
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('nudges in observe mode too, because a steer is not a refusal', async () => {
+    const ctx = await commandHarness({ mode: 'observe', stuckNudgeAfterFailures: 2 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-observe'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    expect(requestTexts(adapter).some(text => text.includes('consecutive failures'))).toBe(true)
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('stuck nudge: after 2 consecutive failures')
+    // The reminder is a steer, so it counts toward the ledger without being an
+    // observable refusal — exactly the asymmetry the mode's contract states.
+    expect(status).toContain('decisions this session: 1 (0 observed)')
+  })
+
+  it('stays out of the loop entirely when stuckNudgeAfterFailures is 0', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 0 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-off'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Four failures in one turn and no judge request anywhere: the rail never
+    // registered a listener.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(0)
+    expect(adapter.requests).toHaveLength(5)
+  })
+
+  it('spends a fresh quota in the next turn', async () => {
+    const ctx = await harness({ stuckNudgeAfterFailures: 2, stuckNudgePerTurn: 1 })
+    ctx.tools.register(failingFixture('broken', 'the cache is stale'))
+    const agent = await ctx.agentLoop.create(SessionId('stuck-next-turn'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'broken', { q: 'x' }),
+      toolCallResponse('c1', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.9}'),
+      textResponse('interim'),
+      toolCallResponse('c2', 'broken', { q: 'x' }),
+      toolCallResponse('c3', 'broken', { q: 'x' }),
+      textResponse('{"spinning":true,"confidence":0.85}'),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+    await userTurn(ctx, agent, 'continue')
+
+    // One judge call per turn: the quota resets when the loop opens a turn,
+    // whatever message claimed it.
+    expect(requestTexts(adapter).filter(text => text.includes('Is the agent spinning'))).toHaveLength(2)
+  })
+})
+
+describe('unknown tool name suggestions', () => {
+  /** Every tool result the loop committed, in call order. */
+  function recordCommittedResults(ctx: Context): ToolExecutionResult[] {
+    const results: ToolExecutionResult[] = []
+    ctx.on('tools/post-execute', (_exec, result, next) => {
+      results.push(result)
+      return next()
+    })
+    return results
+  }
+
+  /** Drive one turn whose model makes exactly one tool call and then stops. */
+  async function turnCalling(ctx: Context, agent: Agent, tool: string, callId: string): Promise<void> {
+    const adapter = new MockAdapter([toolCallResponse(callId, tool, {}), textResponse('done')])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+  }
+
+  it('tells the model the near names for a missed tool call', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    ctx.tools.register(fixture('read', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-hit'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — did you mean "bash"?')
+    expect(missed !== undefined && textOf(missed)).toBe('Error: unknown tool "bashh" — did you mean "bash"?')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+    expect(missed?.error.info?.name).toBe('ToolNotFoundError')
+    expect(runs).toEqual([])
+  })
+
+  it('lists several near names closest first and stops at three', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    for (const name of ['bash', 'bashx', 'bashy', 'push']) ctx.tools.register(fixture(name, runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-many'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — similar tools: "bash", "bashx", "bashy"')
+  })
+
+  it('keeps the original message when nothing registered is near', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('read', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-none'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'zzzzzz', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "zzzzzz"')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+  })
+
+  it('leaves a correctly named call untouched', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-exact'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bash', 'c1')
+
+    const hit = results.find(result => !result.isError)
+    expect(textOf(hit)).toBe('bash ran')
+    expect(runs).toEqual(['bash'])
+  })
+
+  it('keeps the pipeline message and info when the switch is off', async () => {
+    const ctx = await harness({ toolNameSuggestions: false })
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-off'), { provider: 'mock', model: 'mock' })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh"')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+    expect(missed?.error.info?.name).toBe('ToolNotFoundError')
+  })
+
+  it('enhances a miss a downstream listener rethrows as an error', async () => {
+    const ctx = await harness()
+    const runs: string[] = []
+    ctx.tools.register(fixture('bash', runs))
+    const results = recordCommittedResults(ctx)
+    const agent = await ctx.agentLoop.create(SessionId('hints-thrown'), { provider: 'mock', model: 'mock' })
+    ctx.on('tools/execute', async (_exec, next) => {
+      const result = await next()
+      if (!result.isError || result.error.info?.code !== 'UNKNOWN_TOOL') return result
+      const rethrown = new Error(result.error.message)
+      rethrown.name = 'ToolNotFoundError'
+      throw rethrown
+    })
+
+    await turnCalling(ctx, agent, 'bashh', 'c1')
+
+    const missed = results.find(result => result.isError)
+    expect(missed?.error.message).toBe('unknown tool "bashh" — did you mean "bash"?')
+    expect(missed?.error.info?.code).toBe('UNKNOWN_TOOL')
+  })
+})
+
+describe('tool suggestion helpers', () => {
+  it('ranks candidates by distance and caps the list at three', () => {
+    expect(suggestToolNames('bashh', ['push', 'bashy', 'bashx', 'bash'])).toEqual(['bash', 'bashy', 'bashx'])
+  })
+
+  it('credits a case-insensitive substring overlap', () => {
+    expect(suggestToolNames('WebFetch', ['webfetch'])).toEqual(['webfetch'])
+    expect(suggestToolNames('web_fetch', ['fetch'])).toEqual(['fetch'])
+  })
+
+  it('returns nothing when every candidate is outside the budget', () => {
+    expect(suggestToolNames('totally-unrelated-name', ['bash', 'read', 'write'])).toEqual([])
+  })
+
+  it('renders one candidate as a did-you-mean and several as a list', () => {
+    expect(toolNameHint(['bash'])).toBe('did you mean "bash"?')
+    expect(toolNameHint(['bash', 'read'])).toBe('similar tools: "bash", "read"')
+    expect(toolNameHint([])).toBe('')
+  })
+})
+
+describe('wait-time reminder', () => {
+  /** A tool fixture that delays its execution by `delayMs`. */
+  function slowFixture(name: string, delayMs: number) {
+    return defineTool({
+      name,
+      description: `${name} fixture`,
+      parameters: {},
+      output: {
+        schema: { type: 'string' },
+        render: (_args, value) => [{ type: 'text' as const, text: value }],
+      },
+      async execute() {
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        return `${name} ran after ${delayMs}ms`
+      },
+    })
+  }
+
+  /** Boot a harness with the wait-time reminder config and a scripted model. */
+  async function waitHarness(
+    session: string,
+    config: { waitReminderAfterMs: number; waitReminderPerTurn?: number },
+    responses: ReturnType<typeof textResponse>[],
+  ): Promise<{ ctx: Context; agent: Agent; adapter: MockAdapter }> {
+    const ctx = await harness(config)
+    const agent = await newAgent(ctx, session)
+    const adapter = new MockAdapter(responses)
+    ctx.llm.registerAdapter(['mock'], adapter)
+    return { ctx, agent, adapter }
+  }
+
+  /** The text the model was sent in one request, across every content block. */
+  function requestText(request: GenerateOptions): string {
+    return request.messages
+      .map(message => message.content.map(block => block.type === 'text' ? block.text : '').join(''))
+      .join('\n')
+  }
+
+  it('stays out of the loop entirely when the rail is off', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-off', { waitReminderAfterMs: 0 }, [textResponse('done')])
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('sends one reminder when a call exceeds the threshold, once per call', async () => {
+    // First call: fast fixture (under the threshold) -> no reminder.
+    // Second call: 100ms (over the 60ms threshold) -> reminder injected.
+    const { ctx, agent, adapter } = await waitHarness('wait-first', { waitReminderAfterMs: 60 }, [
+      toolCallResponse('c0', 'fast', {}),
+      toolCallResponse('c1', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(fixture('fast', []))
+    ctx.tools.register(slowFixture('slow', 100))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(3)
+    const steered = adapter.requests[2]
+    if (steered === undefined) throw new Error('the third request carries the reminder')
+    expect(requestText(steered)).toContain('The call to `slow` waited')
+    expect(requestText(steered)).toContain('prefer background execution')
+    // Original result unchanged
+    expect(requestText(steered)).toContain('slow ran after 100ms')
+  })
+
+  it('respects the per-turn quota', async () => {
+    // Three slow calls in one turn, quota = 2 -> only first two get reminders.
+    // Reminders are durable session text, so the final request carries the
+    // accumulated copies: exactly two, not three.
+    const { ctx, agent, adapter } = await waitHarness('wait-quota', { waitReminderAfterMs: 50, waitReminderPerTurn: 2 }, [
+      toolCallResponse('c0', 'slow', {}),
+      toolCallResponse('c1', 'slow', {}),
+      toolCallResponse('c2', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 60))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(4)
+    const finalText = requestText(adapter.requests[3])
+    if (finalText === undefined) throw new Error('the final request closes the turn')
+    expect(finalText.split('The call to `slow` waited').length - 1).toBe(2)
+  })
+
+  it('resets the quota on a new turn', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-next-turn', { waitReminderAfterMs: 50, waitReminderPerTurn: 1 }, [
+      toolCallResponse('c0', 'slow', {}),
+      toolCallResponse('c1', 'slow', {}),
+      textResponse('interim'),
+      toolCallResponse('c2', 'slow', {}),
+      toolCallResponse('c3', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 100))
+
+    await userTurn(ctx, agent, 'go')
+    await userTurn(ctx, agent, 'continue')
+
+    // One reminder per turn, so two reminders total across two turns
+    expect(adapter.requests).toHaveLength(6)
+    expect(requestText(adapter.requests[1])).toContain('The call to `slow` waited')
+    expect(requestText(adapter.requests[4])).toContain('The call to `slow` waited')
+  })
+
+  it('formats the wait time in whole seconds once it reaches a minute scale', async () => {
+    const { ctx, agent, adapter } = await waitHarness('wait-format', { waitReminderAfterMs: 100 }, [
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.tools.register(slowFixture('slow', 1100))
+
+    await userTurn(ctx, agent, 'go')
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(requestText(adapter.requests[1])).toContain('waited 1s')
+  })
+
+  it('arms the rail row in the status report under enforce', async () => {
+    const ctx = await commandHarness({ waitReminderAfterMs: 50, waitReminderPerTurn: 2 })
+    ctx.tools.register(slowFixture('slow', 60))
+    const agent = await ctx.agentLoop.create(SessionId('wait-ledger'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    // Enforce prints no decisions block; the armed row is what an operator reads.
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('wait reminder: after 50ms, max 2/turn')
+    expect(status).not.toContain('decisions this session')
+  })
+
+  it('works in observe mode too, and the steer lands in the ledger', async () => {
+    const ctx = await commandHarness({ mode: 'observe', waitReminderAfterMs: 50, waitReminderPerTurn: 2 })
+    ctx.tools.register(slowFixture('slow', 60))
+    const agent = await ctx.agentLoop.create(SessionId('wait-observe'), { provider: 'mock', model: 'mock' })
+
+    const adapter = new MockAdapter([
+      toolCallResponse('c0', 'slow', {}),
+      textResponse('done'),
+    ])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    await userTurn(ctx, agent, 'go')
+
+    const status = (await ctx.commands.execute(agent, '/guardrails', [], new AbortController().signal))?.result.text ?? ''
+    expect(status).toContain('wait reminder: after 50ms, max 2/turn')
+    // A steer is recorded but is not an observation — the same asymmetry the
+    // stuck nudge reports.
+    expect(status).toContain('decisions this session: 1 (0 observed)')
   })
 })

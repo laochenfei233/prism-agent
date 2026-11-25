@@ -2,6 +2,7 @@
 //! start left running, spawn, port health probe, automatic crash restart, and
 //! clean teardown on app exit.
 
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -9,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
@@ -248,7 +249,7 @@ impl DshHandle {
         append_startup_log("spawn_child: begin");
         self.auth_url.lock().unwrap().take();
         self.ensure_home_node_modules()?;
-        crate::setup::ensure_default_plugins(&app)?;
+        crate::setup::ensure_default_plugins(&app, &self.node_path, &self.dsh_bin)?;
         append_startup_log("spawn_child: default plugins ready");
         let port = match select_port() {
             Ok(port) => port,
@@ -265,6 +266,11 @@ impl DshHandle {
             .arg("web")
             .arg("--port")
             .arg(port.to_string())
+            // Bind the machine's private LAN addresses too, so a phone on the
+            // same network reaches the hub on INTERNAL_PORT without a
+            // forwarder; the hub resolves the addresses itself at startup, so
+            // a DHCP change takes effect on the next relaunch.
+            .arg("--bind-lan")
             .arg("--no-open")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -1057,6 +1063,102 @@ fn plain_path(p: &Path) -> PathBuf {
         p.to_path_buf()
     }
 }
+
+/// Name and value of the signed browser-session cookie the launch exchange mints.
+#[derive(Debug)]
+struct AuthCookie {
+    name: String,
+    value: String,
+}
+
+/// The proxy origin the app window loads after the launch-token exchange.
+#[derive(Serialize)]
+pub struct WebviewSession {
+    pub url: String,
+}
+
+/// Read the sole dsh browser-session cookie from the token-exchange response.
+fn auth_cookie_from_response(response: &str) -> Option<AuthCookie> {
+    let header_block = response.split("\r\n\r\n").next()?;
+    let set_cookie = header_block.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("set-cookie")
+            .then(|| value.trim())
+    })?;
+    let (name, value) = set_cookie.split(';').next()?.split_once('=')?;
+    let name = name.trim();
+    if !name.starts_with("dsh-auth-") {
+        return None;
+    }
+    Some(AuthCookie {
+        name: name.to_owned(),
+        value: value.trim().to_owned(),
+    })
+}
+
+/// Exchange the one-time URL token over loopback HTTP for the signed session.
+/// The exchange doubles as the liveness probe, failing before any window can
+/// display the 401 body.
+async fn launch_exchange(parsed: Url) -> Result<AuthCookie, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let port = parsed.port().ok_or("invalid dsh web launch URL")?;
+        let target = match parsed.query() {
+            Some(query) => format!("{}?{query}", parsed.path()),
+            None => parsed.path().to_owned(),
+        };
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        use std::io::Write;
+        stream
+            .write_all(
+                format!(
+                    "GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        let mut response = String::new();
+        std::io::Read::read_to_string(&mut stream, &mut response)
+            .map_err(|e| format!("launch-token exchange failed: {e}"))?;
+        auth_cookie_from_response(&response)
+            .ok_or_else(|| "launch-token response contained no dsh browser cookie".to_owned())
+    })
+    .await
+    .map_err(|e| format!("launch-token exchange task failed: {e}"))?
+}
+
+/// Exchange the launch token, point the app proxy at the session it mints, and
+/// return the proxy origin the window loads.
+///
+/// The window never authenticates through its own cookie jar: the proxy
+/// attaches the signed session to every request and WebSocket handshake. The
+/// frame therefore keeps working where a third-party cookie is withheld, and a
+/// restarted server only replaces the session behind an origin that never
+/// changes.
+#[tauri::command]
+pub async fn authenticate_webview(url: String) -> Result<WebviewSession, String> {
+    let parsed = url
+        .parse::<Url>()
+        .ok()
+        .filter(|parsed| {
+            parsed.scheme() == "http"
+                && parsed.host_str() == Some("127.0.0.1")
+                && parsed.port().is_some()
+        })
+        .ok_or("invalid dsh web launch URL")?;
+    let port = parsed.port().ok_or("invalid dsh web launch URL")?;
+    let cookie = launch_exchange(parsed).await?;
+    crate::proxy::session_updated(port, format!("{}={}", cookie.name, cookie.value));
+    let proxy_port = crate::proxy::ensure_started().await?;
+    crate::proxy::self_check().await;
+    Ok(WebviewSession {
+        url: format!("http://127.0.0.1:{proxy_port}/"),
+    })
+}
+
 
 #[derive(Serialize)]
 pub struct DshStatus {

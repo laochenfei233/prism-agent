@@ -5,14 +5,17 @@
 # the row at the built entry instead:
 #   name: 'file:///absolute/path/to/plugins/prism-session-autoarchive/lib/index.js'
 #
-# The defaults below are the shipped values: keep every top-level conversation
-# that was used within the last 30 days, and sweep once a day. A deployment that
-# wants a longer window raises `idleDays`; `enabled: false` keeps the plugin
-# mounted with no sweep at all.
+# The defaults below are the shipped values: automatic hygiene is OFF until a
+# deployment turns `enabled` on; a conversation then archives after 30 idle
+# days, an idle project after 14 quiet days, and the default Workspace is
+# exempt unless `includeDefaultWorkspace` is on. Sweeps run once a day. Every
+# field is live-editable from the Settings page the plugin's schema generates.
 - insert:
     - id: prism-session-autoarchive
       name: 'prism-session-autoarchive'
       config:
-        enabled: true
+        enabled: false
         idleDays: 30
+        projectIdleDays: 14
+        includeDefaultWorkspace: false
         sweepIntervalMinutes: 1440

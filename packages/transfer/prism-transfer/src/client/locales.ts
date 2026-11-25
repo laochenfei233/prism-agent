@@ -2,6 +2,7 @@
 
 export const zh = {
   emptyProjects: '还没有登记的项目',
+  menuExportProject: '导出项目',
   exportTitle: '导出',
   exportHint: '勾选要导出的项目；压缩包含项目文件夹与其挂接的全部会话。',
   selectAll: '全选',
@@ -61,6 +62,7 @@ export const zh = {
 /** English mirror, typed against the zh key set. */
 export const en: Record<keyof typeof zh, string> = {
   emptyProjects: 'No registered projects yet',
+  menuExportProject: 'Export project',
   exportTitle: 'Export',
   exportHint: 'Pick the projects to export; the archive carries the folder and every attached session.',
   selectAll: 'Select all',

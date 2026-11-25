@@ -1,0 +1,88 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/prism/prism-wiki/README.md
+/:
+  en: d516895128820bd3
+  zh: 73028f73c1454d34
+/prism-prism-wiki:
+  en: 75750d1dc0e692a4
+  zh: 9f02a0eb6218f323
+/prism-prism-wiki/summary:
+  en: 441a1ecb5f908e3f
+  zh: 5d539c1a8b3eb336
+/prism-prism-wiki/table-of-contents:
+  en: d29ccc2144c8ff6c
+  zh: a716907d6cf12f4a
+/prism-prism-wiki/the-vault-layout:
+  en: 88825f009bd2265f
+  zh: fabe24cdd55eec67
+/prism-prism-wiki/configuration:
+  en: c4a806617d5e9908
+  zh: a51e558e2ed68c2e
+/prism-prism-wiki/model-facing-tools:
+  en: 69213c603b38bb8a
+  zh: b171a9174fbf85d2
+/prism-prism-wiki/the-wiki-command:
+  en: bab4ee68369af223
+  zh: 639aefd081de7808
+/prism-prism-wiki/retrieval:
+  en: b8acc89d12384e97
+  zh: 25d8835792defc5e
+/prism-prism-wiki/the-web-knowledge-page:
+  en: 3d1650a223adc135
+  zh: 9e9679807b8b8706
+/prism-prism-wiki/verification:
+  en: 82692211a278ecff
+  zh: f94d85aa04d61298
+/prism-prism-wiki/installation:
+  en: b5747f68d616c026
+  zh: 7b67012981c63db9
+/prism-prism-wiki/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/prism-prism-wiki/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: 24ba47a0c5e02586
+/prism-prism-wiki/model-experience/system-prompt/what-the-model-sees:
+  en: 43e651339cc97e00
+  zh: 4bb62955a9a5c1d3
+/prism-prism-wiki/model-experience/system-prompt/what-the-model-sees/shipped-protocol-text:
+  en: cc285666ecd94dea
+  zh: 81f601507f85ccb9
+/prism-prism-wiki/model-experience/system-prompt/token-effect:
+  en: 065b569e11ac1009
+  zh: 6efca58cef43c3f1
+/prism-prism-wiki/model-experience/system-prompt/kv-cache-effect:
+  en: 2c638d7ed00c181b
+  zh: 8a795482de8d141a
+/prism-prism-wiki/model-experience/vault-conventions-frame:
+  en: 2a72d9a93b8dc191
+  zh: e8b8c4d45763972c
+/prism-prism-wiki/model-experience/vault-conventions-frame/what-the-model-sees:
+  en: 1fa19f657bd791da
+  zh: 4cf0b4a9ad23e5b1
+/prism-prism-wiki/model-experience/vault-conventions-frame/token-effect:
+  en: fd34e5aff5a1a599
+  zh: 5ce7933768db60d4
+/prism-prism-wiki/model-experience/vault-conventions-frame/kv-cache-effect:
+  en: c93449cf31493d6e
+  zh: 47869263ef8389bc
+/prism-prism-wiki/model-experience/model-facing-tools:
+  en: 59bd7715039e05fc
+  zh: 965f9c1782f041f3
+/prism-prism-wiki/model-experience/model-facing-tools/what-the-model-sees:
+  en: 0e834b2aeac344bf
+  zh: a0f55b5d6ea7faf9
+/prism-prism-wiki/model-experience/model-facing-tools/token-effect:
+  en: 5cce091b178b9b02
+  zh: cbe62b41124a6fdc
+/prism-prism-wiki/model-experience/model-facing-tools/kv-cache-effect:
+  en: ce3c2ef44fb08967
+  zh: 01f232a3b492330b
+/prism-prism-wiki/known-limitations-and-deferred-work:
+  en: 8bf881c9713fd1bb
+  zh: c401f68badba81b2
+/prism-prism-wiki/known-limitations-and-deferred-work/dev-note:
+  en: 435a53129a642921
+  zh: f51a691229802b91

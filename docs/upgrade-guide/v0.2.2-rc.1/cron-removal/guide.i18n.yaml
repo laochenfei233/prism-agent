@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-rc.1/cron-removal/guide.md
+/:
+  en: 93e419f6bb81ce4a
+  zh: a5198b5d2989e024
+/cron-scheduling-is-retired-in-favor-of-schedule:
+  en: 54b25a67ba5d990e
+  zh: 3a3ee0c1fc3c872c
+/cron-scheduling-is-retired-in-favor-of-schedule/change:
+  en: 531e6709e074515f
+  zh: 2aaf2b34e4a103a5
+/cron-scheduling-is-retired-in-favor-of-schedule/migration:
+  en: cb8b8863420dbebd
+  zh: 0faef6e54128fd23

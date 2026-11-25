@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { resolvePwshPath } from './packages/shell/pwsh-local/src/resolve.ts'
 import { defineConfig } from 'vitest/config'
 import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
+import { sourceRemotePlugin } from './scripts/vitest-source-remote.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
 import { COVERAGE_PARTITION_MODE_ENV, COVERAGE_TEST_TIMEOUT_ENV, coverageTestTimeoutOptions } from './scripts/coverage-partitions.ts'
 import { LOCAL_TEST_PARALLELISM_CAP, defaultParallelism } from './scripts/parallelism.ts'
@@ -34,7 +36,6 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/experimental/hooks-claude-code',
       'packages/experimental/hooks-codex',
       'packages/terminal/terminal-bash',
-      'packages/experimental/ptc-runtime-python',
       'packages/sandbox/sandbox-local',
       // OpenSSH multiplexing and Unix-socket helper streams require POSIX endpoints.
       'packages/ssh/*',
@@ -108,8 +109,19 @@ const windowsRunnerCoverageExclusions = process.platform === 'win32'
       // win32.spec's injected bindings and exercised natively by every
       // Windows suite through the real backend.
       'packages/session/session-persistence-jsonl/src/lease.ts',
+      'packages/session/session-persistence-sqlite/src/lease.ts',
       // The macOS provider transport uses Unix sockets; POSIX lanes cover its real socket lifecycle.
       'packages/experimental/cua-macos/src/shared-native.ts',
+      // The GitHub CLI runner's suite stands in for `gh` with POSIX shell
+      // scripts and skips on Windows: the Linux and macOS lanes hold its
+      // per-file 100%, while the provider suite pins its callers everywhere.
+      'packages/experimental/forge-github/src/gh.ts',
+      // The GitLab CLI runner's suite does the same with a POSIX `glab` stand-in.
+      'packages/experimental/forge-gitlab/src/glab.ts',
+      // The panel's Git failure and environment cases stand in for `git` with
+      // POSIX shell scripts and skip on Windows: the Linux and macOS lanes hold
+      // its per-file 100%, while its real-Git cases run everywhere.
+      'packages/experimental/client-ui-forge/src/git.ts',
     ]
   : []
 
@@ -171,6 +183,7 @@ const processBoundTests = [
   'packages/llm/llm-pi-ai/tests/adapter.spec.ts',
   'packages/boot/app-boot/tests/app-boot.spec.ts',
   'packages/workflow/workflow-ptc/tests/workflow-ptc.spec.ts',
+  'packages/ptc-runtime/ptc-runtime-node/tests/imports.spec.ts',
 ]
 
 // Claude Code's test-kit module names, served by the mods bridge's test support so the example mods' tests import them unchanged.
@@ -179,9 +192,33 @@ const claudeCodeTestingAliases = {
   'claude-code': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)),
 }
 
+// These client entries statically import their generated `./remote` contribution, which exists
+// only in built `lib/` output. On a clean checkout Vite resolves that import while transforming the
+// entry, before `vi.mock` can answer it, so the jsdom assembly suites need a resolvable stand-in.
+const liveshareRemoteBuild = fileURLToPath(new URL('./packages/experimental/liveshare/lib/typert.remote-client.js', import.meta.url))
+const chatImportRemoteBuild = fileURLToPath(new URL('./packages/experimental/deepseek-chat-import/lib/typert.remote-client.js', import.meta.url))
+const hmrRemoteBuild = fileURLToPath(new URL('./packages/client/hmr/lib/typert.remote-client.js', import.meta.url))
+const generatedRemoteAliases = {
+  ...existsSync(hmrRemoteBuild) ? {} : {
+    '@deepseek-ai/dsh-client-hmr/remote': fileURLToPath(new URL('./packages/client/hmr/tests/generated-remote-stub.ts', import.meta.url)),
+  },
+  ...existsSync(liveshareRemoteBuild) ? {} : {
+    '@deepseek-ai/dsh-experimental-liveshare/remote': fileURLToPath(new URL('./packages/experimental/liveshare/tests/generated-remote-stub.ts', import.meta.url)),
+  },
+  ...existsSync(chatImportRemoteBuild) ? {} : {
+    '@deepseek-ai/dsh-deepseek-chat-import/remote': fileURLToPath(new URL('./packages/experimental/deepseek-chat-import/tests/generated-remote-stub.ts', import.meta.url)),
+  },
+}
+const testingAliases = { ...claudeCodeTestingAliases, ...generatedRemoteAliases }
+const testPlugins = () => [
+  pathsPlugin(),
+  standardDecoratorPlugin(),
+  sourceRemotePlugin(import.meta.dirname, '@deepseek-ai/dsh-client-remote-connection'),
+]
+
 export default defineConfig({
-  plugins: [pathsPlugin(), standardDecoratorPlugin()],
-  resolve: { alias: claudeCodeTestingAliases },
+  plugins: testPlugins(),
+  resolve: { alias: testingAliases },
   test: {
     ...localWorkerBudget,
     setupFiles: [
@@ -194,8 +231,8 @@ export default defineConfig({
     // Node stability; process-bound suites stay separate for inventory control.
     projects: [
       {
-        plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        plugins: testPlugins(),
+        resolve: { alias: testingAliases },
         test: {
           name: 'thread-safe',
           execArgv: vitestExecArgv,
@@ -216,11 +253,12 @@ export default defineConfig({
         },
       },
       {
-        plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        plugins: testPlugins(),
+        resolve: { alias: testingAliases },
         test: {
           name: 'process-bound',
-          execArgv: vitestExecArgv,
+          // Runner import tests require VM modules; the missing-flag test stays in thread-safe.
+          execArgv: [...vitestExecArgv, '--experimental-vm-modules'],
           pool: 'forks',
           ...laneTestBudget,
           setupFiles: [
@@ -268,7 +306,10 @@ export default defineConfig({
         'packages/client/ui-primitives/src/RiskConfirmation.tsx',
         'packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx',
         'packages/client/ui-workspace/src/client/WorkspacePicker.tsx',
+        // BatchActions is WorkspaceBrowser's batch toolbar, moved out verbatim;
+        // it keeps the browser-grade exemption until the lane covers the surface.
         'packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx',
+        'packages/client/ui-workspace/src/client/rows/BatchActions.tsx',
         'packages/client/ui-renderer/src/client/*',
         // Session object internals retain the runtime GUI debt exemption; the
         // assistant-stream reconciler, Controller entry, transport, Agent scope,
@@ -335,16 +376,22 @@ export default defineConfig({
         'packages/api/remotes/src/client/index.ts',
         // The Team browser entry binds its source-covered mount lifecycle to
         // the generated Team Remote contribution, which likewise exists only in lib.
-        'packages/experimental/client-ui-agent-team/src/client/index.ts',
+        'packages/client/ui-agent-team/src/client/index.ts',
         // The speech entry also imports generated Remote definitions; voice-input.e2e.ts
         // exercises the built entry, while source tests cover mountVoiceInput.
         'packages/experimental/client-ui-voice-input/src/client/index.ts',
+        // The permission entry binds generated Remote code; cua-permissions.e2e.ts covers
+        // its built entry, while source tests exercise mountCuaPermissions and its UI.
+        'packages/experimental/cua/src/client/index.ts',
         // The mods band entry imports the bridge's generated Remote contribution, which exists only in lib;
         // the Web snapshot exercises the built entry, while source tests cover mountModsBand.
         'packages/experimental/client-ui-claude-code-mods/src/client/index.ts',
         // The access entry imports its generated Remote contribution, which exists only in lib;
         // the Web snapshot exercises the built entry, while source tests cover mountAccess.
         'packages/api/remote-access/src/client/index.ts',
+        // The forge panel entry imports its generated Remote contribution, which exists only in lib;
+        // forge-panel.e2e.ts exercises the built entry, while source tests cover mountForgePanel.
+        'packages/experimental/client-ui-forge/src/client/index.ts',
         // Slash/command/input round: per-file gaps deferred with the same
         // client-lane debt. TODO(gui): cover and remove with the lane above.
         'packages/client/ui-commands/src/index.ts',
@@ -368,12 +415,15 @@ export default defineConfig({
         'packages/client/ui-sidebar/src/client/index.ts',
         'packages/client/ui-skill/src/client/index.ts',
         'packages/client/ui-workspace/src/client/index.ts',
+        // The Knowledge page's browser entry registers three slots and the
+        // frame-wide notice host; the jsdom lane drives WikiPage itself, and no
+        // harness mounts the slot and locale services it registers into.
+        'packages/prism/prism-wiki/src/client/index.tsx',
         'packages/test-support/client-runtime/src/translate.ts',
         'packages/client/ui-primitives/src/JsonTree.tsx',
         'packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx',
         'packages/client/ui-settings-models/src/client/welcome-store.ts',
-        'packages/extensions/*/src/**/*.ts',
-        'packages/extensions/*/src/**/*.tsx',
+        'packages/extensions/{cordis-client-runner,cordis-host-runner,tool-cordis,ui-cordis}/src/**/*.{ts,tsx}',
         // Typert correctness is checked by its uninstrumented suites,
         // including compiler fixtures and byte-for-byte catalog reproduction.
         'packages/typert/*/src/**/*.{ts,tsx}',
@@ -381,11 +431,9 @@ export default defineConfig({
         // by decision: its correctness signal is its uninstrumented suite and
         // the packer's end-to-end image spec.
         'packages/experimental/webworker-runtime/src/**/*.ts',
-        // Projection/command round: executor lifecycle branches and the
-        // registry's drive tails need the same maturing lanes. TODO(gui):
-        // cover and remove with the client test lane above.
+        // Command executor lifecycle branches need the same maturing lanes.
+        // TODO(gui): cover and remove with the client test lane above.
         'packages/interaction/commands/src/index.ts',
-        'packages/session/session-projection/src/index.ts',
         ...windowsUnsupportedCoveragePackages.map(path => `${path}/src/**/*.ts`),
         ...windowsOnlyCoverageExclusions,
         ...windowsRunnerCoverageExclusions,

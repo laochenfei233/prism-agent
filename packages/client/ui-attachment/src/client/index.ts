@@ -1,15 +1,32 @@
+import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /** Browser attachment plugin: composer entries and independently replaceable image galleries. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SlotFactoryMap } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-trajectory/client'
-import { ComposerAttachments } from './ComposerAttachments.tsx'
+import type {} from '@deepseek-ai/dsh-client-ui-file-drag/client'
+import { ComposerAttachments, type ComposerAttachmentsInjected } from './ComposerAttachments.tsx'
 import { MessageImages, MessageImagesContent } from './MessageImages.tsx'
 
+type MessageImagesInjected = SlotFactoryMap['conversation.images.content']['inject']
+
+/** Minimal workspace-registration face used to adopt a dropped folder. */
+interface WorkspaceProjectRegistration {
+  /** Register or resolve the workspace over an existing directory. */
+  create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
+}
+
+/** Minimal workspace-navigation face used to open the adopted project. */
+interface WorkspaceProjectNavigation {
+  /** Connect the workspace and open a session in it. */
+  openWorkspace(workspaceId: string, beforeOpen?: (sessionId: string) => void): Promise<void>
+}
+
 /** Slot registry required by the attachment presentation plugin. */
-export const inject = ['slots']
+export const inject = ['slots', 'fileDrag']
 
 /**
  * Register composer attachments and the shared gallery with its domain adapters.
@@ -18,9 +35,22 @@ export const inject = ['slots']
 export function apply(ctx: ClientContext): void {
   ctx.slots.registerFactory({
     name: 'conversation.images.content', scope: 'root', locale: 'conversation',
+    inject: (): MessageImagesInjected => ({
+      fileDrag: ctx.fileDrag.actions,
+    }),
   }, MessageImagesContent)
   ctx.slots.inject('conversation.input.attachments', () => ctx.slots.register({
     name: 'conversation.input.attachments',
+    inject: (): ComposerAttachmentsInjected => ({
+      readFileDrag: ctx.fileDrag.read,
+      // A dropped folder becomes an independent project through the same
+      // create-then-open pair the sidebar's add-workspace flow uses.
+      createProjectFromDirectory: async (path: string) => {
+        const workspaces = ctx.get('workspaces') as WorkspaceProjectRegistration
+        const workspace = await workspaces.create({ path })
+        await (ctx.get('uiWorkspace') as WorkspaceProjectNavigation).openWorkspace(workspace.workspaceId)
+      },
+    }),
     locale: 'conversation',
   }, ComposerAttachments))
   ctx.slots.inject('conversation.chat.message.images', () => ctx.slots.register({

@@ -24,9 +24,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { FeedbackDialog } from './FeedbackDialog.tsx'
 import { MessageFeedbackActions } from './MessageFeedbackActions.tsx'
-import type { FeedbackDialogInjected, MessageFeedbackInjected } from './slots.ts'
+import { MessageFeedbackMenuItems } from './MessageFeedbackMenuItems.tsx'
+import type { FeedbackDialogInjected, MessageFeedbackInjected, MessageFeedbackMenuInjected } from './slots.ts'
 import { FeedbackSurface } from './surface.ts'
-import { en, zh } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh } from './locales.ts'
 
 export type {
   MessageFeedbackActionFailure, MessageFeedbackActionResult, MessageFeedbackStatus,
@@ -66,7 +67,7 @@ export const inject = ['slots', 'remote', 'remote.messageFeedback', 'remote.sess
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-message-feedback: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-message-feedback: dictionaries')
 
   const surfaces = new Map<SessionId, FeedbackSurface>()
   const surfaceFor = (sessionId: SessionId): FeedbackSurface => {
@@ -111,6 +112,19 @@ export function apply(ctx: ClientContext): void {
       }
     },
   }, MessageFeedbackActions))
+
+  ctx.slots.inject('conversation.chat.message.menu.item', () => ctx.slots.register({
+    name: 'conversation.chat.message.menu.item',
+    id: 'feedback',
+    order: 10,
+    locale: NS,
+    inject: (sessionId): MessageFeedbackMenuInjected => {
+      const { dialog } = surfaceFor(sessionId)
+      return {
+        openDialog: (messageId, rating) => { dialog.open({ kind: 'message', messageId, rating }) },
+      }
+    },
+  }, MessageFeedbackMenuItems))
 
   ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
     name: 'conversation.input.overlay',

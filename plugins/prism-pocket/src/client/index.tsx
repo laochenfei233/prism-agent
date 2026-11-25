@@ -18,7 +18,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: the settings.section SlotMap merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { watchActivation } from './activate.ts'
-import { installAdapter, type LayoutLike } from './adapter.ts'
+import { installAdapter } from './adapter.ts'
 import { POCKET_CSS } from './css.ts'
 import { en, NS, zh, type PocketLocaleKey } from './locales.ts'
 import { installNotify } from './notify.tsx'
@@ -32,8 +32,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Services required by the browser half (`layout` orders the drawer seam). */
-export const inject = ['slots', 'locale', 'remote', 'layout']
+/** Services required by the browser half. */
+export const inject = ['slots', 'locale', 'remote']
 
 /**
  * Register the pocket browser surfaces.
@@ -55,11 +55,10 @@ export function apply(ctx: Context): void {
   installPwa()
   ctx.effect(() => installNotify(ctx, t), 'pocket: page notifications')
 
-  const layout = Reflect.get(ctx, 'layout') as LayoutLike | undefined
   let uninstallAdapter: (() => void) | null = null
   const stopWatching = watchActivation(localStorage, (active) => {
     if (active) {
-      if (uninstallAdapter === null && layout !== undefined) uninstallAdapter = installAdapter(layout)
+      if (uninstallAdapter === null) uninstallAdapter = installAdapter()
       return
     }
     uninstallAdapter?.()

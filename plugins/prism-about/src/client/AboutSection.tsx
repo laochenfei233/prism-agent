@@ -1,6 +1,7 @@
 /**
  * Settings · About section: the app's identity, the in-app updater (update
- * source fixed to this repository's GitHub Releases), and the project links.
+ * source fixed to the domestic mirror with GitHub Releases as the fallback),
+ * and the project links.
  *
  * The section is a pure reader of the shell-injected update carrier. Outside
  * the desktop shell it degrades to one static line — no dead buttons — and a
@@ -10,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import {
   deriveButtonState,
+  deriveSourceView,
   readCarrier,
   type AboutUpdateState,
   type ButtonState,
@@ -36,6 +38,9 @@ const FAILURE_KEYS: Readonly<Record<UpdateFailureKind, string>> = {
   'install-network': 'failureInstallNetwork',
   'stop-failed': 'failureStop',
 }
+
+/** The fork's repository, for the links the non-desktop About page still shows. */
+const REPO = 'laochenfei233/prism-agent'
 
 /** The primary button's label for its current state. */
 function buttonLabel(button: ButtonState, t: AboutSectionProps['t']): string {
@@ -71,9 +76,25 @@ export function AboutSection({ t }: AboutSectionProps) {
   }, [carrier])
 
   if (carrier === null) {
+    // Outside the desktop shell (a phone browser) there is no update carrier:
+    // still show the identity — name, embedded version, tagline — and the
+    // project links, then the honest one-liner about the updater.
     return (
       <section className="pa-about" aria-label={t('nav')}>
         <style>{ABOUT_CSS}</style>
+        <header className="pa-brand">
+          <div className="pa-identity">
+            <div className="pa-title">
+              <h2>{t('appName')}</h2>
+              <span className="pa-version" title={t('versionLabel')}>{process.env.DSH_CLIENT_VERSION ?? '—'}</span>
+            </div>
+            <p className="pa-muted">{t('tagline')}</p>
+          </div>
+        </header>
+        <div className="pa-links">
+          <a href={`https://github.com/${REPO}/releases`} target="_blank" rel="noreferrer">{t('changelog')}</a>
+          <a href={`https://github.com/${REPO}/issues`} target="_blank" rel="noreferrer">{t('feedback')}</a>
+        </div>
         <p className="pa-muted">{t('desktopOnly')}</p>
       </section>
     )
@@ -125,6 +146,7 @@ export function AboutSection({ t }: AboutSectionProps) {
 
   const repo = state?.source?.repo ?? ''
   const releaseUrl = state?.source?.releaseUrl ?? ''
+  const { badgeKey, href, label } = deriveSourceView(state?.source)
 
   return (
     <section className="pa-about" aria-label={t('nav')}>
@@ -166,10 +188,12 @@ export function AboutSection({ t }: AboutSectionProps) {
       <div className="pa-card">
         <div className="pa-row">
           <span className="pa-label">{t('sourceTitle')}</span>
-          <span className="pa-badge">{t('sourceGitHub')}</span>
+          <span className="pa-badge">{t(badgeKey)}</span>
         </div>
-        {repo !== ''
-          ? <a className="pa-repo" href={releaseUrl} target="_blank" rel="noreferrer">{repo}</a>
+        {label !== ''
+          ? href !== ''
+            ? <a className="pa-repo" href={href} target="_blank" rel="noreferrer">{label}</a>
+            : <span className="pa-repo">{label}</span>
           : <span className="pa-muted">{t('sourceUnavailable')}</span>}
       </div>
       <div className="pa-links">

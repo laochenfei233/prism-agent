@@ -1,10 +1,13 @@
 // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A12.
+import type {} from '@deepseek-ai/dsh-client-ui-context-menu/client'
 /** Register the Chat Conversation target, renderers, stats, and details surface. */
+import type {} from '@deepseek-ai/dsh-client-ui-file-drag/client'
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
+import { sessionDirectory } from '@deepseek-ai/dsh-api-session-controller/client/directories'
 import type { GroupKey } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -22,21 +25,28 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   ChatFlowDataInjected, ChatFlowInjected, ChatNodeInjected, ChatScrollPosition, ChatViewInjected,
-  QuotaNoticeInjected, QuotaNoticeState, TurnTailOwnerProps,
+  QuotaNoticeInjected, QuotaNoticeState,
 } from './contract/slots.ts'
 import type { ChatSnapshot } from './contract/snapshot.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './contract/snapshot.ts'
 import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
+import { sessionFilePath } from './file-path.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { ChatFlow } from './chat/ChatFlow.tsx'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
+import { UsageCostPill } from './chat/UsageCostPill.tsx'
+import { UsagePricePolicy } from './chat/usage-price-policy.ts'
+import type { UsagePriceEditorInjected } from './contract/usage.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
+import { registerFenceLayers } from './fence/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
-import { en, NS, zh } from './locale.ts'
+import { registerSideChat, startSideChat } from './chat/side-chat.tsx'
+import { en, ja, es, fr, de, ru, pt, NS, zh } from './locale.ts'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
 import { createChatStore } from './stores.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
@@ -75,7 +85,7 @@ export const CHAT_NODE_INJECT: ChatNodeInjected = {
 /** Services required by the Chat target and its presentation registrations. */
 export const inject = [
   'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'locale',
-  'configForms', 'remote', 'remote.session', 'sidebarRight',
+  'configForms', 'connection', 'remote', 'remote.session', 'sidebarRight', 'fileDrag',
 ]
 
 /**
@@ -101,18 +111,35 @@ export function apply(ctx: Context): void {
       // replacement or paging never does, because an old failure scrolling
       // back into view is not news.
       const dispose = binding.ctx.effect(() => {
-        const stop = binding.eventSource.subscribe(() => {
-          const { change } = binding.eventSource.getSnapshot()
-          if (change.kind !== 'append') return
-          for (const { event } of change.entries) {
-            if (event.type !== 'turn/end' || event.data.reason.kind !== 'error') continue
-            const { code } = event.data.reason.error
-            if (quotaNoticeHolds.size > 0 || (code !== 'QUOTA' && code !== 'ACCOUNT_QUOTA')) continue
-            quotaNotice.set({ code, seq: ++quotaNoticeSeq })
+        // Live quota failures are reported only while a rendering reference retains the Session's Conversation.
+        const retainInfo = ctx.sessions.retainInfo(binding.sessionId)
+        const retained = (): boolean => ctx.sessions.binding(binding.sessionId) === binding
+          && (retainInfo.getSnapshot().retainedFacets?.conversation ?? 0) > 0
+        let stopEvents: (() => void) | undefined
+        const follow = (): void => {
+          if (!retained()) {
+            stopEvents?.()
+            stopEvents = undefined
+            return
           }
-        })
+          stopEvents ??= binding.eventSource.subscribe(() => {
+            // A dispatch in progress keeps calling copied listeners after unsubscription.
+            if (!retained()) return
+            const { change } = binding.eventSource.getSnapshot()
+            if (change.kind !== 'append') return
+            for (const { event } of change.entries) {
+              if (event.type !== 'turn/end' || event.data.reason.kind !== 'error') continue
+              const { code } = event.data.reason.error
+              if (quotaNoticeHolds.size > 0 || (code !== 'QUOTA' && code !== 'ACCOUNT_QUOTA')) continue
+              quotaNotice.set({ code, seq: ++quotaNoticeSeq })
+            }
+          })
+        }
+        const stopRetained = retainInfo.subscribe(follow)
+        follow()
         return () => {
-          stop()
+          stopRetained()
+          stopEvents?.()
           chatSources.delete(binding)
           quotaSubscriptions.delete(dispose)
         }
@@ -133,8 +160,12 @@ export function apply(ctx: Context): void {
     resolve: binding => ({ hooks: { chat: chatSource(binding) } }),
   })
 
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-chat: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-chat: dictionaries')
   const t = ctx.locale.bind(NS)
+  // A quotation captured by a menu gesture, keyed by the Session its tab will
+  // show; the resource provider consumes it when that tab opens.
+  const sideChatQuotes = new Map<SessionId, string>()
+  registerSideChat(ctx, t, sideChatQuotes)
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
@@ -166,11 +197,12 @@ export function apply(ctx: Context): void {
     }, LinkOpeningRow))
   })
   const transcriptView = new TranscriptViewPolicy(chatSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
-  const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming)
+  const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming, transcriptView.foldedReplies)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose() })
   const performanceUsage = performancePolicy.mode
-  registerChatNodeRenderers(ctx, performanceUsage, presentation)
+  const usagePrices = new UsagePricePolicy()
+  registerChatNodeRenderers(ctx, performanceUsage, presentation, usagePrices.prices)
   ctx.slots.registerFactory({
     name: 'conversation.chat.user.content', scope: 'session', locale: NS,
     children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },
@@ -193,17 +225,22 @@ export function apply(ctx: Context): void {
     order: 12,
     locale: NS,
     inject: (): TranscriptViewRowInjected => ({
-      hooks: { transcriptView: transcriptView.mode, collapseTiming: transcriptView.collapseTiming },
+      hooks: {
+        transcriptView: transcriptView.mode,
+        collapseTiming: transcriptView.collapseTiming,
+        foldedReplies: transcriptView.foldedReplies,
+      },
       setTranscriptView: (mode) => { transcriptView.setMode(mode) },
       setCollapseTiming: (timing) => { transcriptView.setCollapseTiming(timing) },
+      setFoldedReplies: (replies) => { transcriptView.setFoldedReplies(replies) },
     }),
   }, TranscriptViewRow))
 
-  const nodeSources = (binding: SessionBinding): ChatFlowDataInjected => {
+  const connectionState = (ctx.get('connection') as ConnectionHandle).state
+  const nodeSources = (binding: SessionBinding): Pick<ChatViewInjected, 'keyedHooks'> => {
     const chat = chatSource(binding)
     const conversation = ctx.uiConversation.binding(binding)
     return {
-      hooks: { presentation },
       keyedHooks: {
         chatNode: key => chat.getSnapshot().nodes.source(key),
         chatNodeBottom: key => chat.getSnapshot().nodes.bottomSource(key),
@@ -221,7 +258,7 @@ export function apply(ctx: Context): void {
     inject: (sessionId: SessionId): ChatFlowDataInjected => {
       const binding = ctx.sessions.binding(sessionId)
       if (binding === undefined) throw new Error(`ui-chat: unknown session "${sessionId}"`)
-      return nodeSources(binding)
+      return { ...nodeSources(binding), hooks: { presentation, connectionState } }
     },
   }, ChatFlow))
 
@@ -234,6 +271,9 @@ export function apply(ctx: Context): void {
       locale: NS,
       children: {
         'conversation.chat.flow': { kind: 'single', scope: 'session', inject: CHAT_FLOW_INJECT },
+        'conversation.chat.text-interaction': { kind: 'keyed', scope: 'session' },
+        'conversation.chat.markdown.fence': { kind: 'hoc', scope: 'session' },
+        'conversation.chat.aside': { kind: 'single', scope: 'session' },
       },
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
@@ -243,26 +283,30 @@ export function apply(ctx: Context): void {
         const chat = chatSource(binding)
         return {
           ...nodeSources(binding),
-          fileMentions: (owner: TurnTailOwnerProps) => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
+          fileDrag: ctx.fileDrag.actions,
+          hooks: { presentation, interactionIds: ctx.uiConversation.interactions },
+          dispatchInteraction: gesture => ctx.uiConversation.interactions.dispatch(sessionId, gesture),
           // Files open in the right Sidebar, not in a desktop application: the
           // content stays in the product, beside the conversation that produced
-          // it. A relative path, or an absolute one inside the session's
-          // workspace, is addressed under this session's scope,
-          // `dsh-resource://file/session/<id>/<path>`; an absolute path
-          // elsewhere keeps its absolute spelling in the same Session's address.
-          // Which tab type claims the
-          // address is the Sidebar's decision, not this call site's.
+          // it. An absolute path names its file wherever the Session works. A
+          // relative path resolves from the Session's directory at click time,
+          // so one written before a directory move follows the move. The
+          // address, `dsh-resource://file/session/<id>/<absolute path>`,
+          // carries the resolved path: the opened tab keeps its file across
+          // later moves. Which tab type claims the address is the Sidebar's
+          // decision, not this call site's.
           // A line travels as a navigation parameter, not as part of the
           // address: the file is one piece of content whether it is opened at
           // its top or at line 400, so the same tab is revealed and told where
           // to land.
           openFile: async (path, options) => {
-            const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
-            const url = fileAddressFor(sessionId, cwd, path)
+            const directory = sessionDirectory(ctx.sessions, sessionId)
+            const url = fileAddressFor(sessionId, directory, path)
             if (options?.line === undefined) ctx.sidebarRight.openResource(url)
             else ctx.sidebarRight.openResource(url, { params: { line: options.line } })
             await Promise.resolve()
           },
+          resolveFilePath: sessionFilePath(ctx, sessionId),
           openExternalLink: (url) => {
             if (linkOpening.getSnapshot() === 'sidebar' && ctx.get('sidebarRightTabs')?.get('browser') !== undefined) {
               ctx.sidebarRight.openTab('browser', { params: { url } })
@@ -270,7 +314,8 @@ export function apply(ctx: Context): void {
               window.open(url, '_blank', 'noopener,noreferrer')
             }
           },
-          loadOlder: () => { void session.loadOlder() },
+          loadOlder: () => { void session.loadOlder({ deferConsumption: true }) },
+          consumeOlder: () => session.consumeOlder(),
           loadThrough: seq => session.loadThrough(seq),
           loadImage: Object.assign(
             (attachment: ImageAttachmentRef) => ctx.uiConversation.imageUrl(sessionId, attachment),
@@ -294,18 +339,18 @@ export function apply(ctx: Context): void {
                 // Fork or child-title failure leaves the source view unchanged.
               })
           },
-          // A side conversation is a fresh Session in the current workspace with
-          // the quoted text staged in its composer: the reader still chooses when
-          // to send. Without an explicit workspace the navigation layer inherits
-          // the current Session's own.
-          startSideConversation: (prompt) => {
-            ctx.uiWorkspace.startSession(undefined, { prompt, whenDraftExists: 'append' })
-          },
+          // A side conversation is a fresh Session in the current workspace,
+          // opened as a right-Sidebar tab so the main conversation keeps showing
+          // the passage the reader selected. The quotation waits for that tab:
+          // its resource provider stages it in the created Session's composer,
+          // and nothing sends.
+          startSideConversation: (prompt) => { startSideChat(ctx, sessionId, prompt, sideChatQuotes) },
         }
       },
     }, ChatView)
     return disposeView
   })
+  registerFenceLayers(ctx)
 
   // The quota notice host lives in the frame-wide layer so a notice outlives
   // the Chat panel that reported it. Its chain child lets a package with a
@@ -336,6 +381,16 @@ export function apply(ctx: Context): void {
       name: 'conversation.composer.dock', id: 'usage', order: 1, locale: NS, inject: statPillInject,
     }, UsagePill)
   })
+
+  // The cost reading sits in the session header band beside the header's other
+  // actions; its dashboard opens from the same registration.
+  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
+    name: 'conversation.session.header.actions', id: 'usage-cost', order: 30, locale: NS,
+    inject: (): UsagePriceEditorInjected => ({
+      hooks: { unitPrices: usagePrices.prices },
+      setUnitPrice: (model, price) => { usagePrices.set(model, price) },
+    }),
+  }, UsageCostPill))
 
   ctx.slots.inject('conversation.approval.detail', () =>
     ctx.slots.register({ name: 'conversation.approval.detail' }, ApprovalCommand))

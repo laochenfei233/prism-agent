@@ -147,6 +147,14 @@ const homeAndGuide = pairedPages([
     order: 4,
   },
   {
+    source: 'docs/user/guide/desktop-uninstall-cleanup.md',
+    route: 'guide/desktop-uninstall-cleanup.md',
+    label: { root: '卸载 DSH 桌面端', en: 'Uninstall DSH Desktop' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '入门', en: 'Guide' },
+    order: 5,
+  },
+  {
     source: 'docs/user/guide/python-sdk.md',
     route: 'guide/python-sdk.md',
     label: { root: 'Python', en: 'Python' },
@@ -171,9 +179,25 @@ const homeAndGuide = pairedPages([
     order: 2,
   },
   {
+    source: 'docs/user/guide/auto-archive.md',
+    route: 'guide/auto-archive.md',
+    label: { root: '自动归档', en: 'Auto-archive' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '自动化', en: 'Automation' },
+    order: 3,
+  },
+  {
+    source: 'docs/user/session-control.md',
+    route: 'guide/session-control.md',
+    label: { root: '跨会话消息', en: 'Cross-Session messages' },
+    sidebar: { root: 'zh-guide', en: 'en-guide' },
+    section: { root: '自动化', en: 'Automation' },
+    order: 4,
+  },
+  {
     source: 'docs/user/guide/plugin-market.md',
     route: 'guide/plugin-market.md',
-    label: { root: '插件市场', en: 'Plugin markets' },
+    label: { root: '插件索引', en: 'Plugin indexes' },
     sidebar: { root: 'zh-guide', en: 'en-guide' },
     section: { root: '集成', en: 'Integrations' },
     order: 2,
@@ -356,7 +380,6 @@ const subsystemGroups = [
     ['commands.md', '命令', 'Human commands'],
     ['goal.md', '目标', 'Goals'],
     ['schedule.md', '定时提醒', 'Scheduled reminders'],
-    ['cron.md', '定时任务', 'Calendar scheduled tasks'],
   ]],
   ['平台与接入', 'Platform and access', [
     ['web-server.md', 'HTTP 服务器', 'HTTP server'],
@@ -456,6 +479,7 @@ const reference = [
   ...pairedPages(([
     ['adding-a-package.md', '新增 Package', 'Adding a package'],
     ['adding-a-tool.md', '新增 Tool', 'Adding a tool'],
+    ['contributing-system-messages.md', '贡献系统消息', 'Contributing system messages'],
     ['adding-an-llm-adapter.md', '新增 LLM Adapter', 'Adding an LLM adapter'],
     ['adding-a-settings-card.md', '新增设置页', 'Adding a settings page'],
     ['extension-cookbook.md', '扩展模式', 'Extension patterns'],

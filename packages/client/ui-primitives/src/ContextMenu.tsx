@@ -79,10 +79,6 @@ export function ContextMenu({ state, items = [], children, footer, onSelect, den
   // component, while this closure keeps the same fact.
   const pointX = point?.x ?? 0
   const pointY = point?.y ?? 0
-  const anchorRect = useCallback(
-    (): DOMRect | null => new DOMRect(pointX, pointY, 0, 0),
-    [pointX, pointY],
-  )
   if (!open) return null
   return (
     <Menu
@@ -94,10 +90,10 @@ export function ContextMenu({ state, items = [], children, footer, onSelect, den
       onSelect={select}
       onClose={close}
       portal
-      getAnchorRect={anchorRect}
+      anchorPoint={{ x: pointX, y: pointY }}
       dense={dense}
       compact={compact}
-      listClassName={listClassName}
+      {...listClassName === undefined ? {} : { listClassName }}
     >
       {children}
     </Menu>

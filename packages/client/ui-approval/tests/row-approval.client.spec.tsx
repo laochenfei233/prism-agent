@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SessionPendingInteraction, SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionPendingInteraction } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session-status/client'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RowApproval, type RowApprovalProps } from '../src/client/RowApproval.tsx'
@@ -24,7 +25,7 @@ function rowProps(
 ): RowApprovalProps {
   const sessionId = id('s1')
   const snapshot: SessionStatusSnapshot = new Map([[sessionId, {
-    running: false, pendingInteraction: pending, completionUnread: false,
+    running: false, pendingInteraction: pending, completionUnread: false, completionFailed: false,
   }]])
   return {
     sessionId,
@@ -94,6 +95,17 @@ describe('RowApproval', () => {
     expect(view.container.innerHTML).toBe('')
     view.rerender(<RowApproval {...rowProps(undefined)} />)
     expect(view.container.innerHTML).toBe('')
+  })
+
+  it('keeps a decision click out of the row that contains it', async () => {
+    const pending = new PendingApproval(id('s1'), { toolName: 'write', reason: 'Write notes.txt' })
+    const openRow = vi.fn()
+    render(<div onClick={openRow}><RowApproval {...rowProps(pending)} /></div>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once for Notes session' }))
+
+    expect(openRow).not.toHaveBeenCalled()
+    await expect(pending.result).resolves.toBe('allowed-once')
   })
 
   it('answers the pending request from the row and locks both decisions', async () => {

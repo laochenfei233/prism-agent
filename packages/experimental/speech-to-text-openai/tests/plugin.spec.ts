@@ -86,6 +86,7 @@ describe('the OpenAI-compatible recognizer plugin', () => {
       location: 'cloud',
       languages: ['auto', 'zh'],
       model: 'whisper-1',
+      maxAudioSeconds: 3600,
     }])
     await ctx.fiber.dispose()
     expect(speech.listProviders()).toEqual([])
@@ -99,6 +100,7 @@ describe('the OpenAI-compatible recognizer plugin', () => {
       location: 'cloud',
       languages: ['auto'],
       model: 'gpt-4o-transcribe',
+      maxAudioSeconds: 3600,
     }])
   })
 

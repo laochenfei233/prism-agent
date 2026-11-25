@@ -23,7 +23,8 @@
     "src/sources/openclaw.ts",
     "src/sources/opencode.ts",
     "src/sources/pi.ts",
-    "src/sources/shared.ts"
+    "src/sources/shared.ts",
+    "src/sources/zcode.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },

@@ -21,11 +21,36 @@ export type PocketLocaleKey =
   | 'phone.copied'
   | 'phone.qr'
   | 'phone.qr.unavailable'
+  | 'phone.qr.credential'
+  | 'phone.pairing'
+  | 'phone.pairing.rotate'
+  | 'phone.pairing.hint'
   | 'phone.steps'
+  | 'step.bind'
+  | 'step.bind.hint'
+  | 'phone.bind.action'
+  | 'phone.bind.working'
+  | 'phone.bind.done'
   | 'step.serve'
+  | 'step.run'
+  | 'step.quick'
   | 'step.trust'
   | 'step.trust.hint'
   | 'step.trust.cli'
+  | 'remote.provider'
+  | 'remote.provider.lan'
+  | 'remote.provider.tailscale'
+  | 'remote.provider.tunnel'
+  | 'tunnel.label'
+  | 'tunnel.placeholder'
+  | 'tunnel.save'
+  | 'tunnel.saved'
+  | 'tunnel.installed'
+  | 'tunnel.missing'
+  | 'tunnel.hint'
+  | 'phone.blocked.noLan'
+  | 'phone.blocked.notBound'
+  | 'phone.blocked.noTunnelUrl'
   | 'bots.title'
   | 'bots.intro'
   | 'bots.tag.callback'
@@ -117,11 +142,36 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.copied': 'Copied',
   'phone.qr': 'Scan to open this workspace',
   'phone.qr.unavailable': 'No link to encode yet — resolve the blockers below first',
+  'phone.qr.credential': 'The QR encodes this workspace\'s login link — anyone who scans it gets in. Do not share it or screenshot it.',
+  'phone.pairing': 'Bot pairing code',
+  'phone.pairing.rotate': 'New code',
+  'phone.pairing.hint': 'Send /start <code> from your chat to bind the bot to you.',
   'phone.steps': 'Still needed',
+  'step.bind': 'Bind the server to the local-network address',
+  'step.bind.hint': 'Bind the running server to this address — the button above does it live, no restart — then open the link again.',
+  'phone.bind.action': 'Bind now',
+  'phone.bind.working': 'Binding…',
+  'phone.bind.done': 'The local-network address is bound; the link is live.',
   'step.serve': 'Proxy the port to Tailscale',
+  'step.run': 'Run the named tunnel',
+  'step.quick': 'Or start a quick test tunnel (random hostname)',
   'step.trust': 'Trust this address',
   'step.trust.hint': 'Add it to the profile cordis.patch.yml, then restart the app.',
   'step.trust.cli': 'Starting the server from the command line instead? Pass this flag:',
+  'remote.provider': 'Route',
+  'remote.provider.lan': 'Local network',
+  'remote.provider.tailscale': 'Tailscale',
+  'remote.provider.tunnel': 'Cloudflare tunnel',
+  'tunnel.label': 'Public hostname',
+  'tunnel.placeholder': 'https://prism.example.com',
+  'tunnel.save': 'Save hostname',
+  'tunnel.saved': 'Saved',
+  'tunnel.installed': 'cloudflared is installed',
+  'tunnel.missing': 'cloudflared was not found on PATH',
+  'tunnel.hint': 'A named tunnel keeps this hostname stable; add it to the trust list so the server accepts it.',
+  'phone.blocked.notBound': 'The server listens on loopback only: restart it bound to the local-network address',
+  'phone.blocked.noLan': 'No local-network address was found on this machine',
+  'phone.blocked.noTunnelUrl': 'No tunnel hostname yet: enter the https address your tunnel serves',
   'bots.title': 'Bot channels',
   'bots.intro': 'Connect a chat bot on any channel below; messages you send the bot drive this workspace, replies come back to the chat, and pending approvals or questions reach you as numbered choices.',
   'bots.tag.callback': 'callback',
@@ -214,11 +264,36 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.copied': '已复制',
   'phone.qr': '扫码直达这个工作区',
   'phone.qr.unavailable': '还没有可编码的链接——先解决下面的阻塞步骤',
+  'phone.qr.credential': '二维码内嵌本工作区的登录链接，扫码即进入——请勿分享或截图。',
+  'phone.pairing': 'Bot 配对码',
+  'phone.pairing.rotate': '换一个',
+  'phone.pairing.hint': '在你的聊天里发送 /start <配对码>，即可把 bot 绑定到你。',
   'phone.steps': '还需要做到',
+  'step.bind': '把服务绑定到局域网地址',
+  'step.bind.hint': '把运行中的服务绑定到该地址——上方按钮可直接完成、无需重启——然后重新打开链接。',
+  'phone.bind.action': '立即绑定',
+  'phone.bind.working': '绑定中……',
+  'phone.bind.done': '局域网地址已绑定，链接已生效。',
   'step.serve': '把这个端口代理到 Tailscale',
+  'step.run': '运行命名隧道',
+  'step.quick': '或先起一个临时测试隧道（域名随机）',
   'step.trust': '信任这个地址',
   'step.trust.hint': '写进 profile 的 cordis.patch.yml 后重启应用。',
   'step.trust.cli': '如果是命令行启动的服务，改用这个参数：',
+  'remote.provider': '通道',
+  'remote.provider.lan': '局域网',
+  'remote.provider.tailscale': 'Tailscale',
+  'remote.provider.tunnel': 'Cloudflare 隧道',
+  'tunnel.label': '公网域名',
+  'tunnel.placeholder': 'https://prism.example.com',
+  'tunnel.save': '保存域名',
+  'tunnel.saved': '已保存',
+  'tunnel.installed': '已检测到 cloudflared',
+  'tunnel.missing': 'PATH 上没找到 cloudflared',
+  'tunnel.hint': '命名隧道才能让这个域名稳定；把它加进可信列表，服务才会接受。',
+  'phone.blocked.notBound': '服务只监听本机：需要绑定到局域网地址再启动',
+  'phone.blocked.noLan': '这台机器上没有找到局域网地址',
+  'phone.blocked.noTunnelUrl': '还没有隧道域名：填入隧道对外提供的 https 地址',
   'bots.title': 'Bot 渠道',
   'bots.intro': '在下面的任一渠道接入聊天机器人：你在聊天里发的消息会驱动这个工作区，回复直接回到聊天，待处理的审批和提问会以编号选项送达。',
   'bots.tag.callback': '回调',

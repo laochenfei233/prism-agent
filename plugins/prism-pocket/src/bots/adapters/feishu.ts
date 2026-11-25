@@ -11,7 +11,7 @@ import type { BotAdapterFactory, BotInbound } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { postBotJson, stringField } from '../shared/http.ts'
 import { decodeLarkFrame, encodeLarkFrame, type LarkFrame } from '../shared/protobuf.ts'
-import { ReconnectingWs } from '../shared/ws.ts'
+import { ReconnectingWs, waitForSocketReady } from '../shared/ws.ts'
 
 /** Per-message character limit applied on sends. */
 export const FEISHU_MESSAGE_LIMIT = 4000
@@ -44,6 +44,8 @@ export interface LarkEventEnvelope {
   readonly eventType?: string
   readonly chatId?: string
   readonly chatType?: string
+  readonly senderId?: string
+  readonly messageId?: string
   readonly text?: string
 }
 
@@ -61,8 +63,18 @@ export function readLarkEventEnvelope(data: unknown): LarkEventEnvelope | undefi
   if (header?.event_type !== 'im.message.receive_v1' || event === undefined) return undefined
   const message = (event as { message?: unknown }).message
   if (typeof message !== 'object' || message === null) return undefined
-  const fields = message as { chat_id?: unknown; chat_type?: unknown; message_type?: unknown; content?: unknown }
+  const fields = message as { chat_id?: unknown; chat_type?: unknown; message_type?: unknown; message_id?: unknown; content?: unknown }
   if (typeof fields.chat_id !== 'string' || fields.message_type !== 'text' || typeof fields.content !== 'string') return undefined
+  // The open id is the app-scoped stable sender identity; user_id and union_id are the fallbacks.
+  const sender = (event as { sender?: unknown }).sender
+  const senderIds = typeof sender === 'object' && sender !== null
+    ? (sender as { sender_id?: unknown }).sender_id
+    : undefined
+  const idRecord = typeof senderIds === 'object' && senderIds !== null
+    ? senderIds as { open_id?: unknown; user_id?: unknown; union_id?: unknown }
+    : undefined
+  const candidates: readonly unknown[] = [idRecord?.open_id, idRecord?.user_id, idRecord?.union_id]
+  const senderId = candidates.find((value): value is string => typeof value === 'string' && value.length > 0)
   let text: string | undefined
   try {
     const content: unknown = JSON.parse(fields.content)
@@ -78,10 +90,13 @@ export function readLarkEventEnvelope(data: unknown): LarkEventEnvelope | undefi
   const stripped = text.replace(/^@\S+\s*/u, '').trim()
   if (stripped.length === 0) return undefined
   const chatType = typeof fields.chat_type === 'string' ? fields.chat_type : undefined
+  const messageId = typeof fields.message_id === 'string' ? fields.message_id : undefined
   return {
     chatId: fields.chat_id,
     text: stripped,
     ...(chatType !== undefined ? { chatType } : {}),
+    ...(senderId !== undefined ? { senderId } : {}),
+    ...(messageId !== undefined ? { messageId } : {}),
     ...(header.event_type !== undefined ? { eventType: header.event_type } : {}),
   }
 }
@@ -175,7 +190,12 @@ export const createFeishuAdapter: BotAdapterFactory = (config, hooks) => {
     try {
       const envelope = readLarkEventEnvelope(JSON.parse(merged))
       if (envelope !== undefined) {
-        hooks.onInbound({ chatId: envelope.chatId ?? '', text: envelope.text ?? '' } satisfies BotInbound)
+        hooks.onInbound({
+          chatId: envelope.chatId ?? '',
+          senderId: envelope.senderId ?? '',
+          messageId: envelope.messageId ?? '',
+          text: envelope.text ?? '',
+        } satisfies BotInbound)
       }
     } catch {
       // A merged body that fails to parse stays silent; the platform owns its schema.
@@ -228,17 +248,9 @@ export const createFeishuAdapter: BotAdapterFactory = (config, hooks) => {
         },
       )
       ws.start()
-      await new Promise<void>((resolve, reject) => {
-        const began = Date.now()
-        const check = setInterval(() => {
-          if (ws?.open === true) {
-            clearInterval(check)
-            resolve()
-          } else if (Date.now() - began > 15_000) {
-            clearInterval(check)
-            reject(new Error('long connection did not open within 15s'))
-          }
-        }, 250)
+      await waitForSocketReady(() => ws?.open === true, {
+        channel: 'feishu',
+        awaited: 'long connection did not open',
       })
     },
     async stop() {

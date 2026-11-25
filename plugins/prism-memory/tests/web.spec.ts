@@ -105,8 +105,10 @@ describe('the memory routes', () => {
   it('registers one route per operation below the plugin prefix', async () => {
     await boot()
     expect([...routes.keys()].sort()).toEqual([
+      '/api/prism-memory/edit',
       '/api/prism-memory/overview',
       '/api/prism-memory/remember',
+      '/api/prism-memory/retire',
       '/api/prism-memory/review',
       '/api/prism-memory/search',
     ])
@@ -175,6 +177,26 @@ describe('the memory routes', () => {
     // silently succeeding.
     expect(await refusal('/api/prism-memory/review', { id: stored.record.id, decision: 'approve' }))
       .toBe('PRISM_MEMORY_NOT_PENDING')
+  })
+
+  it('rewrites a claim through the edit route and retires one through the retire route', async () => {
+    const ctx = await boot()
+    const stored = await ctx.prismMemory.remember({ text: 'the deploy window is tuesday' }, undefined)
+
+    const rewritten = await post<MemoryReviewValue>('/api/prism-memory/edit', {
+      id: stored.record.id,
+      text: 'the deploy window is wednesday',
+    })
+    if (!rewritten.ok) throw new Error('the edit route answered a failure')
+    expect(rewritten.value.row.text).toBe('the deploy window is wednesday')
+    const old = ctx.prismMemory.all().find(record => record.id === stored.record.id)
+    expect(old?.status).toBe('superseded')
+    expect(old?.supersededBy).toBe(rewritten.value.row.id)
+
+    const retired = await post<MemoryReviewValue>('/api/prism-memory/retire', { id: rewritten.value.row.id })
+    if (!retired.ok) throw new Error('the retire route answered a failure')
+    expect(retired.value.row.status).toBe('archived')
+    expect(ctx.prismMemory.all().find(record => record.id === rewritten.value.row.id)?.status).toBe('archived')
   })
 
   it('rejects an unreadable body and an unknown record', async () => {

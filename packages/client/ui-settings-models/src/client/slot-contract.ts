@@ -38,6 +38,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * Without a registrant the area renders nothing.
      */
     'settings.models.footer': { kind: 'list'; scope: 'root'; owner: ModelsFooterOwnerProps }
+    /**
+     * One page of the Models section's own tab strip, next to the built-in
+     * provider page. The registration id names the tab (`speech`, `local`); the
+     * section owns the labels, so a contribution supplies content only and a
+     * tab whose plugin is absent simply has no contribution.
+     */
+    'settings.models.tab': { kind: 'list'; scope: 'root'; owner: ModelsTabOwnerProps }
   }
 }
 
@@ -56,3 +63,12 @@ export interface ModelsFooterOwnerProps {
   /** Marker field: footer owner props are intentionally empty. */
   children?: never
 }
+
+/** Owner share of one Models tab page (the section supplies nothing). */
+export interface ModelsTabOwnerProps {
+  /** Marker field: tab owner props are intentionally empty. */
+  children?: never
+}
+
+/** Tab pages the Models section lays out, in strip order. */
+export type ModelsTab = 'providers' | 'speech' | 'local'

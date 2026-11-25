@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for appearance-themes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/appearance-themes.md
+/:
+  en: 50b2a846d318a7e5
+  zh: 50b2a846d318a7e5
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews:
+  en: 020d2e38bf568206
+  zh: bea86b46e730e1f6
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/report:
+  en: 19ecc6eff29c8cb3
+  zh: d2dffde184feac30
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s1-problem:
+  en: d2cd524c233aaadc
+  zh: eff1fbe92a34b914
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: 3c4e147edaa36f87
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design/s2-1-standalone-appearance-section:
+  en: 88893d639a41ba1c
+  zh: 908ca968597a3710
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design/s2-2-custom-theme-runtime-synthesis:
+  en: cffe37ee6f4c7e8d
+  zh: 4914c29aaac12375
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design/s2-3-new-palettes:
+  en: f4c9864de2d8e0ac
+  zh: 125a7df5890ea0ae
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design/s2-4-distinct-preview-motifs:
+  en: 781b9639a88a335d
+  zh: c4e7e1a1221b0b9d
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s2-design/s2-5-copy:
+  en: e32f2e5aa764390b
+  zh: 0f673f111d467d33
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s3-scope:
+  en: f0e999f46b696bd6
+  zh: 866fcc225dccc307
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/tasks:
+  en: bf19e526dafed849
+  zh: f7a7dff20f00b251
+/appearance-themes-standalone-section-custom-theme-five-palettes-distinct-previews/s4-acceptance:
+  en: 4311a4b83b8e7bd4
+  zh: fd91e97738a2328b

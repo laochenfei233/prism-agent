@@ -296,7 +296,7 @@ By default, [`session-log-deepseek`](../../packages/session/session-log-deepseek
 
 [`@deepseek-ai/dsh-client-ui-message-feedback`](../../packages/client/ui-message-feedback) is the browser consumer. `@deepseek-ai/dsh-api-remotes` mounts the generated `messageFeedback` and `sessionFeedback` contributions, so the plugin calls `ctx.remote.messageFeedback` and `ctx.remote.sessionFeedback` and never touches the transport.
 
-The controls are the `feedback` entry (order 10) of the `conversation.chat.assistant-actions` list slot, which `ui-conversation` declares and renders inside the finalized assistant message's IconActions row. `AssistantMessageNode` carries the optional `messageId` from the `assistant/message` event. The field is absent on interruption-frozen partials, and the render site skips the slot when it is absent. The strip renders once per turn, on the closing assistant message: the Host accepts every append-origin step message as a target, but earlier steps of a multi-step turn render tool rows rather than a rateable body, so the UI exposes a narrower set than the Host contract allows.
+The controls are the `feedback` entry (order 10) of the `conversation.chat.assistant-actions` list slot, which `ui-conversation` declares and renders inside the finalized assistant message's IconActions row. `AssistantMessageNode` carries the optional `messageId` from the `assistant/message` event. The field is absent on interruption-frozen partials, and the render site skips the slot when it is absent. The strip renders once per turn, on the closing assistant message: the Host accepts every append-origin step message as a target, but earlier steps of a multi-step turn render tool rows rather than an IconActions row, so the strip exposes a narrower set than the Host contract allows. A settled assistant body also carries both ratings in its secondary-press menu, the `feedback` entry of `conversation.chat.message.menu.item`, whose rows open the same dialog.
 
 One `MessageFeedbackController` per Session backs every message control in that Session: a single `list` read seeds the whole transcript, deferred to first hover or focus rather than fired on mount. Each mutation sends the version that controller last observed as `ifVersion`; a `version-conflict` reply carries the authoritative item, so the controller reconciles from the reply instead of refetching. Mutations serialize per Session so a queued operation compares against the committed version. The injected `retract` operation rechecks the committed rating inside that queue and becomes a no-op after a concurrent change, so stale UI cannot bypass the dialog by recording a bare rating. A `connection/reset` refreshes only Sessions already read.
 
@@ -313,6 +313,24 @@ Either unrecorded rating opens the Session's feedback dialog, the `feedback-dial
 - The Web controller does not consume feedback log events, so a second tab's rating becomes visible on reconnect or on the next conflict reply rather than immediately.
 - The dialog does not pre-check `maxNoteBytes`; an oversized description for a message fails on submit with `note-too-large` rather than while typing. A Session remark has no size bound, as the `/feedback` command never had one.
 - `sessionFeedback.record` serves live Sessions only and answers `session-not-found` otherwise; the dialog reports that failure when its Session retires while it is open.
+
+## Feedback in exported Session logs
+
+This section is for consumers that select rated Sessions from exported logs. The [OTel backend](../../packages/session/session-telemetry-otel/README.md#use-this-package) owns the record fields and the feedback that releases a log prefix; the [session-telemetry subsystem](session-telemetry.md) owns deduplication, and [the redact waterfall](session-telemetry.md#session-telemetryrecord--waterfall) owns how exported `data` can differ from the canonical log. The feedback-specific `data` fields are:
+
+| Event | Target | `data` | Meaning |
+|---|---|---|---|
+| `feedback/record` | Whole Session | `text?`, `category?` | One immutable remark. `/feedback <text>` records only `text`; the Web dialog records the selected `category` and the entered `text`, each optional; a record with neither field is valid. |
+| `feedback/message-put` | One assistant message | `sessionId`, and `item` with `messageId`, `rating`, `note?`, `category?`, `version`, `createdAt`, `updatedAt` | Complete current value after a creation or edit |
+| `feedback/message-delete` | One assistant message | `sessionId`, `messageId` | Retraction of the current value |
+
+Derive feedback with these rules:
+
+1. When counting a Session's own feedback, exclude feedback events whose `seq` is below `session.seed_length`, which only seeded Sessions carry, and `feedback/message-*` events whose `data.sessionId` differs from the record's `sessionId`. Keep every other event, including the inherited prefix, for the rules below.
+2. Group `feedback/message-put` by `data.item.messageId` and `feedback/message-delete` by `data.messageId` within one Session; the event with the highest `seq` is the current value, and a `feedback/message-delete` there means no current feedback. Earlier puts remain as edit history.
+3. The rated reply is the append-origin `assistant/message` whose `data.message.id` equals `data.item.messageId`; in a seeded Session it can lie in the inherited prefix. Its `data.turn` identifies the turn, and the events up to it reproduce the conversation state.
+
+The services and events record no actor. Host plugins and runtime extensions can call `sessionFeedback.record` and `messageFeedback.put` or append these events directly, and Client plugins can call the same Remotes, so exported feedback fields can contain plugin-written state. Each appended feedback event of the Session itself also authorizes the release of the prefix that ends at it. Text content does not establish who wrote a value; recognition rules for specific plugins belong to the consumer's tooling.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

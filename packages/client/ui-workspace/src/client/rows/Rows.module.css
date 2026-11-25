@@ -2,22 +2,31 @@
 .sessionRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--dsh-sidebar-label-gap);
   border-radius: var(--dsw-radius-md);
+  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;
+  background-clip: padding-box;
+  box-sizing: border-box;
   padding: 0 8px;
-  padding-inline-start: calc(8px + var(--dsh-workspace-indent, 0px));
+  padding-inline-start: calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset) + var(--dsh-workspace-indent, 0px));
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   color: var(--dsw-alias-label-primary);
 }
 
-.projectRow:hover,
-.sessionRow:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .projectRow:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .sessionRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dragPreview {
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 .searchResultRow {
@@ -29,19 +38,23 @@
   box-sizing: border-box;
   border: none;
   border-radius: var(--dsw-radius-lg);
-  padding: 4px 8px;
+  padding: 4px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));
+  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;
   background: transparent;
+  background-clip: padding-box;
   cursor: pointer;
   text-align: left;
   color: var(--dsw-alias-label-primary);
 }
 
-.searchResultRow:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .searchResultRow:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .searchResultRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-interactive-bg-hover);
 }
 
 .searchResultHeading {
@@ -53,7 +66,7 @@
 .searchResultTitle {
   flex: 0 1 auto;
   min-width: 0;
-  margin-left: 4px;
+  margin: 0 var(--dsh-sidebar-label-gap);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -66,7 +79,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-left: 20px;
+  margin-left: calc(16px + var(--dsh-sidebar-label-gap));
 }
 
 .searchResultWorkspace,
@@ -97,7 +110,7 @@
 
 /* Compact one-line Workspace row after removing the session-count subtitle. */
 .projectRow {
-  height: 34px;
+  height: 32px;
   align-items: center;
   box-sizing: border-box;
 }
@@ -106,19 +119,23 @@
   height: 20px;
 }
 
-/* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
+/* Session titles share the workspace icon slot and compact label gap. */
 .sessionRow {
   height: 32px;
   gap: 0;
 }
 
 .sessionRow .title {
-  margin: 0 6px 0 4px;
+  margin: 0 12px 0 var(--dsh-sidebar-label-gap);
 }
 
+/* PRISM-DIVERGENCE: replay list in docs/compose/spec/approval-panel.md (S5). */
 /* A row holding a pending interaction grows a second full-width line. The
    first line keeps the single-line cell layout, and the pending line starts at
-   the title's left edge, so the wait reads as part of the Session it blocks. */
+   the title's left edge, so the wait reads as part of the Session it blocks.
+   The wrap follows the interaction, not the occupant's DOM: a question or plan
+   review owns its own composer UI and renders nothing here, and the empty
+   line below collapses instead of adding height. */
 .sessionRow.withPending {
   flex-wrap: wrap;
   height: auto;
@@ -127,10 +144,20 @@
   row-gap: 2px;
 }
 
+/* border-box keeps the title-aligned indent inside the row: a content-box
+   100% basis plus the indent overflows the list's scroll clip. */
 .pendingLine {
   flex: 0 0 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding-inline-start: 20px;
+}
+
+/* The outlet anchor is always present and layout-neutral (`display: contents`),
+   so the seat's emptiness is read from it: an occupant that renders nothing
+   leaves the anchor empty, and the line collapses. */
+.pendingLine:has(> [data-slot='sidebar.workspaces.session.pending']:empty) {
+  display: none;
 }
 
 .slot {
@@ -159,8 +186,11 @@
 
 /* Project leading slot: folder by default, expand arrow on row hover. */
 .projectRow .chevron { display: none; }
-.projectRow:hover .chevron { display: inline-flex; }
-.projectRow:hover .folder { display: none; }
+@media (hover: hover) {
+  .projectRow:hover .chevron { display: inline-flex; }
+
+  .projectRow:hover .folder { display: none; }
+}
 
 /* Expand arrow (filled triangle): points right closed, rotates to point down open. */
 .arrow {
@@ -200,31 +230,12 @@
   outline: none;
 }
 
-/* Hovering a session row marquees a title wider than its cell: Rows.tsx crawls
-   it at a constant speed to its far edge while the pointer rests on the row,
-   holds it there, and returns it to the start in one step when the pointer
-   leaves. The motion is scripted frame by frame (reduced motion jumps), so no
-   scroll-behavior applies here. */
+/* Hovering a session row marquees a title wider than its cell: the shared
+   hover marquee carries it at a constant speed to its far edge while the
+   pointer rests on the row, holds it there, fades the edges that still hide
+   text, and returns it to the start in one step when the pointer leaves. */
 .sessionRow .title {
   flex: 1;
-}
-
-/* While the marquee travels, both clipping edges fade in over 12px instead of
-   hard-cutting a character: the left once the title has moved off its start
-   (data-scrolled), the right while text still remains beyond the cell
-   (data-clipped) — at the far edge the right fade lifts so the final character
-   reads at full strength. The mask rides the title span itself, so the status
-   slot and every other leading cell keep their full color. */
-.sessionRow .title[data-scrolled] {
-  mask-image: linear-gradient(to right, transparent, #000 12px);
-}
-
-.sessionRow .title[data-clipped] {
-  mask-image: linear-gradient(to left, transparent, #000 12px);
-}
-
-.sessionRow .title[data-scrolled][data-clipped] {
-  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
 }
 
 .meta {
@@ -241,6 +252,7 @@
   font-size: 10px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
+  margin-inline-end: -1px;
 }
 
 .pinIndicator {
@@ -252,6 +264,46 @@
   justify-content: center;
   margin-left: 6px;
   color: var(--dsw-alias-label-caption);
+}
+
+/* Annotation marks sit between the title and the trailing time cell: a glyph
+   pair and, for a non-default priority, its number. */
+.annotationMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 16px;
+  margin-left: 4px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.priorityMark {
+  border-radius: var(--dsw-radius-sm);
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Batch-mode checkbox cell, leading the row ahead of the status slot. */
+.selectCell {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+}
+
+.selectBox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--dsw-alias-state-business-primary);
 }
 
 /* Archived rows stay in place but read as inactive: titles drop to
@@ -269,20 +321,32 @@
   flex: none;
 }
 
-/* Trailing action buttons surface on hover with bare 16px glyphs. */
+/* The trailing strip keeps a shared gap between its fixed-size control boxes. */
 .rowActions {
   flex: none;
   display: none;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
 }
 
-.projectRow:hover .rowActions,
-.sessionRow:hover .rowActions,
-.searchResultRow:hover .rowActions,
-.projectRow.menuOpen .rowActions,
-.sessionRow.menuOpen .rowActions {
+/* Keep 14px between the Session title and the first glyph, including its slot inset. */
+.sessionRow .rowActions {
+  margin-left: 1px;
+}
+
+@media (hover: hover) {
+  .projectRow:hover .rowActions,
+  .searchResultRow:hover .rowActions {
+    display: inline-flex;
+  }
+}
+
+.projectRow.menuOpen .rowActions {
   display: inline-flex;
+}
+
+.rowQuickActions {
+  display: contents;
 }
 
 /* The search heading has no trailing time cell, so the unarchive action
@@ -291,16 +355,16 @@
   margin-left: auto;
 }
 
-.sessionRow:hover .time,
-.sessionRow.menuOpen .time {
-  display: none;
+.rowResting {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
-/* Hover swaps the trailing cell to the action buttons, which already carry
-   the pin/archive glyphs — hide the static markers so they do not double. */
-.sessionRow:hover .pinIndicator,
-.sessionRow.menuOpen .pinIndicator {
-  display: none;
+.rowResting .pinIndicator {
+  margin-left: 0;
 }
 
 /* The unclipped hover state drops the ellipsis, which would otherwise cover
@@ -308,9 +372,46 @@
    latches `:hover` on the row after the title has already returned: an
    unguarded rule would strand that row without its ellipsis. */
 @media (hover: hover) {
+  .sessionRow:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  .sessionRow:hover .rowActions,
+  .sessionRow.menuOpen .rowActions,
+  :global(html[data-input-modality='keyboard']) .sessionRow:focus-within .rowActions {
+    display: inline-flex;
+  }
+
+  .sessionRow:hover .rowResting,
+  .sessionRow.menuOpen .rowResting,
+  :global(html[data-input-modality='keyboard']) .sessionRow:focus-within .rowResting {
+    display: none;
+  }
+
   .sessionRow:hover .title,
   .sessionRow.menuOpen .title {
     text-overflow: clip;
+  }
+}
+
+@media (hover: none) {
+  .projectRow .rowActions,
+  .searchResultRow .rowActions,
+  .sessionRow .rowActions {
+    display: inline-flex;
+  }
+
+  /* Only update timestamps disappear; pending-interaction labels remain visible. */
+  .sessionRow .timestamp,
+  .sessionRow:has(.pinnedAction) .pinIndicator,
+  .sessionRow .rowQuickActions > :global([data-slot]) > :not(.pinnedAction),
+  .projectRow[aria-expanded='false'] .rowActions {
+    display: none;
+  }
+
+  .sessionRow .pinnedAction {
+    /* Keep More aligned across rows. Tab order remains More, then Unpin. */
+    order: -1;
   }
 }
 
@@ -318,7 +419,7 @@
    hover fill while its dropdown is up). */
 .projectRow.menuOpen,
 .sessionRow.menuOpen {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-interactive-bg-hover);
 }
 
 /* Session drag insert marker: a leading chevron and 2px rule between rows,
@@ -333,8 +434,8 @@
   content: '';
   position: absolute;
   z-index: 1;
-  left: 0;
-  right: 4px;
+  left: calc(-1 * var(--dsh-sidebar-paint-inset));
+  right: calc(4px - var(--dsh-sidebar-paint-inset));
   height: 12px;
   background:
     linear-gradient(
@@ -363,7 +464,7 @@
   bottom: -7px;
 }
 
-/* Hover-card body (figma 169:16903): dark surface, fixed colors both themes. */
+/* Hover-card body (figma 169:16903): dark surface in both themes. */
 .hoverContent {
   display: flex;
   flex-direction: column;
@@ -373,21 +474,21 @@
 .hoverTitle {
   font-size: 14px;
   line-height: 20px;
-  color: #FFFFFF;
+  color: var(--dsw-alias-hovercard-label-primary);
   overflow-wrap: break-word;
 }
 
 .hoverPath {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: var(--dsw-alias-hovercard-label-secondary);
   word-break: break-all;
 }
 
 .hoverTime {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: var(--dsw-alias-hovercard-label-secondary);
 }
 
 .hoverStatus {
@@ -396,7 +497,7 @@
   gap: 8px;
   font-size: 12px;
   line-height: 20px;
-  color: #ADB2B8;
+  color: var(--dsw-alias-hovercard-label-tertiary);
 }
 
 /* Archive glyph rides the status row's text color; slight inset aligns it with the 6px status dots. */
@@ -405,13 +506,15 @@
   margin: 0 -4px;
 }
 
+/* Compensated margins keep the 24px target on the compact icon's center. */
 .iconButton {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
+  margin: -4px;
   border: none;
   border-radius: var(--dsw-radius-xs);
   padding: 0;
@@ -420,8 +523,20 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.iconButton:hover {
-  color: var(--dsw-alias-label-primary);
+.iconButton > svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Keep the focus ring on its original compact outline. */
+.iconButton:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .iconButton:hover {
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step

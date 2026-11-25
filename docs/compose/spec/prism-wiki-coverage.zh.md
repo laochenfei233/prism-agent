@@ -1,0 +1,120 @@
+---
+feature: prism-wiki-coverage
+status: delivered
+updated: 2026-11-24
+branch: feat/prism-wiki
+commits: 3db7a89e49..afaf653cc6
+---
+
+# Prism Wiki 覆盖率
+
+[English](prism-wiki-coverage.md) | 中文
+
+## Report
+
+**建成了什么** —— `@prism/prism-wiki` 已满足仓库的逐文件覆盖率闸门：`src/` 下每个受管文件都报告 100% 的 statements、branches、functions 与 lines，`src/client/index.tsx` 保留其已记录的浏览器入口豁免。八个套件补上了已发布代码中此前无测试覆盖的状态与分支：读者的空库、失败、筛选、折叠、搜索、健康、编辑器与来源面板状态；解析器的拒绝写法与路径守卫；搜索缓存对外来、无品牌、损坏数据库的恢复与回滚路径；工具的缺参与未分类失败分支；命令的参数与错误映射分支；路由的意外失败映射；以及浏览器客户端的线上字段收窄拒绝。共享的磁盘夹具位于 `tests/fixtures/vault-fixtures.ts`。
+
+已发布代码只在分支无法运行处改动：浏览器列表删除了对已按序返回条目的冗余重排；搜索缓存删除了任何可达流程都到不了的内存路径守卫，并改为在 `closeQuietly` 内部容忍空句柄；目录重建无条件弹出尾部分隔行。其余防御性守卫都带有说明理由的 `v8 ignore` 注释；每一条信任边界上的校验都保留且有测试。
+
+**验证** —— `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出、每个受管文件 100%，在 `pnpm run clean` 之后重跑结果相同；279 个测试全部通过。`pnpm run typecheck` 以零退出。`pnpm run check:ci:coverage` 停在这台机器的 Electron 二进制步骤（Windows 上没有 `install-electron`）——即 S1 记录的既有环境缺口；逐文件阈值的证据来自验收命令本身，它在闸门阈值开启的状态下执行且未点名任何文件。`pnpm run verify-translation-pairing packages/prism/prism-wiki/README.md` 在重新记录后通过。未新增 `as unknown` 断言；diff 中唯一的 `unknown` 是既有 `outcome` 助手的签名。
+
+**历程记录** ——
+- 在 `noUncheckedIndexedAccess` 之下，对索引访问的防御性 `?? ''` 即使不可达也被类型系统强制：能在重构后证明状态不可能的就删除，否则留下带理由的 `v8 ignore`。
+- v8 的块归因会漏掉确实执行过的调用点（`discardDatabase` 调用的 `closeQuietly`）；把空检查折进被调方恢复了如实的统计。
+- 一条保存断言靠巧合通过——空草稿的 `updated` 就是当天日期，与测试输入的值相同——掩盖了一个改动从未到达输入框的字段；要断言字段本身的值，而不只是它喂给的请求。
+- 在目录树里，类型筛选胶囊与分组折叠按钮共用同一个可访问名称；用 `aria-expanded` 区分。
+
+## [S1] Problem
+
+仓库按文件卡覆盖率：`vitest.config.ts` 对 `packages/*/*/src` 下的文件要求 statements、branches、functions、lines 均为 `perFile: 100`，CI 通过 `check:ci:coverage` 执行这条规则——先分片跑、再合并做一次阈值检查。达不到的包无法通过 PR。
+
+resync 之后，`@prism/prism-wiki` 报告 **八个源文件、660 处未覆盖**：
+
+| 源文件 | 未覆盖 |
+|---|---|
+| `src/client/WikiPage.tsx` | 268 |
+| `src/vault.ts` | 193 |
+| `src/search.ts` | 71 |
+| `src/tools.ts` | 48 |
+| `src/commands.ts` | 33 |
+| `src/client/api.ts` | 18 |
+| `src/service.ts` | 16 |
+| `src/web.ts` | 13 |
+
+这些不是缺失的功能。每个套件都驱动了各自功能的主路径；未覆盖的是已经在发布的代码里的第二、第三条分支：解析器拒绝的写法、只有异常文件才会产生的错误类、路由对意外失败的映射、可选参数缺失的那一侧，以及读者切换标签页或清空筛选后才会到达的页面状态。包的 README 记录了这笔欠账，早先版本甚至声称工具、命令、路由与浏览器四半没有直接 spec。
+
+### resync 带来的变化
+
+上表是在 resync 后的分支（`a91055e561` 及其后续提交）上测得的，不是 resync 前那棵树：
+
+- `src/tools.ts` 从 55 处降到 48 处。单次调用现在经组合的执行器 seam 与工具 testkit 派发，因此每个套件都会走过工具包装器的派发路径，而不只是它的处理函数。
+- `src/client/index.tsx` 保留了已记录的豁免：合并保住了 `vitest.config.ts` 的豁免行，而目前仍没有 harness 挂载该入口注册所用的 slot 与 locale 服务。
+- 三个模块（`src/types.ts`、`src/web-contract.ts`、`src/index.ts`）在报告里显示 0%，但擦除后没有可执行语句——类型声明与 re-export——因此阈值检查不会点它们。真正被卡的只有表里的八个文件。
+
+### 本计划不负责的仓库状态
+
+resync 之后仓库里带着本包未曾造成的失败，它们会在覆盖率工作推进期间持续为红：`verify-package-dependencies` 在 `packages/transfer/prism-transfer` 报告未分类的宿主导出；多处双语文档记录仍是 resync 前的两哈希格式（`docs/compose/specs/http-asr-provider`、`meeting-minutes-*` 系列、`docs/subsystems/meetings`）；`docs/tool-catalog.zh.md` 的标题落后于英文版。因此本计划的证据是包自身的测量加「没有任何 `packages/prism/prism-wiki` 文件被点名」，而不是一次全仓库通过。
+
+验证还要从干净的树开始：必须先跑 `pnpm run clean`，因为孤儿包目录下的陈旧 `lib/` 产物在 resync 之前就让仓库级 typecheck 失败过，也可能让套件读到构建产物而不是源码面。
+
+## [S2] Design
+
+### 本计划遵守的规则
+
+1. **测试描述行为，且经真实组合驱动。** 用例驱动产品实际组合的面：磁盘上的临时知识库、真实注册表、真实路由处理器，以及 jsdom 中的页面。不添加只给测试用的生产 API，也不 mock 被测代码。
+2. **删掉跑不到的分支，而不是为它写测试。** 类型系统已排除的状态（类型边界后的不可能状态）直接从代码里删除。信任边界上的校验——排队输入、模型/工具 JSON、磁盘文件、线上请求体——保留并补测试。
+3. **豁免必须带理由。** 文件要离开闸门，需在 `vitest.config.ts` 里写明理由，并在包 README 里记一行。目前唯一的豁免是浏览器入口 `src/client/index.tsx`，因为还没有 harness 挂载它注册所用的 slot 与 locale 服务。
+4. **不改变行为。** 已发布代码只因删除死分支而变，或因为新测试暴露的缺陷而修；修复独立成一次提交并带回归测试。
+
+### resync 之后每个新测试必须使用的夹具
+
+resync 重写了套件驱动的 seam。沿用 resync 前形状的新测试要么编译不过，要么绕过了它想覆盖的代码：
+
+- **工具经组合的执行器按 batch 派发。** 夹具挂 `@deepseek-ai/dsh-tool-executor-native`，单次调用经 `@deepseek-ai/dsh-tool-testkit` 的 `executeModelToolFixture` 发出；裸用 `ctx.tools.execute({ name, arguments, … })` 已不是契约。
+- **`Agent` 自带持久模型选择。** 夹具 agent 提供 `model: { current, select }`，提出的步骤带上 `modelSelection`——`agent/pre-step` 现在要求它。
+- **根级客户端组件多收到四个标准 seat**——`useRemoteAccess`、`useSessionAccess`、`useContextMenu`、`useWorkspaceAccess`——与页面夹具已有的那些并列。
+- **路由套件用 recording connection registry**（`ctx.provide('connection', { fetch: { register } })` 加 `webServer` 桩）并经记录下来的路由派发；只有真实组合套件组合真 WebServer 与真 Connection，且必须传 `connection.browserPeer`，因为 exact route 现在要求 owner peer。
+- **浏览器构建 preset 收的是包目录**（`clientBundle(import.meta.dirname, …)`）。让它回退会让读构建产物的测试或 third-party notices 扫描在加载包之前就失败。
+
+### 每个文件缺的测试驱动什么
+
+- `src/commands.ts` —— 经真实命令注册表执行每个 `/wiki` 子命令，包括带计数与不带计数的 `log`、不可用的计数、未知子命令的用法文本，以及知识库失败的错误映射。
+- `src/web.ts` —— 每条路由的失败分支：各路由的畸形请求体、前置数据无法解析的已存页面、不得冒充 wiki 失败的意外错误，以及搜索可选字段存在与缺失两侧。
+- `src/service.ts` —— pre-step 监听器对被拒绝或被中止的步骤让行、`schemaDeliveryEnabled: false`、没有 agent 的调用，以及未配置根目录的知识库。
+- `src/client/api.ts` —— 线上字段收窄时拒绝错误的数字、布尔、可空与联合字段，每个读取器一个用例。
+- `src/tools.ts` —— `wiki_source` 缺参分支、页面存在性探测遇到每种错误类，以及意外错误向上抛出而不是变成结果。
+- `src/search.ts` —— 属于其他应用的数据库、被替换一次的不可读数据库、回滚路径、空集与满集上的 `rebuild`，以及摘要与匹配器的边界。
+- `src/vault.ts` —— 解析器拒绝的写法（缺少分隔符、块未闭合、需要列表处给了标量、置信度超范围）、每个前置数据字段的失败、不可读页面的遍历，以及拒绝路径穿越或「文件当目录」的路径守卫。
+- `src/client/WikiPage.tsx` —— 读者会到达的状态：空知识库、列表读取失败与页面读取失败、每个筛选与清除筛选、折叠的分组、搜索页的空闲/搜索中/无结果/有命中、健康页在检查前后、编辑器的每个字段、来源面板的加载中/截断/失败，以及 wikilink 重写器对围栏代码块与行内代码的处理。
+
+### 顺序
+
+由便宜到贵，让闸门剩余面在每个提交后都缩小：`client/api`（18）、`web`（13）、`service`（16）、`commands`（33）、`tools`（48）、`search`（71）、`vault`（193），最后 `WikiPage`（268）。共享夹具先行，避免两个大文件各自复制一份。
+
+## [S3] Scope
+
+- 范围内：上述测试补充、它们共享的夹具、对跑不到分支的删除，以及新测试暴露出的缺陷修复；记录结果的 README 与 spec 更新。
+- 范围外：新功能或行为改动、覆盖率阈值本身、其他包的覆盖率欠账，以及为浏览器入口手写 slot/locale harness。
+
+## Tasks
+
+- [x] T1: 共享夹具 —— 畸形前置数据表、损坏与外来的搜索数据库、页面构造器；验收：每个助手至少被两个套件使用且带 JSDoc（依赖：无）
+- [x] T2: `client/api.ts` 达到 100% —— 每个字段读取器一个拒绝用例（依赖：T1）
+- [x] T3: `web.ts` 达到 100% —— 每条路由的失败分支，包括无法解析的已存页面与意外错误（依赖：T1）
+- [x] T4: `service.ts` 达到 100% —— pre-step 的让行路径与 schema 投递开关（依赖：T1）
+- [x] T5: `commands.ts` 达到 100% —— 经命令注册表的每个子命令与参数分支（依赖：T1）
+- [x] T6: `tools.ts` 达到 100% —— 缺参、错误类与意外错误向上抛出（依赖：T1）
+- [x] T7: `search.ts` 达到 100% —— 外来、不可读与空的数据库，以及摘要边界（依赖：T1）
+- [x] T8: `vault.ts` 达到 100% —— 解析器与校验器的拒绝、不可读页面遍历、路径守卫（依赖：T1）
+- [x] T9: `WikiPage.tsx` 达到 100% —— 读者状态：空、失败、筛选、折叠、搜索、健康、编辑器字段、来源面板（依赖：T1）
+- [x] T10: 验证 —— 包的闸门以零退出，README 的覆盖率说明被结果替换，feature spec 记录结果（依赖：T2, T3, T4, T5, T6, T7, T8, T9）
+
+## [S4] Acceptance
+
+- [x] `npx vitest run packages/prism/prism-wiki --coverage --coverage.include='packages/prism/prism-wiki/src/**'` 以零退出，除已记录的浏览器入口豁免外，每个文件的 statements、branches、functions、lines 均为 100%。
+- [x] `pnpm run check:ci:coverage` 不再报告任何 `packages/prism/prism-wiki` 文件。由其他包导致的红——resync 后的树已带有 `prism-transfer` 的依赖门禁发现与过期的双语记录——只记为既有状态，不算本计划的失败。（实测：闸门在本机先行停在 Electron 二进制步骤、未点名任何文件，已记录在 Report。）
+- [x] 测量在 `pnpm run clean` 之后进行，陈旧 `lib/` 产物或孤儿包残骸不得遮蔽源码面。
+- [x] 没有新增只给测试用的生产 API，也没有新增 `as unknown` 断言。
+- [x] 所有既有测试保持不变并通过；若修改，改动在对应提交中说明。
+- [x] 包 README 的覆盖率说明从欠账改为实测结果。
+- [x] 每个被判定为跑不到而删除的分支，其提交中写明它无法运行的类型层原因。

@@ -8,13 +8,13 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { POCKET_BOTS_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
-import { remoteCommands } from '../commands.ts'
+import { POCKET_BOTS_PATH, POCKET_LAN_BIND_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
+import { lanCommands, remoteCommands, tunnelCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
 import { phoneQrSvg } from './qr.ts'
 import type { PocketLocaleKey } from './locales.ts'
-import type { PocketRemoteStatus } from '../types.ts'
+import type { PocketProvider, PocketRemoteStatus } from '../types.ts'
 
 /** Section props bound by the settings shell. */
 export type PocketSectionProps = PropsRuntime<'settings.section'> & PropsLocale<'pocket.settings'>
@@ -53,11 +53,23 @@ async function requestJson(url: string, init?: RequestInit): Promise<unknown> {
 export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [status, setStatus] = useState<PocketRemoteStatus | null>(null)
   const [bots, setBots] = useState<readonly BotView[]>([])
+  const [pairingCode, setPairingCode] = useState('')
+  const [pairingNote, setPairingNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pushNote, setPushNote] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [installEvent, setInstallEvent] = useState<Event | null>(null)
+  const [tunnelDraft, setTunnelDraft] = useState('')
+  const [tunnelNote, setTunnelNote] = useState<string | null>(null)
+  const [bindNote, setBindNote] = useState<string | null>(null)
+  const [binding, setBinding] = useState(false)
   const requestSeq = useRef(0)
+
+  /** Apply a bots-list response body to the channel list and the pairing code. */
+  const applyList = useCallback((body: unknown): void => {
+    setBots(readBots(body))
+    setPairingCode(readPairingCode(body))
+  }, [])
 
   const refresh = useCallback(async (seq: number): Promise<void> => {
     const [remote, botsBody] = await Promise.all([
@@ -66,8 +78,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
     ])
     if (requestSeq.current !== seq) return
     setStatus(readStatus(remote))
-    if (botsBody !== undefined) setBots(readBots(botsBody))
-  }, [])
+    if (botsBody !== undefined) applyList(botsBody)
+  }, [applyList])
 
   useEffect(() => {
     const seq = ++requestSeq.current
@@ -101,7 +113,18 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config === undefined ? { channel, action } : { channel, action, config, enabled: true }),
-    }).then((value) => { setBots(readBots(value)) })
+    }).then((value) => { applyList(value) })
+
+  const rotatePairing = (): void => {
+    setPairingNote(null)
+    void requestJson(POCKET_BOTS_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rotatePairing' }),
+    })
+      .then(applyList)
+      .catch((cause: unknown) => { setPairingNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
 
   const subscribe = (): void => {
     if (status === null) return
@@ -135,18 +158,74 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       .catch((cause: unknown) => { setPushNote(cause instanceof Error ? cause.message : String(cause)) })
   }
 
+  /** Persist the chosen transport and adopt the status the host answers with. */
+  const choose = (next: PocketProvider): void => {
+    const tunnelUrl = status?.remote.tunnelUrl
+    void requestJson(POCKET_REMOTE_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: next, ...(tunnelUrl !== undefined ? { tunnelUrl } : {}) }),
+    })
+      .then((value) => { setStatus(readStatus(value)) })
+      .catch((cause: unknown) => { setTunnelNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
+  /** Persist the tunnel hostname; the host re-probes it before answering. */
+  const saveTunnel = (): void => {
+    void requestJson(POCKET_REMOTE_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'tunnel', tunnelUrl: tunnelDraft.trim() }),
+    })
+      .then((value) => {
+        setStatus(readStatus(value))
+        setTunnelDraft('')
+        setTunnelNote(t('tunnel.saved'))
+      })
+      .catch((cause: unknown) => { setTunnelNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
+  /** Bind the LAN address on the running listener; the refreshed status clears the blocker. */
+  const bindLan = (): void => {
+    setBindNote(null)
+    setBinding(true)
+    void requestJson(POCKET_LAN_BIND_PATH, { method: 'POST' })
+      .then((value) => {
+        setStatus(readStatus(value))
+        setBindNote(t('phone.bind.done'))
+      })
+      .catch((cause: unknown) => { setBindNote(cause instanceof Error ? cause.message : String(cause)) })
+      .finally(() => { setBinding(false) })
+  }
+
   if (error !== null) return <p className='prism-page-message' data-tone='error'>{error}</p>
   // A Host half that predates the phone block answers without one; claim nothing.
   if (status === null || (status.phone.url === undefined && status.phone.blocker === undefined)) {
     return <p className='prism-page-message'>{t('phone.title')}</p>
   }
 
-  const commands = remoteCommands(status.server, status.tailscale)
+  const chosen = status.remote.provider
+  const commands = chosen === 'lan'
+    ? lanCommands(status.server, status.lan.ipv4)
+    : chosen === 'tunnel'
+      ? tunnelCommands(status.server, status.remote.tunnelUrl)
+      : remoteCommands(status.server, status.tailscale)
   const { phone } = status
   const verdict = verdictOf(phone)
 
   const steps: Step[] = []
-  if (commands.serve !== undefined && phone.blocker === 'not-serving') {
+  if (chosen === 'lan') {
+    if (commands.bind !== undefined && phone.blocker !== undefined) {
+      steps.push({ key: 'step.bind', code: commands.bind })
+    }
+  } else if (chosen === 'tunnel') {
+    // The run steps are how the transport comes up, so they matter most in
+    // the states that are still blocked (including "no hostname stored yet").
+    if (phone.blocker !== undefined) {
+      if (commands.run !== undefined) steps.push({ key: 'step.run', code: commands.run })
+      if (commands.quick !== undefined) steps.push({ key: 'step.quick', code: commands.quick })
+    }
+  } else if (commands.serve !== undefined && phone.blocker === 'not-serving') {
     steps.push({ key: 'step.serve', code: commands.serve })
   }
   if (commands.trust !== undefined && phone.blocker === 'untrusted') {
@@ -159,12 +238,78 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
     <div className='prism-page'>
       <section className='prism-panel'>
         <h3 className='prism-panel-title'>{t('phone.title')}</h3>
+        <div className='prism-actions' role='group' aria-label={t('remote.provider')}>
+          {(['lan', 'tailscale', 'tunnel'] as const).map(option => (
+            <button
+              key={option}
+              type='button'
+              className={chosen === option ? 'prism-button prism-button-primary' : 'prism-button prism-button-quiet'}
+              aria-pressed={chosen === option}
+              onClick={() => { choose(option) }}
+            >
+              {t(option === 'lan' ? 'remote.provider.lan' : option === 'tailscale' ? 'remote.provider.tailscale' : 'remote.provider.tunnel')}
+            </button>
+          ))}
+        </div>
+        {chosen === 'tunnel' && (
+          <>
+            <label className='prism-field'>
+              <span className='prism-field-label'>{t('tunnel.label')}</span>
+              <input
+                className='prism-input'
+                type='text'
+                autoComplete='off'
+                value={tunnelDraft !== '' ? tunnelDraft : (status.remote.tunnelUrl ?? '')}
+                onChange={(event) => { setTunnelDraft(event.target.value) }}
+                placeholder={t('tunnel.placeholder')}
+              />
+            </label>
+            <p className='prism-channel-hint'>
+              {status.cloudflared.available ? t('tunnel.installed') : t('tunnel.missing')}
+              {status.cloudflared.version !== undefined ? ` ${status.cloudflared.version}` : ''}
+              {!status.cloudflared.available && status.cloudflared.detail !== undefined ? ` · ${status.cloudflared.detail}` : ''}
+            </p>
+            <p className='prism-channel-hint'>{t('tunnel.hint')}</p>
+            <div className='prism-actions'>
+              <button
+                type='button'
+                className='prism-button prism-button-primary'
+                disabled={tunnelDraft.trim() === ''}
+                onClick={saveTunnel}
+              >
+                {t('tunnel.save')}
+              </button>
+            </div>
+          </>
+        )}
+        {tunnelNote !== null && <p className='prism-note'>{tunnelNote}</p>}
         <div className='prism-phone'>
           <div className='prism-phone-qr'>
             {phone.url !== undefined
               ? <div className='prism-qr' aria-label={t('phone.qr')} dangerouslySetInnerHTML={{ __html: phoneQrSvg(phone.url) }} />
               : <p className='prism-qr-empty'>{t('phone.qr.unavailable')}</p>}
             <span className='prism-qr-caption'>{t('phone.qr')}</span>
+            <span className='prism-step-hint'>{t('phone.qr.credential')}</span>
+            {pairingCode !== '' && (
+              <div className='prism-pairing'>
+                <span className='prism-qr-caption'>{t('phone.pairing')}</span>
+                <code className='prism-code'>{pairingCode}</code>
+                <div className='prism-actions'>
+                  <button
+                    type='button'
+                    className='prism-button prism-button-quiet'
+                    onClick={() => copy('pairing', pairingCode)}
+                  >
+                    {copied === 'pairing' ? t('phone.copied') : t('phone.copy')}
+                  </button>
+                  <button type='button' className='prism-button prism-button-quiet' onClick={rotatePairing}>
+                    {t('phone.pairing.rotate')}
+                  </button>
+                </div>
+                {pairingNote !== null && <p className='prism-note'>{pairingNote}</p>}
+                <span className='prism-step-hint'>{t('phone.pairing.hint')}</span>
+              </div>
+            )}
           </div>
           <div className='prism-phone-side'>
             <div className='prism-verdict' data-tone={verdict}>
@@ -182,6 +327,19 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
                 </button>
               </div>
             )}
+            {chosen === 'lan' && phone.blocker === 'not-bound' && (
+              <div className='prism-actions'>
+                <button
+                  type='button'
+                  className='prism-button prism-button-primary'
+                  disabled={binding}
+                  onClick={bindLan}
+                >
+                  {binding ? t('phone.bind.working') : t('phone.bind.action')}
+                </button>
+              </div>
+            )}
+            {bindNote !== null && <p className='prism-note'>{bindNote}</p>}
             {steps.length > 0 && (
               <div className='prism-steps'>
                 <h4 className='prism-steps-title'>{t('phone.steps')}</h4>
@@ -192,6 +350,20 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
                       <span className='prism-step-label'>{t(step.key)}</span>
                       <code className='prism-code'>{step.code}</code>
                       {step.key === 'step.trust' && <span className='prism-step-hint'>{t('step.trust.hint')}</span>}
+                      {step.key === 'step.bind' && <span className='prism-step-hint'>{t('step.bind.hint')}</span>}
+                      {step.key === 'step.trust' && commands.trustedHost !== undefined && (
+                        <>
+                          <span className='prism-step-hint'>{t('step.trust.cli')}</span>
+                          <code className='prism-code'>{commands.trustedHost}</code>
+                          <button
+                            type='button'
+                            className='prism-button prism-button-quiet'
+                            onClick={() => copy('step.trust.cli', commands.trustedHost ?? '')}
+                          >
+                            {copied === 'step.trust.cli' ? t('phone.copied') : t('phone.copy')}
+                          </button>
+                        </>
+                      )}
                       <button
                         type='button'
                         className='prism-button prism-button-quiet'
@@ -437,13 +609,16 @@ function blameKey(blocker: PocketRemoteStatus['phone']['blocker']): PocketLocale
   switch (blocker) {
     case 'loopback': return 'phone.blocked.loopback'
     case 'no-tailscale': return 'phone.blocked.noTailscale'
+    case 'no-lan': return 'phone.blocked.noLan'
+    case 'not-bound': return 'phone.blocked.notBound'
+    case 'no-tunnel-url': return 'phone.blocked.noTunnelUrl'
     case 'not-serving': return 'phone.blocked.notServing'
     case 'untrusted': return 'phone.blocked.untrusted'
     default: return 'phone.ready'
   }
 }
 
-const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'not-serving', 'untrusted'])
+const BLOCKERS: ReadonlySet<string> = new Set(['loopback', 'no-tailscale', 'no-lan', 'not-bound', 'no-tunnel-url', 'not-serving', 'untrusted'])
 
 const STATUSES: ReadonlySet<string> = new Set(['off', 'starting', 'online', 'error'])
 
@@ -454,13 +629,21 @@ const STATUSES: ReadonlySet<string> = new Set(['off', 'starting', 'online', 'err
 function readStatus(value: unknown): PocketRemoteStatus {
   const root = objectOf(value)
   const server = objectOf(root?.server)
+  const lan = objectOf(root?.lan)
   const tailscale = objectOf(root?.tailscale)
+  const cloudflared = objectOf(root?.cloudflared)
+  const remote = objectOf(root?.remote)
   const pocket = objectOf(root?.pocket)
   const phone = objectOf(root?.phone)
   const publicUrl = stringOf(server?.publicUrl)
+  const lanIpv4 = stringOf(lan?.ipv4)
+  const lanDetail = stringOf(lan?.detail)
   const dnsName = stringOf(tailscale?.dnsName)
   const ipv4 = stringOf(tailscale?.ipv4)
   const detail = stringOf(tailscale?.detail)
+  const cloudflaredVersion = stringOf(cloudflared?.version)
+  const cloudflaredDetail = stringOf(cloudflared?.detail)
+  const tunnelUrl = stringOf(remote?.tunnelUrl)
   const blocker = typeof phone?.blocker === 'string' && BLOCKERS.has(phone.blocker)
     ? phone.blocker as NonNullable<PocketRemoteStatus['phone']['blocker']>
     : undefined
@@ -474,11 +657,25 @@ function readStatus(value: unknown): PocketRemoteStatus {
       ...(publicUrl !== undefined ? { publicUrl } : {}),
       trustedHosts: Array.isArray(server?.trustedHosts) ? server.trustedHosts.filter(entry => typeof entry === 'string') : [],
     },
+    lan: {
+      available: lan?.available === true,
+      ...(lanIpv4 !== undefined ? { ipv4: lanIpv4 } : {}),
+      ...(lanDetail !== undefined ? { detail: lanDetail } : {}),
+    },
     tailscale: {
       available: tailscale?.available === true,
       ...(dnsName !== undefined ? { dnsName } : {}),
       ...(ipv4 !== undefined ? { ipv4 } : {}),
       ...(detail !== undefined ? { detail } : {}),
+    },
+    cloudflared: {
+      available: cloudflared?.available === true,
+      ...(cloudflaredVersion !== undefined ? { version: cloudflaredVersion } : {}),
+      ...(cloudflaredDetail !== undefined ? { detail: cloudflaredDetail } : {}),
+    },
+    remote: {
+      provider: remote?.provider === 'tunnel' ? 'tunnel' : remote?.provider === 'tailscale' ? 'tailscale' : 'lan',
+      ...(tunnelUrl !== undefined ? { tunnelUrl } : {}),
     },
     phone: {
       trusted: phone?.trusted === true,
@@ -506,6 +703,16 @@ function readValues(value: unknown): Readonly<Record<string, string>> {
     if (text !== undefined) values[name] = text
   }
   return values
+}
+
+/**
+ * Narrow the pairing code out of a bots-list body; a malformed body reads as none.
+ * @param value - the list route's response body.
+ * @returns the active pairing code, or `''` when the body carries none.
+ */
+function readPairingCode(value: unknown): string {
+  const code = objectOf(value)?.pairingCode
+  return typeof code === 'string' && code.length > 0 ? code : ''
 }
 
 /** Narrow the bots list body; a malformed body reads as an empty list. */

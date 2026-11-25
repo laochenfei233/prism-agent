@@ -7,6 +7,7 @@
 //! keeps the app resident when the window closes.
 
 mod dsh_runner;
+mod proxy;
 mod quit;
 mod setup;
 mod tray;
@@ -18,11 +19,14 @@ use tauri_plugin_opener::OpenerExt;
 
 use dsh_runner::DshHandle;
 
-/// Default port the bundled `dsh web` process listens on. When occupied, the
-/// shell scans upward for a free port and delivers the actual port to the
-/// frontend through the `dsh://ready` event. CLI users who run their own
-/// `dsh web` keep the default 3080.
-pub const INTERNAL_PORT: u16 = 3081;
+/// Default loopback port for the bundled `dsh web` process. When occupied, the
+/// shell scans upward for a free port and delivers the authenticated launch
+/// URL through `dsh://ready`. Sibling dsh-fork desktop shells share the
+/// upstream 3081 default, and the port is part of the browser session's
+/// authority, so losing that race moves every launch to a fallback port and
+/// 401s every existing session cookie; this private default leaves 3081 to
+/// them. CLI users who run their own `dsh web` keep the default 3080.
+pub const INTERNAL_PORT: u16 = 38081;
 
 /// The main window is declared in `tauri.conf.json` with `"create": false`
 /// and built here instead: the `on_new_window` handler that routes popup
@@ -294,6 +298,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             dsh_runner::dsh_status,
+            dsh_runner::authenticate_webview,
             dsh_runner::restart_dsh,
             dsh_runner::open_ui,
             update::prism_update_state,
@@ -302,12 +307,21 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit => {
                 if let Some(dsh) = app_handle.try_state::<DshHandle>() {
                     dsh.stop();
                 }
             }
+            // macOS delivers a Dock click or Finder relaunch as Reopen; without
+            // this arm the hidden window stays hidden and the running app looks
+            // unresponsive until it is fully quit.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } => tray::show_main_window(app_handle),
+            _ => {}
         });
 }
 

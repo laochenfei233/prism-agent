@@ -10,7 +10,7 @@
 import type { BotAdapterFactory, WechatConfig } from '../types.ts'
 import { chunkText } from '../shared/chunk.ts'
 import { fetchBotJson, postBotJson } from '../shared/http.ts'
-import { callbackSignature, decryptWechatMessage, encryptWechatMessage } from '../shared/sign.ts'
+import { callbackSignature, decryptWechatMessage, encryptWechatMessage, timingSafeStringEquals } from '../shared/sign.ts'
 import { buildEncryptedReply, readXmlField } from '../shared/xml.ts'
 
 /** Per-message character limit of the customer-service text message. */
@@ -28,7 +28,7 @@ export const WECHAT_API_BASE = 'https://api.weixin.qq.com'
  * @returns whether the signature matches.
  */
 export function verifyWechatCallback(token: string, signature: string, timestamp: string, nonce: string): boolean {
-  return callbackSignature(token, timestamp, nonce) === signature
+  return timingSafeStringEquals(callbackSignature(token, timestamp, nonce), signature)
 }
 
 /** One decrypted callback message, narrowed to the fields the adapter reads. */
@@ -37,6 +37,8 @@ export interface WechatCallbackMessage {
   readonly to: string
   readonly msgType: string
   readonly content?: string
+  /** The platform message id, when the message carries one. */
+  readonly msgId?: string
 }
 
 /**
@@ -57,7 +59,14 @@ export function readWechatCallback(config: WechatConfig, xml: string): WechatCal
   const msgType = readXmlField(plaintext, 'MsgType')
   if (from === undefined || to === undefined || msgType === undefined) return undefined
   const content = readXmlField(plaintext, 'Content')
-  return { from, to, msgType, ...(content !== undefined ? { content } : {}) }
+  const msgId = readXmlField(plaintext, 'MsgId')
+  return {
+    from,
+    to,
+    msgType,
+    ...(content !== undefined ? { content } : {}),
+    ...(msgId !== undefined ? { msgId } : {}),
+  }
 }
 
 /**

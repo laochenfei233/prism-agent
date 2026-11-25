@@ -3,13 +3,13 @@ description: "The Prism meetings profile layer: durable meeting records, live mi
 kind: "package-bundle"
 ---
 
-# @prism-ai/prism-meeting
+# @prism/prism-meeting
 
 English | [中文](README.zh.md)
 
 ## Summary
 
-This bundle adds meeting capture to a base-backed `dsh` profile: a durable meeting store, live microphone transcription, one configured model route for summaries and questions, the model-facing meeting tools, and the Web meetings page. No shipped profile includes it, so a profile gains it by installing this package and restarting. The profile needs the base LLM, storage-domain, speech-to-text, and tools services, and a speech provider key for recognition. A profile without the Web Connection leaves the page row pending instead of failing, and the package is an installable layer rather than a library.
+This bundle adds meeting capture to a base-backed `dsh` profile: a durable meeting store, live microphone transcription, one configured model route for summaries and questions, the model-facing meeting tools, and the Web meetings page. This repository's `dsh-base` composes these three rows already, so a base-backed profile carries meetings without this package; install it into a profile whose base does not. The profile needs the base LLM, storage-domain, speech-to-text, and tools services, and a speech provider key for recognition. A profile without the Web Connection leaves the page row pending instead of failing, and the package is an installable layer rather than a library.
 
 ## Table of Contents
 
@@ -32,7 +32,7 @@ Install the tarball into a base-backed DSH profile, then restart that profile:
 ```sh
 dsh plugin --profile <profile> add /absolute/path/to/prism-ai-prism-meeting-0.1.0.tgz
 dsh --profile <profile>
-dsh plugin --profile <profile> remove @prism-ai/prism-meeting
+dsh plugin --profile <profile> remove @prism/prism-meeting
 ```
 
 The package declares `dsh.bundle.patch`, so `dsh plugin` reconciles it as a profile layer instead of mounting one plugin. The profile needs the base LLM, storage-domain, speech-to-text, and tools services. Set `DASHSCOPE_API_KEY` for audio recognition, or configure another speech provider for the profile.
