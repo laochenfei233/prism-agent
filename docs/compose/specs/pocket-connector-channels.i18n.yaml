@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for pocket-connector-channels.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/pocket-connector-channels.md
+/:
+  en: f02a7d5a0eaaf1ca
+  zh: f02a7d5a0eaaf1ca
+/pocket-connector:
+  en: f521b9924b198639
+  zh: 8bea2f7cff5d2d0d
+/pocket-connector/report:
+  en: 00e72f51f97ab1c2
+  zh: 00e72f51f97ab1c2
+/pocket-connector/s1-problem:
+  en: 71842f6cfdd6fcab
+  zh: 71842f6cfdd6fcab
+/pocket-connector/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/pocket-connector/s2-design/s2-1-pocket:
+  en: 534192593ebe3254
+  zh: 534192593ebe3254
+/pocket-connector/s2-design/s2-2-retire:
+  en: adc83e71f31957b1
+  zh: adc83e71f31957b1
+/pocket-connector/s2-design/s2-3-connector:
+  en: 1a87dc1206e87ec2
+  zh: 1a87dc1206e87ec2
+/pocket-connector/s2-design/s2-4:
+  en: 26b43cbf8cacc70b
+  zh: 26b43cbf8cacc70b
+/pocket-connector/s2-design/s2-5:
+  en: 5dcee669627e6ac2
+  zh: 5dcee669627e6ac2
+/pocket-connector/s2-design/s2-6:
+  en: a08d161d0e960d8a
+  zh: a08d161d0e960d8a
+/pocket-connector/s3-scope:
+  en: b27cd05b657575fb
+  zh: b27cd05b657575fb
+/pocket-connector/tasks:
+  en: 453031b64c89b064
+  zh: 453031b64c89b064
+/pocket-connector/s4-acceptance:
+  en: e853330b0f5715d3
+  zh: e853330b0f5715d3

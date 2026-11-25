@@ -3,11 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/spec/cross-agent-session-import.md
 /:
-  en: 51da55dfae478e46
-  zh: 51da55dfae478e46
+  en: 6317b3b130d09881
+  zh: 6317b3b130d09881
 /cross-agent-session-import:
   en: 4544144288cc83b5
   zh: b7cb04fdf533aae1
+/cross-agent-session-import/report:
+  en: d5e744ba056b396d
+  zh: 94d4726d954b197e
 /cross-agent-session-import/s1-problem:
   en: eb4225461291b40c
   zh: 2d940182721e5826
@@ -45,8 +48,8 @@
   en: 8aadebe2ba98ab86
   zh: 2b878a94293f8b93
 /cross-agent-session-import/tasks:
-  en: d16e79d010d7cb84
-  zh: 785626eebecc951d
+  en: 08af0a202d0e74b3
+  zh: 20e0312e6b068579
 /cross-agent-session-import/s4-acceptance:
-  en: 0484e05a4f85b943
-  zh: d72ea62cd08d64f7
+  en: 2a47380c6574aeb2
+  zh: 23f4275ae8167d8e

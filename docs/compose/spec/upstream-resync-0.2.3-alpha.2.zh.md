@@ -16,6 +16,13 @@ commits: pending
 
 **待办事项** —— 本文档随落地提交一起交付；完整的解决清单、验证结果与 divergence index 锚点更新在交付时补记于此。
 
+## Journey log
+
+- 合并树输出本身是干净的；几乎全部手工工作量都是测试侧漂移，由全图 `tsc -p tsconfig.host.json` 编译暴露——它能看到按包 `tsc -b` 编译所隐藏的跨包类型漂移。当按包结果不一致时，以 `-p` 编译为仲裁。
+- 上游在 alpha 窗口内调整了多个包的归属（credentials→account，experimental→interaction/extensions/team，subagent 拆分）。别名行与工作区依赖已对合并后的树校验（只有目标仍存在的行才保留），生成的别名区域由 `gen-tsconfig-paths` 重新生成。
+- alpha.2 的 typert 分析器为合并接口增加了 face 纯度检查：每个声明部分必须位于已注册的贡献包内。fork 的 cron 服务包成为了贡献者（`@typert service cron` + `./typert` 导出 + `files` 行）；wiki 与 autonomy 包保持未注册，因为主机图中没有导入它们的代码，遍历不会到达其声明。
+- cron/wiki/autonomy/meeting/microcompact 服务在其包加入主机图后，对目录与文档图投影变为可发现；它们的 SERVICE_PAGE 行与服务角色已（重新）加入，过期的遍历豁免已移除。
+- fork 2026-11-05 的持久化记录写于 pre-alpha.2 的内联格式，新的历史解析器会拒绝它；已按当前清单在规范的 keyed-node 布局中重新生成，其确认摘要也更新到当前 schema。
 ## [S1] 问题
 
 fork 跟随上游的内核、包与文档，但其历史是孤儿导入：上游提交永远无法合并，因此上游的每个版本都必须以内容级树合并的方式重放，并手工重放 fork 的分歧区域。上游已推进到 `0.2.3-alpha.2`，而每个触及上游变更代码的 fork 面——client UI 包、生成的目录、门禁、CLI 身份、桌面壳的排除项——都需要在不丢失 fork 身份与特性的前提下拿到这份增量。

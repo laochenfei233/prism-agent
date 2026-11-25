@@ -18,7 +18,7 @@ client 预设会压缩浏览器 bundle 的文本（`minify: { compress: false, m
 
 `@deepseek-ai/dsh` 通过 [`scripts/stage-dsh-docs.ts`](../../../../scripts/stage-dsh-docs.ts) 在自己的 `prepack` 生命周期里把这一集合复制到 `apps/cli/docs`，并在 `postpack` 中再次删除这份副本。集合包含：网站清单中的 Markdown、`docs/upgrade-guide/` 下的全部文档，以及这些页面引用的非 Markdown 资产。暂存时还会生成 `docs/upgrade-guide/README.md`：按每个 `v<T>` 目录升级前的版本分组，列出每份指南的标题、中英文描述与两种语言的相对路径；仓库树本身不保留索引。生成的 `docs/persistence-changes/` 记录、`docs/i18n/` 规范与 `*.i18n.yaml` 一致性记录不发布。vendored 族保持上游 payload 不变（[发布序列](2026-08-10-npm-release-sequences.zh.md)）。
 
-桌面版在 `app.asar` 内保留 `src/` 与 `@deepseek-ai/dsh` 的 `docs/` 树，agent 可在其中读取已安装版本的文档与代码；其[运行时文件策略](../../../../apps/desktop/scripts/runtime-file-policy.ts)仍剔除全部声明文件与映射。普通工具打不开归档内条目，因此 [`dsh-shell-env`](../../../../packages/shell/shell-env/README.zh.md) 为每次模型 shell 调用提供 `DSH_INSTALL_DIR`（`@deepseek-ai/dsh` 包目录）与 `DSH_NODE_EXECUTABLE`（运行 Harness 的可执行文件）；桌面版下它是 Electron，其 Node 模式（`ELECTRON_RUN_AS_NODE=1`）能读取归档。Python 单文件可执行体不付出代价：[`PUBLISHED_PAYLOAD_IGNORES`](../../../../scripts/build-exe-for-python-sdk.ts) 排除同样的树，因此其内容不取决于检出中是否残留暂存的 `docs`。
+桌面版在 `app.asar` 内保留 `src/` 与 `@deepseek-ai/dsh` 的 `docs/` 树，agent 可在其中读取已安装版本的文档与代码；其[运行时文件策略)仍剔除全部声明文件与映射。普通工具打不开归档内条目，因此 [`dsh-shell-env`](../../../../packages/shell/shell-env/README.zh.md) 为每次模型 shell 调用提供 `DSH_INSTALL_DIR`（`@deepseek-ai/dsh` 包目录）与 `DSH_NODE_EXECUTABLE`（运行 Harness 的可执行文件）；桌面版下它是 Electron，其 Node 模式（`ELECTRON_RUN_AS_NODE=1`）能读取归档。Python 单文件可执行体不付出代价：[`PUBLISHED_PAYLOAD_IGNORES`](../../../../scripts/build-exe-for-python-sdk.ts) 排除同样的树，因此其内容不取决于检出中是否残留暂存的 `docs`。
 
 ## Alternatives considered
 

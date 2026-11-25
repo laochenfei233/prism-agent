@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for remote-access-assessment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/remote-access-assessment.md
+/:
+  en: 1ab45f34acecd35f
+  zh: 1ab45f34acecd35f
+/remote-connection-pocket:
+  en: 25601873736032fc
+  zh: 0058fb33fb53c01e
+/remote-connection-pocket/report:
+  en: 359cf1122679c6c0
+  zh: 359cf1122679c6c0
+/remote-connection-pocket/s1-problem:
+  en: 609caf41a4119936
+  zh: 609caf41a4119936
+/remote-connection-pocket/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/remote-connection-pocket/s2-design/s2-1:
+  en: 2b05fabe76675d9a
+  zh: 2b05fabe76675d9a
+/remote-connection-pocket/s2-design/s2-2:
+  en: c6f7331bb4167ec9
+  zh: c6f7331bb4167ec9
+/remote-connection-pocket/s2-design/s2-3-spec:
+  en: aae54e66c7bc73eb
+  zh: aae54e66c7bc73eb
+/remote-connection-pocket/s2-design/s2-4:
+  en: 5f4c6d64d7aadbd3
+  zh: 5f4c6d64d7aadbd3
+/remote-connection-pocket/s3-scope:
+  en: 8b51e7402965ad4d
+  zh: 8b51e7402965ad4d
+/remote-connection-pocket/tasks:
+  en: 91d670fb93e30289
+  zh: 91d670fb93e30289
+/remote-connection-pocket/s4-acceptance:
+  en: 3b7a181c23b339b8
+  zh: 3b7a181c23b339b8

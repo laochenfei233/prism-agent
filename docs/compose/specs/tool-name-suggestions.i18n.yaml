@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for tool-name-suggestions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/tool-name-suggestions.md
+/:
+  en: 5a1e2ffe7d7cdecb
+  zh: 5a1e2ffe7d7cdecb
+/section:
+  en: 6e5f2d5e5a20e87b
+  zh: a433f0811d1093b1
+/section/report:
+  en: 4c2b1a6929e54f30
+  zh: 4c2b1a6929e54f30
+/section/s1-problem:
+  en: 6909e589c0db2cb0
+  zh: 6909e589c0db2cb0
+/section/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/section/s2-design/s2-1-tools-execute:
+  en: 84b50a2e213b75e0
+  zh: 84b50a2e213b75e0
+/section/s2-design/s2-2-src-tool-hints-ts:
+  en: 7fc547947f77ba91
+  zh: 7fc547947f77ba91
+/section/s2-design/s2-3-rethrow:
+  en: 5773ced0cead1c51
+  zh: 5773ced0cead1c51
+/section/s2-design/s2-4:
+  en: 217da5c16998e4a0
+  zh: 217da5c16998e4a0
+/section/s3-scope:
+  en: b742ad97ef67a310
+  zh: b742ad97ef67a310
+/section/tasks:
+  en: 039b94345a4cfd03
+  zh: 039b94345a4cfd03
+/section/s4-acceptance:
+  en: 70186e5986819410
+  zh: 70186e5986819410

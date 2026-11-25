@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for guard-message-redaction.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/guard-message-redaction.md
+/:
+  en: 08354f59ad78cf5b
+  zh: 08354f59ad78cf5b
+/guardrails:
+  en: fd2063c50294b3f4
+  zh: e0804f2a78f03be2
+/guardrails/report:
+  en: 11e2fdfcda86ed2f
+  zh: 11e2fdfcda86ed2f
+/guardrails/s1-problem:
+  en: 1fe8210897794eda
+  zh: 1fe8210897794eda
+/guardrails/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/guardrails/s2-design/s2-1-helper-src-redact-ts:
+  en: 4aad50e75516511f
+  zh: 4aad50e75516511f
+/guardrails/s2-design/s2-2:
+  en: 0f8426d20965ffa7
+  zh: 0f8426d20965ffa7
+/guardrails/s2-design/s2-3:
+  en: 99fd0abc972a85c6
+  zh: 99fd0abc972a85c6
+/guardrails/s3-scope:
+  en: 34384fa4d9a4cca6
+  zh: 34384fa4d9a4cca6
+/guardrails/tasks:
+  en: f5326054bc430df0
+  zh: f5326054bc430df0
+/guardrails/s4-acceptance:
+  en: bb46329c1c7b926a
+  zh: bb46329c1c7b926a

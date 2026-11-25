@@ -8,6 +8,8 @@ commits: 38749f9739 (master)
 
 # 令牌用量提醒开关（默认关闭）
 
+English | [中文](usage-reminder-toggle.zh.md)
+
 ## Report
 
 已实现（2026-11-24，`plugins/prism-guardrails`）：

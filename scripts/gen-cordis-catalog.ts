@@ -196,6 +196,7 @@ export const SERVICE_PAGE: Record<string, string> = {
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2). The projection discovers no host typert face for these fork services, so the walk exempts them with their documentation owners instead of rendering catalog rows.
+  'connection.tokenLogin': 'login-URL minting for the reusable launch token and single-use pairing links — packages/host/authentication-token/README.md owns the contract',
   timeline: 'experimental session data service internal to the bundle — packages/experimental/timeline/README.md owns its behavior',
   contextMenus: 'client-side interface-typed menu registry — packages/client/ui-context-menu/README.md owns the API',
   fileActions: 'client-side interface-typed file actions — packages/client/ui-file-actions/README.md owns the API',

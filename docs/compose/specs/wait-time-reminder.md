@@ -8,6 +8,8 @@ commits: 7abf808b6c (master)
 
 # 按实际等待时长的静默提醒
 
+English | [中文](wait-time-reminder.zh.md)
+
 ## Report
 
 已实现（2026-11-25，`plugins/prism-guardrails`）：

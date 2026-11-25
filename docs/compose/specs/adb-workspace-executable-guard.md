@@ -8,6 +8,8 @@ commits: 待交付时回填
 
 # Command guard：可执行文件工作区限定（adb）
 
+English | [中文](adb-workspace-executable-guard.zh.md)
+
 ## Report
 
 待实施后回填。
@@ -23,8 +25,7 @@ commits: 待交付时回填
 - `CommandRule`（`config.ts:62-67`）增加可选字段 `workspaceBinary?: boolean`（缺省 `false` = 现行为完全不变）；键名加入 `COMMAND_RULE_KEYS`（`config.ts:247`）。
 - 语义：命中该规则且**可执行文件不在工作区内（或无法确认在工作区内）→ deny；可执行文件在工作区内 → 放行（不 ask，继续后续规则）**。即该类规则是"合规放行、违规拒绝"，不同于普通规则的"命中即 ask"。
 - `resolveCommandRules`（`config.ts:746-778`）做布尔校验（非法值加载即 throw），并把标志保留进 `ResolvedCommandRule`（`config.ts:78-85`）。
-- 出厂配置（`cordis.patch.yml` 的 commandGuard 段）为 bash 与 pwsh 各新增一条：
-  `{ pattern: "\\badb\\b", reason: "adb 仅允许使用工作区内的可执行文件", workspaceBinary: true }`。
+- 出厂配置（`cordis.patch.yml` 的 commandGuard 段）为 bash 与 pwsh 各新增一条：`{ pattern: "\\badb\\b", reason: "adb 仅允许使用工作区内的可执行文件", workspaceBinary: true }`。
 
 ### S2.2 可执行文件提取与工作区判定（新 helper + `installCommandGuard`）
 

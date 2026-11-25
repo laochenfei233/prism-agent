@@ -54,9 +54,11 @@ Sessions outside a team (ordinary sessions, independently resumed subagents, tre
 A new tool `team_report`, available to every member:
 
 ```ts
-{ status: 'progress' | 'waiting' | 'ready' | 'blocked' | 'failed' | 'dropped'
+type TeamReport = {
+  status: 'progress' | 'waiting' | 'ready' | 'blocked' | 'failed' | 'dropped'
   summary: string
-  taskId?: string }
+  taskId?: string
+}
 ```
 
 Execution is two steps: first `ctx.subagents.sendMessage(caller, root.session.id, content, { signal })` — an ordinary tree message whose receiver is the Lead's inbox — with the body `Report from <name> [<status>]: <summary>` plus the optional taskId; then the same row is recorded in the plugin's ledger. The return value is a receipt (status, delivered, ledger count) and never fabricates model-side handling.

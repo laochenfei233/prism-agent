@@ -8,6 +8,8 @@ commits: 待交付时回填
 
 # Pocket 的飞书/企微/钉钉改用上游 Connector 实现
 
+English | [中文](pocket-connector-channels.zh.md)
+
 ## Report
 
 **What was built** — `plugins/prism-pocket` 退役了飞书、钉钉、企微三个自研 bot 适配器，这三个通道改由上游 CLI connector 承担，口袋设置页仍是九通道的唯一入口。宿主侧：`BotChannelId`/`BOT_CHANNEL_KINDS`/`BOT_SECRET_FIELDS`/`BotConfig` 与 `validate.ts` 的严格读取收窄为六通道；删除 `adapters/{feishu,dingtalk,wecom}.ts`、只为飞书长连接存在的 `shared/protobuf.ts`、企业微信回调路由与 `oneOf` 区域校验；`BotStore` 加载时丢弃这三个通道的旧条目并回写文件，不留残余凭据。浏览器侧：`CHANNEL_META` 保持九张卡与页序，三张卡改为 `connector: true` 的注记卡——品牌 chip、名称、「上游 connector」标签、账号状态（已连接/未连接/检查中/连接中/不可用，来自宿主新增的连接器状态读取）与来源说明，不再渲染凭据表单、开始/停止/测试与控制台链接；只为飞书存在的区域选择器一并删除。组合侧：pocket 的 `cordis.patch.yml` 追加 `feishu`/`dingtalk`/`wecom` 三行（上游 connector 的共享服务 `cli-account`、`upstream-skills` 已是 base bundle 行，Plugins 页账号 UI 已是 web-app bundle 的 `connector-account` 行，均无需重复声明）。

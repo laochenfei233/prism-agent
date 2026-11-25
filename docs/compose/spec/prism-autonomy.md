@@ -28,9 +28,9 @@ A new plugin `@prism/prism-autonomy` (`plugins/prism-autonomy`), composed by a b
 
 ```ts
 // The plugin's config and its defaults.
-const config = {
-  preset: 'autonomous-guarded', // the preset that engages autonomy
-  requireHuman: [{ reasonPrefix: 'escalate sandbox to' }], // the require-human list
+interface AutonomyConfig {
+  preset: 'autonomous-guarded' // the preset that engages autonomy
+  requireHuman: { reasonPrefix: string }[] // the require-human list
 }
 ```
 

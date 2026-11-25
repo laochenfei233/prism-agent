@@ -8,6 +8,8 @@ commits: e161bdab89 (feat/tool-name-suggestions), e7c738b135 (master)
 
 # 未知工具名的相近名称建议
 
+English | [中文](tool-name-suggestions.zh.md)
+
 ## Report
 
 已实现于分支 `feat/tool-name-suggestions`（worktree `.worktrees/tool-name-suggestions`）。guardrails 新增 `tools/execute` 包装（结果路径 + 兜底 catch）、`src/tool-hints.ts`（大小写折叠 Levenshtein + 子串优惠，预算 `max(2, ⌊len/3⌋)`，至多 3 个）、`toolNameSuggestions` 配置（默认 `true`，进 `KNOWN_KEYS`）。新增 10 个用例（6 个经真实 agent loop + 工具管线的行为用例、4 个纯函数用例）全部通过。顺带修复 spec 的失效导入（`defineContentToolFixture` 实际来自 `@deepseek-ai/dsh-tool-testkit`），使整个套件恢复可运行：失败数从 85 降到 55，剩余 55 个失败是 HEAD 上既有的 `ctx.tools.execute` 逐调用签名与现批量 API 的漂移，与本特性无关。README 双语与 i18n 配对已同步。
@@ -32,8 +34,13 @@ commits: e161bdab89 (feat/tool-name-suggestions), e7c738b135 (master)
 ### S2.3 返回形态：不 rethrow，返回增强后的错误结果
 
 ```ts
-{ content: [{ type: 'text', text: `Error: ${enhanced}` }], isError: true,
-  error: { message: enhanced, ...originalInfo } }   // 保留 reachableFrom 等 info
+declare const enhanced: string
+declare const originalInfo: Record<string, unknown>
+const enhancedResult = {
+  content: [{ type: 'text', text: `Error: ${enhanced}` }],
+  isError: true,
+  error: { message: enhanced, ...originalInfo }, // keep reachableFrom and the rest
+}
 ```
 
 该结果经 `normalizeDispatchResult`（`pipeline.ts:570-588`）与 post-execute 正常流转，最终写入 `tool/result` 事件到达模型（`batch.ts:258`）。判定逻辑（哪些调用被拒/放行）完全不变——本特性只改错误文本。

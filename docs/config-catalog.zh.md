@@ -1645,7 +1645,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-experimental-speech-to-text-dashscope`
 
 - `inject`: `speechToText`
-- `source`: [`packages/experimental/speech-to-text-dashscope/src/index.ts:42`](../packages/experimental/speech-to-text-dashscope/src/index.ts)
+- `source`: [`packages/experimental/speech-to-text-dashscope/src/index.ts:43`](../packages/experimental/speech-to-text-dashscope/src/index.ts)
 
 ```ts config-catalog
 /** Plugin configuration; every field is resolved before the provider is registered. */
@@ -2255,7 +2255,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-authentication-token`
 
 - `inject`: `connection` · `connection.authentication` · `credentials`
-- `source`: [`packages/host/authentication-token/src/index.ts:16`](../packages/host/authentication-token/src/index.ts)
+- `source`: [`packages/host/authentication-token/src/index.ts:17`](../packages/host/authentication-token/src/index.ts)
 
 ```ts config-catalog
 /** Default browser and API cookie lifetime. */
@@ -5988,6 +5988,7 @@ export type ImportSourceId =
   | 'hermes'
   | 'pi'
   | 'gemini'
+  | 'zcode'
 ```
 <!-- END GENERATED config-catalog:@prism/prism-session-import -->
 

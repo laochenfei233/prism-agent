@@ -138,7 +138,7 @@ No composition can bind every interface at once: the unspecified address is reje
 
 ## The service
 
-The nested `connection.authentication` service selects a Peer through registered Providers; Connection applies source policy and WebServer passes the selected Peer to each call. The [Token plugin](../../packages/host/authentication-token/README.md) contributes its signed login URL; WebApp owns startup printing and browser opening. [Desktop](../../apps/desktop/README.md#application-overview) registers a separate Provider using a credential delivered over its private parent–Host IPC channel; its ready message carries the ordinary Host address and startup injections.
+The nested `connection.authentication` service selects a Peer through registered Providers; Connection applies source policy and WebServer passes the selected Peer to each call. The [Token plugin](../../packages/host/authentication-token/README.md) contributes its signed login URL; WebApp owns startup printing and browser opening. [Desktop]) registers a separate Provider using a credential delivered over its private parent–Host IPC channel; its ready message carries the ordinary Host address and startup injections.
 
 `WebServer` (`ctx.webServer`) listens immediately on activation; a listen failure (EADDRINUSE…) rejects initialization, and the boot process reports the failed fiber. The `tls` pair is read once before the listener binds, and an unreadable, empty, or mismatched pair rejects initialization the same way instead of falling back to HTTP. `register(route)` adds one named route and returns its disposer; a duplicate `(kind, path)` throws because route patterns are a composition-level contract and a collision is a misconfiguration. Gzip wraps eligible socket-backed responses inside the server, so handlers keep direct `ServerResponse` ownership, and a resource hands the service a `Response` to write back. Existing content encodings, `Cache-Control: no-transform`, ranges, SSE, ZIP, and the packaged `.gz` Worker image remain identity responses. `collectIndexInjections(peer)` gathers structured `IndexInjection` rows over one `webserver/index-inject` emit that passes the Peer the page speaks for, and `renderIndex(html, peer)` renders them into successful root and configured index responses before applying the raw `tapIndex(transform)` escape-hatch transforms in registration order; [dsh-client-modules](../../packages/client/modules) answers the event with the boot manifest rows. `port` reads the listening port, including the port assigned by the OS when `config.port` is 0, and `protocol` reports the scheme the listener serves (`http:` or `https:`).
 
@@ -172,6 +172,16 @@ createSharedFetchHandler(channel: '/api'): ConnectionFetchHandler
  * @returns the credential's Peer, or the rejection status.
  */
 admit(request: ConnectionTrustRequest): PeerAdmission
+
+/**
+ * Whether the Host/Origin fence admits one request, without requiring a login.
+ * Anonymous route owners need this decision before handling a request the
+ * browser sends outside any authenticated channel.
+ * @param request - request headers; only Host, Origin, and Fetch-Metadata are read.
+ * @returns true when the request authority belongs to this deployment and any
+ * attached browser markers are same-origin.
+ */
+isTrustedRequest(request: ConnectionTrustRequest): boolean
 
 /**
  * Create an independent in-process Peer, disposed with the Context that read `ctx.connection`.

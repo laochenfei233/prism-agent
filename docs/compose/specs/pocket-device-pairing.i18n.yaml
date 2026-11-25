@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for pocket-device-pairing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/pocket-device-pairing.md
+/:
+  en: 8dfacc40d7373463
+  zh: 8dfacc40d7373463
+/section:
+  en: e892a453e9f3753d
+  zh: 0c568d5b2988d2e6
+/section/report:
+  en: 1cec3af5f2f442c8
+  zh: 1cec3af5f2f442c8
+/section/s1-problem:
+  en: 8ba7ad544178feb6
+  zh: 8ba7ad544178feb6
+/section/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/section/s2-design/s2-1:
+  en: d5c58f212589934e
+  zh: d5c58f212589934e
+/section/s2-design/s2-2-url-connection:
+  en: d94c1ec5d75608b1
+  zh: d94c1ec5d75608b1
+/section/s2-design/s2-3:
+  en: 3bb6c959b919c5ac
+  zh: 3bb6c959b919c5ac
+/section/s2-design/s2-4:
+  en: 0e55a353c6bdaddc
+  zh: 0e55a353c6bdaddc
+/section/s2-design/s2-5:
+  en: 21b058d5ccc351bd
+  zh: 21b058d5ccc351bd
+/section/s2-design/s2-6:
+  en: 91301c373e080e89
+  zh: 91301c373e080e89
+/section/s2-design/s2-7:
+  en: 8db1fbb4e1bb0343
+  zh: 8db1fbb4e1bb0343
+/section/s3-scope:
+  en: 950cd03ba080080b
+  zh: 950cd03ba080080b
+/section/tasks:
+  en: 43f4707ef3c6c960
+  zh: 43f4707ef3c6c960
+/section/s4-acceptance:
+  en: 64874f73f4606561
+  zh: 64874f73f4606561

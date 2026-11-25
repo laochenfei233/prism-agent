@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for wait-time-reminder.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/wait-time-reminder.md
+/:
+  en: 5a836bfeebe814cb
+  zh: 5a836bfeebe814cb
+/section:
+  en: d0ad10696a55e2bd
+  zh: bcf5e047f4faef1b
+/section/report:
+  en: 81a3f85cb2bbcece
+  zh: 81a3f85cb2bbcece
+/section/s1-problem:
+  en: af959687a943e422
+  zh: af959687a943e422
+/section/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/section/s2-design/s2-1-tools-execute:
+  en: 7496fcd2569766a4
+  zh: 7496fcd2569766a4
+/section/s2-design/s2-2-additionalcontexts:
+  en: d24b1f8d3d7e0baa
+  zh: d24b1f8d3d7e0baa
+/section/s2-design/s2-3:
+  en: a8bb07b3ab5c1612
+  zh: a8bb07b3ab5c1612
+/section/s2-design/s2-4:
+  en: e1e8cd5a67bb2f88
+  zh: e1e8cd5a67bb2f88
+/section/s3-scope:
+  en: b570408bc64c6932
+  zh: b570408bc64c6932
+/section/tasks:
+  en: 8c4a70e0a3c67bd1
+  zh: 8c4a70e0a3c67bd1
+/section/s4-acceptance:
+  en: 8074f9a9a38e0b0a
+  zh: 8074f9a9a38e0b0a

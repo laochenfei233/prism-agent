@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for usage-reminder-toggle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/usage-reminder-toggle.md
+/:
+  en: f163c589feaac590
+  zh: f163c589feaac590
+/section:
+  en: 8dc054cdc847d758
+  zh: d71efe895c32b30b
+/section/report:
+  en: a6077315871149de
+  zh: a6077315871149de
+/section/s1-problem:
+  en: 38a8bdd1af24f0b4
+  zh: 38a8bdd1af24f0b4
+/section/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/section/s2-design/s2-1-session-event:
+  en: 10117117e2792ccc
+  zh: 10117117e2792ccc
+/section/s2-design/s2-2-agent-steer:
+  en: 4e3c122034469d1b
+  zh: 4e3c122034469d1b
+/section/s2-design/s2-3:
+  en: 4a79db28a71b271b
+  zh: 4a79db28a71b271b
+/section/s2-design/s2-4:
+  en: fa0d86e966b868f2
+  zh: fa0d86e966b868f2
+/section/s3-scope:
+  en: 37b6cddc33a0edc9
+  zh: 37b6cddc33a0edc9
+/section/tasks:
+  en: e8d0edc9879bb5f9
+  zh: e8d0edc9879bb5f9
+/section/s4-acceptance:
+  en: 8cc3c923c3b94011
+  zh: 8cc3c923c3b94011

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/compose/specs/schedule-consolidation.md
 /:
-  en: 0dbfc73b2b159a1d
-  zh: 0dbfc73b2b159a1d
+  en: acba98fde9b8e3f6
+  zh: acba98fde9b8e3f6
 /scheduling-consolidation-upstream-schedule-wins-cron-retires:
   en: 58da4e79ed8c29b2
   zh: f50d4e4ca19b1697

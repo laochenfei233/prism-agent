@@ -8,6 +8,8 @@ commits: 待交付时回填
 
 # Guardrails 消息与台账脱敏
 
+English | [中文](guard-message-redaction.zh.md)
+
 ## Report
 
 待实施后回填。

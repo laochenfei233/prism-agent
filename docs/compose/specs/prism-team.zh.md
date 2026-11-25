@@ -28,7 +28,7 @@ commits: 50ff54bd96..c4bd1a25a3
 
 ## [S1] Problem
 
-实验性 Agent Teams（`packages/experimental/agent-team` + `tool-agent-team`）给了 Lead 与具名 teammate、点对点消息和一个持久任务板，但它自己列出的四条限制，正好是 dsh-superagent-prototype 已经在别处解决掉的问题：
+实验性 Agent Teams（`packages/team/agent-team` + `tool-agent-team`）给了 Lead 与具名 teammate、点对点消息和一个持久任务板，但它自己列出的四条限制，正好是 dsh-superagent-prototype 已经在别处解决掉的问题：
 
 | 团队包自认的限制 | superagent 原型里的对应做法 |
 |---|---|
@@ -54,9 +54,11 @@ commits: 50ff54bd96..c4bd1a25a3
 新工具 `team_report`，每个成员都有：
 
 ```ts
-{ status: 'progress' | 'waiting' | 'ready' | 'blocked' | 'failed' | 'dropped'
+type TeamReport = {
+  status: 'progress' | 'waiting' | 'ready' | 'blocked' | 'failed' | 'dropped'
   summary: string
-  taskId?: string }
+  taskId?: string
+}
 ```
 
 执行分两步：先 `ctx.subagents.sendMessage(caller, root.session.id, content, { signal })`——树内普通消息，Lead 的收件箱就是收件方——正文是 `Report from <name> [<status>]: <summary>` 加可选的 taskId；再把同一条记录进插件台账。返回值是一张收据（状态、是否送达、台账条数），不伪造模型处理结果。

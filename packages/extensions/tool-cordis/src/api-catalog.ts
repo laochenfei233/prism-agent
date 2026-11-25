@@ -820,6 +820,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the credential\'s Peer, or the rejection status.',
       },
       {
+        signature: 'isTrustedRequest(request: ConnectionTrustRequest): boolean',
+        description: 'Whether the Host/Origin fence admits one request, without requiring a login. Anonymous route owners need this decision before handling a request the browser sends outside any authenticated channel.',
+        parameters: [{ name: 'request', description: 'request headers; only Host, Origin, and Fetch-Metadata are read.' }],
+        returns: 'true when the request authority belongs to this deployment and any attached browser markers are same-origin.',
+      },
+      {
         signature: 'createPeer(options: { readonly principal: Principal; readonly interactions?: \'answer\' | \'none\' }): PeerScope',
         description: 'Create an independent in-process Peer, disposed with the Context that read `ctx.connection`.',
         parameters: [{ name: 'options', description: 'fixed principal and interaction participation (default answer).' }],

@@ -8,6 +8,8 @@ commits: 工作区改动，提交时回填
 
 # 手机接入改为一次性配对流
 
+English | [中文](pocket-device-pairing.zh.md)
+
 ## Report
 
 **What was built** — 二维码改为编码 `phone.accessUrl`（`/pocket-pair` 干净地址）。手机页（`src/pairing/page.ts`，webserver 上的匿名 HTML）生成 id+secret、显示 8 位接入码、每 2s 轮询；桌面 Pocket 页在既有 8s 状态轮询的响应里读 `pairing.requests`，渲染「接入请求」卡（码、来源 IP、剩余分钟、允许/拒绝），决定走 `POST /api/pocket/pairing`；批准后手机拿到一次性登录 URL，走既有 `?token=` 交换。`packages/client/connection` 新增一次性令牌（内存 Map、兑换即删、`ttlMs` 过期、`/connect` 不接受）与 `mintOneTimeLoginUrl`，并把栅栏判定从私有 `isTrusted` 提为公开 `isTrustedRequest`。三条匿名路由（`/pocket-pair/{request,status,cancel}`）挂在 webserver 上：先过 `isTrustedRequest`，只收 `POST` + `application/json`，body ≤1 KiB，创建间隔 1s、池上限 16、轮询间隔 2s、票据 TTL 5 分钟；票据只在内存，插件 dispose 时 `clear()`，`issueUrl` 的基址取自解析出的手机地址而不是请求里的 Host。
@@ -29,7 +31,7 @@ pocket 的二维码直接编码带登录令牌的链接：`phoneOf` 用 `connect
 1. 桌面 Pocket 设置页的二维码改为编码干净接入页 `http://<addr>:<port>/pocket-pair`，不含 token。
 2. 手机打开该页：pocket 在 webserver 注册的匿名 HTML（形状同 `src/pwa.ts:89` 的 PWA 资源）。页面脚本生成 `id`（uuid）与 `secret`（32 字节 base64url），`POST /pocket-pair/request` 拿到 8 位接入码，显示「等待批准」并每 2s 轮询 `/pocket-pair/status`。
 3. 桌面设置页在既有 8s 轮询的 `/api/pocket/remote` 响应里看到 `pairing.requests`（接入码、来源 IP、剩余时间）。owner 比对手机上显示的码后点「允许」或「拒绝」，`POST /api/pocket/pairing`。
-4. 手机轮询到 `approved` 拿到一次性登录 URL，顶层跳转走既有 `?token=` 交换（`packages/client/connection/src/browser-auth.ts:278` `authorizeIndex`），换取 30 天 HttpOnly cookie，进入应用。
+4. 手机轮询到 `approved` 拿到一次性登录 URL，顶层跳转走既有 `?token=` 交换（`packages/host/authentication-token/src/browser-auth.ts` `authorizeIndex`），换取 30 天 HttpOnly cookie，进入应用。
 
 ### S2.2 一次性登录 URL（connection 的唯一改动）
 

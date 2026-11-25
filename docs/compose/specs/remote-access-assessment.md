@@ -8,6 +8,8 @@ commits: 评估类文档，无交付提交
 
 # 远程接入体系评估：上游 remote-connection 是否替换 pocket
 
+English | [中文](remote-access-assessment.zh.md)
+
 ## Report
 
 待实施后回填（本 spec 为评估/决策记录，结论：**不替换**，见 S2.2）。

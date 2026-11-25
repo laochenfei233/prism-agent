@@ -27,10 +27,10 @@ base bundle 的 permission-presets 预设表新增一个预设：`autonomous-gua
 新插件 `@prism/prism-autonomy`（`plugins/prism-autonomy`），像其他 prism 插件一样通过 bundle patch 行接入。其配置：
 
 ```ts
-// 插件的配置与默认值。
-const configZh = {
-  preset: 'autonomous-guarded', // 启用自治模式的预设
-  requireHuman: [{ reasonPrefix: 'escalate sandbox to' }], // 需人工确认的列表
+// The plugin's config and its defaults.
+interface AutonomyConfig {
+  preset: 'autonomous-guarded' // the preset that engages autonomy
+  requireHuman: { reasonPrefix: string }[] // the require-human list
 }
 ```
 

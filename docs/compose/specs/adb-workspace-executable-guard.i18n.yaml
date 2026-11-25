@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for adb-workspace-executable-guard.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/compose/specs/adb-workspace-executable-guard.md
+/:
+  en: da36c67e718f9f40
+  zh: da36c67e718f9f40
+/command-guard-adb:
+  en: 4881819abffb5e8e
+  zh: 7fb681295b600ac2
+/command-guard-adb/report:
+  en: 11e2fdfcda86ed2f
+  zh: 11e2fdfcda86ed2f
+/command-guard-adb/s1-problem:
+  en: b459c4021a1fc676
+  zh: b459c4021a1fc676
+/command-guard-adb/s2-design:
+  en: ecbb0dbfa14686f0
+  zh: ecbb0dbfa14686f0
+/command-guard-adb/s2-design/s2-1-src-config-ts:
+  en: 5a715aa9946b2fd1
+  zh: 5a715aa9946b2fd1
+/command-guard-adb/s2-design/s2-2-helper-installcommandguard:
+  en: 25033b8af3f09f1e
+  zh: 25033b8af3f09f1e
+/command-guard-adb/s2-design/s2-3-observe:
+  en: 62ffcc00f46f9109
+  zh: 62ffcc00f46f9109
+/command-guard-adb/s2-design/s2-4:
+  en: 9a667fef5e7256ed
+  zh: 9a667fef5e7256ed
+/command-guard-adb/s3-scope:
+  en: 84dcc3144427b551
+  zh: 84dcc3144427b551
+/command-guard-adb/tasks:
+  en: 4fb4f1f4c00d71a8
+  zh: 4fb4f1f4c00d71a8
+/command-guard-adb/s4-acceptance:
+  en: 8d583636d3c4ffcf
+  zh: 8d583636d3c4ffcf
