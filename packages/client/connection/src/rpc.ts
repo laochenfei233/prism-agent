@@ -225,6 +225,16 @@ export interface HostConnectionHandle {
   admit(request: ConnectionTrustRequest): PeerAdmission
 
   /**
+   * Whether the Host/Origin fence admits one request, without requiring a login.
+   * Anonymous route owners need this decision before handling a request the
+   * browser sends outside any authenticated channel.
+   * @param request - request headers; only Host, Origin, and Fetch-Metadata are read.
+   * @returns true when the request authority belongs to this deployment and any
+   * attached browser markers are same-origin.
+   */
+  isTrustedRequest(request: ConnectionTrustRequest): boolean
+
+  /**
    * Create an independent in-process Peer, disposed with the Context that read `ctx.connection`.
    * @param options - fixed principal and interaction participation (default answer).
    * @returns a new Peer distinct from every other Peer.

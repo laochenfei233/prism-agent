@@ -13,7 +13,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { join } from 'node:path'
-import { POCKET_LAN_BIND_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from './routes.ts'
+import type { IncomingHttpHeaders } from 'node:http'
+import { POCKET_LAN_BIND_PATH, POCKET_PAIRING_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from './routes.ts'
 import { encryptPushPayload } from './push/encrypt.ts'
 import { loadOrCreateVapidKeys, type VapidMaterial } from './push/keys.ts'
 import { deliverBark, deliverWebPush } from './push/sender.ts'
@@ -24,6 +25,8 @@ import { detectCloudflared } from './tunnel.ts'
 import { detectLanAddress } from './lan.ts'
 import { applyLanBind } from './lan-bind.ts'
 import { RemotePrefsStore, readRemotePrefs } from './remote-prefs.ts'
+import { PairingRequests } from './pairing/requests.ts'
+import { PAIRING_PAGE_PATH, registerPairingRoutes } from './pairing/routes.ts'
 import type { PocketPhoneAccess, PocketPushPayload, PocketPushSubscriptionRecord, PocketRemoteStatus, PocketServerSurface } from './types.ts'
 import { lanAccess, phoneAccess, probeVerdict, tunnelAccess } from './commands.ts'
 import { registerPwaAssets, type WebServerLike } from './pwa.ts'
@@ -84,8 +87,16 @@ interface ConnectionRoute {
       readonly fetch: (request: Request) => Promise<Response>
     }): () => Promise<void>
   }
-  /** Adds this process's login token to an application URL. */
+  /** The Host/Origin fence, without the login requirement the `/api` channel adds. */
+  isTrustedRequest(request: { readonly headers: IncomingHttpHeaders }): boolean
+}
+
+/** Login-URL minting from the token plugin; absent when a profile replaces it. */
+interface TokenLoginUrlsLike {
+  /** Adds this process's reusable login token to an application URL. */
   authenticatedUrl(baseUrl: string): string
+  /** Adds a single-use login token; the returned URL signs one browser in once. */
+  mintOneTimeLoginUrl(baseUrl: string, ttlMs: number): string
 }
 
 /** Structural view of the startup-provided web surface values. */
@@ -100,11 +111,17 @@ interface WebStartupLike {
 /** Everything `apply` resolved once, shared by the routes and the deliverer. */
 interface PocketRuntime {
   connection: ConnectionRoute
+  /** Single-use and reusable login-URL minting; undefined without the token plugin. */
+  loginUrls: TokenLoginUrlsLike | undefined
   webserver: WebServerLike
   webStartup: WebStartupLike
   material: Promise<VapidMaterial>
   store: SubscriptionStore
   prefs: RemotePrefsStore
+  /** Pending phone-access tickets; process-local, cleared with the plugin. */
+  requests: PairingRequests
+  /** The clean phone address the last status read resolved; the pairing collect mints its login URL. */
+  phoneTarget: string | undefined
   config: Required<Pick<Config, 'pushEnabled' | 'notifyTurnComplete'>> & Pick<Config, 'barkUrl'>
 }
 
@@ -120,13 +137,17 @@ export function apply(ctx: Context, config: Config = {}): void {
   const connection = ctx.get('connection') as ConnectionRoute
   const webserver = ctx.get('webServer') as WebServerLike
   const webStartup = ctx.get('webStartup') as WebStartupLike
+  const loginUrls = ctx.get('connection.tokenLogin') as TokenLoginUrlsLike | undefined
   const runtime: PocketRuntime = {
     connection,
+    loginUrls,
     webserver,
     webStartup,
     material: loadOrCreateVapidKeys(join(homeOf(ctx), 'pocket', 'keys.json')),
     store: new SubscriptionStore(join(homeOf(ctx), 'pocket', 'subscriptions.json')),
     prefs: new RemotePrefsStore(join(homeOf(ctx), 'pocket', 'remote.json')),
+    requests: new PairingRequests(),
+    phoneTarget: undefined,
     config: resolved,
   }
 
@@ -143,6 +164,27 @@ export function apply(ctx: Context, config: Config = {}): void {
     requestBody: 'buffered',
     fetch: async request => lanBindResponse(request, runtime),
   }), 'pocket: lan bind')
+
+  ctx.effect(() => connection.fetch.register({
+    path: POCKET_PAIRING_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async request => pairingDecisionResponse(request, runtime),
+  }), 'pocket: pairing decision')
+
+  registerPairingRoutes(route => {
+    ctx.effect(() => runtime.webserver.register(route), `pocket: ${route.path}`)
+  }, {
+    requests: runtime.requests,
+    isTrusted: request => runtime.connection.isTrustedRequest(request),
+    // The base comes from the resolved phone address, never from the requesting
+    // browser: a caller-chosen base would let an approved request mint a token
+    // for a host the owner never saw.
+    issueUrl: () => runtime.phoneTarget === undefined || runtime.loginUrls === undefined
+      ? undefined
+      : runtime.loginUrls.mintOneTimeLoginUrl(runtime.phoneTarget, ONE_TIME_LOGIN_TTL_MS),
+  })
+  ctx.effect(() => () => { runtime.requests.clear() }, 'pocket: pairing tickets')
 
   ctx.effect(() => connection.fetch.register({
     path: POCKET_PUSH_SUBSCRIBE_PATH,
@@ -344,6 +386,9 @@ async function deliverToSubscription(
 /** How long one request to the advertised phone address may take before it counts as unreachable. */
 const PHONE_PROBE_TIMEOUT_MS = 2500
 
+/** How long the login token handed to a just-approved phone stays exchangeable. */
+const ONE_TIME_LOGIN_TTL_MS = 120_000
+
 /** Answer one remote-status request: GET reads, POST persists the selection. */
 async function remoteResponse(request: Request, runtime: PocketRuntime): Promise<Response> {
   if (request.method === 'GET') return jsonResponse(await statusOf(runtime))
@@ -393,13 +438,16 @@ async function statusOf(runtime: PocketRuntime): Promise<PocketRemoteStatus> {
       ? lanAccess(surface, lan.ipv4)
       : phoneAccess(surface, tailscale)
   const phone = await resolvePhone(access)
+  // The pairing collect mints a login URL for the address this page just showed.
+  runtime.phoneTarget = access.target
   return {
     server: surface,
     lan,
     tailscale,
     cloudflared,
     remote: { provider: remote.provider, ...(tunnelUrl !== undefined ? { tunnelUrl } : {}) },
-    phone: phoneOf(runtime.connection, phone),
+    phone: phoneOf(runtime, phone),
+    pairing: { requests: runtime.requests.list() },
     pocket: {
       pushEnabled: runtime.config.pushEnabled,
       notifyTurnComplete: runtime.config.notifyTurnComplete,
@@ -439,14 +487,15 @@ async function resolvePhone(
 }
 
 /**
- * Attach this process's login token to the phone target, keeping a display
- * copy without it: the token is what the phone trades for a session cookie,
- * and a settings page must not print it into a screenshot.
- * @param connection - the carrier that mints authenticated URLs.
+ * Attach the phone access URLs: the clean pairing page a phone opens, plus the
+ * authenticated link (display copy with its token elided) kept as the manual
+ * fallback. A settings page must not print the token verbatim into a
+ * screenshot.
+ * @param runtime - resolved pocket services, including login-URL minting when present.
  * @param access - the resolved phone target and blocker.
  */
 function phoneOf(
-  connection: ConnectionRoute,
+  runtime: PocketRuntime,
   access: ReturnType<typeof phoneAccess>,
 ): PocketPhoneAccess {
   const base = {
@@ -454,8 +503,37 @@ function phoneOf(
     ...(access.blocker !== undefined ? { blocker: access.blocker } : {}),
   }
   if (access.target === undefined) return base
-  const url = connection.authenticatedUrl(access.target)
-  return { ...base, url, display: url.replace(/([?&]token=)[^&]*/u, '$1…') }
+  const url = runtime.loginUrls?.authenticatedUrl(access.target)
+  return {
+    ...base,
+    accessUrl: new URL(PAIRING_PAGE_PATH, access.target).href,
+    ...(url === undefined ? {} : { url, display: url.replace(/([?&]token=)[^&]*/u, '$1…') }),
+  }
+}
+
+/** Answer one owner decision on a pending pairing request. */
+async function pairingDecisionResponse(request: Request, runtime: PocketRuntime): Promise<Response> {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return jsonResponse({ error: 'invalid JSON body' }, 400)
+  }
+  const decision = readDecision(body)
+  if (decision === undefined) {
+    return jsonResponse({ error: 'expected { id: string, decision: "allow" | "deny" }' }, 400)
+  }
+  const result = runtime.requests.decide(decision.id, decision.decision)
+  return jsonResponse({ result, requests: runtime.requests.list() })
+}
+
+/** Validate one decision body from the wire. */
+function readDecision(value: unknown): { id: string; decision: 'allow' | 'deny' } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { id, decision } = value as { id?: unknown; decision?: unknown }
+  if (typeof id !== 'string' || id.length === 0) return undefined
+  if (decision !== 'allow' && decision !== 'deny') return undefined
+  return { id, decision }
 }
 
 /** Validate and persist one subscription; the reply carries the VAPID public key. */

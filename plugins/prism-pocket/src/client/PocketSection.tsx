@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { POCKET_BOTS_PATH, POCKET_LAN_BIND_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
+import { POCKET_BOTS_PATH, POCKET_LAN_BIND_PATH, POCKET_PAIRING_PATH, POCKET_PUSH_SUBSCRIBE_PATH, POCKET_PUSH_TEST_PATH, POCKET_REMOTE_PATH } from '../routes.ts'
 import { lanCommands, remoteCommands, tunnelCommands } from '../commands.ts'
 import { promptInstall, subscribeThisDevice } from './pwa.ts'
 import { CHANNEL_META, type BotChannelMeta } from './channel-meta.ts'
@@ -62,6 +62,7 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
   const [installEvent, setInstallEvent] = useState<Event | null>(null)
   const [tunnelDraft, setTunnelDraft] = useState('')
   const [tunnelNote, setTunnelNote] = useState<string | null>(null)
+  const [accessNote, setAccessNote] = useState<string | null>(null)
   const [bindNote, setBindNote] = useState<string | null>(null)
   const [binding, setBinding] = useState(false)
   const requestSeq = useRef(0)
@@ -200,9 +201,21 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       .finally(() => { setBinding(false) })
   }
 
+  /** Approve or deny one pending access request, then re-read the host's list. */
+  const decideAccess = (id: string, decision: 'allow' | 'deny'): void => {
+    setAccessNote(null)
+    void requestJson(POCKET_PAIRING_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, decision }),
+    })
+      .then(async () => { setStatus(readStatus(await requestJson(POCKET_REMOTE_PATH))) })
+      .catch((cause: unknown) => { setAccessNote(cause instanceof Error ? cause.message : String(cause)) })
+  }
+
   if (error !== null) return <p className='prism-page-message' data-tone='error'>{error}</p>
   // A Host half that predates the phone block answers without one; claim nothing.
-  if (status === null || (status.phone.url === undefined && status.phone.blocker === undefined)) {
+  if (status === null || (status.phone.url === undefined && status.phone.accessUrl === undefined && status.phone.blocker === undefined)) {
     return <p className='prism-page-message'>{t('phone.title')}</p>
   }
 
@@ -214,6 +227,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
       : remoteCommands(status.server, status.tailscale)
   const { phone } = status
   const verdict = verdictOf(phone)
+  const accessRequests = status.pairing.requests
+  const qrTarget = phone.accessUrl ?? phone.url
 
   const steps: Step[] = []
   if (chosen === 'lan') {
@@ -287,8 +302,8 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
         {tunnelNote !== null && <p className='prism-note'>{tunnelNote}</p>}
         <div className='prism-phone'>
           <div className='prism-phone-qr'>
-            {phone.url !== undefined
-              ? <div className='prism-qr' aria-label={t('phone.qr')} dangerouslySetInnerHTML={{ __html: phoneQrSvg(phone.url) }} />
+            {qrTarget !== undefined
+              ? <div className='prism-qr' aria-label={t('phone.qr')} dangerouslySetInnerHTML={{ __html: phoneQrSvg(qrTarget) }} />
               : <p className='prism-qr-empty'>{t('phone.qr.unavailable')}</p>}
             <span className='prism-qr-caption'>{t('phone.qr')}</span>
             <span className='prism-step-hint'>{t('phone.qr.credential')}</span>
@@ -318,6 +333,38 @@ export function PocketSection({ t }: PocketSectionProps): ReactElement {
               <p className='prism-verdict-text'>{t(verdict === 'ok' ? 'phone.ready' : blameKey(phone.blocker))}</p>
               {phone.display !== undefined && <code className='prism-address'>{phone.display}</code>}
             </div>
+            {accessRequests.length > 0 && (
+              <div className='prism-verdict' data-tone='wait'>
+                <p className='prism-verdict-text'>{t('access.pending')}</p>
+                {accessRequests.map(request => (
+                  <div key={request.id} className='prism-pairing'>
+                    <code className='prism-code'>{request.code}</code>
+                    <span className='prism-qr-caption'>
+                      {t('access.from').replace('{ip}', request.sourceIp ?? t('access.unknown'))}
+                      {' · '}
+                      {t('access.minutes').replace('{n}', String(Math.max(1, Math.ceil(request.expiresInMs / 60_000))))}
+                    </span>
+                    <div className='prism-actions'>
+                      <button
+                        type='button'
+                        className='prism-button prism-button-primary'
+                        onClick={() => { decideAccess(request.id, 'allow') }}
+                      >
+                        {t('access.allow')}
+                      </button>
+                      <button
+                        type='button'
+                        className='prism-button prism-button-quiet'
+                        onClick={() => { decideAccess(request.id, 'deny') }}
+                      >
+                        {t('access.deny')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {accessNote !== null && <p className='prism-note'>{accessNote}</p>}
+              </div>
+            )}
             {phone.url !== undefined && (
               <div className='prism-actions'>
                 <button
@@ -666,6 +713,7 @@ function readStatus(value: unknown): PocketRemoteStatus {
   const cloudflared = objectOf(root?.cloudflared)
   const remote = objectOf(root?.remote)
   const pocket = objectOf(root?.pocket)
+  const pairing = objectOf(root?.pairing)
   const phone = objectOf(root?.phone)
   const publicUrl = stringOf(server?.publicUrl)
   const lanIpv4 = stringOf(lan?.ipv4)
@@ -680,6 +728,7 @@ function readStatus(value: unknown): PocketRemoteStatus {
     ? phone.blocker as NonNullable<PocketRemoteStatus['phone']['blocker']>
     : undefined
   const phoneUrl = stringOf(phone?.url)
+  const phoneAccessUrl = stringOf(phone?.accessUrl)
   const phoneDisplay = stringOf(phone?.display)
   const vapidPublicKey = stringOf(pocket?.vapidPublicKey)
   return {
@@ -712,8 +761,25 @@ function readStatus(value: unknown): PocketRemoteStatus {
     phone: {
       trusted: phone?.trusted === true,
       ...(blocker !== undefined ? { blocker } : {}),
+      ...(phoneAccessUrl !== undefined ? { accessUrl: phoneAccessUrl } : {}),
       ...(phoneUrl !== undefined ? { url: phoneUrl } : {}),
       ...(phoneDisplay !== undefined ? { display: phoneDisplay } : {}),
+    },
+    pairing: {
+      requests: (Array.isArray(pairing?.requests) ? pairing.requests : []).flatMap(entry => {
+        const row = objectOf(entry)
+        if (row === undefined) return []
+        const id = stringOf(row.id)
+        const code = stringOf(row.code)
+        if (id === undefined || code === undefined) return []
+        const sourceIp = stringOf(row.sourceIp)
+        return [{
+          id,
+          code,
+          ...(sourceIp !== undefined ? { sourceIp } : { sourceIp: null }),
+          expiresInMs: numberOr(row.expiresInMs, 0),
+        }]
+      }),
     },
     pocket: {
       pushEnabled: pocket?.pushEnabled === true,

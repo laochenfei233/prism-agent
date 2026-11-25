@@ -129,8 +129,8 @@ export class HostConnectionService extends Service implements HostConnectionHand
     return new Peer(this.ctx, options)
   }
 
-  /** Check the deployment's request-source policy without credential verification. */
-  private isTrustedRequest(request: ConnectionTrustRequest): boolean {
+  /** Apply the Host/Origin fence without requiring a login; anonymous routes read it first. */
+  isTrustedRequest(request: ConnectionTrustRequest): boolean {
     const carrier = this.owner.get('webServer')
     return isTrustedApiRequest(request, this.trustedHosts, carrier?.hosts, carrier?.protocol ?? 'http:')
   }

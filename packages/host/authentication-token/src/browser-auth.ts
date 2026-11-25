@@ -21,6 +21,8 @@ const COOKIE_PAYLOAD_VERSION = 1
 const STORED_SECRET_VERSION = 1
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]*$/
 const PROCESS_LAUNCH_TOKENS = new WeakMap<object, string>()
+/** Retained single-use tokens; the oldest is dropped past this bound. */
+const ONE_TIME_TOKEN_LIMIT = 64
 
 interface StoredSecretPayload {
   readonly version: typeof STORED_SECRET_VERSION
@@ -229,6 +231,7 @@ async function initializeSecret(credentials: CredentialProvider): Promise<Buffer
 export class BrowserAuth {
   private readonly launchToken: string
   private readonly maxAgeMilliseconds: number
+  private readonly oneTimeTokens = new Map<string, number>()
 
   private constructor(
     processOwner: object,
@@ -271,6 +274,49 @@ export class BrowserAuth {
   }
 
   /**
+   * Add a single-use token to the caller's application URL, authorizing one
+   * login by another device (a paired phone, for example). The token is spent
+   * by its one code exchange and then no longer exists.
+   * @param baseUrl - clean browser URL whose authority and mount are preserved.
+   * @param ttlMs - lifetime of the token before it stops authorizing a login.
+   * @returns the same URL carrying the single-use token as its sole authentication input.
+   */
+  oneTimeLoginUrl(baseUrl: string, ttlMs: number): string {
+    const url = new URL(baseUrl)
+    url.searchParams.set(TOKEN_QUERY, this.mintOneTimeToken(ttlMs))
+    return url.href
+  }
+
+  /**
+   * Retain one single-use token until it is exchanged or its lifetime ends.
+   * @param ttlMs - lifetime in milliseconds.
+   * @returns a 256-bit token distinct from the process launch token.
+   */
+  mintOneTimeToken(ttlMs: number): string {
+    const now = Date.now()
+    for (const [token, expiresAt] of this.oneTimeTokens) {
+      if (expiresAt <= now) this.oneTimeTokens.delete(token)
+    }
+    if (this.oneTimeTokens.size >= ONE_TIME_TOKEN_LIMIT) {
+      const oldest = this.oneTimeTokens.keys().next()
+      /* v8 ignore next -- the map holds ONE_TIME_TOKEN_LIMIT keys here, so its iterator has a value. */
+      if (!oldest.done) this.oneTimeTokens.delete(oldest.value)
+    }
+    const token = encodeBase64Url(randomBytes(SECRET_BYTES))
+    this.oneTimeTokens.set(token, now + ttlMs)
+    return token
+  }
+
+  /** Whether this token authorizes the index exchange; a single-use token is spent by the answer. */
+  private consumeToken(actual: string): boolean {
+    if (tokenMatches(actual, this.launchToken)) return true
+    const expiresAt = this.oneTimeTokens.get(actual)
+    if (expiresAt === undefined) return false
+    this.oneTimeTokens.delete(actual)
+    return expiresAt > Date.now()
+  }
+
+  /**
    * Authenticate an index request. A valid root query token mints the cookie —
    * expiring every other session cookie the request still carries — and
    * redirects to the directory-relative clean `./`; a valid cookie lets
@@ -291,7 +337,7 @@ export class BrowserAuth {
     if (tokens.length > 0) {
       const authority = requestAudience(req.headers, secure)
       if (req.method === 'GET' && url.pathname === '/' && tokens.length === 1
-        && authority !== undefined && tokenMatches(tokens.join(''), this.launchToken)) {
+        && authority !== undefined && this.consumeToken(tokens.join(''))) {
         const issuedAt = Date.now()
         const expiresAt = issuedAt + this.maxAgeMilliseconds
         const value = encodeCookie({

@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyLanBind, type BindableWebServer } from '../src/lan-bind.ts'
 import { lanBindResponse } from '../src/index.ts'
+import { PairingRequests } from '../src/pairing/requests.ts'
 import { SubscriptionStore } from '../src/push/store.ts'
 import { RemotePrefsStore } from '../src/remote-prefs.ts'
 import { loadOrCreateVapidKeys } from '../src/push/keys.ts'
@@ -94,8 +95,14 @@ function fakeRuntime(webserver: ReturnType<typeof fakeListenerServer>) {
   return {
     connection: {
       fetch: { register: () => async () => {} },
-      authenticatedUrl: (url: string) => `${url}?token=secret`,
+      isTrustedRequest: () => true,
     },
+    loginUrls: {
+      authenticatedUrl: (url: string) => `${url}?token=secret`,
+      mintOneTimeLoginUrl: (url: string) => `${url}?token=once`,
+    },
+    requests: new PairingRequests(),
+    phoneTarget: undefined,
     webserver,
     webStartup: {},
     material: loadOrCreateVapidKeys(join(root, 'keys.json')),

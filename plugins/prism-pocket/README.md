@@ -32,8 +32,15 @@ A client-side patch plugin — zero changes to the web app itself. Every adaptat
 **Remote access: local network first, Tailscale or a stable tunnel as the fallback**:
 
 - The Pocket settings section offers three transports and starts on the local network: it finds the machine's private IPv4 address (192.168 first), and a listener bound to that address gives the phone `http://<address>:<port>/` directly — the fence already admits the listener's own bind address, so no trust entry is needed. The desktop app starts with `--bind-lan`, which binds the machine's private IPv4 addresses itself, so the page offers the trusted link and its QR directly. A deployment that listens on loopback only reports `not-bound`; the page then shows a bind button that puts the detected address on the running listener live (`POST /api/pocket/lan/bind`, no restart) beside the copyable `prism web --host <address> --port <port>` step — an address the OS reports but the listener did not bind is withheld, because a link to a port nothing listens on only hands the phone a connection timeout.
-- Tailscale: it probes the local CLI and answers whether a phone can open this now, requests the advertised address instead of inferring from configuration, so a fence refusal and a missing proxy read differently, and offers the authenticated link to copy — the login token is what the phone trades for a session cookie — with the missing steps (`tailscale serve`, the `trustedHosts` entry for the ts.net authority) when the answer is no. The QR encodes that login link, so keep it off screenshots and shared chats.
+- Tailscale: it probes the local CLI and answers whether a phone can open this now, requests the advertised address instead of inferring from configuration, so a fence refusal and a missing proxy read differently, and offers the authenticated link to copy — the login token is what the phone trades for a session cookie — with the missing steps (`tailscale serve`, the `trustedHosts` entry for the ts.net authority) when the answer is no.
 - Cloudflare tunnel or any stable HTTPS hostname: enter the public address your named tunnel serves. The page reports the cloudflared probe, prints `cloudflared tunnel run <name>` and a first-run `cloudflared tunnel --url http://127.0.0.1:<port>` test, and prints the `trustedHosts` entry for that hostname; the address counts as ready only after it answers the probe without a fence refusal. The kernel trust policy is read, never modified.
+
+**Phone access is approved, never implied**:
+
+- The QR encodes the clean access page (`/pocket-pair`), not a login link. The phone generates a ticket in its own browser, shows the host-issued 8-character code, and waits; the Pocket page lists the request with its code, source address, and remaining minutes, and only `Allow` hands back a login URL.
+- That URL carries a single-use token: the phone exchanges it once for the ordinary 30-day browser cookie, a second visit gets the login page, and the token expires after two minutes. The process launch token never reaches the phone.
+- Pending tickets live in memory only — a restart drops them — so nothing about a request survives the process, and denial, cancellation, and expiry each produce no login. Copying the authenticated link stays available as the manual fallback; it is the reusable launch token, so treat it like a password.
+- The three anonymous routes sit outside `/api` and apply the Host/Origin fence before reading a body, accept JSON only, and cap the body at 1 KiB and the pool at 16 requests.
 
 **PWA install**: manifest, icon, and service worker served by the plugin; the browser half injects the tags at runtime, so a phone browser can add Prism to the home screen.
 
@@ -60,7 +67,7 @@ pocket:
 ## Notes and limits
 
 - The webserver rejects wildcard binds and unknown Host/Origin authorities by design; the settings page explains the exact command for the path you choose. Tailscale `serve` and a named tunnel both provide HTTPS, which browsers require for push and service workers on non-localhost origins.
-- Binding the local-network address exposes the whole app to that network; the login token in the link is the only gate. A phone opened over plain `http` also gets no service worker, push, or home-screen install — those need the HTTPS of Tailscale or the tunnel.
+- Binding the local-network address exposes the whole app to that network; approving a phone is what gates it, and the copied login link bypasses the approval. A phone opened over plain `http` also gets no service worker, push, or home-screen install — those need the HTTPS of Tailscale or the tunnel.
 - The plugin never starts, stops, or configures Tailscale or the tunnel process, and reads no tunnel credentials; a random quick-tunnel hostname cannot pass the fence, so the stable name of a named tunnel is what the page stores.
 - iOS home-screen icons fall back to a screenshot (SVG touch icons are unsupported there); PNG icons are a follow-up.
 - The service worker keeps its own small zh/en text table because it lives outside the client context.

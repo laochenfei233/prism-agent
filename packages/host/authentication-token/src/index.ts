@@ -6,6 +6,7 @@ import { CONNECT_PATH } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionTrustRequest, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { BrowserAuth } from './browser-auth.ts'
+import { TokenLoginUrls } from './login-urls.ts'
 
 /** Stable plugin name. */
 export const name = 'host-authentication-token'
@@ -30,6 +31,7 @@ export const Config: z<Config> = z.object({
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const auth = await BrowserAuth.create(ctx[Context.root], ctx.credentials, config.cookieMaxAgeDays)
+  new TokenLoginUrls(ctx, auth)
   const peer = ctx.connection.createPeer({ principal: { kind: 'owner' } })
   const apiPeers = new Map<PeerScope['id'], PeerScope>()
   ctx.connection.authentication.register({

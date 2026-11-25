@@ -35,6 +35,8 @@ kind: "package-reference"
 
 携带启动 Token query 的根路径请求由原 Token 交换处理：成功的 `GET /` 返回303、写入 Cookie，并重定向到 `./`；无效凭据返回401。其他路径的请求交给其路由 owner。WebApp 就绪后收集入口时，本插件向传入的基地址追加进程 Token，同时保留 authority、路径与其他 query 字段。贡献的入口允许自动打开。Token 不读取 WebApp 服务，也不拥有打印、就绪判断或原生浏览器打开器。
 
+除可复用的启动链接外，本插件还提供 `connection.tokenLogin` 服务。`mintOneTimeLoginUrl(baseUrl, ttlMs)` 用同一条根路径交换支持「另一台设备只做一次」的登录：令牌 256 位，只存在于本次激活的内存里，首次成功兑换即删除，`ttlMs` 到期消失。它只授权根路径交换——`/connect` 从不接受它——方法、路径或 authority 不通过的请求也不会消耗它。`authenticatedUrl(baseUrl)` 铸发普通的可复用链接。
+
 浏览器会把同一 hostname 的 Cookie 发给每个 port，因此该 hostname 下所有已登录 authority 的 Cookie 会出现在同一个 `Cookie` 请求头中。成功的根路径交换因此还会让请求携带的其他 authority 的 Cookie 过期，只保留声明的签发时间最新的 16 个。它只选取符合生成格式的名称，并在不验证签名的情况下读取签发时间，因为其他 Harness home 使用不同的密钥签名。`/connect` 交换不让任何 Cookie 过期。
 
 浏览器 v1 Cookie 认证为本插件拥有的共享 Peer。`/connect` 声明匿名路由准入：Connection 检查来源，handler 随后验证启动 Token、创建 API Peer，并在 v2 Cookie 中签入其 ID。有效 v2 Cookie 通过同一 Provider 认证页面与 API 请求。Peer 的 principal 与 RemoteAccess 决定权限，不区分页面/API purpose 等级。Token 限制每个 API Peer 只有一条 `/api/remote.mux` Socket；重复关联返回409，不撤销首条连接。该 Socket 关闭时先同步撤销凭据，再释放 Peer；后续使用该 Cookie 的请求被拒绝。其他升级路由（包括 Inspector CDP）不认领该 Peer，也不在关闭时撤销它。

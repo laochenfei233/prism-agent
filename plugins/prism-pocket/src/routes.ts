@@ -12,6 +12,9 @@ export const POCKET_REMOTE_PATH = '/api/pocket/remote'
 /** Bind the machine's LAN address on the running listener; answers the fresh status. */
 export const POCKET_LAN_BIND_PATH = '/api/pocket/lan/bind'
 
+/** The owner's decision on one pending pairing request. */
+export const POCKET_PAIRING_PATH = '/api/pocket/pairing'
+
 /** The bot channels' list/action route. */
 export const POCKET_BOTS_PATH = '/api/pocket/bots'
 

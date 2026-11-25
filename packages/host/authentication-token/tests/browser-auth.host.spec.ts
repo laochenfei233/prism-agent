@@ -515,3 +515,68 @@ describe('BrowserAuth', () => {
       .rejects.toThrow('host-authentication-token: cookieMaxAgeDays exceeds the safe timestamp range')
   })
 })
+
+describe('single-use login tokens', () => {
+  const AUTHORITY = '127.0.0.1:3080'
+
+  /** Exchange one absolute URL as the browser would after opening it. */
+  function exchangeUrl(auth: BrowserAuth, url: string): ResponseState {
+    const target = new URL(url)
+    const res = response()
+    auth.authorizeIndex(request(`${target.pathname}${target.search}`, AUTHORITY), res.value)
+    return res.state
+  }
+
+  it('mints one cookie for a single-use link and then spends its token', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const url = auth.oneTimeLoginUrl(`http://${AUTHORITY}/`, 60_000)
+
+    const first = exchangeUrl(auth, url)
+    expect(first.status).toBe(303)
+    expect(auth.isAuthenticated(request(
+      '/', AUTHORITY, { cookie: mintCookie(first).split(';', 1)[0]! },
+    ))).toBe(true)
+
+    const replay = exchangeUrl(auth, url)
+    expect(replay.status).toBe(401)
+    expect(setCookies(replay)).toEqual([])
+  })
+
+  it('never hands the process launch token back to the caller', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const launch = new URL(auth.authenticatedUrl(`http://${AUTHORITY}/`)).searchParams.get('token')
+    expect(new URL(auth.authenticatedUrl(`http://${AUTHORITY}/`)).searchParams.get('token')).toBe(launch)
+    expect(new URL(auth.oneTimeLoginUrl(`http://${AUTHORITY}/`, 60_000)).searchParams.get('token')).not.toBe(launch)
+  })
+
+  it('stops authorizing an expired single-use token', async () => {
+    vi.useFakeTimers()
+    const auth = await createAuth(new RecordCredentials())
+    const url = auth.oneTimeLoginUrl(`http://${AUTHORITY}/`, 1_000)
+    vi.advanceTimersByTime(1_500)
+    expect(exchangeUrl(auth, url).status).toBe(401)
+  })
+
+  it('prunes expired tokens when the next one is minted', async () => {
+    vi.useFakeTimers()
+    const auth = await createAuth(new RecordCredentials())
+    const stale = auth.oneTimeLoginUrl(`http://${AUTHORITY}/`, 1_000)
+    vi.advanceTimersByTime(1_500)
+    const fresh = auth.oneTimeLoginUrl(`http://${AUTHORITY}/`, 60_000)
+    expect(exchangeUrl(auth, stale).status).toBe(401)
+    expect(exchangeUrl(auth, fresh).status).toBe(303)
+  })
+
+  it('refuses a single-use token at the API credential exchange', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const url = new URL(auth.oneTimeLoginUrl(`http://${AUTHORITY}/connect`, 60_000))
+    const res = response()
+    auth.authorizeConnect(
+      request(`${url.pathname}${url.search}`, AUTHORITY),
+      res.value,
+      false,
+      () => 'peer-id' as PeerId,
+    )
+    expect(res.state.status).toBe(401)
+  })
+})

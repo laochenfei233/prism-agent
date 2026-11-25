@@ -72,10 +72,22 @@ export interface PocketPhoneAccess {
   blocker?: 'loopback' | 'no-tailscale' | 'no-lan' | 'not-bound' | 'no-tunnel-url' | 'not-serving' | 'untrusted'
   /** The address already passes the Host/Origin fence. */
   trusted: boolean
+  /** The clean page a phone opens to ask for access; carries no credential, so it is safe to show. */
+  accessUrl?: string
   /** Authenticated URL to open on the phone; carries the login token, so never render it verbatim. */
   url?: string
   /** The same URL with its token elided, safe to display and to keep in a screenshot. */
   display?: string
+}
+
+/** One pending pairing request as the owner's settings page reads it. */
+export interface PocketPairingRow {
+  id: string
+  /** Display code the applicant shows; the owner compares it before allowing. */
+  code: string
+  /** Address the request came from, when the socket reported one. */
+  sourceIp: string | null
+  expiresInMs: number
 }
 
 /** The `GET /api/pocket/remote` body. */
@@ -86,6 +98,8 @@ export interface PocketRemoteStatus {
   cloudflared: PocketCloudflaredInfo
   remote: PocketRemotePrefs
   phone: PocketPhoneAccess
+  /** Requests waiting for the owner's decision, newest last. */
+  pairing: { requests: PocketPairingRow[] }
   pocket: {
     pushEnabled: boolean
     notifyTurnComplete: boolean

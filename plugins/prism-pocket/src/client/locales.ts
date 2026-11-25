@@ -25,6 +25,12 @@ export type PocketLocaleKey =
   | 'phone.pairing'
   | 'phone.pairing.rotate'
   | 'phone.pairing.hint'
+  | 'access.pending'
+  | 'access.from'
+  | 'access.unknown'
+  | 'access.minutes'
+  | 'access.allow'
+  | 'access.deny'
   | 'phone.steps'
   | 'step.bind'
   | 'step.bind.hint'
@@ -142,10 +148,16 @@ export const en: Record<PocketLocaleKey, string> = {
   'phone.copied': 'Copied',
   'phone.qr': 'Scan to open this workspace',
   'phone.qr.unavailable': 'No link to encode yet — resolve the blockers below first',
-  'phone.qr.credential': 'The QR encodes this workspace\'s login link — anyone who scans it gets in. Do not share it or screenshot it.',
+  'phone.qr.credential': 'The code opens the access request page, not the workspace. Approve the phone in this panel before it can sign in.',
   'phone.pairing': 'Bot pairing code',
   'phone.pairing.rotate': 'New code',
   'phone.pairing.hint': 'Send /start <code> from your chat to bind the bot to you.',
+  'access.pending': 'A phone is asking for access',
+  'access.from': 'From {ip}',
+  'access.unknown': 'an unknown address',
+  'access.minutes': '{n} min left',
+  'access.allow': 'Allow',
+  'access.deny': 'Deny',
   'phone.steps': 'Still needed',
   'step.bind': 'Bind the server to the local-network address',
   'step.bind.hint': 'Bind the running server to this address — the button above does it live, no restart — then open the link again.',
@@ -264,10 +276,16 @@ export const zh: Record<PocketLocaleKey, string> = {
   'phone.copied': '已复制',
   'phone.qr': '扫码直达这个工作区',
   'phone.qr.unavailable': '还没有可编码的链接——先解决下面的阻塞步骤',
-  'phone.qr.credential': '二维码内嵌本工作区的登录链接，扫码即进入——请勿分享或截图。',
+  'phone.qr.credential': '二维码打开的是接入申请页，不含登录链接——要在这里点「允许」，手机才能进入。',
   'phone.pairing': 'Bot 配对码',
   'phone.pairing.rotate': '换一个',
   'phone.pairing.hint': '在你的聊天里发送 /start <配对码>，即可把 bot 绑定到你。',
+  'access.pending': '有手机正在申请接入',
+  'access.from': '来自 {ip}',
+  'access.unknown': '未知地址',
+  'access.minutes': '还剩 {n} 分钟',
+  'access.allow': '允许',
+  'access.deny': '拒绝',
   'phone.steps': '还需要做到',
   'step.bind': '把服务绑定到局域网地址',
   'step.bind.hint': '把运行中的服务绑定到该地址——上方按钮可直接完成、无需重启——然后重新打开链接。',
