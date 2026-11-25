@@ -9,13 +9,10 @@
 import type {
   BotChannelId,
   BotConfig,
-  DingtalkConfig,
   DiscordConfig,
-  FeishuConfig,
   QqConfig,
   SlackConfig,
   TelegramConfig,
-  WecomConfig,
   WechatConfig,
   WhatsappConfig,
 } from './types.ts'
@@ -39,15 +36,6 @@ function required(channel: BotChannelId, source: Record<string, unknown>, field:
   return value.trim()
 }
 
-/** Read one string field that must be one of the listed values. */
-function oneOf<T extends string>(channel: BotChannelId, source: Record<string, unknown>, field: string, values: readonly T[]): T {
-  const value = source[field]
-  if (typeof value !== 'string' || !values.includes(value as T)) {
-    throw new BotConfigError(channel, `${field} (expected one of: ${values.join(', ')})`)
-  }
-  return value as T
-}
-
 /** Validate a wire value into one channel's config, rejecting the first bad field. */
 export function readBotConfig(channel: BotChannelId, value: unknown): BotConfig {
   const source: Record<string, unknown> = typeof value === 'object' && value !== null
@@ -66,30 +54,8 @@ export function readBotConfig(channel: BotChannelId, value: unknown): BotConfig 
       const fields: SlackConfig = { botToken: required(channel, source, 'botToken'), appToken: required(channel, source, 'appToken') }
       return { channel, fields }
     }
-    case 'feishu': {
-      const fields: FeishuConfig = {
-        appId: required(channel, source, 'appId'),
-        appSecret: required(channel, source, 'appSecret'),
-        region: oneOf(channel, source, 'region', ['feishu', 'lark']),
-      }
-      return { channel, fields }
-    }
-    case 'dingtalk': {
-      const fields: DingtalkConfig = { clientId: required(channel, source, 'clientId'), clientSecret: required(channel, source, 'clientSecret') }
-      return { channel, fields }
-    }
     case 'qq': {
       const fields: QqConfig = { appId: required(channel, source, 'appId'), clientSecret: required(channel, source, 'clientSecret') }
-      return { channel, fields }
-    }
-    case 'wecom': {
-      const fields: WecomConfig = {
-        corpId: required(channel, source, 'corpId'),
-        agentId: required(channel, source, 'agentId'),
-        corpSecret: required(channel, source, 'corpSecret'),
-        token: required(channel, source, 'token'),
-        encodingAesKey: required(channel, source, 'encodingAesKey'),
-      }
       return { channel, fields }
     }
     case 'wechat': {

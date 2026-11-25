@@ -14,8 +14,6 @@ export interface BotFieldMeta {
   readonly name: string
   /** Render as a secret (password) input. */
   readonly secret?: boolean
-  /** Render as the region picker (飞书 / Lark). */
-  readonly region?: boolean
 }
 
 /** Presentation metadata of one channel. */
@@ -35,6 +33,11 @@ export interface BotChannelMeta {
   readonly consoleUrl?: string
   /** The callback channels carry a public callback path. */
   readonly callback?: boolean
+  /**
+   * The channel belongs to an upstream CLI connector: the card states the
+   * implementation source and renders no credential form or start switch.
+   */
+  readonly connector?: boolean
 }
 
 /** The nine channels, in page order. */
@@ -71,18 +74,18 @@ export const CHANNEL_META: readonly BotChannelMeta[] = [
     label: 'channel.feishu',
     color: '#3370FF',
     chip: '飞',
-    fields: [{ name: 'appId' }, { name: 'appSecret', secret: true }, { name: 'region', region: true }],
+    fields: [],
     hint: 'hint.feishu',
-    consoleUrl: 'https://open.feishu.cn/app',
+    connector: true,
   },
   {
     id: 'dingtalk',
     label: 'channel.dingtalk',
     color: '#0089FF',
     chip: '钉',
-    fields: [{ name: 'clientId' }, { name: 'clientSecret', secret: true }],
+    fields: [],
     hint: 'hint.dingtalk',
-    consoleUrl: 'https://open-dev.dingtalk.com/feapp',
+    connector: true,
   },
   {
     id: 'qq',
@@ -98,13 +101,9 @@ export const CHANNEL_META: readonly BotChannelMeta[] = [
     label: 'channel.wecom',
     color: '#0082EF',
     chip: '企',
-    fields: [
-      { name: 'corpId' }, { name: 'agentId' }, { name: 'corpSecret', secret: true },
-      { name: 'token', secret: true }, { name: 'encodingAesKey', secret: true },
-    ],
+    fields: [],
     hint: 'hint.wecom',
-    consoleUrl: 'https://work.weixin.qq.com',
-    callback: true,
+    connector: true,
   },
   {
     id: 'wechat',

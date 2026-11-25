@@ -35,8 +35,8 @@ describe('readBotConfig', () => {
   it('rejects each missing field with the field named', () => {
     expect(() => readBotConfig('slack', { botToken: 'x' })).toThrow(BotConfigError)
     expect(() => readBotConfig('slack', { botToken: 'x', appToken: '' })).toThrow(/appToken/)
-    expect(() => readBotConfig('feishu', { appId: 'a', appSecret: 's', region: 'weixin' })).toThrow(/region/)
-    expect(() => readBotConfig('wecom', { corpId: 'c', agentId: '1', corpSecret: 's', token: 't' })).toThrow(/encodingAesKey/)
+    expect(() => readBotConfig('whatsapp', { accessToken: 'a', phoneNumberId: '1', verifyToken: 'v' })).toThrow(/appSecret/)
+    expect(() => readBotConfig('wechat', { appId: 'i', appSecret: 's', token: 't' })).toThrow(/encodingAesKey/)
   })
 
   it('rejects non-object bodies', () => {
@@ -44,20 +44,9 @@ describe('readBotConfig', () => {
   })
 
   it('validates every channel once round-tripped through its own reader', () => {
-    const samples: Record<BotChannelId, unknown> = {
-      telegram: { botToken: 't' },
-      discord: { botToken: 'd' },
-      slack: { botToken: 'b', appToken: 'a' },
-      feishu: { appId: 'i', appSecret: 's', region: 'lark' },
-      dingtalk: { clientId: 'c', clientSecret: 's' },
-      qq: { appId: 'i', clientSecret: 's' },
-      wecom: { corpId: 'c', agentId: '1', corpSecret: 's', token: 't', encodingAesKey: 'k'.repeat(43) },
-      wechat: { appId: 'i', appSecret: 's', token: 't', encodingAesKey: 'k'.repeat(43) },
-      whatsapp: { accessToken: 'a', phoneNumberId: '1', verifyToken: 'v', appSecret: 's' },
-    }
     for (const channel of BOT_CHANNELS) {
-      expect(readBotConfig(channel, samples[channel])?.channel).toBe(channel)
-      expect(reviveBotConfig(channel, samples[channel])?.channel).toBe(channel)
+      expect(readBotConfig(channel, minimalConfig(channel))?.channel).toBe(channel)
+      expect(reviveBotConfig(channel, minimalConfig(channel))?.channel).toBe(channel)
     }
   })
 
@@ -74,17 +63,8 @@ describe('mergeBotConfig', () => {
     expect(merged).toEqual({ channel: 'slack', fields: { botToken: 'xoxb-new', appToken: 'xapp-stored' } })
     const blank = mergeBotConfig('slack', { botToken: ' ', appToken: '' }, stored)
     expect(blank).toEqual({ channel: 'slack', fields: { botToken: 'xoxb-stored', appToken: 'xapp-stored' } })
-  })
-
-  it('still rejects a malformed value even with a stored fallback', () => {
-    const stored = readBotConfig('feishu', { appId: 'i', appSecret: 's', region: 'feishu' })
-    expect(() => mergeBotConfig('feishu', { region: 'weixin' }, stored)).toThrow(BotConfigError)
-  })
-
-  it('keeps the region when the card edit omits it', () => {
-    const stored = readBotConfig('feishu', { appId: 'i', appSecret: 's', region: 'lark' })
-    const merged = mergeBotConfig('feishu', { appId: 'i2' }, stored)
-    expect(merged).toEqual({ channel: 'feishu', fields: { appId: 'i2', appSecret: 's', region: 'lark' } })
+    const kept = mergeBotConfig('qq', { appId: ' ', clientSecret: '' }, readBotConfig('qq', { appId: 'i', clientSecret: 's' }))
+    expect(kept).toEqual({ channel: 'qq', fields: { appId: 'i', clientSecret: 's' } })
   })
 })
 
@@ -104,11 +84,11 @@ describe('BotStore', () => {
 
   it('keeps the binding through a config change and refuses to enable an unknown channel', () => {
     const { store } = tempStore()
-    store.setConfig(readBotConfig('dingtalk', { clientId: 'c', clientSecret: 's' }))
-    store.bind('dingtalk', 's1', 'c1', 'staff-1')
-    store.setConfig(readBotConfig('dingtalk', { clientId: 'c2', clientSecret: 's2' }))
-    expect(store.entry('dingtalk')?.sessionId).toBe('s1')
-    expect(store.entry('dingtalk')?.senderId).toBe('staff-1')
+    store.setConfig(readBotConfig('qq', { appId: 'i', clientSecret: 's' }))
+    store.bind('qq', 's1', 'c1', 'staff-1')
+    store.setConfig(readBotConfig('qq', { appId: 'i2', clientSecret: 's2' }))
+    expect(store.entry('qq')?.sessionId).toBe('s1')
+    expect(store.entry('qq')?.senderId).toBe('staff-1')
     expect(store.setEnabled('telegram', true)).toBe(false)
   })
 
@@ -132,6 +112,20 @@ describe('BotStore', () => {
     writeRaw(file, raw)
     const reread = new BotStore(file)
     expect(reread.entry('qq')).toBeUndefined()
+  })
+
+  it('drops a retired connector channel entry and rewrites the file without it', () => {
+    const { file } = tempStore()
+    writeRaw(file, {
+      version: 1,
+      bots: {
+        telegram: { config: { channel: 'telegram', fields: { botToken: 't' } }, enabled: true },
+        feishu: { config: { channel: 'feishu', fields: { appId: 'a', appSecret: 'secret', region: 'feishu' } }, enabled: true },
+      },
+    })
+    const reread = new BotStore(file)
+    expect(reread.entry('telegram')).toMatchObject({ enabled: true })
+    expect(rawChannels(file)).toEqual(['telegram'])
   })
 
   it('returns enabled channels in page order', () => {
@@ -167,7 +161,6 @@ describe('pairing code', () => {
 describe('callback paths', () => {
   it('are origin-rooted and per-channel', () => {
     expect(botCallbackPath('wechat')).toBe('/pocket/bots/wechat/callback')
-    expect(botCallbackPath('wecom')).toBe('/pocket/bots/wecom/callback')
     expect(botCallbackPath('whatsapp')).toBe('/pocket/bots/whatsapp/callback')
   })
 })
@@ -178,14 +171,17 @@ function minimalConfig(channel: BotChannelId): unknown {
     telegram: { botToken: 't' },
     discord: { botToken: 'd' },
     slack: { botToken: 'b', appToken: 'a' },
-    feishu: { appId: 'i', appSecret: 's', region: 'feishu' },
-    dingtalk: { clientId: 'c', clientSecret: 's' },
     qq: { appId: 'i', clientSecret: 's' },
-    wecom: { corpId: 'c', agentId: '1', corpSecret: 's', token: 't', encodingAesKey: 'k'.repeat(43) },
     wechat: { appId: 'i', appSecret: 's', token: 't', encodingAesKey: 'k'.repeat(43) },
     whatsapp: { accessToken: 'a', phoneNumberId: '1', verifyToken: 'v', appSecret: 's' },
   }
   return samples[channel]
+}
+
+/** The channel keys the store file currently holds. */
+function rawChannels(file: string): string[] {
+  const body = JSON.parse(readFileSync(file, 'utf8')) as { bots?: Record<string, unknown> }
+  return Object.keys(body.bots ?? {})
 }
 
 /** Overwrite the store file with raw JSON, bypassing the store API. */

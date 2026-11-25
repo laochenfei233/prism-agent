@@ -2,7 +2,20 @@
 # assets) and the browser roster row that loads the client half. `webStartup`
 # exists on every profile that mounts the web-app bundle, which is the only
 # place this plugin is meant to load.
+#
+# The feishu/dingtalk/wecom channel cards delegate to the upstream CLI
+# connectors, so enabling pocket mounts the three connector rows beside it.
+# The shared `cli-account` and `upstream-skills` services are base-bundle rows,
+# and the Plugins page account UI is the web-app bundle's `connector-account`
+# row. The connectors' CLIs need their platform binaries: lark-cli's download
+# is denied at repository install and approved by the profile that mounts it.
 - insert:
     - id: pocket
       name: '@prism/prism-pocket'
       inject: [webStartup]
+    - id: feishu
+      name: '@deepseek-ai/dsh-feishu'
+    - id: dingtalk
+      name: '@deepseek-ai/dsh-dingtalk'
+    - id: wecom
+      name: '@deepseek-ai/dsh-wecom'
