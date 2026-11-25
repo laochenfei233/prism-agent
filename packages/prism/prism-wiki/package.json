@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-wiki",
   "description": "Prism wiki: an LLM-maintained knowledge vault of interlinked markdown pages, with vault tools, a /wiki operator command, full-text retrieval, and the Web Knowledge page",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "publishConfig": {
     "access": "public"
   },

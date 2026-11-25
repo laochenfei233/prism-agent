@@ -133,8 +133,11 @@ export abstract class ReleaseFamily {
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
       // PRISM-DIVERGENCE: replay list in docs/compose/spec/fork-upstream-divergence.md (S2), area A8.
-      // Upstream publishes only @deepseek-ai packages; this fork additionally publishes its CLI package `prism-agent`.
-      if (!name.startsWith('@deepseek-ai/') && name !== 'prism-agent') throw new Error(`${normalized} must name an @deepseek-ai package`)
+      // Upstream publishes only @deepseek-ai packages; this fork additionally publishes its CLI
+      // package `prism-agent` and its `@prism/*` plugin packages under the same unified version.
+      if (!name.startsWith('@deepseek-ai/') && !name.startsWith('@prism/') && name !== 'prism-agent') {
+        throw new Error(`${normalized} must name an @deepseek-ai or @prism package`)
+      }
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({

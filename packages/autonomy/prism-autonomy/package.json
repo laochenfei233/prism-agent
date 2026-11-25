@@ -1,7 +1,7 @@
 {
   "name": "@prism/prism-autonomy",
   "description": "Autonomous approvals: the autonomous-guarded permission preset auto-answers approval requests through the approval seam, keeping deny rails and sandbox escalations under human control",
-  "version": "0.2.2-rc.1",
+  "version": "0.2.3",
   "publishConfig": {
     "access": "public"
   },
