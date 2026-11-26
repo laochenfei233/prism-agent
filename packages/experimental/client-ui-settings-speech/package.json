@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-experimental-client-ui-settings-speech",
   "description": "Speech recognition settings: manage the composed HTTP recognizers and the default selection",
-  "version": "0.2.3+1",
+  "version": "0.2.3-alpha.2",
   "publishConfig": {
     "access": "public"
   },
