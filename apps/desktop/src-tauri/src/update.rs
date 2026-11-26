@@ -7,12 +7,13 @@
 //! `version`, `percent`, `failure`) plus the About-page facts (current
 //! version, last check, last error, and the update source derived from the
 //! configured endpoints — the domestic mirror first with the GitHub Releases
-//! fallback, no override seam). Every
+//! fallback, overridable through the About page's source list, which persists
+//! to its own file and falls back to the compiled endpoints when unset). Every
 //! transition emits [`STATE_EVENT`]; the shell page relays it into the
 //! embedded UI, where the compact indicator, the sidebar badge, and the
 //! About section all render from it.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -27,6 +28,9 @@ use crate::dsh_runner::DshHandle;
 const AUTO_CHECK_DELAY: Duration = Duration::from_secs(30);
 /// Durable state file under the app data directory.
 const STATE_FILE: &str = "update-state.json";
+/// Durable update-source override under the same directory. Absent (or
+/// invalid) means the compiled `tauri.conf.json` endpoints are in charge.
+const SOURCE_FILE: &str = "update-source.json";
 /// Update-state event; the shell page relays it into the embedded UI.
 pub const STATE_EVENT: &str = "prism://update-state";
 
@@ -67,16 +71,20 @@ enum Operation {
     Install,
 }
 
-/// Where updates come from, parsed from the configured updater endpoints.
+/// Where updates come from, parsed from the active update-source endpoints.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSource {
     /// Display host shown as the About section's source line: the named
-    /// official host when a domestic mirror endpoint is configured, empty
-    /// otherwise (a bare GitHub configuration shows the repository instead).
+    /// official host when a domestic mirror endpoint is configured, the first
+    /// endpoint's own host for a custom selection, empty otherwise (a bare
+    /// GitHub configuration shows the repository instead).
     host: String,
+    /// Whether the active selection is a custom list: the About section then
+    /// labels the source line as user-configured instead of the built-in mirror.
+    custom: bool,
     /// `owner/name` of the GitHub repository serving updates; empty when no
-    /// configured endpoint is a GitHub releases URL (the About section then
+    /// active endpoint is a GitHub releases URL (the About section then
     /// hides the repository line; the plugin-side checks still fail loudly).
     repo: String,
     /// Human-facing releases page used by the About section's links.
@@ -101,6 +109,15 @@ pub struct UpdateSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
     source: UpdateSource,
+}
+
+/// The About section's source panel wire: the active endpoints and the
+/// compiled defaults the reset affordance restores.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSourcesSnapshot {
+    endpoints: Vec<String>,
+    default_endpoints: Vec<String>,
 }
 
 /// Fields that survive restarts; everything else is rebuilt on boot.
@@ -137,6 +154,7 @@ impl UpdateState {
     /// Builds the initial state: current version from the package, the update
     /// source from the configured endpoints, and the durable fields from disk.
     pub fn new(app: &AppHandle) -> Self {
+        let persisted_sources = load_source_endpoints(&source_path(app));
         let fields = Fields {
             phase: Phase::Idle,
             version: None,
@@ -146,7 +164,7 @@ impl UpdateState {
             last_error: None,
             known_latest: None,
             current_version: app.package_info().version.to_string(),
-            source: source_from_endpoints(&endpoints_from_config(app)),
+            source: source_from_endpoints(&active_endpoints(app), !persisted_sources.is_empty()),
         };
         let persisted = load_persisted(&state_path(app));
         Self {
@@ -199,24 +217,37 @@ const MIRROR_REQUEST_HOST: &str = "cdn.xyern.com";
 const MIRROR_REQUEST_PATH: &str = "/prism-agent/";
 const MIRROR_DISPLAY_HOST: &str = "prism.xyern.com";
 
-/// Maps the configured updater endpoints to the human-facing source facts.
-/// An endpoint on the mirror CDN marks the display host; the first GitHub
+/// Maps the active updater endpoints to the human-facing source facts.
+/// A built-in mirror endpoint marks the named display host; the first GitHub
 /// releases endpoint anywhere in the list provides the repository facts that
 /// back the changelog and feedback links, which stay on GitHub
-/// Releases/issues. Anything unrecognized yields empty facts, which the
-/// About section renders as "source unavailable" while checks fail loudly.
-fn source_from_endpoints(endpoints: &[String]) -> UpdateSource {
+/// Releases/issues. A custom (overridden) selection displays its first
+/// endpoint's own host when that host has no built-in name. Anything
+/// unrecognized yields empty facts, which the About section renders as
+/// "source unavailable" while checks fail loudly.
+fn source_from_endpoints(endpoints: &[String], custom: bool) -> UpdateSource {
     let parsed = endpoints
         .iter()
         .filter_map(|value| tauri::Url::parse(value).ok())
         .collect::<Vec<_>>();
-    let host = parsed
+    let mirror = parsed
         .iter()
         .any(|url| {
             url.host_str() == Some(MIRROR_REQUEST_HOST)
                 && url.path().starts_with(MIRROR_REQUEST_PATH)
-        })
+        });
+    let github_first = parsed.first().is_some_and(|url| url.host_str() == Some("github.com"));
+    let host = mirror
         .then(|| MIRROR_DISPLAY_HOST.to_string())
+        .or_else(|| {
+            (!mirror && custom && !github_first && !parsed.is_empty())
+                .then(|| {
+                    parsed[0]
+                        .host_str()
+                        .map(str::to_string)
+                        .unwrap_or_default()
+                })
+        })
         .unwrap_or_default();
     let (repo, release_url) = parsed
         .iter()
@@ -231,6 +262,7 @@ fn source_from_endpoints(endpoints: &[String]) -> UpdateSource {
         })
         .unwrap_or_default();
     UpdateSource {
+        custom: custom && !mirror,
         host,
         release_url,
         repo,
@@ -259,6 +291,85 @@ fn state_path(app: &AppHandle) -> Option<PathBuf> {
         .app_data_dir()
         .ok()
         .map(|dir| dir.join(STATE_FILE))
+}
+
+fn source_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| dir.join(SOURCE_FILE))
+}
+
+/// Whether one endpoint string is usable as an update source: an absolute
+/// http(s) URL with a host. Anything else is refused at the set boundary
+/// rather than silently skipped.
+fn is_valid_endpoint(value: &str) -> bool {
+    tauri::Url::parse(value)
+        .ok()
+        .filter(|url| {
+            matches!(url.scheme(), "http" | "https") && url.host_str().is_some_and(|h| !h.is_empty())
+        })
+        .is_some()
+}
+
+/// Validates an endpoint list for persistence: non-empty, every entry usable,
+/// duplicates collapsed preserving the first occurrence.
+fn validate_endpoint_list(endpoints: &[String]) -> Result<Vec<String>, String> {
+    if endpoints.is_empty() {
+        return Err("the update source list is empty".to_string());
+    }
+    for value in endpoints {
+        if !is_valid_endpoint(value) {
+            return Err(format!("invalid update source endpoint: {value:?}"));
+        }
+    }
+    let mut unique = Vec::with_capacity(endpoints.len());
+    for value in endpoints {
+        if !unique.contains(value) {
+            unique.push(value.clone());
+        }
+    }
+    Ok(unique)
+}
+
+/// The persisted override; an absent, malformed, or invalid file means "no
+/// override" — a corrupt source file must never block updates.
+fn load_source_endpoints(path: &Option<PathBuf>) -> Vec<String> {
+    let Some(path) = path else { return Vec::new() };
+    let Ok(raw) = std::fs::read_to_string(path) else { return Vec::new() };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) else { return Vec::new() };
+    let Some(list) = value.get("endpoints").and_then(|v| v.as_array()) else { return Vec::new() };
+    list.iter()
+        .filter_map(|entry| entry.as_str())
+        .filter(|entry| is_valid_endpoint(entry))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The endpoints checks actually use: the persisted override when present,
+/// otherwise the compiled configuration.
+fn active_endpoints(app: &AppHandle) -> Vec<String> {
+    let persisted = load_source_endpoints(&source_path(app));
+    if persisted.is_empty() {
+        endpoints_from_config(app)
+    } else {
+        persisted
+    }
+}
+
+/// Persists one validated override, or removes the file when the list equals
+/// the compiled defaults — an uncustomized deployment must keep following the
+/// shipped endpoints through upgrades.
+fn store_source_endpoints(path: Option<&Path>, endpoints: &[String], defaults: &[String]) {
+    let Some(path) = path else { return };
+    if endpoints == defaults {
+        let _ = std::fs::remove_file(path);
+        return;
+    }
+    let body = serde_json::json!({ "endpoints": endpoints });
+    if let Ok(text) = serde_json::to_string_pretty(&body) {
+        let _ = std::fs::write(path, text + "\n");
+    }
 }
 
 /// Reads the durable fields; unreadable or malformed content resets to the
@@ -347,9 +458,21 @@ where
 }
 
 /// One endpoint check; shared by the manual command and the launch-time
-/// silent check.
+/// silent check. A persisted source override replaces the compiled endpoints;
+/// the compiled configuration answers when no override exists.
 async fn check_once(app: &AppHandle) -> Result<Option<Update>, UpdaterError> {
-    app.updater()?.check().await
+    let persisted = load_source_endpoints(&source_path(app));
+    if persisted.is_empty() {
+        return app.updater()?.check().await;
+    }
+    let urls = persisted
+        .iter()
+        .filter_map(|value| tauri::Url::parse(value).ok())
+        .collect::<Vec<_>>();
+    if urls.is_empty() {
+        return app.updater()?.check().await;
+    }
+    app.updater_builder().endpoints(urls)?.build()?.check().await
 }
 
 /// Runs a check to completion: transitions, persistence, event, snapshot.
@@ -368,6 +491,10 @@ async fn run_check(app: &AppHandle) -> UpdateSnapshot {
     let outcome = check_once(app).await;
     let snapshot = commit_state(app, true, |fields| {
         fields.last_check = Some(now_millis());
+        fields.source = source_from_endpoints(
+                    &active_endpoints(app),
+                    !load_source_endpoints(&source_path(app)).is_empty(),
+                );
         match &outcome {
             Ok(Some(update)) => {
                 fields.phase = Phase::Available;
@@ -541,6 +668,47 @@ pub async fn prism_install_update(app: AppHandle) -> UpdateSnapshot {
     snapshot
 }
 
+/// The About section's source panel: the endpoints checks use now, plus the
+/// compiled defaults behind the reset affordance.
+#[tauri::command]
+pub fn prism_update_sources(app: AppHandle) -> UpdateSourcesSnapshot {
+    let default_endpoints = endpoints_from_config(&app);
+    let endpoints = {
+        let persisted = load_source_endpoints(&source_path(&app));
+        if persisted.is_empty() {
+            default_endpoints.clone()
+        } else {
+            persisted
+        }
+    };
+    UpdateSourcesSnapshot {
+        endpoints,
+        default_endpoints,
+    }
+}
+
+/// Replaces the About-managed source list. The list is validated loudly and
+/// persisted only when it differs from the compiled defaults; a check against
+/// the new list is left to the caller (the About section re-checks).
+#[tauri::command]
+pub fn prism_set_update_sources(
+    app: AppHandle,
+    endpoints: Vec<String>,
+) -> Result<UpdateSourcesSnapshot, String> {
+    let validated = validate_endpoint_list(&endpoints)?;
+    let default_endpoints = endpoints_from_config(&app);
+    store_source_endpoints(source_path(&app).as_deref(), &validated, &default_endpoints);
+    let custom = !load_source_endpoints(&source_path(&app)).is_empty();
+    let source = source_from_endpoints(&active_endpoints(&app), custom);
+    commit_state(&app, false, |fields| {
+        fields.source = source;
+    });
+    Ok(UpdateSourcesSnapshot {
+        endpoints: active_endpoints(&app),
+        default_endpoints,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -614,6 +782,7 @@ mod tests {
             known_latest: Some("0.2.2".to_string()),
             current_version: "0.2.1-rc.4".to_string(),
             source: UpdateSource {
+                custom: false,
                 host: String::new(),
                 repo: "laochenfei233/prism-agent".to_string(),
                 release_url: "https://github.com/laochenfei233/prism-agent/releases".to_string(),
@@ -659,6 +828,7 @@ mod tests {
             known_latest: None,
             current_version: "0.2.1-rc.4".to_string(),
             source: UpdateSource {
+                custom: false,
                 host: String::new(),
                 repo: String::new(),
                 release_url: String::new(),
@@ -684,6 +854,7 @@ mod tests {
             known_latest: None,
             current_version: "0.2.1-rc.4".to_string(),
             source: UpdateSource {
+                custom: false,
                 host: "prism.xyern.com".to_string(),
                 repo: "laochenfei233/prism-agent".to_string(),
                 release_url: "https://github.com/laochenfei233/prism-agent/releases".to_string(),
@@ -723,7 +894,7 @@ mod tests {
             "https://cdn.xyern.com/prism-agent/updates/latest.json".to_string(),
             "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json"
                 .to_string(),
-        ]);
+        ], false);
         assert_eq!(mirror.host, "prism.xyern.com");
         assert_eq!(mirror.repo, "laochenfei233/prism-agent");
         assert_eq!(
@@ -735,33 +906,74 @@ mod tests {
         let github = source_from_endpoints(&[
             "https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json"
                 .to_string(),
-        ]);
+        ], false);
         assert_eq!(github.host, String::new());
         assert_eq!(github.repo, "laochenfei233/prism-agent");
 
         // The mirror display does not imply repository facts, and foreign,
         // shallow, or other-product endpoints stay empty.
         let mirror_only =
-            source_from_endpoints(&["https://cdn.xyern.com/prism-agent/updates/latest.json".to_string()]);
+            source_from_endpoints(&["https://cdn.xyern.com/prism-agent/updates/latest.json".to_string()], false);
         assert_eq!(mirror_only.host, "prism.xyern.com");
         assert_eq!(mirror_only.repo, String::new());
+        // A custom (non-builtin) selection displays its first endpoint's host
+        // and is flagged custom, with no repository facts.
         let foreign = source_from_endpoints(&[
             "https://example.com/a/b/releases/latest/download/latest.json".to_string(),
-        ]);
-        assert_eq!(
-            foreign,
-            UpdateSource {
-                host: String::new(),
-                repo: String::new(),
-                release_url: String::new(),
-            }
-        );
-        let shallow = source_from_endpoints(&["https://github.com/releases".to_string()]);
+        ], true);
+        assert_eq!(foreign.host, "example.com");
+        assert!(foreign.custom);
+        assert_eq!(foreign.repo, String::new());
+        assert_eq!(foreign.release_url, String::new());
+        let shallow = source_from_endpoints(&["https://github.com/releases".to_string()], false);
         assert_eq!(shallow.repo, String::new());
         let other_product = source_from_endpoints(&[
             "https://cdn.xyern.com/easel/updates/latest.json".to_string(),
-        ]);
-        assert_eq!(other_product.host, String::new());
-        assert_eq!(source_from_endpoints(&[]).host, String::new());
+        ], true);
+        assert_eq!(other_product.host, "cdn.xyern.com");
+        assert!(other_product.custom);
+        assert!(!source_from_endpoints(&[], false).custom);
+        assert_eq!(source_from_endpoints(&[], false).host, String::new());
+    }
+
+    #[test]
+    fn endpoint_list_validation_fails_loud_and_dedupes() {
+        assert!(validate_endpoint_list(&[]).is_err());
+        assert!(validate_endpoint_list(&["not a url".to_string()]).is_err());
+        assert!(validate_endpoint_list(&["ftp://example.com/latest.json".to_string()]).is_err());
+        let list = vec![
+            "https://a.test/latest.json".to_string(),
+            "http://b.test/latest.json".to_string(),
+            "https://a.test/latest.json".to_string(),
+        ];
+        assert_eq!(
+            validate_endpoint_list(&list).expect("valid"),
+            vec![
+                "https://a.test/latest.json".to_string(),
+                "http://b.test/latest.json".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn source_endpoints_round_trip_and_self_heal() {
+        let path = temp_state_path("sources").expect("temp path");
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+        assert!(load_source_endpoints(&Some(path.clone())).is_empty());
+
+        let list = vec!["https://a.test/latest.json".to_string()];
+        store_source_endpoints(Some(path.as_path()), &list, &[]);
+        assert_eq!(load_source_endpoints(&Some(path.clone())), list);
+
+        // Garbage and invalid entries read as no override.
+        std::fs::write(&path, "{not json").expect("write");
+        assert!(load_source_endpoints(&Some(path.clone())).is_empty());
+        std::fs::write(&path, r#"{"endpoints":["ftp://x/y"]}"#).expect("write");
+        assert!(load_source_endpoints(&Some(path.clone())).is_empty());
+
+        // Restoring the compiled defaults removes the override file.
+        let defaults = vec!["https://cdn.xyern.com/prism/updates/latest.json".to_string()];
+        store_source_endpoints(Some(path.as_path()), &defaults, &defaults);
+        assert!(!path.exists());
     }
 }

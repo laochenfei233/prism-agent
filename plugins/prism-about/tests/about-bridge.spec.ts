@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   deriveButtonState,
   deriveSourceView,
+  isValidEndpoint,
   readCarrier,
+  withPrimary,
   type DesktopUpdateCarrier,
 } from '../src/client/about-bridge.ts'
 
@@ -97,9 +99,50 @@ describe('deriveSourceView', () => {
     })
   })
 
+  it('labels a custom selection with its own host and the custom badge', () => {
+    const view = deriveSourceView({
+      custom: true,
+      host: 'updates.example.com',
+      repo: '',
+      releaseUrl: '',
+    })
+    expect(view).toEqual({ badgeKey: 'sourceCustom', href: '', label: 'updates.example.com' })
+  })
+
+  it('keeps the GitHub badge for a custom list that starts on GitHub', () => {
+    const view = deriveSourceView({
+      custom: true,
+      host: '',
+      repo: 'laochenfei233/prism-agent',
+      releaseUrl: 'https://github.com/laochenfei233/prism-agent/releases',
+    })
+    expect(view).toEqual({
+      badgeKey: 'sourceGitHub',
+      href: 'https://github.com/laochenfei233/prism-agent/releases',
+      label: 'laochenfei233/prism-agent',
+    })
+  })
+
   it('falls back to the unavailable state without recognizable facts', () => {
     expect(deriveSourceView(undefined)).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
     expect(deriveSourceView({})).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
     expect(deriveSourceView({ repo: '', releaseUrl: '' })).toEqual({ badgeKey: 'sourceGitHub', href: '', label: '' })
+  })
+})
+
+describe('source panel helpers', () => {
+  it('validates absolute http(s) endpoints with a host', () => {
+    expect(isValidEndpoint('https://example.com/updates/latest.json')).toBe(true)
+    expect(isValidEndpoint('http://192.168.1.2:8080/latest.json')).toBe(true)
+    expect(isValidEndpoint('ftp://example.com/latest.json')).toBe(false)
+    expect(isValidEndpoint('example.com/latest.json')).toBe(false)
+    expect(isValidEndpoint('https://')).toBe(false)
+    expect(isValidEndpoint('')).toBe(false)
+  })
+
+  it('moves the chosen endpoint to the front without duplicating it', () => {
+    expect(withPrimary(['a', 'b', 'c'], 'b')).toEqual(['b', 'a', 'c'])
+    expect(withPrimary(['a', 'b'], 'c')).toEqual(['c', 'a', 'b'])
+    expect(withPrimary(['a'], 'a')).toEqual(['a'])
   })
 })

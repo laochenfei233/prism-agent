@@ -38,6 +38,8 @@ try {
     'prism_update_state',
     'prism_check_update',
     'prism_install_update',
+    'prism_update_sources',
+    'prism_set_update_sources',
     'prism://update-state',
     'updates',
   ];

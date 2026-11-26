@@ -188,6 +188,8 @@ const UPDATE_COMMANDS = new Set([
   'prism_update_state',
   'prism_check_update',
   'prism_install_update',
+  'prism_update_sources',
+  'prism_set_update_sources',
 ]);
 
 function replyToFrame(id, payload) {
@@ -214,12 +216,12 @@ function handleHostBridge(event) {
     invoke('plugin:opener|open_url', { url: event.data.url })
       .catch((err) => console.error('[desktop] open failed:', err));
   } else if (event.data.kind === 'call') {
-    const { id, cmd } = event.data;
+    const { id, cmd, args } = event.data;
     if (!UPDATE_COMMANDS.has(cmd)) {
       replyToFrame(id, { ok: false, error: 'command not allowed through the desktop host bridge' });
       return;
     }
-    invoke(cmd).then(
+    invoke(cmd, args ?? undefined).then(
       (value) => replyToFrame(id, { ok: true, value }),
       (err) => replyToFrame(id, { ok: false, error: String(err) }),
     );

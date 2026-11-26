@@ -524,7 +524,7 @@ export function injectDesktopHostBridge(distDest) {
       }
     }
   })
-  const callHost = (cmd, timeoutMs) => new Promise((resolve, reject) => {
+  const callHost = (cmd, timeoutMs, args) => new Promise((resolve, reject) => {
     const id = ++rpcSeq
     const entry = { resolve, reject, timer: 0 }
     pendingCalls.set(id, entry)
@@ -534,7 +534,7 @@ export function injectDesktopHostBridge(distDest) {
         reject(new Error("desktop host call timed out: " + cmd))
       }, timeoutMs)
     }
-    post({ kind: "call", id, cmd })
+    post({ kind: "call", id, cmd, args })
   })
   window.dshDesktop = {
     protocolVersion: 1,
@@ -542,6 +542,8 @@ export function injectDesktopHostBridge(distDest) {
       status: () => callHost("prism_update_state", 30000),
       check: () => callHost("prism_check_update", 30000),
       open: () => callHost("prism_install_update", 0),
+      sources: () => callHost("prism_update_sources", 15000),
+      setSources: (endpoints) => callHost("prism_set_update_sources", 15000, { endpoints }),
       subscribe(listener) {
         updateListeners.add(listener)
         return () => updateListeners.delete(listener)

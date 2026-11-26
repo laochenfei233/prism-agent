@@ -36,4 +36,19 @@ export const ABOUT_CSS = `
 .pa-links{display:flex;gap:16px}
 .pa-links a{color:var(--dsw-alias-state-business-primary,#4176e6);text-decoration:none}
 .pa-links a:hover{text-decoration:underline}
+.pa-sources{gap:8px}
+.pa-sources .pa-row{justify-content:space-between}
+.pa-quiet{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:12px;background:transparent;color:inherit;padding:0 10px;min-height:24px}
+.pa-quiet:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}
+.pa-quiet:disabled{cursor:default;color:var(--dsw-alias-label-tertiary,#81858c)}
+.pa-source-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.pa-source-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.04));border-radius:10px}
+.pa-source-row[data-primary]{border-color:var(--dsw-alias-state-business-primary,#4176e6)}
+.pa-source-url{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.pa-source-actions{display:flex;gap:6px;flex:none}
+.pa-source-add{display:flex;gap:8px}
+.pa-input{flex:1;min-width:0;font:inherit;padding:4px 10px;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:10px;background:var(--dsw-alias-bg-base,#fff);color:inherit}
+.pa-source-add button{font:inherit;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:10px;background:transparent;color:inherit;padding:4px 12px}
+.pa-source-add button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}
+.pa-source-add button:disabled{cursor:default;color:var(--dsw-alias-label-tertiary,#81858c)}
 `

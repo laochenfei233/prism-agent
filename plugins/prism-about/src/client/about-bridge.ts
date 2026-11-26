@@ -43,16 +43,25 @@ export interface AboutUpdateState {
   readonly lastCheck?: number
   readonly lastError?: string
   readonly source?: {
-    /** Display host for the source line; set when a domestic mirror endpoint is configured. */
+    /** Whether the active list is a user-configured override. */
+    readonly custom?: boolean
+    /** Display host for the source line; set when a named source is configured. */
     readonly host?: string
     readonly repo?: string
     readonly releaseUrl?: string
   }
 }
 
+/** The About section's source panel wire: active endpoints and the defaults. */
+export interface AboutUpdateSources {
+  readonly endpoints: readonly string[]
+  readonly defaultEndpoints: readonly string[]
+}
+
 /**
  * The carrier API. `status`/`open`/`subscribe` are the shared presentation
- * contract; `check` is this shell's additive manual-check extension, probed
+ * contract; `check` is this shell's additive manual-check extension, and
+ * `sources`/`setSources` the additive source-panel extension — both probed
  * for feature detection so an older shell still degrades to `open`.
  */
 export interface DesktopUpdateCarrier {
@@ -60,6 +69,8 @@ export interface DesktopUpdateCarrier {
   open(): Promise<void>
   subscribe(listener: (state: AboutUpdateState) => void): () => void
   check?(): Promise<AboutUpdateState>
+  sources?(): Promise<AboutUpdateSources>
+  setSources?(endpoints: readonly string[]): Promise<AboutUpdateSources>
 }
 
 /** Reads the shell-injected carrier; null outside the desktop shell. */
@@ -102,28 +113,53 @@ export function deriveButtonState(phase: UpdatePhase, checked: boolean): ButtonS
 
 /** The source card's badge key and address line, derived from the snapshot. */
 export interface SourceView {
-  /** Badge copy key: the mirror state or the GitHub state. */
-  badgeKey: 'sourceGitHub' | 'sourceMirror'
-  /** Address-line text: the mirror host, the GitHub repository, or empty. */
+  /** Badge copy key: the custom, mirror, or GitHub state. */
+  badgeKey: 'sourceGitHub' | 'sourceMirror' | 'sourceCustom'
+  /** Address-line text: the mirror host, the custom host, the GitHub repository, or empty. */
   label: string
   /** Address-line href: the Releases page for a repository; empty when the line is display-only or unavailable. */
   href: string
 }
 
 /**
- * Derives the source card's badge and address line. A configured domestic
- * mirror displays its named host — display and actual are intentionally
- * separated, so the host is not a navigable page and gets no href. A bare
- * GitHub configuration keeps the repository link; anything else is the
- * unavailable state. The changelog and feedback links stay on GitHub and are
- * rendered straight from the snapshot's repository facts.
+ * Derives the source card's badge and address line. A custom selection
+ * displays its first endpoint's host as user-configured; a built-in mirror
+ * displays its named host — display and actual are intentionally separated,
+ * so the host is not a navigable page and gets no href. A bare GitHub
+ * configuration keeps the repository link; anything else is the unavailable
+ * state. The changelog and feedback links stay on GitHub and are rendered
+ * straight from the snapshot's repository facts.
  * @param source - Source facts from the shell snapshot, when present.
  * @returns The badge key and the address line's text and href.
  */
 export function deriveSourceView(source: AboutUpdateState['source'] | undefined): SourceView {
+  const custom = source?.custom === true
   const host = source?.host ?? ''
-  if (host !== '') return { badgeKey: 'sourceMirror', href: '', label: host }
+  if (custom && host !== '') return { badgeKey: 'sourceCustom', href: '', label: host }
+  if (!custom && host !== '') return { badgeKey: 'sourceMirror', href: '', label: host }
   const repo = source?.repo ?? ''
   if (repo !== '') return { badgeKey: 'sourceGitHub', href: source?.releaseUrl ?? '', label: repo }
   return { badgeKey: 'sourceGitHub', href: '', label: '' }
+}
+
+/** Whether one endpoint string is an absolute http(s) URL with a host. */
+export function isValidEndpoint(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && url.hostname !== ''
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Reorders the source list so one endpoint is checked first. The endpoint
+ * moves to the front; a missing endpoint is prepended.
+ * @param endpoints - the current ordered list.
+ * @param primary - the endpoint to check first.
+ * @returns the reordered list.
+ */
+export function withPrimary(endpoints: readonly string[], primary: string): string[] {
+  return [primary, ...endpoints.filter((endpoint) => endpoint !== primary)]
 }

@@ -304,6 +304,8 @@ pub fn run() {
             update::prism_update_state,
             update::prism_check_update,
             update::prism_install_update,
+            update::prism_update_sources,
+            update::prism_set_update_sources,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
