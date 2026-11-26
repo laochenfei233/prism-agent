@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "dsh-desktop"
-version = "0.2.2-rc.1"
+version = "0.2.3"
 dependencies = [
  "getrandom 0.3.4",
  "serde",
