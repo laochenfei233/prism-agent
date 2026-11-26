@@ -1077,7 +1077,9 @@ struct AuthCookie {
     value: String,
 }
 
-/// The proxy origin the app window loads after the launch-token exchange.
+/// The proxy URL the app window loads after the launch-token exchange. It
+/// carries the shell nonce so the proxy can tell this window's frame
+/// navigation from any other page that reaches its loopback port.
 #[derive(Serialize)]
 pub struct WebviewSession {
     pub url: String,
@@ -1137,13 +1139,18 @@ async fn launch_exchange(parsed: Url) -> Result<AuthCookie, String> {
 }
 
 /// Exchange the launch token, point the app proxy at the session it mints, and
-/// return the proxy origin the window loads.
+/// return the proxy URL the window loads.
 ///
 /// The window never authenticates through its own cookie jar: the proxy
 /// attaches the signed session to every request and WebSocket handshake. The
 /// frame therefore keeps working where a third-party cookie is withheld, and a
 /// restarted server only replaces the session behind an origin that never
 /// changes.
+///
+/// The returned URL carries a fresh [`shell_nonce`]: the window is a `tauri://`
+/// document, so the frame's navigation reaches dsh as cross-site, which its
+/// browser-trust fence refuses. The nonce lets the proxy recognize that one
+/// navigation as the shell's own; no other page knows the value.
 #[tauri::command]
 pub async fn authenticate_webview(url: String) -> Result<WebviewSession, String> {
     let parsed = url
@@ -1157,14 +1164,27 @@ pub async fn authenticate_webview(url: String) -> Result<WebviewSession, String>
         .ok_or("invalid dsh web launch URL")?;
     let port = parsed.port().ok_or("invalid dsh web launch URL")?;
     let cookie = launch_exchange(parsed).await?;
-    crate::proxy::session_updated(port, format!("{}={}", cookie.name, cookie.value));
+    let nonce = shell_nonce()?;
+    crate::proxy::session_updated(
+        port,
+        format!("{}={}", cookie.name, cookie.value),
+        nonce.clone(),
+    );
     let proxy_port = crate::proxy::ensure_started().await?;
     crate::proxy::self_check().await;
     Ok(WebviewSession {
-        url: format!("http://127.0.0.1:{proxy_port}/"),
+        url: format!("http://127.0.0.1:{proxy_port}/?__prism_shell={nonce}"),
     })
 }
 
+/// 32 random bytes for the frame URL's shell nonce: a page that scans the
+/// loopback ports cannot guess the value the proxy accepts as proof that a
+/// navigation belongs to this shell's webview.
+fn shell_nonce() -> Result<String, String> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).map_err(|error| format!("shell nonce: {error}"))?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
 
 #[derive(Serialize)]
 pub struct DshStatus {
@@ -1212,6 +1232,15 @@ mod tests {
             parse_launch_url("dsh web: http://127.0.0.1:3081/?token=abc-def"),
             Some("http://127.0.0.1:3081/?token=abc-def".to_string()),
         );
+    }
+
+    #[test]
+    fn shell_nonce_is_64_hex_characters_and_fresh_each_call() {
+        let first = shell_nonce().expect("a nonce from OS entropy");
+        let second = shell_nonce().expect("a nonce from OS entropy");
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_ne!(first, second);
     }
 
     #[test]

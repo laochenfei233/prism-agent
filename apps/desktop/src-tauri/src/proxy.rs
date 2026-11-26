@@ -8,8 +8,11 @@
 //! window talks to this proxy: every request (HTTP and the WebSocket upgrade)
 //! leaves with the session injected as a `Cookie` header, a rewritten `Host`,
 //! and a rewritten `Origin`/`Referer`, so the dsh server authenticates it
-//! exactly like a browser request that carried the cookie. The webview's own
-//! cookie jar is no longer involved.
+//! exactly like a browser request that carried the cookie. A request that
+//! presents the session's shell nonce also loses its cross-site marker: the
+//! window is a `tauri://` document, so the frame's first navigation would
+//! otherwise be refused by dsh's browser-trust fence. The webview's own cookie
+//! jar is no longer involved.
 //!
 //! One request per client connection: non-upgrade requests are forwarded with
 //! `Connection: close` so the response framing never needs parsing, and upgrade
@@ -33,6 +36,13 @@ pub(crate) struct Session {
     pub(crate) upstream_port: u16,
     /// `name=value` of the signed browser-session cookie.
     pub(crate) cookie: String,
+    /// Secret the shell appends to its frame URL. The window is a `tauri://`
+    /// document, so the frame's first navigation reaches the server as
+    /// cross-site and dsh's browser-trust fence refuses that marker. The
+    /// secret proves the navigation was started by this shell; requests
+    /// without it keep the marker, so any other page that reaches the proxy
+    /// still meets the fence.
+    pub(crate) shell_nonce: String,
 }
 
 static SESSION: RwLock<Option<Session>> = RwLock::new(None);
@@ -42,10 +52,15 @@ static CHECKED: AtomicBool = AtomicBool::new(false);
 
 /// Point the proxy at the live server and session. The proxy keeps its own
 /// port and the app window keeps its origin, so this is all a restart needs.
-pub(crate) fn session_updated(upstream_port: u16, cookie: String) {
+/// @param upstream_port - loopback port of the running `dsh web`.
+/// @param cookie - `name=value` of the signed browser-session cookie.
+/// @param shell_nonce - per-launch secret allowed to carry the shell's own
+///   frame navigation past the browser-trust fence (see [`Session`]).
+pub(crate) fn session_updated(upstream_port: u16, cookie: String, shell_nonce: String) {
     *SESSION.write().expect("proxy session lock") = Some(Session {
         upstream_port,
         cookie,
+        shell_nonce,
     });
 }
 
@@ -74,9 +89,10 @@ pub(crate) async fn ensure_started() -> Result<u16, String> {
 /// Fetch the index through the proxy once per app run and record the status.
 ///
 /// The exchange proves the token; this proves the path the window actually
-/// takes — injected Cookie, rewritten Host — authenticates, so the next 401 in
-/// the window is distinguishable from a proxy-side rejection by one startup
-/// log line instead of another field round trip.
+/// takes — cross-site frame navigation, shell nonce, injected Cookie, rewritten
+/// Host — authenticates, so the next 401 or 403 in the window is
+/// distinguishable from a proxy-side rejection by one startup log line instead
+/// of another field round trip.
 pub(crate) async fn self_check() {
     if CHECKED.swap(true, Ordering::SeqCst) {
         return;
@@ -84,15 +100,23 @@ pub(crate) async fn self_check() {
     let Some(port) = PROXY_PORT.get().copied() else {
         return;
     };
+    let Some(nonce) = SESSION
+        .read()
+        .expect("proxy session lock")
+        .as_ref()
+        .map(|session| session.shell_nonce.clone())
+    else {
+        return;
+    };
     let status = async {
         let mut stream = TcpStream::connect(("127.0.0.1", port))
             .await
             .map_err(|e| format!("connect failed: {e}"))?;
+        let request = format!(
+            "GET /?__prism_shell={nonce} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nSec-Fetch-Site: cross-site\r\nConnection: close\r\n\r\n"
+        );
         stream
-            .write_all(
-                format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n")
-                    .as_bytes(),
-            )
+            .write_all(request.as_bytes())
             .await
             .map_err(|e| format!("write failed: {e}"))?;
         let mut head = [0u8; 128];
@@ -203,9 +227,15 @@ fn client_authority(text: &str) -> Option<&str> {
 /// Rewrite one request head for the upstream server: the `Cookie` header is
 /// replaced with the session, `Host` points at the server authority the
 /// session was minted for, and `Origin`/`Referer` lose the proxy origin.
-/// Non-upgrade requests are made one-shot (`Connection: close`) so no request
-/// framing is needed past the head. Returns the rewritten head (including the
-/// terminating blank line) and whether the request upgrades.
+/// A request carrying this session's shell nonce also loses `Sec-Fetch-Site`
+/// and the nonce itself: the nonce proves the shell started the navigation,
+/// which dsh's browser-trust fence would otherwise refuse as cross-site
+/// because the surrounding window is a `tauri://` document. Non-upgrade
+/// requests are made one-shot (`Connection: close`) so no request framing is
+/// needed past the head.
+/// @param head - request head bytes, including the terminating blank line.
+/// @param session - upstream target, browser session, and shell nonce.
+/// @returns the rewritten head, or `None` when it cannot be forwarded safely.
 fn rewrite_head(head: &[u8], session: &Session) -> Option<Vec<u8>> {
     let text = std::str::from_utf8(head).ok()?;
     let mut lines = text.split("\r\n");
@@ -218,8 +248,13 @@ fn rewrite_head(head: &[u8], session: &Session) -> Option<Vec<u8>> {
     let upstream = format!("127.0.0.1:{}", session.upstream_port);
     let proxy_origin = format!("http://{client}");
     let trusted_origin = format!("http://{upstream}");
+    let nonce_param = format!("__prism_shell={}", session.shell_nonce);
+    let nonce_first = format!("?{nonce_param}&");
+    let nonce_later = format!("&{nonce_param}");
+    let nonce_only = format!("?{nonce_param}");
+    let (request_line, shell_navigation) = strip_shell_nonce(request_line, &nonce_param);
     let mut out = String::with_capacity(text.len() + session.cookie.len() + 64);
-    out.push_str(request_line);
+    out.push_str(&request_line);
     out.push_str("\r\n");
     for line in lines {
         if line.is_empty() {
@@ -235,8 +270,19 @@ fn rewrite_head(head: &[u8], session: &Session) -> Option<Vec<u8>> {
             // into the upstream request.
             continue;
         }
+        if shell_navigation && lower.starts_with("sec-fetch-site:") {
+            continue;
+        }
         if lower.starts_with("origin:") || lower.starts_with("referer:") {
-            out.push_str(&line.replace(&proxy_origin, &trusted_origin));
+            // The frame document's URL carries the nonce; strip it from the
+            // referer so the secret stays between the shell and the proxy.
+            // The three shapes cover first, later, and only query parameter.
+            let cleaned = line
+                .replace(&nonce_first, "?")
+                .replace(&nonce_later, "")
+                .replace(&nonce_only, "")
+                .replace(&proxy_origin, &trusted_origin);
+            out.push_str(&cleaned);
             out.push_str("\r\n");
             continue;
         }
@@ -251,6 +297,37 @@ fn rewrite_head(head: &[u8], session: &Session) -> Option<Vec<u8>> {
     Some(out.into_bytes())
 }
 
+/// Remove the shell nonce from a request target.
+/// @param request_line - `METHOD TARGET HTTP/1.x` line, verbatim.
+/// @param nonce_param - `__prism_shell=<nonce>` for the active session.
+/// @returns the target without that parameter, and whether it was present.
+fn strip_shell_nonce(request_line: &str, nonce_param: &str) -> (String, bool) {
+    let Some((target, rest)) = request_line.split_once('?') else {
+        return (request_line.to_owned(), false);
+    };
+    let Some((query, version)) = rest.split_once(' ') else {
+        return (request_line.to_owned(), false);
+    };
+    let mut kept = Vec::new();
+    let mut matched = false;
+    for piece in query.split('&') {
+        if piece == nonce_param {
+            matched = true;
+        } else {
+            kept.push(piece);
+        }
+    }
+    if !matched {
+        return (request_line.to_owned(), false);
+    }
+    let target = if kept.is_empty() {
+        target.to_owned()
+    } else {
+        format!("{target}?{}", kept.join("&"))
+    };
+    (format!("{target} {version}"), true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{find_head_end, rewrite_head, serve, Session, SESSION};
@@ -259,6 +336,7 @@ mod tests {
         Session {
             upstream_port: 3081,
             cookie: "dsh-auth-abc=value".to_owned(),
+            shell_nonce: "shell-secret".to_owned(),
         }
     }
 
@@ -291,6 +369,55 @@ mod tests {
         assert!(out.contains("Referer: http://127.0.0.1:3081/index.html\r\n"));
         assert!(out.contains("Accept: */*\r\n"));
         assert!(out.ends_with("Connection: close\r\n\r\n"));
+    }
+
+    #[test]
+    fn rewrite_clears_the_cross_site_marker_for_the_shell_nonce() {
+        let out = head(
+            "GET /?__prism_shell=shell-secret HTTP/1.1\r\nHost: 127.0.0.1:40000\r\nSec-Fetch-Site: cross-site\r\nSec-Fetch-Dest: iframe\r\nReferer: http://127.0.0.1:40000/?__prism_shell=shell-secret\r\n\r\n",
+        );
+        // dsh's browser-trust fence refuses a cross-site request before it
+        // authenticates; the nonce is what tells the proxy this navigation is
+        // the shell's own frame load.
+        assert!(out.starts_with("GET / HTTP/1.1\r\n"), "{out}");
+        assert!(!out.contains("Sec-Fetch-Site"), "{out}");
+        assert!(!out.contains("__prism_shell"), "{out}");
+        assert!(out.contains("Sec-Fetch-Dest: iframe\r\n"), "{out}");
+        assert!(out.contains("Referer: http://127.0.0.1:3081/\r\n"), "{out}");
+        assert!(out.contains("Cookie: dsh-auth-abc=value\r\n"), "{out}");
+    }
+
+    #[test]
+    fn rewrite_clears_the_marker_for_a_nonce_after_another_parameter() {
+        let out = head(
+            "GET /?view=chat&__prism_shell=shell-secret HTTP/1.1\r\nHost: 127.0.0.1:40000\r\nsEc-FeTcH-SiTe: cross-site\r\nReferer: http://127.0.0.1:40000/?view=chat&__prism_shell=shell-secret\r\n\r\n",
+        );
+        assert!(out.starts_with("GET /?view=chat HTTP/1.1\r\n"), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("sec-fetch-site"), "{out}");
+        assert!(!out.contains("__prism_shell"), "{out}");
+        assert!(out.contains("Referer: http://127.0.0.1:3081/?view=chat\r\n"), "{out}");
+    }
+
+    #[test]
+    fn rewrite_keeps_the_cross_site_marker_without_the_shell_nonce() {
+        for request_line in [
+            "GET / HTTP/1.1",
+            "GET /?__prism_shell=guessed HTTP/1.1",
+            "GET /?__prism_shell=shell-secret-extra HTTP/1.1",
+        ] {
+            let out = head(&format!(
+                "{request_line}\r\nHost: 127.0.0.1:40000\r\nSec-Fetch-Site: cross-site\r\n\r\n"
+            ));
+            assert!(out.contains("Sec-Fetch-Site: cross-site\r\n"), "{out}");
+        }
+    }
+
+    #[test]
+    fn rewrite_keeps_other_query_parameters() {
+        let out = head(
+            "GET /?a=1&__prism_shell=shell-secret&b=2 HTTP/1.1\r\nHost: 127.0.0.1:40000\r\n\r\n",
+        );
+        assert!(out.starts_with("GET /?a=1&b=2 HTTP/1.1\r\n"), "{out}");
     }
 
     #[test]
@@ -334,6 +461,7 @@ mod tests {
         *SESSION.write().unwrap() = Some(Session {
             upstream_port,
             cookie: "dsh-auth-abc=value".to_owned(),
+            shell_nonce: "shell-secret".to_owned(),
         });
         let browser = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
         let browser_port = browser.local_addr().unwrap().port();

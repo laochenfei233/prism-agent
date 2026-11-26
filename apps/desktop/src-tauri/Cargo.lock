@@ -936,6 +936,7 @@ dependencies = [
 name = "dsh-desktop"
 version = "0.2.2-rc.1"
 dependencies = [
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "serde_yaml",
