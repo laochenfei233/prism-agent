@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3+1] - 2026-11-26
+
+Hotfix on top of 0.2.3: the desktop shell's trust fence no longer blocks its own first navigation, the runtime stops cleanly before an in-app update installs, and a stale package export is dropped.
+
+### Fixed
+
+- Make the merged tree pass the release gates
+- Point the release bundle patches at the resynced package homes
+- Cut the Tauri app version to 0.2.3 with the family
+- In-app updates now finish installing on Windows: the download no longer stalls at 100% because the shell stops its local runtime the same way the quit path does before handing over to the installer.
+- The app window no longer gets stuck on a 'forbidden' page at first launch: the trust fence now lets the shell's own tauri:// navigation through.
+- Fixes carried over from another checkout: the guardrails runtime mount, the team bundle in the web composition, and the release gates they need; a stale package export without a build output is dropped.
+
 ## [0.2.3] - 2026-11-25
 
 The first stable release: phone access now needs explicit approval with single-use sign-in links, the feishu/dingtalk/wecom bot channels delegate to the upstream connectors, speech recognition gains nine HTTP providers with long-audio splitting, and memory runs on autopilot with auditable claims.

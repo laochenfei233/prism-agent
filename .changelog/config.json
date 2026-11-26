@@ -5,7 +5,7 @@
   "tag_format": "dsh-v{version}",
   "versioning": {
     "preset": "semver",
-    "format": "{major}.{minor}.{patch}",
+    "format": "{major}.{minor}.{patch}[+{build}]",
     "bump_rules": {
       "breaking": "major",
       "added": "minor",
