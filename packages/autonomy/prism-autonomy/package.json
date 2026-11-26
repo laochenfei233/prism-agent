@@ -14,10 +14,6 @@
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {
-    "./typert": {
-      "types": "./lib/typert.host.d.ts",
-      "default": "./lib/typert.host.js"
-    },
     ".": {
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
@@ -32,9 +28,7 @@
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts",
-    "lib/typert.host.js",
-    "lib/typert.host.d.ts"
+    "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
   "dependencies": {
