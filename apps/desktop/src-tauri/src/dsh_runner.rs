@@ -400,26 +400,32 @@ impl DshHandle {
     /// spawned task: a task is dropped with the runtime, and the hub of every
     /// quit survived it.
     pub fn stop(&self) {
+        tauri::async_runtime::block_on(self.stop_async());
+    }
+
+    /// The body of [`stop`] as a future. An async caller — the updater's
+    /// install command runs on the runtime — must await this: the blocking
+    /// wrapper would panic inside an async context, abort the command, and
+    /// leave its install state stuck at the last committed phase.
+    pub async fn stop_async(&self) {
         self.stopping.store(true, Ordering::SeqCst);
-        tauri::async_runtime::block_on(async {
-            if let Some(mut child) = self.child.lock().await.take() {
-                end_owned_child(&mut child).await;
-                forget_server();
-                return;
-            }
-            // An adopted hub is no longer this shell's child, so it is ended by
-            // pid — and only a pid the record still proves: re-reading it
-            // requires the process on that port to answer with the launch token
-            // the recorded hub printed, which the pid of a replaced hub cannot.
-            let path = server_record_path();
-            let bin = self.dsh_bin.clone();
-            let adopted =
-                tauri::async_runtime::spawn_blocking(move || adopt_decision(&path, &bin)).await;
-            if let Ok(Some(record)) = adopted {
-                terminate_pid(record.pid);
-                forget_server();
-            }
-        });
+        if let Some(mut child) = self.child.lock().await.take() {
+            end_owned_child(&mut child).await;
+            forget_server();
+            return;
+        }
+        // An adopted hub is no longer this shell's child, so it is ended by
+        // pid — and only a pid the record still proves: re-reading it
+        // requires the process on that port to answer with the launch token
+        // the recorded hub printed, which the pid of a replaced hub cannot.
+        let path = server_record_path();
+        let bin = self.dsh_bin.clone();
+        let adopted =
+            tauri::async_runtime::spawn_blocking(move || adopt_decision(&path, &bin)).await;
+        if let Ok(Some(record)) = adopted {
+            terminate_pid(record.pid);
+            forget_server();
+        }
     }
 
     /// Graceful restart requested from the UI ("Restart service").

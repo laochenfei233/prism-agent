@@ -472,8 +472,9 @@ async fn run_install(app: &AppHandle) -> UpdateSnapshot {
     };
 
     // The installer is about to replace the binary and prune everything under
-    // the runtime directory, so the child must be down first. `stop()` is
-    // synchronous and idempotent.
+    // the runtime directory, so the child must be down first. This command
+    // already runs on the runtime, where the blocking `stop()` panics; awaiting
+    // the same body ends the hub and lets the install state advance.
     let Some(dsh) = app.try_state::<DshHandle>() else {
         return commit_state(app, true, |fields| {
             fields.phase = Phase::Error;
@@ -482,7 +483,7 @@ async fn run_install(app: &AppHandle) -> UpdateSnapshot {
             fields.last_error = Some("dsh runtime handle is not registered".to_string());
         });
     };
-    dsh.stop();
+    dsh.stop_async().await;
 
     commit_state(app, false, |fields| {
         fields.phase = Phase::Installing;
