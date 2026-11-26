@@ -138,7 +138,7 @@ export function compareVersions(left: string, right: string): number {
  */
 function nextSharedVersion(current: string, request: string): string {
   if (!RELEASE_TYPES.includes(request as typeof RELEASE_TYPES[number])) {
-    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(request)) {
+    if (!/^\d+\.\d+\.\d+(?:\+[0-9A-Za-z.-]+)?(?:-[0-9A-Za-z.-]+)?$/.test(request)) {
       throw new Error(`usage: release:dsh <major|minor|patch|x.y.z>, got ${request}`)
     }
     return request
