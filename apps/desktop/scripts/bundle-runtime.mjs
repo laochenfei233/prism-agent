@@ -720,7 +720,8 @@ export function verifyRequiredNativeAddons(
   // the first flock call, so the payload is checked too. macOS ships
   // `bin/system.node`; Linux selects a libc subdirectory (glibc/musl).
   if (platform === 'mac' || platform === 'linux') {
-    const flockPkg = `node-addon-system-${platform}-${arch}`;
+    // Package names follow the os field: `darwin-<arch>` on macOS, `linux-<arch>` elsewhere.
+    const flockPkg = platform === 'mac' ? `node-addon-system-darwin-${arch}` : `node-addon-system-linux-${arch}`;
     const binDir = join(nodeModulesDir, '@deepseek-ai', flockPkg, 'bin');
     const payload = platform === 'mac'
       ? join(binDir, 'system.node')
