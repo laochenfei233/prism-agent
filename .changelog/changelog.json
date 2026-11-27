@@ -1,77 +1,8 @@
 {
   "versions": [
     {
-      "version": "0.2.3+1",
+      "version": "0.2.3-alpha.2",
       "date": "2026-11-26",
-      "summary": "Hotfix on top of 0.2.3: the desktop shell's trust fence no longer blocks its own first navigation, the runtime stops cleanly before an in-app update installs, and a stale package export is dropped.",
-      "entries": [
-        {
-          "type": "fixed",
-          "text": "Make the merged tree pass the release gates",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "0b29a56553"
-          ]
-        },
-        {
-          "type": "fixed",
-          "text": "Point the release bundle patches at the resynced package homes",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "0f42ef631a"
-          ]
-        },
-        {
-          "type": "fixed",
-          "text": "Cut the Tauri app version to 0.2.3 with the family",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "5fdfea04c6"
-          ]
-        },
-        {
-          "type": "fixed",
-          "text": "In-app updates now finish installing on Windows: the download no longer stalls at 100% because the shell stops its local runtime the same way the quit path does before handing over to the installer.",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "fab689f"
-          ]
-        },
-        {
-          "type": "fixed",
-          "text": "The app window no longer gets stuck on a 'forbidden' page at first launch: the trust fence now lets the shell's own tauri:// navigation through.",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "8e30d69"
-          ]
-        },
-        {
-          "type": "fixed",
-          "text": "Fixes carried over from another checkout: the guardrails runtime mount, the team bundle in the web composition, and the release gates they need; a stale package export without a build output is dropped.",
-          "breaking": false,
-          "audience": "user",
-          "highlight": false,
-          "commits": [
-            "c560b01",
-            "e9ad126",
-            "5a8a9ff"
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.2.3",
-      "date": "2026-11-25",
       "summary": "The first stable release: phone access now needs explicit approval with single-use sign-in links, the feishu/dingtalk/wecom bot channels delegate to the upstream connectors, speech recognition gains nine HTTP providers with long-audio splitting, and memory runs on autopilot with auditable claims.",
       "entries": [
         {
@@ -2365,6 +2296,74 @@
           "commits": [
             "05d542ac3f"
           ]
+        },
+        {
+          "type": "fixed",
+          "text": "Make the merged tree pass the release gates",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0b29a56553"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Point the release bundle patches at the resynced package homes",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "0f42ef631a"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Cut the Tauri app version to 0.2.3 with the family",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "5fdfea04c6"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "In-app updates now finish installing on Windows: the download no longer stalls at 100% because the shell stops its local runtime the same way the quit path does before handing over to the installer.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "fab689f"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "The app window no longer gets stuck on a 'forbidden' page at first launch: the trust fence now lets the shell's own tauri:// navigation through.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "8e30d69"
+          ]
+        },
+        {
+          "type": "fixed",
+          "text": "Fixes carried over from another checkout: the guardrails runtime mount, the team bundle in the web composition, and the release gates they need; a stale package export without a build output is dropped.",
+          "breaking": false,
+          "audience": "user",
+          "highlight": false,
+          "commits": [
+            "c560b01",
+            "e9ad126",
+            "5a8a9ff"
+          ]
+        },
+        {
+          "type": "added",
+          "breaking": false,
+          "audience": "user",
+          "text": "Switch the update source from the About page: China mirror or GitHub as the primary with the other as fallback, plus custom mirror URLs; the choice persists and signature checks are unchanged."
         }
       ]
     },
