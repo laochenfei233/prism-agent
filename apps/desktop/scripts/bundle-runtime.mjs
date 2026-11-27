@@ -679,7 +679,7 @@ function ensureSystemAddon() {
   }
   mkdirSync(dirname(binary), { recursive: true });
   const args = [
-    '-arch', ARCH,
+    '-arch', ARCH === 'x64' ? 'x86_64' : 'arm64',
     '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-fPIC',
     '-fvisibility=hidden', '-DNAPI_VERSION=8', '-I', headers,
     '-bundle', '-undefined', 'dynamic_lookup', '-mmacosx-version-min=11.0',
@@ -716,14 +716,18 @@ export function verifyRequiredNativeAddons(
   step(`native addon ${suffix} present`);
 
   // The POSIX flock binding is loaded lazily by `process.arch`; a platform
-  // package present without its `bin/system.node` passes an arch scan and
-  // still crashes the first flock call, so its payload is checked too.
+  // package present without its payload passes an arch scan and still crashes
+  // the first flock call, so the payload is checked too. macOS ships
+  // `bin/system.node`; Linux selects a libc subdirectory (glibc/musl).
   if (platform === 'mac' || platform === 'linux') {
     const flockPkg = `node-addon-system-${platform}-${arch}`;
-    const flock = join(nodeModulesDir, '@deepseek-ai', flockPkg, 'bin', 'system.node');
-    if (!existsSync(flock)) {
+    const binDir = join(nodeModulesDir, '@deepseek-ai', flockPkg, 'bin');
+    const payload = platform === 'mac'
+      ? join(binDir, 'system.node')
+      : ['glibc', 'musl'].map((libc) => join(binDir, libc, 'system.node')).find((p) => existsSync(p));
+    if (payload === undefined || !existsSync(payload)) {
       throw new Error(
-        `runtime closure has no ${flockPkg}/bin/system.node; the addon was not built for ${arch}`,
+        `runtime closure has no ${flockPkg} flock payload; the addon was not built for ${arch}`,
       );
     }
     step(`native addon ${flockPkg} payload present`);
