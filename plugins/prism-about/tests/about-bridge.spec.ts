@@ -1,8 +1,12 @@
 /** Carrier detection and view derivation for the About section. */
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  classifyEndpoint,
+  customEndpointsOf,
   deriveButtonState,
+  deriveSourceMode,
   deriveSourceView,
+  endpointsForMode,
   isValidEndpoint,
   readCarrier,
   withPrimary,
@@ -144,5 +148,38 @@ describe('source panel helpers', () => {
     expect(withPrimary(['a', 'b', 'c'], 'b')).toEqual(['b', 'a', 'c'])
     expect(withPrimary(['a', 'b'], 'c')).toEqual(['c', 'a', 'b'])
     expect(withPrimary(['a'], 'a')).toEqual(['a'])
+  })
+})
+
+describe('source modes', () => {
+  const MIRROR = 'https://cdn.xyern.com/prism-agent/updates/latest.json'
+  const GITHUB = 'https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json'
+  const DEFAULTS = [MIRROR, GITHUB]
+  const CUSTOM = 'https://mirror.example.com/prism/latest.json'
+
+  it('classifies endpoints into the three families', () => {
+    expect(classifyEndpoint(MIRROR)).toBe('mirror')
+    expect(classifyEndpoint(GITHUB)).toBe('github')
+    expect(classifyEndpoint(CUSTOM)).toBe('custom')
+    expect(classifyEndpoint('not a url')).toBe('custom')
+  })
+
+  it('derives the mode from the first endpoint', () => {
+    expect(deriveSourceMode(DEFAULTS)).toBe('mirror')
+    expect(deriveSourceMode([GITHUB])).toBe('github')
+    expect(deriveSourceMode([CUSTOM, GITHUB])).toBe('custom')
+    expect(deriveSourceMode([])).toBe('mirror')
+  })
+
+  it('builds the endpoint list per mode with the GitHub fallback behind custom', () => {
+    expect(endpointsForMode('mirror', DEFAULTS, [])).toEqual(DEFAULTS)
+    expect(endpointsForMode('github', DEFAULTS, [CUSTOM])).toEqual([GITHUB])
+    expect(endpointsForMode('custom', DEFAULTS, [CUSTOM])).toEqual([CUSTOM, GITHUB])
+    expect(endpointsForMode('custom', DEFAULTS, [])).toEqual([GITHUB])
+  })
+
+  it('lists only the custom endpoints of an active list', () => {
+    expect(customEndpointsOf([CUSTOM, GITHUB, CUSTOM])).toEqual([CUSTOM, CUSTOM])
+    expect(customEndpointsOf(DEFAULTS)).toEqual([])
   })
 })

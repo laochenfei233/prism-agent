@@ -153,6 +153,65 @@ export function isValidEndpoint(value: string): boolean {
   }
 }
 
+/** Which built-in family an endpoint belongs to; anything else is custom. */
+export type EndpointKind = 'mirror' | 'github' | 'custom'
+
+/** The built-in mirror CDN that ships with the app (request path prefix). */
+const MIRROR_HOST = 'cdn.xyern.com'
+const MIRROR_PATH = '/prism-agent/'
+
+/**
+ * Classifies one endpoint for the source selector.
+ * @param value - the endpoint URL.
+ * @returns mirror for the built-in CDN, github for a GitHub releases endpoint, custom otherwise.
+ */
+export function classifyEndpoint(value: string): EndpointKind {
+  if (!isValidEndpoint(value)) return 'custom'
+  const url = new URL(value)
+  if (url.host === MIRROR_HOST && url.pathname.startsWith(MIRROR_PATH)) return 'mirror'
+  if (url.host === 'github.com' && url.pathname.includes('/releases/')) return 'github'
+  return 'custom'
+}
+
+/** The source selector's mode, derived from the first endpoint in the list. */
+export type SourceMode = 'mirror' | 'github' | 'custom'
+
+/**
+ * Derives the selector's mode from the active endpoint list.
+ * @param endpoints - the active ordered list.
+ * @returns mirror when the mirror is checked first, github when GitHub is first, custom otherwise.
+ */
+export function deriveSourceMode(endpoints: readonly string[]): SourceMode {
+  const first = endpoints[0]
+  if (first === undefined) return 'mirror'
+  return classifyEndpoint(first) === 'custom' ? 'custom' : classifyEndpoint(first)
+}
+
+/**
+ * The endpoint list a selector mode stands for. Every mode keeps the GitHub
+ * Releases fallback behind the primary, mirroring the compiled default.
+ * @param mode - the selected mode.
+ * @param defaults - the compiled default endpoints (mirror first, GitHub fallback).
+ * @param customEndpoints - the user's custom mirror URLs, checked in order.
+ * @returns the ordered endpoint list to persist.
+ */
+export function endpointsForMode(
+  mode: SourceMode,
+  defaults: readonly string[],
+  customEndpoints: readonly string[],
+): string[] {
+  const github = defaults.find((endpoint) => classifyEndpoint(endpoint) === 'github')
+    ?? `https://github.com/laochenfei233/prism-agent/releases/latest/download/latest.json`
+  if (mode === 'mirror') return [...defaults]
+  if (mode === 'github') return [github]
+  return [...customEndpoints.filter((endpoint) => classifyEndpoint(endpoint) === 'custom'), github]
+}
+
+/** The custom endpoints of an active list, in their check order. */
+export function customEndpointsOf(endpoints: readonly string[]): string[] {
+  return endpoints.filter((endpoint) => classifyEndpoint(endpoint) === 'custom')
+}
+
 /**
  * Reorders the source list so one endpoint is checked first. The endpoint
  * moves to the front; a missing endpoint is prepended.

@@ -10,15 +10,18 @@
  */
 import { useEffect, useState } from 'react'
 import {
+  customEndpointsOf,
   deriveButtonState,
+  endpointsForMode,
+  deriveSourceMode,
   deriveSourceView,
   isValidEndpoint,
   readCarrier,
-  withPrimary,
   type AboutUpdateSources,
   type AboutUpdateState,
   type ButtonState,
   type DesktopUpdateCarrier,
+  type SourceMode,
   type UpdateFailureKind,
 } from './about-bridge.ts'
 import { ABOUT_CSS } from './styles.ts'
@@ -70,6 +73,24 @@ export function AboutSection({ t }: AboutSectionProps) {
   const [sources, setSourcesState] = useState<AboutUpdateSources | null>(null)
   const [sourceDraft, setSourceDraft] = useState('')
   const [sourceNote, setSourceNote] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [customEditing, setCustomEditing] = useState(false)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (event: MouseEvent) => {
+      if ((event.target as Element).closest('.pa-select') === null) setMenuOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('click', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('click', close)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [menuOpen])
 
   useEffect(() => {
     if (carrier === null) return
@@ -156,7 +177,7 @@ export function AboutSection({ t }: AboutSectionProps) {
 
   const repo = state?.source?.repo ?? ''
   const releaseUrl = state?.source?.releaseUrl ?? ''
-  const { badgeKey, href, label } = deriveSourceView(state?.source)
+  const { label } = deriveSourceView(state?.source)
 
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'verifying' || phase === 'installing'
   const persistSources = (endpoints: readonly string[]) => {
@@ -171,23 +192,40 @@ export function AboutSection({ t }: AboutSectionProps) {
       },
     )
   }
-  const addSource = () => {
+  const addCustomSource = () => {
     const value = sourceDraft.trim()
     if (value === '') return
     if (!isValidEndpoint(value)) {
       setSourceNote(t('sourcesInvalid'))
       return
     }
-    const current = sources?.endpoints ?? []
-    if (current.includes(value)) {
+    const existing = sources === null ? [] : customEndpointsOf(sources.endpoints)
+    if (existing.includes(value)) {
       setSourceDraft('')
       return
     }
     setSourceDraft('')
-    persistSources([...current, value])
+    persistSources(endpointsForMode('custom', sources?.defaultEndpoints ?? [], [...existing, value]))
   }
   const sourcesEditable = sources !== null && carrier.setSources !== undefined && !busy
-  const defaultSet = new Set(sources?.defaultEndpoints ?? [])
+  const mode: SourceMode = sources === null ? 'mirror' : deriveSourceMode(sources.endpoints)
+  const customs = sources === null ? [] : customEndpointsOf(sources.endpoints)
+  const selectorLabel = mode === 'mirror'
+    ? t('sourcesMirrorOption')
+    : mode === 'github'
+      ? t('sourcesGithubOption')
+      : t('sourcesCustomOption')
+  const modeHint = mode === 'mirror'
+    ? t('sourcesMirrorHint')
+    : mode === 'github'
+      ? t('sourcesGithubHint')
+      : t('sourcesCustomHint')
+  const toggleMenu = () => setMenuOpen((open) => !open)
+  const pickMode = (next: SourceMode) => {
+    setMenuOpen(false)
+    setCustomEditing(next === 'custom')
+    if (next !== 'custom') persistSources(endpointsForMode(next, sources?.defaultEndpoints ?? [], customs))
+  }
 
   return (
     <section className="pa-about" aria-label={t('nav')}>
@@ -226,84 +264,112 @@ export function AboutSection({ t }: AboutSectionProps) {
           <span className="pa-muted">{progressLine}</span>
         </div>
       )}
-      <div className="pa-card">
+      <div className="pa-card pa-source-card">
         <div className="pa-row">
           <span className="pa-label">{t('sourceTitle')}</span>
-          <span className="pa-badge">{t(badgeKey)}</span>
-        </div>
-        {label !== ''
-          ? href !== ''
-            ? <a className="pa-repo" href={href} target="_blank" rel="noreferrer">{label}</a>
-            : <span className="pa-repo">{label}</span>
-          : <span className="pa-muted">{t('sourceUnavailable')}</span>}
-      </div>
-      {sources !== null && (
-        <div className="pa-card pa-sources">
-          <div className="pa-row">
-            <span className="pa-label">{t('sourceTitle')}</span>
-            <button
-              type="button"
-              className="pa-quiet"
-              disabled={!sourcesEditable || sources.endpoints.join('|') === sources.defaultEndpoints.join('|')}
-              onClick={() => persistSources(sources.defaultEndpoints)}
-            >
-              {t('sourcesReset')}
-            </button>
-          </div>
-          <p className="pa-muted">{t('sourcesHint')}</p>
-          <ul className="pa-source-list">
-            {sources.endpoints.map((endpoint, index) => (
-              <li key={endpoint} className="pa-source-row" data-primary={index === 0 || undefined}>
-                <code className="pa-source-url">{endpoint}</code>
-                <span className="pa-source-actions">
-                  {index !== 0 && (
+          {sources !== null && (
+            <div className="pa-select">
+              <button
+                type="button"
+                className="pa-select-button"
+                aria-haspopup="listbox"
+                aria-expanded={menuOpen}
+                disabled={!sourcesEditable}
+                onClick={toggleMenu}
+              >
+                <span>{selectorLabel}</span>
+                <i className="pa-caret" aria-hidden="true" />
+              </button>
+              {menuOpen && (
+                <ul className="pa-menu" role="listbox">
+                  <li>
                     <button
                       type="button"
-                      className="pa-quiet"
-                      disabled={!sourcesEditable}
-                      onClick={() => persistSources(withPrimary(sources.endpoints, endpoint))}
+                      role="option"
+                      aria-selected={mode === 'mirror'}
+                      data-active={mode === 'mirror' || undefined}
+                      onClick={() => pickMode('mirror')}
                     >
-                      {t('sourcesPrimary')}
+                      {t('sourcesMirrorOption')}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="pa-quiet"
-                    disabled={!sourcesEditable}
-                    onClick={() => persistSources(sources.endpoints.filter((entry) => entry !== endpoint))}
-                  >
-                    {t('sourcesRemove')}
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="pa-source-add">
-            <input
-              className="pa-input"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={t('sourcesAddPlaceholder')}
-              value={sourceDraft}
-              disabled={!sourcesEditable}
-              onChange={(event) => { setSourceDraft(event.target.value); setSourceNote(null) }}
-            />
-            <button
-              type="button"
-              disabled={!sourcesEditable || sourceDraft.trim() === ''}
-              onClick={addSource}
-            >
-              {t('sourcesAdd')}
-            </button>
-          </div>
-          {sourceNote !== null && <p className="pa-hint" data-tone="error">{sourceNote}</p>}
-          {busy && <p className="pa-muted">{t('sourcesBusy')}</p>}
-          {defaultSet.size > 0 && (
-            <p className="pa-muted">{t('sourceMirror')} / {t('sourceGitHub')}: {[...defaultSet].join(' · ')}</p>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={mode === 'github'}
+                      data-active={mode === 'github' || undefined}
+                      onClick={() => pickMode('github')}
+                    >
+                      {t('sourcesGithubOption')}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={mode === 'custom'}
+                      data-active={mode === 'custom' || undefined}
+                      onClick={() => pickMode('custom')}
+                    >
+                      {t('sourcesCustomOption')}
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </div>
           )}
         </div>
-      )}
+        <p className="pa-muted">{modeHint}</p>
+        {label !== '' && mode === 'custom' && (
+          <span className="pa-repo">{label}</span>
+        )}
+        {mode === 'custom' && (customEditing || customs.length > 0) && (
+          <div className="pa-source-editor">
+            {customs.length > 0 && (
+              <ul className="pa-source-list">
+                {customs.map((endpoint) => (
+                  <li key={endpoint} className="pa-source-row">
+                    <code className="pa-source-url">{endpoint}</code>
+                    <span className="pa-source-actions">
+                      <button
+                        type="button"
+                        className="pa-quiet"
+                        disabled={!sourcesEditable}
+                        onClick={() => persistSources(endpointsForMode('custom', sources?.defaultEndpoints ?? [], customs.filter((entry) => entry !== endpoint)))}
+                      >
+                        {t('sourcesRemove')}
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="pa-source-add">
+              <input
+                className="pa-input"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t('sourcesAddPlaceholder')}
+                value={sourceDraft}
+                disabled={!sourcesEditable}
+                onChange={(event) => { setSourceDraft(event.target.value); setSourceNote(null) }}
+              />
+              <button
+                type="button"
+                disabled={!sourcesEditable || sourceDraft.trim() === ''}
+                onClick={addCustomSource}
+              >
+                {t('sourcesAdd')}
+              </button>
+            </div>
+            <p className="pa-muted">{t('sourcesCustomHint')}</p>
+          </div>
+        )}
+        {sourceNote !== null && <p className="pa-hint" data-tone="error">{sourceNote}</p>}
+        {busy && <p className="pa-muted">{t('sourcesBusy')}</p>}
+      </div>
       <div className="pa-links">
         {releaseUrl !== '' && <a href={releaseUrl} target="_blank" rel="noreferrer">{t('changelog')}</a>}
         {repo !== '' && <a href={`https://github.com/${repo}/issues`} target="_blank" rel="noreferrer">{t('feedback')}</a>}

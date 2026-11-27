@@ -41,6 +41,19 @@ export const ABOUT_CSS = `
 .pa-quiet{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:12px;background:transparent;color:inherit;padding:0 10px;min-height:24px}
 .pa-quiet:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}
 .pa-quiet:disabled{cursor:default;color:var(--dsw-alias-label-tertiary,#81858c)}
+.pa-select{position:relative;flex:none}
+.pa-select-button{display:inline-flex;gap:8px;align-items:center;font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:10px;background:var(--dsw-alias-bg-base,#fff);color:inherit;padding:4px 10px;min-height:30px}
+.pa-select-button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}
+.pa-select-button:disabled{cursor:default;color:var(--dsw-alias-label-tertiary,#81858c)}
+.pa-caret{width:8px;height:8px;border-right:1.5px solid var(--dsw-alias-label-secondary,#61666b);border-bottom:1.5px solid var(--dsw-alias-label-secondary,#61666b);transform:rotate(45deg) translateY(-2px)}
+.pa-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:220px;margin:0;padding:6px;display:grid;gap:2px;list-style:none;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.pa-menu button{display:flex;gap:8px;align-items:center;width:100%;text-align:left;font:inherit;font-size:13px;cursor:pointer;border:0;border-radius:8px;background:transparent;color:inherit;padding:7px 10px;min-height:30px}
+.pa-menu button:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(38,49,72,.06))}
+.pa-menu button[data-active]{background:var(--dsw-alias-state-business-primary,#4176e6);color:#fff}
+.pa-menu button[data-active]:hover{filter:brightness(1.05)}
+.pa-menu button::before{content:'✓';width:14px;font-size:12px;visibility:hidden}
+.pa-menu button[data-active]::before{visibility:visible}
+.pa-source-editor{display:grid;gap:8px;padding-top:4px}
 .pa-source-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
 .pa-source-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.04));border-radius:10px}
 .pa-source-row[data-primary]{border-color:var(--dsw-alias-state-business-primary,#4176e6)}
