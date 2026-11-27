@@ -310,6 +310,7 @@ async function deployDsh() {
   copyLocalPlugins(repo);
   if (PLATFORM === 'linux') pruneForeignLinuxPlatformPackages();
   if (PLATFORM === 'mac' || PLATFORM === 'linux') pruneForeignNativeModules();
+  ensureSystemAddon();
   verifyRequiredNativeAddons();
   // Last: flattenClosure and the patch passes rebuild node_modules from the
   // store, which would overwrite an earlier dist patch.
@@ -653,6 +654,42 @@ function pruneForeignNativeModules() {
   step(`pruned ${removed} foreign-arch native module(s) from ${PLATFORM} closure`);
 }
 
+// The POSIX flock binding resolves `node-addon-system-<platform>-<arch>` at
+// runtime by `process.arch`. Workspace installs build only the HOST addon
+// (`--host-addon-only`), so a cross-arch macOS bundle (x64 target on the arm64
+// runner, or the reverse) ships a platform package with no `bin/system.node`
+// and the app dies on startup with MODULE_NOT_FOUND for that path. Compile the
+// target addon from the repository source into the deployed closure when it is
+// missing; the bundled Node installation supplies the Node-API headers.
+function ensureSystemAddon() {
+  if (PLATFORM !== 'mac') return;
+  const pkg = `node-addon-system-darwin-${ARCH}`;
+  const dir = join(DSH_DIR, 'node_modules', '@deepseek-ai', pkg);
+  const binary = join(dir, 'bin', 'system.node');
+  if (existsSync(binary)) return;
+  if (!existsSync(dir)) {
+    throw new Error(`runtime closure has no ${pkg}; the deploy resolved the wrong platform`);
+  }
+  const repo = resolve(ROOT, '..', '..');
+  const source = join(repo, 'native', 'system', 'packages', 'entry', 'src', 'flock.c');
+  const headers = join(NODE_DIR, 'include', 'node');
+  if (!existsSync(source)) throw new Error(`flock source missing at ${source}`);
+  if (!existsSync(join(headers, 'node_api.h'))) {
+    throw new Error(`Node-API headers missing at ${headers}; the bundled node lacks include/node`);
+  }
+  mkdirSync(dirname(binary), { recursive: true });
+  const args = [
+    '-arch', ARCH,
+    '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-fPIC',
+    '-fvisibility=hidden', '-DNAPI_VERSION=8', '-I', headers,
+    '-bundle', '-undefined', 'dynamic_lookup', '-mmacosx-version-min=11.0',
+    '-o', binary, source,
+  ];
+  step(`compiling ${pkg} addon for ${ARCH}`);
+  execFileSync('cc', args, { stdio: 'inherit' });
+  if (!existsSync(binary)) throw new Error(`cc produced no ${binary}`);
+}
+
 // Fail the bundle when the plugin loader's mandatory native addon has no
 // build for the target. `node-addon-require-builtin` ships its native binary
 // as per-platform optionalDependencies; a closure resolved for the wrong
@@ -677,6 +714,20 @@ export function verifyRequiredNativeAddons(
     );
   }
   step(`native addon ${suffix} present`);
+
+  // The POSIX flock binding is loaded lazily by `process.arch`; a platform
+  // package present without its `bin/system.node` passes an arch scan and
+  // still crashes the first flock call, so its payload is checked too.
+  if (platform === 'mac' || platform === 'linux') {
+    const flockPkg = `node-addon-system-${platform}-${arch}`;
+    const flock = join(nodeModulesDir, '@deepseek-ai', flockPkg, 'bin', 'system.node');
+    if (!existsSync(flock)) {
+      throw new Error(
+        `runtime closure has no ${flockPkg}/bin/system.node; the addon was not built for ${arch}`,
+      );
+    }
+    step(`native addon ${flockPkg} payload present`);
+  }
 }
 
 // True when the file's declared architectures cover the target (Mach-O thin
