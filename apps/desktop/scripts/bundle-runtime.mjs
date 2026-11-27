@@ -672,10 +672,15 @@ function ensureSystemAddon() {
   }
   const repo = resolve(ROOT, '..', '..');
   const source = join(repo, 'native', 'system', 'packages', 'entry', 'src', 'flock.c');
-  const headers = join(NODE_DIR, 'include', 'node');
+  // The bundled runtime is a pruned Node distribution without include/node;
+  // the host Node running this script carries the Node-API headers, which are
+  // architecture-independent C declarations and therefore safe for a
+  // cross-arch build.
+  const headers = [join(NODE_DIR, 'include', 'node'), resolve(dirname(process.execPath), '..', 'include', 'node')]
+    .find((candidate) => existsSync(join(candidate, 'node_api.h')));
   if (!existsSync(source)) throw new Error(`flock source missing at ${source}`);
-  if (!existsSync(join(headers, 'node_api.h'))) {
-    throw new Error(`Node-API headers missing at ${headers}; the bundled node lacks include/node`);
+  if (headers === undefined) {
+    throw new Error('Node-API headers not found in the bundled runtime or the host Node installation');
   }
   mkdirSync(dirname(binary), { recursive: true });
   const args = [
