@@ -25,6 +25,7 @@
     "skipLibCheck": true,
     "paths": {
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-brand": ["../../packages/util/brand/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm": ["../../packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm/types": ["../../packages/llm/llm/lib/types/types.d.ts"],

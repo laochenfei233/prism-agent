@@ -1,7 +1,9 @@
 {
-  // Out of tree and self-contained: the host services this package touches are
-  // typed structurally (see src/client/externals.d.ts), so typecheck needs no
-  // built workspace artifacts and no tsconfig paths facade.
+  // Out of tree: the host services this package touches are typed structurally
+  // (see src/client/externals.d.ts), so the only borrowed declarations are the
+  // baseline modules and `ui-primitives`' nav-icon glyph — run `pnpm run build`
+  // in the checkout first; an unbuilt checkout fails this typecheck with a
+  // missing module rather than a type error.
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],
@@ -17,7 +19,12 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }

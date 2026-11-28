@@ -7,6 +7,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { IconSearchOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createSettingsBridge, type RemoteLike, type SaveRequest } from './bridge.ts'
 import { en, NS, zh } from './locales.ts'
 import { SearchSection } from './SearchSection.tsx'
@@ -21,6 +22,11 @@ export type { SearchLocaleKey } from './locales.ts'
 export { SearchSection } from './SearchSection.tsx'
 export type { SearchSectionProps } from './SearchSection.tsx'
 export { inject } from './services.ts'
+
+/** Nav glyph for the search section; the shell keeps its gear fallback without this seat. */
+function SearchNavIcon({ size }: { size: number; active: boolean }) {
+  return <IconSearchOutlineMedium size={size} />
+}
 
 /**
  * Register the Prism Search settings section.
@@ -41,4 +47,9 @@ export function apply(ctx: Context): void {
       save: (request: SaveRequest) => bridge.save(request),
     }),
   }, SearchSection))
+  ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+    name: 'settings.section.icon',
+    id: 'prism-search',
+    locale: NS,
+  }, SearchNavIcon))
 }

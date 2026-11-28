@@ -8,6 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { IconInfoOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import { AboutSection } from './AboutSection.tsx'
 import { en, NS, zh } from './locales.ts'
 
@@ -18,6 +19,11 @@ export type { AboutUpdateState, ButtonState, DesktopUpdateCarrier, UpdateFailure
 
 /** Services required by the browser half. */
 export const inject = ['slots', 'locale']
+
+/** Nav glyph for the About section; the shell keeps its gear fallback without this seat. */
+function AboutNavIcon({ size }: { size: number; active: boolean }) {
+  return <IconInfoOutlineMedium size={size} />
+}
 
 /**
  * Register the About page.
@@ -33,4 +39,9 @@ export function apply(ctx: Context): void {
     label: () => t('nav'),
     locale: NS,
   }, AboutSection))
+  ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+    name: 'settings.section.icon',
+    id: 'about',
+    locale: NS,
+  }, AboutNavIcon))
 }

@@ -1,4 +1,9 @@
 {
+  // Out of tree and self-contained except for `ui-primitives`, whose nav-icon
+  // glyph and published declarations are borrowed from the checkout's BUILT
+  // output — run `pnpm run build` there first, as `prism-memory` documents; an
+  // unbuilt checkout fails this typecheck with a missing module rather than a
+  // type error.
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],
@@ -13,7 +18,11 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "types": ["node"],
+    "noEmit": true,
+    "paths": {
+      "@deepseek-ai/dsh-client-ui-primitives": ["../../packages/client/ui-primitives/lib/types/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }

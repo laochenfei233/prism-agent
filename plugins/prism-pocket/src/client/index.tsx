@@ -17,6 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: the settings.section SlotMap merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import { IconPaperPlaneOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import { watchActivation } from './activate.ts'
 import { installAdapter } from './adapter.ts'
 import { POCKET_CSS } from './css.ts'
@@ -24,6 +25,11 @@ import { en, NS, zh, type PocketLocaleKey } from './locales.ts'
 import { installNotify } from './notify.tsx'
 import { installPwa } from './pwa.ts'
 import { PocketSection } from './PocketSection.tsx'
+
+/** Nav glyph for the Pocket section; the shell keeps its gear fallback without this seat. */
+function PocketNavIcon({ size }: { size: number; active: boolean }) {
+  return <IconPaperPlaneOutlineMedium size={size} />
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -77,4 +83,9 @@ export function apply(ctx: Context): void {
     label: () => t('nav'),
     locale: NS,
   }, PocketSection))
+  ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+    name: 'settings.section.icon',
+    id: 'pocket',
+    locale: NS,
+  }, PocketNavIcon))
 }

@@ -8,6 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { IconArchiveOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createArchivedProjectsSection, type ArchivedProjectsSectionContext } from './ArchivedProjectsSection.tsx'
 import { en, NS, zh } from './locales.ts'
 
@@ -31,11 +32,21 @@ interface ShellSeats {
       seat: { name: 'settings.section'; id: string; order: number; label: () => string; locale: string },
       component: (props: { close: () => void; t: (key: string, params?: Record<string, string | number>) => string }) => unknown,
     ): () => void
+    inject(name: 'settings.section.icon', register: () => () => void): void
+    register(
+      seat: { name: 'settings.section.icon'; id: string; locale: string },
+      component: (props: { size: number; active: boolean }) => unknown,
+    ): () => void
   }
   readonly locale: {
     register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
     bind(namespace: string): (key: string, params?: Record<string, string | number>) => string
   }
+}
+
+/** Nav glyph for the archived-projects section; the shell keeps its gear fallback without this seat. */
+function ArchivedProjectsNavIcon({ size }: { size: number; active: boolean }) {
+  return <IconArchiveOutlineMedium size={size} />
 }
 
 /**
@@ -54,4 +65,9 @@ export function apply(ctx: Context): void {
     label: () => t('nav'),
     locale: NS,
   }, Section))
+  seats.slots.inject('settings.section.icon', () => seats.slots.register({
+    name: 'settings.section.icon',
+    id: 'archived-projects',
+    locale: NS,
+  }, ArchivedProjectsNavIcon))
 }
