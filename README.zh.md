@@ -15,6 +15,11 @@
 
 **Prism Agent** 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）的开箱即用发行版——这是一套构建于 [Cordis](https://github.com/cordiverse/cordis) 之上、「一切皆插件」的智能体框架：框架内核仍是上游的，而 Prism 把它做成了成品——原生桌面壳、一组预装并即插即用的插件、以及与机器上任何其他 harness 构建相互隔离的安装身份。
 
+<p align="center">
+  <img src="./design-assets/readme/demo-getting-started.gif" width="49%" alt="首次启动：预览说明、空会话、模型选择器与设置页。">
+  <img src="./design-assets/readme/demo-in-use.gif" width="49%" alt="日常使用：会话列表、打开的会话，以及一轮实时读文件的智能体任务。">
+</p>
+
 ## 为什么选择 Prism Agent
 
 - **首次启动即可用。** 安装包自带 Node 运行时、完整 Web UI 和十一个插件——会话导入、迁移导出、备份、记忆、会议、聊天机器人、guardrails 等——第一轮对话只需要一个 API key，其余都已就位。
@@ -69,6 +74,20 @@ pnpm dsh web
 | 任务可靠性 | guardrails 做上下文卫生与卡会话提醒；委派子智能体的作业控制；定时跟进。 |
 | 日常整理 | 空闲会话按计划自动归档并可在设置中恢复；「关于」页承载应用内更新。 |
 | 桌面宠物桥 | HachimoDock 可以列出 Prism 会话、打开并引导运行中的智能体。 |
+
+## 界面速览
+
+| 轨迹视图——每一轮、每次工具调用与耗时都在一条可审计的时间线上 | 深色模式——完整 UI，展示同一会话 |
+| --- | --- |
+| <img src="./design-assets/readme/feature-trajectory.png" width="100%" alt="轨迹视图：逐条列出模型轮次、工具调用与耗时。"> | <img src="./design-assets/readme/feature-dark-conversation.png" width="100%" alt="深色主题下的完整会话，带文件引用与逐轮用量。"> |
+
+| 自动化任务——一键模板的定时任务 | 插件——内置与实验性插件卡片 |
+| --- | --- |
+| <img src="./design-assets/readme/feature-automation.png" width="100%" alt="自动化任务页与八张推荐定时任务模板。"> | <img src="./design-assets/readme/feature-plugins.png" width="100%" alt="插件页：内置配置与实验性插件卡片。"> |
+
+| 模型——提供方、语音识别与本地模型在同一页 | Agent 预设——标准、PTC、极简、创造四种工作模式 |
+| --- | --- |
+| <img src="./design-assets/readme/feature-settings-models.png" width="100%" alt="模型设置页：模型提供方、语音识别与本地模型三个标签。"> | <img src="./design-assets/readme/feature-settings-presets.png" width="100%" alt="Agent 预设页的四张预设卡片。"> |
 
 ## 工作原理
 

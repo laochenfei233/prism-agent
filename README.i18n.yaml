@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
 /prism-agent:
-  en: 8014a81e8a1ea3c4
-  zh: 4f7fadbf2d3b3d20
+  en: 21c6419ccf506992
+  zh: beabd7a6b56ee37a
 /prism-agent/why-prism-agent:
   en: 608597d8a50a4e07
   zh: afc586359ea98739
@@ -23,6 +23,9 @@
 /prism-agent/what-s-in-the-box:
   en: b7d3fd60500bac8f
   zh: 4a371910bf84cff9
+/prism-agent/a-quick-tour:
+  en: 8389b9393d29f35f
+  zh: 449deaa3c47c657d
 /prism-agent/how-it-works:
   en: 81090fd0f6cdd3e1
   zh: ee91ba181cd200b7

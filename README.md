@@ -15,6 +15,11 @@ English | [中文](README.zh.md)
 
 **Prism Agent** is an out-of-the-box distribution of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`), the everything-is-a-plugin agent harness built on [Cordis](https://github.com/cordiverse/cordis): the harness stays the engine, and Prism turns it into a finished product — a native desktop shell, a curated set of plugins preinstalled and wired on first launch, and an install identity isolated from every other harness build on the machine.
 
+<p align="center">
+  <img src="./design-assets/readme/demo-getting-started.gif" width="49%" alt="First launch: the preview notice, an empty session, the model picker, and the settings dialog.">
+  <img src="./design-assets/readme/demo-in-use.gif" width="49%" alt="Daily use: the session list, an opened conversation, and a live agent round reading todo.txt.">
+</p>
+
 ## Why Prism Agent
 
 - **Ready on first launch.** The installer bundles the Node runtime, the full web UI, and eleven plugins — conversation import, transfer, backup, memory, meetings, chat bots, guardrails, and more — so the first conversation needs an API key and nothing else.
@@ -69,6 +74,20 @@ Review the [safety notice](SAFETY.md) before running the project.
 | Task reliability | Guardrails for context hygiene and stuck-session nudges; job controls for delegated subagents; scheduled follow-ups. |
 | Housekeeping | Idle conversations auto-archive on a schedule and restore from Settings; the About page carries in-app updates. |
 | Desktop pet bridge | HachimoDock lists Prism sessions, opens them, and steers the running agent. |
+
+## A quick tour
+
+| Trajectory — every round, tool call, and timing on one auditable timeline | Dark mode — the full UI, showing the same conversation |
+| --- | --- |
+| <img src="./design-assets/readme/feature-trajectory.png" width="100%" alt="The trajectory view listing each model round, tool call, and timing."> | <img src="./design-assets/readme/feature-dark-conversation.png" width="100%" alt="The dark theme showing a finished conversation with file references and per-turn usage."> |
+
+| Automation — scheduled jobs with one-click templates | Plugins — built-in and experimental cards |
+| --- | --- |
+| <img src="./design-assets/readme/feature-automation.png" width="100%" alt="The automation page with eight recommended scheduled job templates."> | <img src="./design-assets/readme/feature-plugins.png" width="100%" alt="The plugins page listing built-in configuration and experimental plugin cards."> |
+
+| Models — providers, speech recognizers, and local models in one page | Agent presets — standard, PTC, minimal, and creative working modes |
+| --- | --- |
+| <img src="./design-assets/readme/feature-settings-models.png" width="100%" alt="The Models settings page with provider, speech recognition, and local model tabs."> | <img src="./design-assets/readme/feature-settings-presets.png" width="100%" alt="The Agent preset page with four preset cards."> |
 
 ## How it works
 
