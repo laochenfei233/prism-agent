@@ -234,13 +234,13 @@ describe('write scope matching', () => {
     expect(PrismTeam.withinScopes(ROOT, 'src/a.ts', ['src'])).toBe(true)
     expect(PrismTeam.withinScopes(ROOT, `${ROOT}/src/deep/b.ts`, ['src/'])).toBe(true)
     expect(PrismTeam.withinScopes(ROOT, 'srcx/a.ts', ['src'])).toBe(false)
-    expect(PrismTeam.withinScopes(ROOT, 'docs/a.md', ['src'])).toBe(false)
+    expect(PrismTeam.withinScopes(ROOT, 'assets/a.md', ['src'])).toBe(false)
     expect(PrismTeam.withinScopes(ROOT, '../../outside.ts', ['src'])).toBe(false)
   })
 
   it('compares a path inside a teammate worktree against the same scopes', () => {
     expect(PrismTeam.withinScopes(ROOT, '.worktrees/team-01234567-one/src/a.ts', ['src'])).toBe(true)
-    expect(PrismTeam.withinScopes(ROOT, '.worktrees/team-01234567-one/docs/a.md', ['src'])).toBe(false)
+    expect(PrismTeam.withinScopes(ROOT, '.worktrees/team-01234567-one/assets/a.md', ['src'])).toBe(false)
   })
 })
 
@@ -357,7 +357,7 @@ describe('write scope', () => {
     const inside = await executeAs(ctx, agents[1]!, 'c1', 'write', { file_path: 'src/a.ts' })
     expect(inside.isError, textOf(inside)).toBe(false)
 
-    const outside = await executeAs(ctx, agents[1]!, 'c2', 'write', { file_path: 'docs/a.md' })
+    const outside = await executeAs(ctx, agents[1]!, 'c2', 'write', { file_path: 'assets/a.md' })
     expect(outside.isError).toBe(true)
     expect(textOf(outside)).toContain('outside the write scopes')
   })
@@ -365,14 +365,14 @@ describe('write scope', () => {
   it('leaves the Lead alone', async () => {
     const { ctx, agents } = await harness()
     registerWrite(ctx)
-    const result = await executeAs(ctx, agents[0]!, 'c1', 'write', { file_path: 'docs/a.md' })
+    const result = await executeAs(ctx, agents[0]!, 'c1', 'write', { file_path: 'assets/a.md' })
     expect(result.isError, textOf(result)).toBe(false)
   })
 
   it('lets an out-of-scope write through and records it under observe', async () => {
     const { ctx, agents } = await harness({ mode: 'observe' })
     registerWrite(ctx)
-    const result = await executeAs(ctx, agents[1]!, 'c1', 'write', { file_path: 'docs/a.md' })
+    const result = await executeAs(ctx, agents[1]!, 'c1', 'write', { file_path: 'assets/a.md' })
     expect(result.isError, textOf(result)).toBe(false)
     expect(await run(ctx, agents[0]!, '/team')).toContain('observed  reviewer')
   })

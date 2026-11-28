@@ -14,7 +14,7 @@
 import { defineConfig } from 'tsdown'
 
 /** Package name; also the module-table row id the browser half registers under. */
-const ID = 'prism-team'
+const ID = '@prism/prism-team'
 
 /** Shell-seeded specifiers the browser half must not inline (see `packages/client/web/src/platform.ts`). */
 const BASELINE = ['react', 'react/jsx-runtime', '@deepseek-ai/cordis']

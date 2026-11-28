@@ -1,6 +1,31 @@
+---
+description: "把一棵已启用的子智能体树变成受管团队：每个 teammate 一个 worktree、结构化报告、需要人介入的清单，以及强制写作用域。"
+kind: "package-bundle"
+---
+
 # prism-team
 
 [English](README.md) | 中文
+
+## 概述
+
+`@prism/prism-team` 把一棵已启用的子智能体树变成受管团队：根 Agent 是 Lead，每个可延续的后代都成为有自己的 `git worktree` 与分支的 teammate；Lead 接收结构化报告、需要人介入的成员清单，并受强制写作用域约束。
+
+## 目录
+
+- [能力](#能力)
+- [要求](#要求)
+- [安装](#安装)
+- [配置](#配置)
+- [成员得到什么](#成员得到什么)
+- [会话头部入口](#会话头部入口)
+- [写入范围](#写入范围)
+- [worktree](#worktree)
+- [开发备注](#开发备注)
+- [模型体验](#模型体验)
+- [已知限制与延期工作](#已知限制与延期工作)
+
+## 能力
 
 Prism Team 在 Agent Teams 包之外补上四项能力，且不改动它们：
 
@@ -82,7 +107,61 @@ teammate 创建时，bundle 会在 `<Lead cwd>/.worktrees/team-<team>-<name>` �
 
 没有任何自动删除：一个未评审的 worktree 可能就是成员的成果。`/team` 与成员段落都会带路径；清理靠手工 `git worktree remove <path>`。
 
-## 已知限制
+## 开发备注
+
+### 测试
+
+```sh
+npm test    # vitest run --config vitest.config.ts
+```
+
+测试套件用真实的工具、system-prompt、会话与命令注册表，对 Team 与 subagent 服务打桩，因此它检验的是本 bundle 自己的决策，而不是团队领域本身。
+
+## 模型体验
+
+### 结构化报告
+
+#### 模型看到什么
+
+`team_report` 返回一条状态消息，作为单独一条进入 Lead 的收件箱。报告的持久副本就是这条消息；本插件的账本在内存中，重启后不重建。
+
+#### Token 影响
+
+报告作为一条保留消息进入 Lead 的收件箱；汇报方 teammate 在自己的历史里看到调用的工具结果。
+
+#### KV Cache 影响
+
+收件箱消息追加进 Lead 的保留历史；没有任何东西重新发布更早的上下文，内存账本本身也不向上下文添加内容。
+
+### /team 清单
+
+#### 模型看到什么
+
+`/team` 先列出 blocked、failed、ready、waiting 的成员，再列健康成员；健康的团队只占一行。在 `observe` 模式下，每个成员小节标注自己的模式，被观察的写入以 observed 行列出。
+
+#### Token 影响
+
+清单是发起会话的一条保留命令结果，长度随名册与任务数增长，每个成员一行。
+
+#### KV Cache 影响
+
+与所有命令结果一样追加进发起会话的保留历史；重复调用各自追加自己的结果。
+
+### 写作用域
+
+#### 模型看到什么
+
+teammate 写入其认领任务作用域之外的路径会失败，消息指明该写入在写作用域之外并转入审批；Lead 自己的写入不检查。`observe` 模式下同样的写入会放行并被记录。
+
+#### Token 影响
+
+拒绝即 write 工具在 teammate 历史里的错误结果；审批请求走审批流程呈现，而不是作为模型上下文出现。
+
+#### KV Cache 影响
+
+拒绝追加进 teammate 的保留历史；没有任何东西重新发布更早的上下文。
+
+## 已知限制与延期工作
 
 - **worktree 是劝告，不是隔离。** 会话的工作目录在创建时就已固定，bundle 无法把成员的 cwd 切到它的 worktree。teammate 必须用绝对路径在 worktree 内工作；共享 checkout 依然可写。worktree 带来的变化真实但狭窄：每个成员终于有一个可以提交、可以 `git diff` 的专属 checkout。
 - **台账在内存里。** 它回答「团队现在什么样」，重启即失。出树插件写不了 Session 事件，所以汇报的持久副本是 Lead 收件箱里的那条消息。
@@ -90,11 +169,3 @@ teammate 创建时，bundle 会在 `<Lead cwd>/.worktrees/team-<team>-<name>` �
 - **`/team` 只读团队服务暴露的内容。** 它列出名册、任务与本 bundle 的台账；不会总结某个 teammate 自己的会话。
 - **没有 Web 写入路径。** 头部面板只读；认领、完成、改派留在模型工具里，因为它们需要活的 Agent 与 Lead 权限。
 - **头部 chip 不隐藏自己。** 没有团队的会话仍显示团队 chip；打开它得到空状态，而不是 chip 消失，这样头部在不同会话之间保持稳定。
-
-## 测试
-
-```sh
-npm test    # vitest run --config vitest.config.ts
-```
-
-测试套件用真实的工具、system-prompt、会话与命令注册表，对 Team 与 subagent 服务打桩，因此它检验的是本 bundle 自己的决策，而不是团队领域本身。

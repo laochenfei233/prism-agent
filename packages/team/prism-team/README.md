@@ -1,6 +1,31 @@
+---
+description: "Turn an enabled subagent tree into a managed team: worktree-per-teammate, structured reports, a needs-a-person list, and an enforced write scope."
+kind: "package-bundle"
+---
+
 # prism-team
 
 English | [中文](README.zh.md)
+
+## Summary
+
+`@prism/prism-team` turns an enabled subagent tree into a managed team: the root Agent is the Lead, each continuable descendant becomes a teammate with its own `git worktree` and branch, and the Lead receives structured reports, a needs-a-person list, and enforced write scopes.
+
+## Table of Contents
+
+- [Capabilities](#capabilities)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Configuration](#configuration)
+- [What a member gets](#what-a-member-gets)
+- [The header entry](#the-header-entry)
+- [The write scope](#the-write-scope)
+- [The worktree](#the-worktree)
+- [Dev Note](#dev-note)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+
+## Capabilities
 
 Prism Team adds four capabilities the Agent Teams packages leave open, without changing them:
 
@@ -82,7 +107,61 @@ On a teammate's creation the bundle prepares `<Lead cwd>/.worktrees/team-<team>-
 
 Nothing removes a worktree automatically: an unreviewed checkout may be the member's only result. `/team` and the member section carry the path; removal is `git worktree remove <path>` by hand.
 
-## Known limitations
+## Dev Note
+
+### Tests
+
+```sh
+npm test    # vitest run --config vitest.config.ts
+```
+
+The suite drives the real tools, system-prompt, session, and command registries against stubbed Team and subagent services, so it exercises this bundle's own decisions rather than the team domain.
+
+## Model Experience
+
+### Structured reports
+
+#### What the model sees
+
+`team_report` returns one status message that lands in the Lead's inbox as a single item. The durable copy of a report is that message; the bundle's ledger is in memory and rebuilds nothing on restart.
+
+#### Token effect
+
+The report lands in the Lead's inbox as one retained message, and the reporting teammate sees the call's tool result in its own history.
+
+#### KV Cache effect
+
+The inbox message appends to the Lead's retained history; nothing republishes earlier context, and the in-memory ledger adds nothing of its own to context.
+
+### The /team list
+
+#### What the model sees
+
+`/team` prints blocked, failed, ready, and waiting members before working ones; a healthy team takes one line. Under `observe`, each member section states its mode and observed writes print as observed rows.
+
+#### Token effect
+
+The listing is one retained command result in the invoking session; its length grows with roster and task count, one line per member.
+
+#### KV Cache effect
+
+Like any command result it appends to the invoking session's retained history; repeated calls each add their own result.
+
+### Write scope
+
+#### What the model sees
+
+A teammate's write outside the scopes of its claimed task fails with a message naming the write as outside the write scopes and routes to approval; the Lead's own writes never check. In `observe` mode the same write passes and is recorded.
+
+#### Token effect
+
+The refusal is the write tool's error result in the teammate's history; an approval request surfaces through the approval flow rather than as model context.
+
+#### KV Cache effect
+
+The refusal appends to the teammate's retained history; nothing republishes earlier context.
+
+## Known Limitations and Deferred Work
 
 - **The worktree is advice, not confinement.** A session's working directory is fixed at creation, and the bundle cannot switch a member's cwd to its worktree. A teammate must address files with absolute paths inside its worktree; the shared checkout stays writable. What the worktree changes is real but narrow: each member finally has its own checkout it can commit and `git diff` in.
 - **The ledger is in memory.** It answers "what does the team look like right now" and disappears on restart. An out-of-tree plugin cannot write Session events, so the durable copy of a report is the message in the Lead's inbox.
@@ -90,11 +169,3 @@ Nothing removes a worktree automatically: an unreviewed checkout may be the memb
 - **`/team` reads what the team service exposes.** It lists roster, tasks, and this bundle's ledger; it does not summarize a teammate's own conversation.
 - **No Web write path.** The header panel is read-only; claiming, completing, and reassigning stay in the model's tools, because they need a live Agent and Lead authority.
 - **The header chip does not hide itself.** A session with no team still shows the Team chip; opening it answers with the empty state rather than the chip disappearing, so the header stays stable across sessions.
-
-## Tests
-
-```sh
-npm test    # vitest run --config vitest.config.ts
-```
-
-The suite drives the real tools, system-prompt, session, and command registries against stubbed Team and subagent services, so it exercises this bundle's own decisions rather than the team domain.
