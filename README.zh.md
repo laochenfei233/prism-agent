@@ -20,6 +20,8 @@
   <img src="./design-assets/readme/demo-in-use.gif" width="49%" alt="日常使用：会话列表、打开的会话，以及一轮实时读文件的智能体任务。">
 </p>
 
+<p align="center"><sub>录制自真实的 hub、真实 API key 与真实模型轮次；播放速度为实时的 2 倍与 3 倍。</sub></p>
+
 ## 为什么选择 Prism Agent
 
 - **首次启动即可用。** 安装包自带 Node 运行时、完整 Web UI 和十一个插件——会话导入、迁移导出、备份、记忆、会议、聊天机器人、guardrails 等——第一轮对话只需要一个 API key，其余都已就位。

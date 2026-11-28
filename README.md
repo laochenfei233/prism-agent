@@ -20,6 +20,8 @@ English | [中文](README.zh.md)
   <img src="./design-assets/readme/demo-in-use.gif" width="49%" alt="Daily use: the session list, an opened conversation, and a live agent round reading todo.txt.">
 </p>
 
+<p align="center"><sub>Recorded against a real hub, a real API key, and real model rounds; playback is 2× and 3× faster than real time.</sub></p>
+
 ## Why Prism Agent
 
 - **Ready on first launch.** The installer bundles the Node runtime, the full web UI, and eleven plugins — conversation import, transfer, backup, memory, meetings, chat bots, guardrails, and more — so the first conversation needs an API key and nothing else.
